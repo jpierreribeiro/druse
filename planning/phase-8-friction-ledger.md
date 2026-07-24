@@ -179,12 +179,15 @@ caught it.)
 | **8. Public cost / reversibility** | No public API change — it is internal request handling, behaviour-only. The cost is transport work (recognize the header; optionally emit a `100 Continue` line). Reversible; no signature moves. It should be measured against the C-0x wire tests so the interim response does not disturb the single-commit/response model. |
 | **9. RED test** | A raw-wire test: send `POST` with `Expect: 100-continue` and a body over `max_body`; assert the server reads the body and the handler runs (spool created), rather than answering `417` — RED today (`417`, body unread), GREEN after. It distinguishes *improvement* (default clients can upload large bodies) from *preference* (whether a real `100 Continue` interim is sent is a sub-choice; either honoring or ignoring passes). |
 
-**Disposition:** RECORDED with **live provenance** — found proving the spool path
-on deployment #2 (a 5 MiB curl upload got `417`; the same upload with `-H
-"Expect:"` got `201 spooled=true`). The spool path is correct; the gap is the
-transport's hard `417` to a universal expectation. Browsers are unaffected; CLI
-and server-to-server clients need the header stripped. **Not applied in Phase 8;
-carried for the owner's review** as a transport-level robustness fix.
+**Disposition:** **RESOLVED by corrective WP C6 (2026-07-24).** The adapter now
+honors `Expect: 100-continue` by reading the body (RFC 9110 §10.1.1) instead of a
+hard 417 — no interim `100 Continue` is sent (the vendored auto-continue stays
+off), the client sends its body after its short continue timeout, and the handler
+runs. Any other expectation is still 417. A default-client large upload (curl,
+python-requests) no longer needs `-H "Expect:"`. Pinned by the re-aimed wire
+corpus (`tests/wp9-wire`, socket) + `check_c6_controls.sh`, Amendment 36.
+(Originally RECORDED with live provenance — a 5 MiB curl upload got 417 on
+deployment #2 until the header was stripped.)
 
 ---
 

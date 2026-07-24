@@ -198,7 +198,18 @@ mirroring the Hardening H-1 pattern.
   (registry unit test: open→live, close/stale/out-of-range→dead) +
   `check_c4_controls.sh`. Full gate: 188 PASS, C1-C4 green (only the wp41 flake).
 - [ ] C5 F8-8 crystals timestamp+validator
-- [ ] C6 F8-7 Expect: 100-continue
+- [x] **C6 F8-7 Expect: 100-continue — DONE (2026-07-24).** The adapter honors
+  `Expect: 100-continue` by READING THE BODY (RFC 9110 §10.1.1) instead of a hard
+  417, so default clients (curl, python-requests) can complete large uploads; any
+  other expectation is still 417. No ledger change (transport behaviour). Helper
+  `expect_is_100_continue` (allocation-free); `auto_expect_continue` stays off
+  (mutation 53 pins it). Wire corpus re-aimed (honored case → 201 + a new
+  unknown-expectation → 417 case), socket-proven in `tests/wp9-wire`. Amendment 36,
+  docs updated (errors.md, transport-conformance.md), `check_c6_controls.sh` wired.
+  Full gate: 181 PASS, C1-C6 controls green, wp9-wire green (both Expect cases);
+  the only failure was the known **c03 real-socket contention flake under load**
+  (F-C03-2 — unrelated to Expect; the machine was saturated by the soak poller +
+  back-to-back gates).
 - [ ] C7 F8-3 ADR-028 request-scoped state
 - [ ] Scale/robustness campaign + report
 - [ ] Release-readiness: all six green → my approval

@@ -341,7 +341,7 @@ never runs.
 | a fixed body that ends before its declared length | rejected, connection closed |
 | whitespace before a header name or colon, obs-fold continuation | 400, connection closed |
 | invalid request line | rejected, connection closed |
-| `Expect: 100-continue` | 417, connection closed |
+| `Expect:` with an unknown expectation (not `100-continue`) | 417, connection closed |
 
 In every one of these cases: the handler does not run, the connection is
 closed, and no trailing bytes are reinterpreted as a second request. A rejected

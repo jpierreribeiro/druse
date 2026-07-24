@@ -2312,3 +2312,34 @@ so a hub still prunes on a `Closed` send too — belt and suspenders.
 | `stream_live` | A | C4 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c4-stream-live/stream_live_test.odin::c4_is_live_tracks_open_and_close` (registry: open→live, close/stale/out-of-range→dead) + `::c4_public_stream_live_false_for_zero_value` | `docs/ai-context.md::web.stream_live` | read-only disconnect predicate; mirrors the send admission guard; true-over-the-wire path is a socket exercise |
 
 **Rollback.** Reversible before release. Fourth of the C1..C7 corrective batch.
+
+## Amendment 36 — Corrective WP C6 (friction F8-7): `Expect: 100-continue` honored
+
+**Date: 2026-07-24. Authority: the Corrective Program, owner-mandated.**
+**Ledger effect: NONE — no public symbol changes.** This is a TRANSPORT BEHAVIOUR
+amendment (like Amendment 26): the public signature snapshot is unchanged.
+
+**WHAT CHANGES.** The WP9-D5 rule refused every `Expect` with **417** before
+reading anything. Proof-by-use (Phase 8, deployment #2) found that this breaks
+default clients: curl and python-requests add `Expect: 100-continue` for a large
+upload, and the hard 417 failed exactly the spooled-upload path (`web.enable_upload`)
+it exists to serve — a 5 MiB attachment got a 417 until the header was stripped.
+
+Corrective WP C6 makes the adapter **honor `100-continue` by reading the body**:
+per RFC 9110 §10.1.1 a server that will not send the interim `100 Continue` may
+simply read the body, so the request proceeds and the handler runs. The vendored
+`auto_expect_continue` stays **off** (it blocked waiting for a body that may never
+arrive — mutation 53 still pins that), and no interim response is emitted; the
+client sends its body after its short continue timeout. **Any other expectation**
+the server cannot meet is still **417**, as the RFC requires.
+
+**Evidence.** `tests/support/transport_conformance/corpus.odin` (wire corpus): the
+old case *"Expect: 100-continue is refused with 417"* is re-aimed to *"Expect:
+100-continue is honored — body read, handler runs (C6)"* (a real body, → 201,
+handler runs), and a new case *"an unknown Expect is still refused with 417"*
+preserves the 417 branch. Both run in `tests/wp9-wire` (real socket). The
+`auto_expect_continue = false` control (`check_public_api.sh` 11a) and mutation 53
+are unchanged. Adapter helper: `expect_is_100_continue` (allocation-free).
+
+**Rollback.** Reversible before release (restore the unconditional 417). Fifth of
+the C1..C7 corrective batch.

@@ -363,17 +363,55 @@ runtime_handler :: proc(runtime: ^Server_Runtime) -> http.Handler {
 	return h
 }
 
+// expect_is_100_continue reports whether an `Expect` header value is exactly the
+// `100-continue` expectation (case-insensitive, surrounding optional whitespace
+// trimmed). Allocation-free — the transport path must not allocate on a header a
+// client controls (corrective WP C6).
+@(private)
+expect_is_100_continue :: proc(value: string) -> bool {
+	s := value
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
+		s = s[1:]
+	}
+	for len(s) > 0 && (s[len(s) - 1] == ' ' || s[len(s) - 1] == '\t') {
+		s = s[:len(s) - 1]
+	}
+	target := "100-continue"
+	if len(s) != len(target) {
+		return false
+	}
+	for i in 0 ..< len(s) {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 32
+		}
+		if c != target[i] {
+			return false
+		}
+	}
+	return true
+}
+
 @(private)
 catch_all :: proc(runtime: ^Server_Runtime, req: ^http.Request, res: ^http.Response) {
-	// WP9 D5 — `Expect: 100-continue` is refused before anything is read. This
-	// is a PROTOCOL error handled by the adapter rather than by the core (D6):
-	// there is no framework-owned request yet, so there is no envelope to write.
-	// The handler never runs and the server never waits for a body.
+	// Corrective WP C6 (friction F8-7). `Expect: 100-continue` is the universal
+	// HTTP/1.1 large-upload mechanism; the WP9-D5 behaviour of refusing it with 417
+	// broke default clients (curl, python-requests) for exactly the spooled-upload
+	// path it exists to serve. RFC 9110 §10.1.1 lets a server that will not send
+	// the interim `100 Continue` simply READ THE BODY, so `100-continue` is now
+	// IGNORED and the request proceeds — the client sends its body after its short
+	// continue timeout. No interim response is emitted (the vendored
+	// `auto_expect_continue` stays off — it blocked waiting for a body that may
+	// never arrive). Any OTHER expectation is unknown and still a 417, as the RFC
+	// requires: an expectation the server cannot meet is a protocol error handled
+	// by the adapter (D6), with no framework-owned request to write an envelope to.
 	if expect, ok := http.headers_get_unsafe(req.headers, "expect"); ok && len(expect) > 0 {
-		http.headers_set_close(&res.headers)
-		res.status = http.Status.Expectation_Failed
-		http.respond(res)
-		return
+		if !expect_is_100_continue(expect) {
+			http.headers_set_close(&res.headers)
+			res.status = http.Status.Expectation_Failed
+			http.respond(res)
+			return
+		}
 	}
 
 	exchange := new(Exchange, context.temp_allocator)

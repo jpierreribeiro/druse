@@ -1484,11 +1484,14 @@ test -n "${URUQUIM_ADAPTER:-}" ||
 URUQUIM_ADAPTER_CODE="$(sed -E 's://.*$::' "$URUQUIM_ADAPTER")"
 
 # 11a. The backend must not rewrite a method before the core decides (D7), and
-#      must not answer 100-continue on its own (D5).
+#      must not answer 100-continue on its own (D5). Corrective WP C6 (F8-7)
+#      keeps auto_expect_continue OFF — the vendored auto-continue blocked waiting
+#      for a body — but the adapter now HONORS 100-continue by reading the body
+#      (no interim response) instead of a hard 417; other expectations still 417.
 grep -qE 'opts\.redirect_head_to_get = false' <<<"$URUQUIM_ADAPTER_CODE" ||
   fail "redirect_head_to_get must stay false; HEAD must not be silently converted to GET (WP9 D7)"
 grep -qE 'opts\.auto_expect_continue = false' <<<"$URUQUIM_ADAPTER_CODE" ||
-  fail "auto_expect_continue must stay false; Expect is refused with 417, never auto-continued (WP9 D5)"
+  fail "auto_expect_continue must stay false; the vendored auto-continue blocks, so 100-continue is honored by reading the body, not by an interim response (WP9 D5 / C6 F8-7)"
 
 # 11b. The five vendored framing patches are held by EXECUTABLE evidence, not
 #      by the shape of their code (WP16, audit A-10).

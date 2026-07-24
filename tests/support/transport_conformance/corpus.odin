@@ -347,14 +347,27 @@ corpus_storage := []Wire_Case{
 
 		// --- 24-25: Expect and unknown methods ------------------------------
 		{
-			name = "Expect: 100-continue is refused with 417",
+			name = "Expect: 100-continue is honored — body read, handler runs (C6)",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n" +
+			"Content-Length: 16\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n" +
+			`{"name":"grace"}`,
+			outcome = .Ok,
+			allowed_status = {201},
+			handler_must_run = true,
+			connection_must_close = true,
+			notes = "C6 (F8-7): RFC 9110 §10.1.1 lets a server omit the interim 100 and " +
+			"read the body. 100-continue is IGNORED, the body is read, the handler runs. " +
+			"No interim response is emitted.",
+		},
+		{
+			name = "an unknown Expect is still refused with 417",
 			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Length: 2\r\n" +
-			"Expect: 100-continue\r\n\r\n",
+			"Expect: 200-ok\r\n\r\n",
 			outcome = .Rejected,
 			allowed_status = {417},
 			connection_must_close = true,
-			notes = "WP9 D5: Phase 1 implements no interim response; refuse and close, " +
-			"never block waiting for a body.",
+			notes = "C6: only 100-continue is honored; any other expectation the server " +
+			"cannot meet is a 417 (RFC 9110 §10.1.1), refused and closed before a body is read.",
 		},
 		{
 			name = "valid unknown method reaches the core, not a backend 501",

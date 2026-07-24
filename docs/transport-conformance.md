@@ -66,9 +66,14 @@ be answered by the adapter or closed without a response.
 
 ### `Expect: 100-continue`
 
-Refused with **417** and the connection closes. Phase 1 implements no interim
-response flow. The handler does not run, and the server never waits for a body
-that may not arrive.
+**Honored by reading the body** (corrective WP C6, friction F8-7). The framework
+sends **no** interim `100 Continue` — the vendored auto-continue blocked waiting
+for a body that might never arrive, so it stays off — but per RFC 9110 §10.1.1 a
+server may omit the interim response and simply read the body, so the request
+proceeds and the handler runs. A default client (curl, python-requests) that adds
+`Expect: 100-continue` for a large upload sends its body after its short continue
+timeout. **Any other expectation** the server cannot meet is still **417** and the
+connection closes.
 
 ### Unknown methods
 
@@ -94,7 +99,8 @@ only the `Content-Length`/`Transfer-Encoding` safety rules above are.
 | ambiguous framing (CL+TE, duplicate CL, …) | **no** | closes | never |
 | malformed chunked / truncated body | **no** | closes | never |
 | malformed syntax (whitespace, obs-fold, request line) | **no** | closes | never |
-| `Expect: 100-continue` | **no** | closes | never |
+| `Expect: 100-continue` | **yes** (body read; C6) | per `Connection:` | served on keep-alive |
+| `Expect:` unknown expectation | **no** | closes | never |
 
 ## What the bootstrap does not do yet
 
