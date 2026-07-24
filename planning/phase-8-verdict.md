@@ -69,7 +69,7 @@ incl. a spooled >max_body file.
 | **G8-2** Evolvable data | ✅ MET | 7 immutable migrations, checksum-guarded (tamper **refused** live), ≥1 backfill + an expand/contract deployment |
 | **G8-3** Concurrent product correctness | ✅ MET | two-user conflict → 409; blocked queries + pool saturation → fast 503; SSE notify + reconnect; no silent last-write |
 | **G8-4** Operable failure | ✅ MET (core cells) | process kill, PG restart, graceful restart, malformed input — each detected, bounded, recovered with the declared invariant. Network/upload-interruption cells deferred behind the soak |
-| **G8-5** Bounded resources | ✅ MET | named caps measured (pool 8, max_body 4 MiB, attachment 50 MiB, streams); post-drill counters return to baseline; **≥4h soak PASSED (2026-07-24): 2750 cycles, 16745 responses, errors=0, RSS plateaued flat at 41,780 kB after a 12→41 MB warm-up — no runaway growth (<64 MiB); session-expiry boundary uncrossed at 24h TTL, flagged)** |
+| **G8-5** Bounded resources | ✅ MET | named caps measured (pool 8, max_body 4 MiB, attachment 50 MiB, streams); post-drill counters return to baseline; **≥4h soak PASSED (2026-07-24): 2750 cycles, 16745 responses, errors=0, RSS plateaued flat at 41,780 kB after a 12→41 MB warm-up — no runaway growth (<64 MiB); session-expiry boundary then crossed by ops/session-expiry-drill.sh: fresh→200, aged-past-now()→401, re-login→200, revoke→401)** |
 | **G8-6** Joy | ◑ agents MET / human PENDING | 3 agent conditions completed canonical tasks from the public surface without a second architecture; the **human** condition is the owner's |
 | **G8-7** Honest positioning | ✅ on track | see §6; capability claims below match the evidence |
 
