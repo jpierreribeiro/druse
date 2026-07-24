@@ -190,7 +190,13 @@ mirroring the Hardening H-1 pattern.
   77 → 78, union 80. Full ritual (signatures, counts, Amendment 34, RED→GREEN
   `tests/c3-query-opt` + `check_c3_controls.sh`). Full gate: 187 PASS, C1+C2+C3
   green (only the known wp41 timing flake under load).
-- [ ] C4 F8-5 stream_live
+- [x] **C4 F8-5 stream_live — DONE (2026-07-24).** `web.stream_live(s) -> bool`,
+  the read-only disconnect predicate a subscriber registry needs to prune a
+  departed client without sending. Three layers: `internal/stream.is_live`
+  (mirrors the send admission guard) → `transport.stream_live` → the public proc.
+  Ledger 78 → 79, union 81. Full ritual + Amendment 35 + `tests/c4-stream-live`
+  (registry unit test: open→live, close/stale/out-of-range→dead) +
+  `check_c4_controls.sh`. Full gate: 188 PASS, C1-C4 green (only the wp41 flake).
 - [ ] C5 F8-8 crystals timestamp+validator
 - [ ] C6 F8-7 Expect: 100-continue
 - [ ] C7 F8-3 ADR-028 request-scoped state

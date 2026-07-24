@@ -50,6 +50,7 @@ application	proc	stats :: proc() -> Server_Stats
 application	proc	stop :: proc(a: ^App)
 application	proc	stream :: proc(ctx: ^Context, content_type := "") -> (s: Stream, ok: bool)
 application	proc	stream_close :: proc(s: Stream)
+application	proc	stream_live :: proc(s: Stream) -> bool
 application	proc	stream_send :: proc(s: Stream, data: []u8) -> Stream_Send
 application	proc	text :: proc(ctx: ^Context, status: Status, s: string)
 application	proc	trust_proxies :: proc(a: ^App, prefixes: []string)

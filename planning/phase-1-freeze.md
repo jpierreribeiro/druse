@@ -2281,3 +2281,34 @@ PRESENT+malformed (`present=false, ok=false`, a committed 400). It carries no
 | `query_int_opt` | A | C3 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c3-query-opt/contract_test.odin::c3_absent_is_present_false_ok_true` + `::c3_present_valid_carries_the_value` + `::c3_present_malformed_is_a_400` | `docs/ai-context.md::web.query_int_opt` | optional typed query reader; absent ≠ present ≠ malformed; empty value is present-but-malformed (a 400) |
 
 **Rollback.** Reversible before release. Third of the C1..C7 corrective batch.
+
+## Amendment 35 — Corrective WP C4 (friction F8-5): `stream_live`
+
+**Date: 2026-07-24. Authority: the Corrective Program, owner-mandated.**
+**Ledger effect: application 78 → 79.** 79 application + 2 test-support = union
+**81**. One symbol:
+
+```
+application	proc	stream_live :: proc(s: Stream) -> bool
+```
+
+**WHY.** Proof-by-use (Phase 8, WP107) recorded that a stream had no
+client-disconnect signal: an application learned a subscriber had left ONLY when
+a `stream_send` returned `Closed`, so a notification hub could not prune a
+departed idle client without publishing to it, and an idle project accumulated
+dead subscribers against the open-stream cap. `stream_live` is the targeted,
+reversible half the ledger named: a read-only predicate that reports whether a
+stream is still open and would accept a send, so a registry can prune WITHOUT
+sending. It mirrors `stream_send`'s admission guard exactly (generation match,
+`.Open`, not close-requested, not draining), one layer down in the stream
+registry (`internal/stream.is_live`, wrapped by the transport boundary), so a
+stale/reused/closing token answers `false` just as a send would collapse to
+`Closed`. On the in-memory test transport (no real connection) it is always
+`false`; a `true` result is point-in-time (the peer may leave the instant after),
+so a hub still prunes on a `Closed` send too — belt and suspenders.
+
+| Symbol | Ledger | WP | Signature evidence | Behaviour evidence | Doc | Notes |
+|---|---|---|---|---|---|---|
+| `stream_live` | A | C4 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c4-stream-live/stream_live_test.odin::c4_is_live_tracks_open_and_close` (registry: open→live, close/stale/out-of-range→dead) + `::c4_public_stream_live_false_for_zero_value` | `docs/ai-context.md::web.stream_live` | read-only disconnect predicate; mirrors the send admission guard; true-over-the-wire path is a socket exercise |
+
+**Rollback.** Reversible before release. Fourth of the C1..C7 corrective batch.

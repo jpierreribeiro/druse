@@ -127,12 +127,15 @@ confirmation of F8-2's prediction: no public way to emit typed bytes.)
 | **8. Public cost / reversibility** | `web.stream_live` is additive and cheap — it reads liveness the stream layer already tracks, no new lifetime. A periodic-task hook is larger (a scheduling and drain-ordering commitment) and should not be rushed. Recorded as evidence; the targeted `stream_live` is the reversible, low-cost half. |
 | **9. RED test** | For the targeted half: open a stream, simulate the peer's disconnect, and assert `web.stream_live(s) == false` **without** a prior `send` — RED today (no such predicate; disconnect is observable only through a failed send), GREEN after. It distinguishes *improvement* (a registry can prune a gone client proactively) from *preference* (heartbeat cadence, which stays app policy). |
 
-**Disposition:** RECORDED as an evidence/DX finding (kin to F8-3). The board's
-publish-time pruning is correct and sufficient for an active board; the leak is
-real only for idle projects, and closing it fully needs either a small framework
-predicate (`stream_live`) or an app heartbeat thread the framework does not help
-build. **Not applied in Phase 8**; the targeted `stream_live` is offered as the
-cheap, reversible improvement for the owner's review.
+**Disposition:** **RESOLVED by corrective WP C4 (2026-07-24).** `web.stream_live(s)
+-> bool` is the read-only disconnect predicate: a hub can prune a departed
+subscriber WITHOUT sending to it. It mirrors the send admission guard one layer
+down (`internal/stream.is_live`), so a stale/closing/drained token answers false
+just as a send would collapse to `Closed`. The board can prune idle-project
+ghosts at its next re-pin. Pinned by `tests/c4-stream-live` (registry unit test)
++ `check_c4_controls.sh`, Amendment 35. (Originally RECORDED in Phase 8 as the
+cheap, reversible half of the disconnect-signal gap; the heartbeat-cadence part
+stays app policy.)
 
 ---
 

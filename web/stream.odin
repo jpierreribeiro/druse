@@ -106,6 +106,23 @@ stream_close :: proc(s: Stream) {
 	transport.stream_end(s.private.slot, s.private.generation)
 }
 
+// stream_live reports whether this stream is still open and would accept a send
+// (corrective WP C4, friction F8-5). It lets an application prune a departed
+// subscriber from a registry WITHOUT sending to it — the disconnect signal a
+// hub needs that a bare `stream_send` could only give as a side effect. It is
+// read-only, safe from any thread, and answers `false` for the zero value, a
+// closed/drained stream, or a stale (reused-slot) token — the same "not mine"
+// collapse `stream_send` makes. A `true` result is a point-in-time observation:
+// the peer may still leave the instant after, which is why a hub also prunes on
+// a `Closed` send. On the in-memory test transport (no real connection) it is
+// always `false`.
+stream_live :: proc(s: Stream) -> bool {
+	if !s.private.live {
+		return false
+	}
+	return transport.stream_live(s.private.slot, s.private.generation)
+}
+
 // response_stream_headers finishes the framework-owned trailing headers for a
 // stream's committed head, exactly as the buffered responders do (so a stream
 // carries `secure_headers`, the request id and any chain contribution). It adds

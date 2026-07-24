@@ -917,3 +917,16 @@ stream_end :: proc(slot: i32, generation: u64) {
 	}
 	_ = stream.close(reg, stream.Token{slot = slot, generation = generation})
 }
+
+// stream_live reports whether the token still names an open, sendable stream —
+// the boundary wrapper for the public `web.stream_live` (corrective WP C4,
+// friction F8-5). No connection or registry means not live.
+stream_live :: proc(slot: i32, generation: u64) -> bool {
+	sync.lock(&g_server.mutex)
+	defer sync.unlock(&g_server.mutex)
+	reg := g_server.streams
+	if reg == nil {
+		return false
+	}
+	return stream.is_live(reg, stream.Token{slot = slot, generation = generation})
+}

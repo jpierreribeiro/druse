@@ -58,7 +58,7 @@ no recoverable panic (ADR-020). See the appendix.
 - Never emit `web.recovery`, a `recovery` middleware, or advice to "wrap the
   handler to catch the panic". None of it exists, and none of it can.
 
-**Two ledgers.** The application API is exactly **78** symbols (32 frozen in
+**Two ledgers.** The application API is exactly **79** symbols (32 frozen in
 Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 `header`/`bearer_token`, `observe`/`Framework_Event`/`Framework_Error`,
 `logger` and `request_id` from Phase 2, and `route`, `app_with_state`,
@@ -68,8 +68,8 @@ Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 from Phases 5-6, `stream`/`Stream`/`stream_send`/`Stream_Send`/`stream_close` from
 Phase 7, `enable_upload`/`upload`/`upload_persist`/`Upload`/`Upload_Config` from
 Phase 7.5, `stats`/`Server_Stats` from the Closure, `set_header`/`bytes` from
-corrective WP C2, and `query_int_opt` from C3).
-The test-support API is a separate ledger of exactly **2**. Union: **80**. Do not
+corrective WP C2, `query_int_opt` from C3, and `stream_live` from C4).
+The test-support API is a separate ledger of exactly **2**. Union: **81**. Do not
 fold them together and do not invent a third form.
 
 ## Application
@@ -128,6 +128,7 @@ stream(ctx, content_type="") -> (Stream, bool)   open a detached response; then 
 Stream                            an opaque, stale-safe value token (copyable)
 stream_send(s, data) -> Stream_Send   enqueue bounded output from any thread
 Stream_Send                       enum {Sent, Full, Closed}
+stream_live(s) -> bool            is the stream still open? prune a gone subscriber WITHOUT sending (C4)
 stream_close(s)                   end the stream; idempotent
 ```
 
@@ -139,7 +140,10 @@ must declare itself — `text/event-stream` for SSE, `application/json` for a
 chunked JSON feed; empty (the default) adds none. Later code sends on the token from any thread: `web.stream_send`
 copies the bytes into stream-owned storage and never blocks — a full bounded
 queue returns `.Full`, and the application decides whether to retry, drop or
-coalesce. `web.stream_close` writes the terminating chunk. `ok` is `false`
+coalesce. `web.stream_live(s)` reports whether the stream is still open (C4),
+so a subscriber registry can prune a client that has left WITHOUT sending to it;
+it is `false` for a closed/stale stream and on the in-memory transport.
+`web.stream_close` writes the terminating chunk. `ok` is `false`
 when there is no connection to detach (the in-memory `test_request`
 transport) or the open-stream cap is reached; the Handler then falls back to
 an ordinary buffered response. A Handler that never calls `stream` links none

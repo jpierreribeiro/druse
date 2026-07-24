@@ -422,6 +422,26 @@ rebind_wake :: proc(r: ^Registry, tok: Token, wake: Wake_Proc, wake_user: rawptr
 	return true
 }
 
+// is_live reports whether `tok` still names an OPEN stream that would accept a
+// send — the query a subscriber registry needs to prune a departed client WITHOUT
+// sending to it (corrective WP C4, friction F8-5). It mirrors `try_send`'s
+// admission guard exactly (generation match, `.Open`, not close-requested, not
+// draining), read-only and under the slot lock, so a stale/reused/closing token
+// answers false just as a send to it would collapse to `Closed`. Safe from any
+// thread.
+is_live :: proc(r: ^Registry, tok: Token) -> bool {
+	if !r.initialized || tok.slot < 0 || int(tok.slot) >= len(r.slots) {
+		return false
+	}
+	s := &r.slots[tok.slot]
+	sync.mutex_lock(&s.mu)
+	defer sync.mutex_unlock(&s.mu)
+	if s.generation != tok.generation || s.state != .Open || s.close_requested {
+		return false
+	}
+	return !sync.atomic_load(&r.draining)
+}
+
 // retire frees an OWNED slot after the owner's teardown is complete: the
 // terminator is on the wire (or the connection aborted) and no zero-copy view
 // into the slot's ring store can be in flight any more. Owner lane only.
