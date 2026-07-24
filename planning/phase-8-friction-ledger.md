@@ -104,3 +104,26 @@ Two independent needs now point at the same missing surface (a public way to set
 headers, and a public way to emit typed bytes). **Not applied in Phase 8; carried
 for the owner's review**, and a natural pairing with the F8-2 `web.set_header`
 proposal.
+
+---
+
+## F8-5 — no client-disconnect signal for a stream, so a subscriber registry leaks until it next sends
+
+| Field | Value |
+|---|---|
+| **1. Task attempted** | A live board (WP107): a per-project SSE subscription registry (the hub) that fans task changes out to connected browsers, and **prunes a browser that has gone away** so its slot and memory are reclaimed and the open-stream cap is not exhausted by ghosts. |
+| **2. Public API used** | `web.stream`/`stream_send`/`stream_close`; crystals `web/sse` `open`/`send`/`last_event_id`. |
+| **3. Boilerplate / concepts** | A stream is opened in a handler that then returns; the app sends to the token later. There is **no disconnect callback and no "is this stream still connected" query** — the ONLY way the application learns a client left is that a subsequent `send`/`stream_send` returns `Closed`. So the hub can prune a departed client **only when it next publishes to that project**. A project with no activity accumulates dead subscribers indefinitely; each holds a slot against the framework's open-stream cap. Detecting-and-pruning an idle-but-gone client requires the app to send something on a timer — a **heartbeat** — which in turn requires a periodic background task the app must build and shut down itself: the framework offers no ticker, and none that is coordinated with `web`'s drain. |
+| **4. Safety / ownership problem** | No unsafety — `stream_send`/`stream_close` are documented safe from any thread and are idempotent on a stale token. The cost is a **resource leak that the application cannot close through the public surface alone**: without an app-run heartbeat thread, ghosts occupy the bounded stream capacity, and the framework's own cap (`DEFAULT_MAX_STREAMS`) is then consumed by clients that left. The app must additionally coordinate that thread's shutdown with the framework drain, which has no public hook for "drain starting". |
+| **5. Workaround** | The board prunes **on publish** (a `Closed` send drops the subscriber — implemented in `board/hub.odin hub_publish`) and closes every remaining stream at `application_destroy`. Idle-subscriber pruning via a heartbeat thread is a **recorded follow-up**, deferred because it needs its own `core:thread` + a shutdown handshake the framework does not expose. Reconnect is handled by nudging a Last-Event-ID client to refetch (`hub_resync`), not by replaying an event log. |
+| **6. Application-specific?** | **Split, stated honestly.** The heartbeat *interval and content* are legitimately application policy (the framework should not dictate them). What is **not** application-specific is (a) the absence of any disconnect signal or liveness query on a stream — every streaming app that keeps a registry hits this — and (b) the absence of a drain-coordinated periodic hook, so the required heartbeat thread must reinvent shutdown coordination each time. |
+| **7. Smallest candidate improvement** | Either (a) a **disconnect callback / liveness predicate** on a stream, so a registry can prune without sending — e.g. `web.stream_live(s) -> bool` backed by the state `stream_send` already checks; and/or (b) a documented, drain-aware **periodic-task hook** (a callback the framework invokes on an interval on a framework-managed lane, stopped as part of drain), which the heartbeat and other housekeeping would use. (a) is the smaller, more targeted add and directly closes the leak. |
+| **8. Public cost / reversibility** | `web.stream_live` is additive and cheap — it reads liveness the stream layer already tracks, no new lifetime. A periodic-task hook is larger (a scheduling and drain-ordering commitment) and should not be rushed. Recorded as evidence; the targeted `stream_live` is the reversible, low-cost half. |
+| **9. RED test** | For the targeted half: open a stream, simulate the peer's disconnect, and assert `web.stream_live(s) == false` **without** a prior `send` — RED today (no such predicate; disconnect is observable only through a failed send), GREEN after. It distinguishes *improvement* (a registry can prune a gone client proactively) from *preference* (heartbeat cadence, which stays app policy). |
+
+**Disposition:** RECORDED as an evidence/DX finding (kin to F8-3). The board's
+publish-time pruning is correct and sufficient for an active board; the leak is
+real only for idle projects, and closing it fully needs either a small framework
+predicate (`stream_live`) or an app heartbeat thread the framework does not help
+build. **Not applied in Phase 8**; the targeted `stream_live` is offered as the
+cheap, reversible improvement for the owner's review.
