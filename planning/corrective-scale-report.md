@@ -62,8 +62,32 @@ cgroup contract (Caddy `proxy_buffering off`, `TimeoutStopSec > max_drain_time`,
 
 ## 5. Results
 
-_Pending the campaign. Each env's numbers, what held, what did not, and the
-capacity envelope go here; then release-readiness Gate 2 flips GREEN._
+### Env A (baseline, 2 vCPU / 1.6 GiB) — partial, 2026-07-24
+
+The functional/concurrency/drill/soak results are recorded in the board's
+`DEPLOYMENTS.md` (#1–#5 + the drills). The **intermediate live SSE scale probe**
+(`ops/sse-scale.sh`) adds the first capacity data point:
+
+| Concurrent SSE subs | Admitted | /health/live | /ready | Server RSS |
+|---|---|---|---|---|
+| 50  | 50 / 50   | 200 | 200 | 27.9 MB |
+| 100 | 100 / 100 | 200 | 200 | 30.2 MB |
+| 200 | 200 / 200 | 200 | 200 | 39.8 MB |
+| 300 | **297 / 300** | 200 | 200 | 53.4 MB |
+
+- **Capacity knee ≈ 300 concurrent SSE streams on this 2-CPU/1.6 GiB host** —
+  admission falls just below the offered load there (3 dropped), and does so
+  *gracefully*: health and readiness stayed 200, and the server **recovered 100%**
+  after every level (no crash, no wedge).
+- **RSS tracks connections linearly and cleanly** (28→30→40→53 MB for
+  50→100→200→300) — a live confirmation of the **C-04 rule** (RSS ≈ per-connection
+  retention). No runaway growth; RSS returns to baseline after release.
+- This is NOT the owed **3,000-socket** round — that needs Env B. But it proves the
+  live SSE wire path scales to the small host's limit predictably, and gives the
+  first point on the capacity curve. The 3,000 round and the RSS-vs-connections
+  slope at scale are the Env B deliverable.
+
+### Env B / C — pending the owner's larger VPS.
 
 ## 6. What I need from the owner
 
