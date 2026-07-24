@@ -79,3 +79,28 @@ requires; the application does not smuggle an extension bag into `Context`"). Th
 board honors ADR-028 — no `Context` bag — and pays the repetition explicitly.
 One data point toward reopening ADR-028; **not** a Phase-8 change. Revisit when
 WP105–108 add more protected handlers and the cluster is larger.
+
+---
+
+## F8-4 — no buffered binary response body, so an authenticated file download is not expressible
+
+| Field | Value |
+|---|---|
+| **1. Task attempted** | Serve a task attachment's bytes for download (WP106): `GET /attachments/:id`, authorized by project role, returning the stored file with its `Content-Type` and a safe `Content-Disposition: attachment; filename="…"`. |
+| **2. Public API used** | The public responders `web.json`/`web.text`/`web.ok`/`web.created`/`web.no_content`; `web.stream`; `web.static`. |
+| **3. Boilerplate / concepts** | There is **no buffered binary responder**. `web.text` sends `text/plain` and copies a *string*; `web.json` marshals a value; neither emits arbitrary bytes with a chosen media type. The only way to put non-JSON/non-text bytes on the wire is `web.stream`, which is the **SSE/chunked** substrate: it commits **200 only** (no 404/403 on the stream head), sets **no `Content-Length`** (always chunked), enforces a **bounded queue** (`stream_send` returns `Full` — designed for backpressured feeds, not a bulk file), and — like every path — **cannot set `Content-Disposition`** (friction F8-2). `web.static` serves a directory of files but has **no authorization hook** and no per-file disposition, so it cannot gate a download by project role. |
+| **4. Safety / ownership problem** | A file download that cannot set `Content-Disposition: attachment` invites the browser to render attacker-controlled content **inline** (an HTML/SVG attachment becomes stored XSS on the app's origin) and loses the download filename. And an authorized download cannot be built on `web.static` at all (no auth). So the safe, ordinary shape — auth-gated bytes with a disposition — has no public expression. |
+| **5. Workaround** | **None acceptable.** The board serves attachment **metadata** as JSON (`GET /attachments/:id` returns id/filename/content_type/byte_size/…) and records this finding rather than mislead. Considered and rejected: (a) `web.stream` — misframes a bulk download as a chunked feed, can't set the filename, and its `Full` backpressure would truncate or wedge a handler lane on a large file; (b) `web.static` over the storage dir — bypasses the whole WP104 authorization model and exposes the generated storage names. |
+| **6. Application-specific?** | **No.** Returning bytes with a content type (a PDF, an image, a CSV export) is a universal server capability, needed by essentially every application that stores files or generates reports. The board's own WP106 attachment feature — a core plan requirement ("static download policy and safe content disposition") — is **half-built**: upload works end-to-end (buffered and spool), download does not. |
+| **7. Smallest candidate improvement** | Two additions, composable with F8-2's `web.set_header`: (a) a buffered binary responder, e.g. `web.bytes(ctx, status, content_type, data)` — the exact shape of `web.text` but with a caller-chosen media type and a `[]u8` body (the `Response` already owns an arbitrary `[]u8`; only the public entry point is missing); (b) the header API of F8-2 so `Content-Disposition` (and `Cache-Control`) can be set. With both, an auth-gated download is `require_role(...); web.set_header(ctx, "Content-Disposition", …); web.bytes(ctx, .OK, ct, data)`. |
+| **8. Public cost / reversibility** | Additive: one new responder over the existing owned-body commit path, no change to any current responder or to the ownership model (`response_commit_owned` already frees a `[]u8`). Ledger-growing (freeze evidence-matrix ritual). Fully reversible before release. The design question is only the content-type validation policy (reject CR/LF injection into the header), a small decidable rule. |
+| **9. RED test** | A public-surface test: a handler calls `web.bytes(ctx, .OK, "application/pdf", data)` and the recorded response has that exact `Content-Type` and the exact bytes on the wire — RED today (no such responder), GREEN after. It distinguishes *improvement* (an app can emit a typed binary body) from *preference* (there is nothing subjective about "an app cannot return a PDF"). |
+
+**Disposition:** RECORDED. This is the **confirmation of F8-2's prediction** — the
+header gap, met "from a different direction" in WP106 — plus a distinct, sharper
+gap: **no buffered binary body at all**. The board ships attachment upload
+(buffered + spool) and metadata; byte download is carried as a framework finding.
+Two independent needs now point at the same missing surface (a public way to set
+headers, and a public way to emit typed bytes). **Not applied in Phase 8; carried
+for the owner's review**, and a natural pairing with the F8-2 `web.set_header`
+proposal.
