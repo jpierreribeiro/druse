@@ -49,11 +49,13 @@ capacity/cost envelope. **Blocked on: owner-provided access to the larger VPS(s)
 **PARTIAL.** MET: ≥5 immutable migrations (7, incl. backfill + expand/contract);
 ≥4h soak (PASS); dataset (5 projects / 600 tasks / 2400 comments / spooled
 attachment); the drill set (kill, PG restart, graceful restart, malformed,
-checksum-tamper). the deferred WP110 **upload-interruption** cell GREEN; the **network-interruption**
-cell found a real gap (readiness unbounded under a silent partition) and shipped a
-mitigation (`tcp_user_timeout`) whose full validation needs a REMOTE DB (folded
-into Gate 2 — the loopback repro cannot exercise it). OPEN: **≥10 deployments**
-(5 recorded — the rest accrue through the scale campaign).
+checksum-tamper). the **full WP110 drill set is now complete live** — upload interruption GREEN,
+proxy misconfiguration GREEN (C-06 proven: buffering ON withholds SSE, OFF
+forwards), network interruption found a real gap + shipped a `tcp_user_timeout`
+mitigation (remote-DB validation → Gate 2); the **session-expiry boundary** the
+soak could not cross is now exercised (drill 4/4); the intermediate **SSE capacity
+point** (~300 streams, linear RSS / C-04) is recorded. OPEN: **≥10 deployments**
+(5 recorded — accrue via the scale campaign) and the remote-DB partition validation.
 
 ## Gate 4 — Owner ratification of the ADR-028 amendment (C7)
 
