@@ -517,13 +517,9 @@ ERROR_BODY_INVALID_JSON ::
 // can report the ACTUAL configured limit rather than a constant "4 MiB" that
 // lied whenever `max_body` was changed.
 
-// STATUS_BODY_TOO_LARGE carries HTTP 413 WITHOUT adding a public `Status`
-// member. `Status` is a public enum and its member list is frozen (WP7 D3), but
-// an enum value is just its backing integer, so casting 413 in yields a status
-// that serializes as 413 while naming nothing new on the public surface. The
-// transport (WP8) writes `int(status)` on the wire; the number is what matters.
-@(private)
-STATUS_BODY_TOO_LARGE :: Status(413)
+// The 413 status is the public `Status.Payload_Too_Large` member (corrective WP
+// C1, friction F8-1). Before C1 there was no public 413 and this path cast a
+// private `Status(413)`; now it names the member like every other responder.
 
 // Error_Envelope is the wire shape for an error WITHOUT a field.
 //
@@ -574,7 +570,7 @@ error_commit_body_too_large :: proc(ctx: ^Context, limit: int) {
 
 	response_commit(
 		&ctx.private.response,
-		STATUS_BODY_TOO_LARGE,
+		.Payload_Too_Large,
 		response_json_headers(ctx),
 		buffer[:n],
 	)

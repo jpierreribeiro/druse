@@ -163,7 +163,15 @@ ledger entries move from RECORDED → RESOLVED (with the pinning test) as they l
 mirroring the Hardening H-1 pattern.
 
 ### Progress
-- [ ] C1 F8-1 enum — *next*
+- [x] **C1 F8-1 enum — DONE (2026-07-24).** `web.Status` gains `Conflict=409`,
+  `Payload_Too_Large=413`, `Too_Many_Requests=429`, `Service_Unavailable=503`;
+  the body-too-large path now returns the named `.Payload_Too_Large` (private
+  `Status(413)` cast removed). Full freeze ritual: signature snapshot, the
+  14-member freeze control, the inverted public-api control, `docs/ai-context.md`,
+  Amendment 32, mutation probes 39/46 re-aimed, RED→GREEN test
+  `tests/c1-status-codes` + `build/check_c1_controls.sh` wired into the gate. Full
+  gate: 187 checks PASS, no real failure (one unrelated wp69 temp-dir linker flake,
+  green on re-run). No ledger growth (Status is one symbol; union stays 77).
 - [ ] C2 F8-2/F8-4 response surface
 - [ ] C3 F8-6 query_int_opt
 - [ ] C4 F8-5 stream_live

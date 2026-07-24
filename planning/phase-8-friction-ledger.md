@@ -27,11 +27,15 @@ findings.
 | **8. Public cost / reversibility** | Additive to a frozen public enum — a ledger-growing change (the Phase-1 freeze evidence-matrix ritual), but purely additive: no existing member moves, no signature changes, fully reversible before any release. Enum additions do not break existing `case` matches on the current members. |
 | **9. RED test** | A public-surface test that asserts `web.Status.Service_Unavailable == 503` and that `web.text(ctx, .Service_Unavailable, "x")` produces a `503` status line on the wire — RED today (the member does not exist), GREEN after the addition. It distinguishes *improvement* (a named 503 exists and works) from *preference* (nothing about the cast is a matter of taste — the cast is unsafe and undiscoverable). |
 
-**Disposition:** RECORDED. The board uses the `web.Status(503)` workaround to
-proceed (`board/routes.odin`). The candidate improvement is a real, additive,
-well-evidenced finding — two independent applications, a universal pattern —
-and is the kind of change the corrective-WP process exists for. **Not applied in
-Phase 8; carried as the first framework finding for the owner's review.**
+**Disposition:** **RESOLVED by corrective WP C1 (2026-07-24).** `web.Status` now
+carries `Conflict=409`, `Payload_Too_Large=413`, `Too_Many_Requests=429`,
+`Service_Unavailable=503` as named members; the framework's own body-too-large
+path returns the named `.Payload_Too_Large` (the private `Status(413)` cast
+removed). Pinned by `tests/c1-status-codes` + `build/check_c1_controls.sh`, with
+the full freeze ritual (Amendment 32) and the re-aimed mutation probes. The board
+drops the `web.Status(503)`/`(409)`/`(413)` casts for the named members at its
+next re-pin. (Originally RECORDED in Phase 8 as the first, most-corroborated
+finding — three independent applications.)
 
 ---
 

@@ -293,10 +293,12 @@ uruquim_freeze_expect_decl() { # description exact-line
 uruquim_freeze_expect_decl "Method must stay a closed 6-member u8 enum" \
   'application	type	Method :: enum u8 {UNKNOWN, GET, POST, PUT, PATCH, DELETE}'
 
-# 413 is a PRIVATE HTTP behavior (WP7): the transport emits it, but no public
-# Status member exists for it and none may be added.
-uruquim_freeze_expect_decl "Status must stay the closed 10-member int enum, with NO public 413" \
-  'application	type	Status :: enum int {OK = 200, Created = 201, Accepted = 202, No_Content = 204, Bad_Request = 400, Unauthorized = 401, Forbidden = 403, Not_Found = 404, Method_Not_Allowed = 405, Internal_Server_Error = 500}'
+# Status is the closed int enum. Corrective WP C1 (friction F8-1, amendment in
+# planning/phase-1-freeze.md) ADDED the operationally-essential codes three
+# independent applications were forced to spell as raw-int casts: 409, 413, 429,
+# 503. The set is again closed and pinned here — additive only, no member moved.
+uruquim_freeze_expect_decl "Status must stay the closed 14-member int enum (C1: +409/413/429/503)" \
+  'application	type	Status :: enum int {OK = 200, Created = 201, Accepted = 202, No_Content = 204, Bad_Request = 400, Unauthorized = 401, Forbidden = 403, Not_Found = 404, Method_Not_Allowed = 405, Conflict = 409, Payload_Too_Large = 413, Too_Many_Requests = 429, Internal_Server_Error = 500, Service_Unavailable = 503}'
 
 uruquim_freeze_expect_decl "Handler must stay the single handler shape" \
   'application	type	Handler :: proc(ctx: ^Context)'
@@ -550,7 +552,7 @@ done
 # Report.
 # ---------------------------------------------------------------------------
 echo "freeze: signatures      -> $URUQUIM_FREEZE_APP_COUNT application + $URUQUIM_FREEZE_TS_COUNT test-support = $URUQUIM_FREEZE_TOTAL, byte-identical to the snapshot"
-echo "freeze: fields/enums    -> Method(u8, 6), Status(int, 10, no 413), Handler, Context, Request, Header_View, App, Recorded_Response pinned"
+echo "freeze: fields/enums    -> Method(u8, 6), Status(int, 14, C1:+409/413/429/503), Handler, Context, Request, Header_View, App, Recorded_Response pinned"
 echo "freeze: extractors      -> named results pinned, no #optional_ok on any exported procedure"
 echo "freeze: dependencies    -> $(wc -l <"$URUQUIM_FREEZE_ACTUAL_DEP" | tr -d ' ') direct imports match the snapshot; boundaries one-way"
 echo "freeze: evidence matrix -> $URUQUIM_FREEZE_REF_COUNT citations resolved, all 65 symbols present, none NOT_FROZEN"

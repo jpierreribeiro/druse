@@ -672,8 +672,14 @@ a bare integer. The complete set:
 ```text
 .OK .Created .Accepted .No_Content
 .Bad_Request .Unauthorized .Forbidden .Not_Found .Method_Not_Allowed
-.Internal_Server_Error
+.Conflict .Payload_Too_Large .Too_Many_Requests
+.Internal_Server_Error .Service_Unavailable
 ```
+
+The last row's `.Conflict` (409), `.Payload_Too_Large` (413), `.Too_Many_Requests`
+(429) and `.Service_Unavailable` (503) were added by corrective WP C1 (friction
+F8-1): operationally-essential codes three independent applications were forced
+to spell as raw-int casts. Prefer the named member over `Status(<int>)`.
 
 `Content-Type` is set for you: `application/json` for JSON and every envelope,
 `text/plain; charset=utf-8` for text, none for `no_content`. There is no way to

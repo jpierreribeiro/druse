@@ -95,10 +95,11 @@ STATIC_CONTENT_TYPE :: "Content-Type"
 @(private)
 STATIC_ETAG_MAX :: 40
 
-// STATUS_NOT_MODIFIED carries HTTP 304 WITHOUT adding a public `Status` member,
-// on the STATUS_BODY_TOO_LARGE precedent exactly. The six-member enum is frozen
-// field-by-field, and 304 is a cache negotiation the framework performs on the
-// application's behalf — a handler never returns it, so nothing would call a
+// STATUS_NOT_MODIFIED carries HTTP 304 WITHOUT adding a public `Status` member.
+// Unlike 409/413/429/503 (which corrective WP C1 promoted to named members
+// because applications return them), 304 is a cache negotiation the framework
+// performs on the application's behalf — a handler never returns it, so nothing
+// would call a
 // public name for it.
 @(private)
 STATUS_NOT_MODIFIED :: Status(304)

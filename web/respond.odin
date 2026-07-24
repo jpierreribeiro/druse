@@ -21,9 +21,12 @@ import "core:mem"
 // Status is the HTTP status enumeration used by the public response helpers.
 //
 // It exists because the ratified `json(ctx, status, value)` and
-// `text(ctx, status, s)` signatures require a status type. Its members are
-// limited to the statuses the Phase-1 public documentation and the Phase-1
-// default-policy contract actually name; later phases add their own.
+// `text(ctx, status, s)` signatures require a status type. Phase 1 named only the
+// statuses its public documentation and default-policy contract used; the
+// corrective WP C1 (friction F8-1) adds the operationally-essential codes that
+// three independent applications were forced to spell as raw-int casts. These are
+// ADDITIVE: no existing member moves, and an enum addition does not break a
+// `case` match on the current members.
 Status :: enum int {
 	OK                    = 200,
 	Created               = 201,
@@ -34,7 +37,11 @@ Status :: enum int {
 	Forbidden             = 403,
 	Not_Found             = 404,
 	Method_Not_Allowed    = 405,
+	Conflict              = 409,
+	Payload_Too_Large     = 413,
+	Too_Many_Requests     = 429,
 	Internal_Server_Error = 500,
+	Service_Unavailable   = 503,
 }
 
 // json writes `value` as a JSON response with the given status.

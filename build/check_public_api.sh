@@ -1417,15 +1417,17 @@ for URUQUIM_CODE in invalid_json body_too_large; do
     fail "the ratified WP7 error code '$URUQUIM_CODE' is missing from web/ (docs/errors.md)"
 done
 
-# 10d-x. 413 is carried WITHOUT a public Status member. The public enum member
-#        list is frozen; a private `Status(413)` value is the sanctioned path
-#        (WP7 D3).
-if awk '/^Status :: enum int \{/{f=1;next} /^\}/{f=0} f' <<<"$URUQUIM_WEB_PUBLIC_CODE" |
-  grep -qiE 'Payload_Too_Large|Too_Large|413'; then
-  fail "a 413 member was added to the public Status enum; use a private Status(413) value instead (WP7 D3)"
+# 10d-x. 413 is now the PUBLIC `Status.Payload_Too_Large` member (corrective WP
+#        C1, friction F8-1): three independent applications were forced to cast a
+#        raw `Status(413)`, so the code is named on the public surface. The
+#        body-too-large path must therefore reference the NAMED member, not a
+#        private `Status(413)` cast — the inverse of the old WP7 D3 control.
+if grep -qE 'STATUS_BODY_TOO_LARGE|Status\(413\)' <<<"$URUQUIM_WEB_CODE"; then
+  fail "the body-too-large path still casts a private Status(413); use the public .Payload_Too_Large member (C1/F8-1)"
 fi
-grep -qE '^STATUS_BODY_TOO_LARGE :: Status\(413\)$' <<<"$URUQUIM_WEB_CODE" ||
-  fail "the private STATUS_BODY_TOO_LARGE :: Status(413) value is missing (WP7 D3)"
+awk '/^Status :: enum int \{/{f=1;next} /^\}/{f=0} f' <<<"$URUQUIM_WEB_PUBLIC_CODE" |
+  grep -qE 'Payload_Too_Large += 413' ||
+  fail "the public Status.Payload_Too_Large = 413 member is missing (C1/F8-1)"
 
 # 10e. The two WP5 error codes are spelled exactly as the ratified wire contract
 #      requires (docs/errors.md). A typo here is a silent compatibility break:
@@ -1573,5 +1575,5 @@ done
 echo "public API contract: WP9 harness is test-only; both factories run the shared matrix"
 echo "public API contract: the adapter keeps HEAD and Expect under core control; the wire corpus covers all five vendor patches"
 
-echo "public API contract: WP7 arena is private; the 4 MiB cap gates the parser; strict JSON; 413 is a private Status value"
+echo "public API contract: WP7 arena is private; the 4 MiB cap gates the parser; strict JSON; 413 is the public Status.Payload_Too_Large member (C1)"
 echo "PASS: Phase-1 public API anti-accretion contract (WP1 + WP2 + WP3 + WP4 + WP5 + WP6 + WP7)"

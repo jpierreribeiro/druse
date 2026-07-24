@@ -2168,3 +2168,45 @@ hands to whatever it already runs, the smallest thing that discharges the WP50
 **Rollback.** Frozen ledger once shipped; the backend counters they read are
 removable with the WP90 adapter code (vendored patch 28), but the names are a
 public contract from the Closure freeze onward.
+
+## Amendment 32 — Corrective WP C1 (friction F8-1): `Status` gains 409/413/429/503
+
+**Date: 2026-07-24. Authority: the Corrective Program (`planning/corrective-program-plan.md`),
+owner-mandated, closing the Phase-8 friction ledger toward production readiness.**
+**Ledger effect: NONE — `Status` is a single symbol already counted; the ledger
+stays application 75 + test-support 2 = union 77.** This amendment WIDENS one
+frozen enum's signature, additively.
+
+`Status` gains four members, in numeric order among the existing ones:
+
+```
+Conflict            = 409
+Payload_Too_Large   = 413
+Too_Many_Requests   = 429
+Service_Unavailable = 503
+```
+
+**WHY.** Proof-by-use (Phase 8) recorded that **three independent applications** —
+the reference board, the crystals `examples/notes` app, and (for 413) the
+framework's own body-too-large path — were forced to spell operationally-essential
+statuses as raw-int casts (`web.Status(503)`, `web.Status(409)`), which defeats
+the named-checked-value purpose of the enum and is undiscoverable. F8-1 is the
+first ledger entry and the most-corroborated. These four are the codes a
+production service actually returns: 409 (optimistic conflict / unique
+violation), 413 (payload too large), 429 (rate limiting), 503 (readiness / pool
+exhaustion / backpressure).
+
+**ADDITIVE, no member moved.** Every existing member keeps its value; an enum
+addition does not break a `case` match on the current members. The formerly
+private `STATUS_BODY_TOO_LARGE :: Status(413)` cast is **removed** — the
+body-too-large path now returns the named `.Payload_Too_Large`, so 413 is a
+first-class member used internally too. (304, still framework-internal cache
+negotiation a handler never returns, legitimately stays a private `Status(304)`.)
+
+| Symbol | Ledger | WP | Signature evidence | Behaviour evidence | Doc | Notes |
+|---|---|---|---|---|---|---|
+| `Status` (widened) | A | C1 | `build/phase1-public-signatures.txt` (the 14-member row) + `build/check_phase1_freeze.sh` (the pinned declaration) | `tests/c1-status-codes/status_codes_test.odin` (named members equal their codes and reach the wire) | `docs/ai-context.md` (the member set) | +409/413/429/503; no ledger growth; `STATUS_BODY_TOO_LARGE` removed; mutation probes 39/46 re-aimed to the inverted control |
+
+**Rollback.** Reversible before release (remove the four members, restore the
+private 413 cast) — but from the corrective freeze onward the names are a public
+contract. This is the first of the C1..C7 corrective batch.

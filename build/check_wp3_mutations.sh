@@ -493,12 +493,14 @@ PY2
 expect_reject "$T" "capability consumed after parse" \
   "consumes the capability after parsing"
 
-# 39. A public member added to the Status enum for 413.
+# 39. RE-AIMED for corrective WP C1 (F8-1): 413 is now the PUBLIC
+#     `Status.Payload_Too_Large` member. Removing it must be rejected — the public
+#     code returns it by name, so the member is load-bearing.
 T="$(fresh_tree)"; TREES+=("$T")
-mutate_sed "public 413 Status member" "$T/web/respond.odin" \
-  's/^\tMethod_Not_Allowed    = 405,/\tMethod_Not_Allowed    = 405,\n\tPayload_Too_Large     = 413,/'
-expect_reject "$T" "public 413 Status member" \
-  "a 413 member was added to the public Status enum"
+mutate_sed "remove public 413 member" "$T/web/respond.odin" \
+  '/^\tPayload_Too_Large     = 413,$/d'
+expect_reject "$T" "removed public 413 member" \
+  "the public Status.Payload_Too_Large = 413 member is missing"
 
 # 40. A configurable body limit smuggled in.
 T="$(fresh_tree)"; TREES+=("$T")
@@ -547,12 +549,14 @@ printf '\nserve_with :: proc(a: ^App, port: int) {}\n' >>"$T/web/serve.odin"
 expect_reject "$T" "serve_with added to the public surface" \
   "exports symbols outside the ratified Phase-1 surface"
 
-# 46. A public member added to Status for 413 — still banned after WP8.
+# 46. RE-AIMED for corrective WP C1 (F8-1): the body-too-large path must use the
+#     NAMED public member, not a private `Status(413)` cast. Reintroducing the
+#     private cast must be rejected — the inverse of the old WP7 D3 control.
 T="$(fresh_tree)"; TREES+=("$T")
-mutate_sed "public 413 Status member" "$T/web/respond.odin" \
-  's/^\tMethod_Not_Allowed    = 405,/\tMethod_Not_Allowed    = 405,\n\tPayload_Too_Large     = 413,/'
-expect_reject "$T" "public 413 Status member after WP8" \
-  "a 413 member was added to the public Status enum"
+mutate_sed "private Status(413) cast reintroduced" "$T/web/errors.odin" \
+  's/^\t\t\.Payload_Too_Large,$/\t\tStatus(413),/'
+expect_reject "$T" "private Status(413) cast in the body-too-large path" \
+  "the body-too-large path still casts a private Status(413)"
 
 # 47. An unexpected subdirectory under web/internal/.
 T="$(fresh_tree)"; TREES+=("$T")
