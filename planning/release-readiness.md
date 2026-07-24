@@ -55,7 +55,9 @@ forwards), network interruption found a real gap + shipped a `tcp_user_timeout`
 mitigation (remote-DB validation → Gate 2); the **session-expiry boundary** the
 soak could not cross is now exercised (drill 4/4); the intermediate **SSE capacity
 point** (~300 streams, linear RSS / C-04) is recorded. OPEN: **≥10 deployments**
-(5 recorded — accrue via the scale campaign) and the remote-DB partition validation.
+(**9 recorded** — an honest recount incl. the drill-fix cycles + the hardened-core
+deploy; one real change away, accrues on the next deploy) and the remote-DB
+partition validation (Gate 2).
 
 ## Gate 4 — Owner ratification of the ADR-028 amendment (C7)
 
