@@ -2,3 +2,11 @@
 
 # WP61 — the static-file suite builds its fixture directory at run time.
 tests/wp61-public-surface/fixture/
+
+# odin test binaries built at the repo root when a test dir is run in isolation
+/c03-fault-campaign
+/wp41-fault
+/*-status-codes
+/*-response-surface
+/*-query-opt
+/*-stream-live
