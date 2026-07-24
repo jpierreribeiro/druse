@@ -170,3 +170,144 @@ text :: proc(ctx: ^Context, status: Status, s: string) {
 no_content :: proc(ctx: ^Context) {
 	response_commit(&ctx.private.response, .No_Content, nil, nil)
 }
+
+// set_header records an APPLICATION response header, to ride on whatever response
+// the handler then commits (corrective WP C2, friction F8-2). It is the public
+// path applications need for `Set-Cookie`, `Cache-Control`, `Content-Disposition`,
+// `Location`, and the like — the surface Phase 1 deliberately omitted.
+//
+// It returns `true` when the header was accepted and `false` when it was refused,
+// so the caller hears about a mistake rather than a header silently vanishing. It
+// refuses when:
+//
+//   - the response is already committed (the header list is finished and being
+//     read — a header set now could never appear);
+//   - the name is empty, or the name or value contains a control byte (CR, LF or
+//     NUL) — the header-injection vector, rejected unconditionally;
+//   - the name is framework- or transport-owned (`Content-Type`, `Content-Length`,
+//     `Transfer-Encoding`, `Connection`, `X-Request-Id`), which the framework sets
+//     itself — use `web.bytes`/`web.json`/`web.text` to choose a content type;
+//   - the per-request pair budget (`APP_HEADER_MAX`) or byte budget
+//     (`APP_HEADER_BUFFER`) is exhausted.
+//
+// The name and value are COPIED into request-local storage, so the caller may
+// pass handler-local strings freely — the committed response reads its own copy
+// after the handler returns. No allocation, no teardown (the `allow_buffer`
+// idiom). Order is preserved and application headers are emitted AFTER every
+// framework header, so a handler can never shadow a framework-owned one.
+set_header :: proc(ctx: ^Context, name: string, value: string) -> bool {
+	if ctx.private.response.committed {
+		return false
+	}
+	if len(name) == 0 || header_field_has_control(name) || header_field_has_control(value) {
+		return false
+	}
+	if header_name_is_reserved(name) {
+		return false
+	}
+	if ctx.private.app_header_count >= APP_HEADER_MAX {
+		return false
+	}
+	need := len(name) + len(value)
+	if ctx.private.app_header_used + need > APP_HEADER_BUFFER {
+		return false
+	}
+
+	buf := ctx.private.app_header_buffer[:]
+	off := ctx.private.app_header_used
+	copy(buf[off:], name)
+	name_view := string(buf[off:off + len(name)])
+	off += len(name)
+	copy(buf[off:], value)
+	value_view := string(buf[off:off + len(value)])
+	off += len(value)
+
+	ctx.private.app_header_used = off
+	ctx.private.app_headers[ctx.private.app_header_count] = Header_Pair {
+		name  = name_view,
+		value = value_view,
+	}
+	ctx.private.app_header_count += 1
+	return true
+}
+
+// bytes writes a response with a CALLER-CHOSEN media type and a raw byte body
+// (corrective WP C2, friction F8-4). It is the buffered binary responder Phase 1
+// omitted: `web.text` sends `text/plain` from a string and `web.json` marshals a
+// value, but neither can put arbitrary bytes on the wire with a chosen type — a
+// PDF, an image, a CSV export, an attachment download.
+//
+// `content_type` is COPIED into request-local storage (so the committed
+// response's view outlives the handler) after validation: it must be non-empty,
+// within `CONTENT_TYPE_MAX`, and free of control bytes (the same header-injection
+// guard as `set_header`). An invalid content type is a handler programming error
+// and produces a logged 500, never a corrupt header on the wire. `data` is COPIED
+// into an allocation the `Response` then OWNS and releases, exactly like
+// `web.text`'s body — so the caller may reuse or free `data` immediately.
+bytes :: proc(ctx: ^Context, status: Status, content_type: string, data: []u8) {
+	if ctx.private.response.committed {
+		return
+	}
+	// An invalid content type is a handler programming error (it should be a
+	// trusted, typically static, media type — never built from request input).
+	// Answer a clean 500 rather than put a split or empty content type on the
+	// wire. No diagnostic is logged: the empty-bodied 500 is the signal, and the
+	// contract is "pass a valid media type".
+	if len(content_type) == 0 ||
+	   len(content_type) > CONTENT_TYPE_MAX ||
+	   header_field_has_control(content_type) {
+		internal_error(ctx)
+		return
+	}
+
+	copy(ctx.private.content_type_buffer[:], content_type)
+	ct_view := string(ctx.private.content_type_buffer[:len(content_type)])
+
+	body, err := mem.alloc_bytes(len(data), allocator = context.allocator)
+	if err != nil {
+		return
+	}
+	copy(body, data)
+
+	response_commit_owned(
+		&ctx.private.response,
+		status,
+		response_bytes_headers(ctx, ct_view),
+		body,
+		context.allocator,
+	)
+}
+
+// header_field_has_control reports whether a header name or value carries a byte
+// that must never reach the wire unescaped: CR or LF (header/response splitting)
+// or NUL. Any of them makes the field unusable, so the responder refuses it.
+@(private)
+header_field_has_control :: proc(s: string) -> bool {
+	for b in transmute([]byte)s {
+		if b == '\r' || b == '\n' || b == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// header_name_is_reserved reports whether a header name is framework- or
+// transport-owned and therefore not settable by an application. Case-insensitive,
+// because header names are (RFC 9110 §5.1).
+@(private)
+header_name_is_reserved :: proc(name: string) -> bool {
+	@(static, rodata)
+	reserved := [?]string {
+		"content-type",
+		"content-length",
+		"transfer-encoding",
+		"connection",
+		"x-request-id",
+	}
+	for r in reserved {
+		if ascii_fold_equal(name, r) {
+			return true
+		}
+	}
+	return false
+}

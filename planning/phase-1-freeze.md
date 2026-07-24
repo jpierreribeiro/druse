@@ -2210,3 +2210,47 @@ negotiation a handler never returns, legitimately stays a private `Status(304)`.
 **Rollback.** Reversible before release (remove the four members, restore the
 private 413 cast) — but from the corrective freeze onward the names are a public
 contract. This is the first of the C1..C7 corrective batch.
+
+## Amendment 33 — Corrective WP C2 (frictions F8-2/F8-4): `set_header` and `bytes`
+
+**Date: 2026-07-24. Authority: the Corrective Program, owner-mandated.**
+**Ledger effect: application 75 → 77.** 77 application + 2 test-support = union
+**79**. Two symbols — the smallest response-surface completion that closes two
+findings at once:
+
+```
+application	proc	set_header :: proc(ctx: ^Context, name: string, value: string) -> bool
+application	proc	bytes :: proc(ctx: ^Context, status: Status, content_type: string, data: []u8)
+```
+
+**WHY.** Proof-by-use (Phase 8) recorded that the public surface had **no way to
+set a response header** (F8-2) — so cookie sessions, CSRF, `Cache-Control`,
+`Location` and `Content-Disposition` were all inexpressible, and the board was
+forced onto bearer tokens — and **no buffered binary responder** (F8-4), so a
+file download (a PDF, an image, an attachment) could not be served with a chosen
+media type. The two gaps are one missing region of the response surface.
+
+**`set_header`** records an application header into request-local storage (copied,
+so a handler-local string is safe) that rides on EVERY response path after the
+framework headers; it returns `false` — rather than silently dropping — when the
+response is committed, the name/value carries a control byte (CR/LF/NUL injection),
+the name is framework/transport-owned, or the per-request budget is exhausted.
+**`bytes`** is the buffered binary responder: a caller-chosen `Content-Type`
+(validated for control bytes, copied to request-local storage) and a `[]u8` body
+the `Response` owns and releases — `web.text`'s ownership model with an arbitrary
+media type. Together they make an auth-gated file download expressible:
+`set_header(ctx, "Content-Disposition", …); bytes(ctx, .OK, ct, data)`.
+
+**REDACTION / INJECTION.** `set_header` and `bytes` both reject CR/LF/NUL in any
+field, closing response-splitting by construction. Framework-owned header names
+are refused so an application cannot corrupt `Content-Type`/`Content-Length`/the
+transport framing. Storage is fixed request-local (no allocation, no teardown),
+bounded by `APP_HEADER_MAX`/`APP_HEADER_BUFFER`/`CONTENT_TYPE_MAX`.
+
+| Symbol | Ledger | WP | Signature evidence | Behaviour evidence | Doc | Notes |
+|---|---|---|---|---|---|---|
+| `set_header` | A | C2 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c2-response-surface/contract_test.odin::c2_set_header_rides_on_the_response` + `::c2_set_header_refuses_reserved_and_injection` | `docs/ai-context.md::web.set_header` | app header, copied to request-local storage, emitted after framework headers; rejects committed/injection/reserved/over-budget with `false` |
+| `bytes` | A | C2 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c2-response-surface/contract_test.odin::c2_bytes_sends_typed_binary_body` + `::c2_bytes_rejects_control_content_type` | `docs/ai-context.md::web.bytes` | buffered binary responder; caller `Content-Type` validated + copied; body owned by the Response like `web.text` |
+
+**Rollback.** Reversible before release; from the corrective freeze onward the two
+names are a public contract. Second of the C1..C7 corrective batch.

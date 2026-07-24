@@ -99,6 +99,26 @@ Context_Internal :: struct {
 	// read after `dispatch` returns.
 	response_headers: [RESPONSE_HEADER_MAX]Header_Pair,
 
+	// C2 (friction F8-2) — request-local storage for APPLICATION-set headers
+	// (`web.set_header`). Unlike every framework header, these names and values
+	// are supplied by the handler and may be handler-local, so `set_header` COPIES
+	// them into `app_header_buffer` and the pairs in `app_headers` are views over
+	// that buffer — on exactly the `allow_buffer` terms, so the committed response
+	// (which appends them via `response_headers_finish`) can read them after
+	// `dispatch` returns, with no allocation and no teardown. `app_header_count`
+	// bounds the pairs (`APP_HEADER_MAX`); `app_header_used` the bytes
+	// (`APP_HEADER_BUFFER`). Both are zero on a request no handler set a header on.
+	app_headers:      [APP_HEADER_MAX]Header_Pair,
+	app_header_buffer: [APP_HEADER_BUFFER]u8,
+	app_header_count: int,
+	app_header_used:  int,
+
+	// C2 (friction F8-4) — request-local storage for the `web.bytes` caller's
+	// `Content-Type`, copied here so the committed response's view outlives the
+	// handler (the same reason as `app_header_buffer`). Media types are short; a
+	// content type exceeding this is rejected by `web.bytes`.
+	content_type_buffer: [CONTENT_TYPE_MAX]u8,
+
 	// WP5 — request-local storage for the extractor error envelope, on exactly
 	// the same terms as `allow_buffer` above and for exactly the same reason:
 	// the committed response holds a VIEW over it, and it is read after the

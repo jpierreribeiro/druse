@@ -5,6 +5,7 @@ application	proc	bad_request :: proc(ctx: ^Context, message: string)
 application	proc	bare :: proc() -> App
 application	proc	bearer_token :: proc(ctx: ^Context) -> (value: string, ok: bool)
 application	proc	body :: proc(ctx: ^Context, dst: ^$T) -> bool
+application	proc	bytes :: proc(ctx: ^Context, status: Status, content_type: string, data: []u8)
 application	proc	client_ip :: proc(ctx: ^Context) -> string
 application	proc	cors :: proc(a: ^App, o: Cors_Options)
 application	proc	created :: proc(ctx: ^Context, value: $T)
@@ -41,6 +42,7 @@ application	proc	route :: proc(ctx: ^Context) -> string
 application	proc	router :: proc() -> Router
 application	proc	secure_headers :: proc(ctx: ^Context)
 application	proc	serve :: proc(a: ^App, port: int)
+application	proc	set_header :: proc(ctx: ^Context, name: string, value: string) -> bool
 application	proc	state :: proc(ctx: ^Context, $T: typeid) -> ^T
 application	proc	static :: proc(a: ^App, prefix: string, dir: string, o: Static_Options = {...})
 application	proc	stats :: proc() -> Server_Stats

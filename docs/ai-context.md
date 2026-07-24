@@ -58,7 +58,7 @@ no recoverable panic (ADR-020). See the appendix.
 - Never emit `web.recovery`, a `recovery` middleware, or advice to "wrap the
   handler to catch the panic". None of it exists, and none of it can.
 
-**Two ledgers.** The application API is exactly **75** symbols (32 frozen in
+**Two ledgers.** The application API is exactly **77** symbols (32 frozen in
 Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 `header`/`bearer_token`, `observe`/`Framework_Event`/`Framework_Error`,
 `logger` and `request_id` from Phase 2, and `route`, `app_with_state`,
@@ -67,8 +67,9 @@ Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 `cors`/`Cors_Options`, `static`/`Static_Options`, `form_field`/`form_file`/`Uploaded_File`
 from Phases 5-6, `stream`/`Stream`/`stream_send`/`Stream_Send`/`stream_close` from
 Phase 7, `enable_upload`/`upload`/`upload_persist`/`Upload`/`Upload_Config` from
-Phase 7.5, and `stats`/`Server_Stats` from the Closure).
-The test-support API is a separate ledger of exactly **2**. Union: **77**. Do not
+Phase 7.5, `stats`/`Server_Stats` from the Closure, and `set_header`/`bytes` from
+corrective WP C2).
+The test-support API is a separate ledger of exactly **2**. Union: **79**. Do not
 fold them together and do not invent a third form.
 
 ## Application
@@ -663,6 +664,7 @@ ok(ctx, value)               200 JSON   — exactly json(ctx, .OK, value)
 created(ctx, value)          201 JSON   — exactly json(ctx, .Created, value)
 json(ctx, status, value)     any status, JSON
 text(ctx, status, s)         plain text
+bytes(ctx, status, ct, data) any status, caller-chosen Content-Type, raw []u8 body (C2)
 no_content(ctx)              204, no body, no Content-Type
 ```
 
@@ -682,8 +684,18 @@ F8-1): operationally-essential codes three independent applications were forced
 to spell as raw-int casts. Prefer the named member over `Status(<int>)`.
 
 `Content-Type` is set for you: `application/json` for JSON and every envelope,
-`text/plain; charset=utf-8` for text, none for `no_content`. There is no way to
-set a response header yourself in Phase 1.
+`text/plain; charset=utf-8` for text, the caller's value for `bytes`, none for
+`no_content`.
+
+Set your own response headers with **`web.set_header(ctx, name, value) -> bool`**
+(corrective WP C2, friction F8-2) — for `Set-Cookie`, `Cache-Control`,
+`Content-Disposition`, `Location`, etc. Call it BEFORE the responder; it returns
+`false` if the response is already committed, the name is empty or the name/value
+carries a control byte (CR/LF/NUL — header injection), the name is framework-owned
+(`Content-Type`, `Content-Length`, `Transfer-Encoding`, `Connection`,
+`X-Request-Id`), or the per-request budget is exhausted. Application headers are
+emitted after every framework header. Serve a file download by pairing
+`web.set_header(ctx, "Content-Disposition", …)` with `web.bytes`.
 
 **Payloads are VALUES.** `web.ok(ctx, user)` — never a pointer, and never a
 variable whose type is `^User`. A rejected payload is logged on the server and
@@ -961,9 +973,10 @@ web.serve_with(&app, web.Serve_Config{host = "0.0.0.0", port = 8080})
 ```
 
 Other names reserved for later phases, none of which exist today:
-`web.serve_transport`, `web.body_limit`, `web.bytes`, `web.redirect`,
-`web.conflict`. Two names will NEVER exist: `web.recovery` (ADR-020) and
-`web.group` (ADR-024).
+`web.serve_transport`, `web.body_limit`, `web.redirect`. (`web.bytes` and
+`web.set_header` DO exist now — added by corrective WP C2; `web.conflict` is
+unnecessary since C1 made `.Conflict` a named `Status` member.) Two names will
+NEVER exist: `web.recovery` (ADR-020) and `web.group` (ADR-024).
 
 Phase boundaries in one line each:
 

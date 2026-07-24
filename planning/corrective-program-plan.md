@@ -172,7 +172,16 @@ mirroring the Hardening H-1 pattern.
   `tests/c1-status-codes` + `build/check_c1_controls.sh` wired into the gate. Full
   gate: 187 checks PASS, no real failure (one unrelated wp69 temp-dir linker flake,
   green on re-run). No ledger growth (Status is one symbol; union stays 77).
-- [ ] C2 F8-2/F8-4 response surface
+- [x] **C2 F8-2/F8-4 response surface — DONE (2026-07-24).** `web.set_header(ctx,
+  name, value) -> bool` (app headers, copied to request-local storage, emitted
+  after framework headers, rejects committed/injection/reserved/over-budget) and
+  `web.bytes(ctx, status, content_type, data)` (buffered binary responder, caller
+  media type validated + copied, body owned like `web.text`). Ledger 75 → 77,
+  union 79. Full ritual: signatures, EXPECTED_EXPORTS + counts across
+  freeze/api/docs, the two future-API ban lists cleared of `bytes`, Amendment 33,
+  RED→GREEN `tests/c2-response-surface` + `check_c2_controls.sh` wired. Full gate:
+  186 checks PASS, C1+C2 green (only the known wp41 timing flake, green on re-run).
+  Unblocks cookies/CSRF (F8-2) and auth-gated file download (F8-4).
 - [ ] C3 F8-6 query_int_opt
 - [ ] C4 F8-5 stream_live
 - [ ] C5 F8-8 crystals timestamp+validator

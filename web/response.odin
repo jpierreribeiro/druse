@@ -168,23 +168,38 @@ response_destroy :: proc(res: ^Response) {
 // ---------------------------------------------------------------------------
 
 // RESPONSE_HEADER_MAX is the worst case: a 405 carries `Allow` and
-// `Content-Type`, WP23 appends `X-Request-Id` when the request-ID middleware is
-// in use, and WP49 appends three more when `secure_headers` is. Nothing carries
-// more.
+// `Content-Type` (2), WP60 the CORS headers (up to 4), WP23 appends `X-Request-Id`
+// (1), WP49 appends three more when `secure_headers` is on (3), and corrective WP
+// C2 (friction F8-2) appends up to `APP_HEADER_MAX` application-set headers.
 //
-// SIX, and the number is arithmetic rather than headroom: 2 + 1 + 3. A response
-// that needed a seventh would be a work package, not an edit, because this array
-// is fixed request-local storage and the capacity ledger does not accept a bound
-// without a behaviour when full. There is no "when full" here BY CONSTRUCTION —
-// every writer is a compile-time-known step, so the bound is a proof rather than
-// a limit, and `#assert` below is what keeps that true.
+// The bound is arithmetic, not headroom: the framework's own worst case (12) plus
+// the application allowance (`APP_HEADER_MAX`). This array is fixed request-local
+// storage; every framework writer is a compile-time-known step, and the app path
+// is bounded by `APP_HEADER_MAX` with a "when full" behaviour (`set_header`
+// refuses). `#assert` below keeps the framework arithmetic honest.
 @(private)
-RESPONSE_HEADER_MAX :: 12
+FRAMEWORK_HEADER_MAX :: 12
+@(private)
+RESPONSE_HEADER_MAX :: FRAMEWORK_HEADER_MAX + APP_HEADER_MAX
 
-// The proof that the bound is arithmetic. If a future writer is added without
-// raising the bound, this fails at COMPILE time rather than overflowing
-// request-local storage at run time.
-#assert(RESPONSE_HEADER_MAX >= 2 + 1 + 3)
+// C2 (F8-2): the application header allowance. `set_header` writes up to this
+// many pairs into request-local storage, copied so they outlive the handler.
+@(private)
+APP_HEADER_MAX :: 8
+// The byte budget for application header names + values combined (request-local,
+// no allocation). A header exceeding the remaining budget is refused.
+@(private)
+APP_HEADER_BUFFER :: 2048
+
+// C2 (F8-4): the byte budget for a `web.bytes` caller's `Content-Type`, copied
+// into request-local storage. Media types are short; a longer one is refused.
+@(private)
+CONTENT_TYPE_MAX :: 128
+
+// The proof that the framework bound is arithmetic. If a future framework writer
+// is added without raising FRAMEWORK_HEADER_MAX, this fails at COMPILE time
+// rather than overflowing request-local storage at run time.
+#assert(FRAMEWORK_HEADER_MAX >= 2 + 4 + 1 + 3)
 
 @(private)
 CONTENT_TYPE_HEADER_NAME :: "Content-Type"
@@ -220,6 +235,19 @@ response_text_headers :: proc(ctx: ^Context) -> []Header_Pair {
 	ctx.private.response_headers[0] = Header_Pair {
 		name  = CONTENT_TYPE_HEADER_NAME,
 		value = CONTENT_TYPE_TEXT,
+	}
+	return response_headers_finish(ctx, 1)
+}
+
+// response_bytes_headers is the C2 (F8-2/F8-4) counterpart for `web.bytes`: the
+// `Content-Type` is the CALLER's, not a framework constant. `content_type` must
+// already be a stable view (the responder copies it into request-local storage
+// before calling here, so it outlives the handler like every other header value).
+@(private)
+response_bytes_headers :: proc(ctx: ^Context, content_type: string) -> []Header_Pair {
+	ctx.private.response_headers[0] = Header_Pair {
+		name  = CONTENT_TYPE_HEADER_NAME,
+		value = content_type,
 	}
 	return response_headers_finish(ctx, 1)
 }
@@ -281,6 +309,17 @@ response_headers_finish :: proc(ctx: ^Context, n: int) -> []Header_Pair {
 			name  = REQUEST_ID_HEADER,
 			value = ctx.private.request_id_value,
 		}
+		count += 1
+	}
+
+	// C2 (F8-2) — the application's own headers, set via `web.set_header`, ride on
+	// EVERY response path (json/text/bytes/error/404/405/stream) at the same funnel
+	// as the framework headers. They are appended LAST so an application header can
+	// never shadow a framework-owned one earlier in the list, and each is a view
+	// over request-local `app_header_buffer` (copied by `set_header`, so it outlives
+	// the handler). `app_header_count` is 0 unless the handler called `set_header`.
+	for i in 0 ..< ctx.private.app_header_count {
+		ctx.private.response_headers[count] = ctx.private.app_headers[i]
 		count += 1
 	}
 	return ctx.private.response_headers[:count]

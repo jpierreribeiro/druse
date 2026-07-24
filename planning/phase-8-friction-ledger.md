@@ -53,13 +53,14 @@ finding — three independent applications.)
 | **8. Public cost / reversibility** | Additive: one (or two) new public procs, no signature change to existing responders, no behaviour change to any current path. Ledger-growing (the freeze evidence-matrix ritual). The design cost is the reserved-name policy (an app must not clobber `Content-Type`/`X-Request-Id`/CORS/secure headers) — a small, decidable rule. Fully reversible before release. |
 | **9. RED test** | A public-surface test: a handler calls `web.set_header(ctx, "Set-Cookie", "sid=x; HttpOnly")` then `web.text(ctx, .OK, "")`, and the recorded response carries that exact header on the wire — RED today (no such proc), GREEN after. It distinguishes *improvement* (an app can emit a header) from *preference* (bearer-vs-cookie is a real design axis, but "an app cannot set **any** header" is a capability gap, not a taste). |
 
-**Disposition:** RECORDED. The board proceeds with bearer-token sessions
-(`board/auth.odin`), which is a legitimate architecture — but the finding is that
-the framework **removed the choice**. This is the sharpest kind of proof-by-use
-evidence: a plan-required capability that the public surface cannot express. Two
-WP104 sub-requirements (cookie policy, CSRF) are discharged by architecture
-substitution, with the substitution and its cause recorded here. **Not applied in
-Phase 8; carried as a framework finding for the owner's review.**
+**Disposition:** **RESOLVED by corrective WP C2 (2026-07-24).** `web.set_header(ctx,
+name, value) -> bool` is now the public path to set any application response header
+(`Set-Cookie`, `Cache-Control`, `Content-Disposition`, `Location`, …), rejecting
+CR/LF/NUL injection, framework-owned names, over-commit and over-budget. Cookie
+sessions and CSRF are now expressible; the board keeps bearer tokens (a legitimate
+choice) but the framework **no longer removes the choice**. Pinned by
+`tests/c2-response-surface` + `check_c2_controls.sh`, Amendment 33. (Originally
+RECORDED in Phase 8: the framework had removed a plan-required capability.)
 
 ---
 
@@ -100,14 +101,15 @@ WP105–108 add more protected handlers and the cluster is larger.
 | **8. Public cost / reversibility** | Additive: one new responder over the existing owned-body commit path, no change to any current responder or to the ownership model (`response_commit_owned` already frees a `[]u8`). Ledger-growing (freeze evidence-matrix ritual). Fully reversible before release. The design question is only the content-type validation policy (reject CR/LF injection into the header), a small decidable rule. |
 | **9. RED test** | A public-surface test: a handler calls `web.bytes(ctx, .OK, "application/pdf", data)` and the recorded response has that exact `Content-Type` and the exact bytes on the wire — RED today (no such responder), GREEN after. It distinguishes *improvement* (an app can emit a typed binary body) from *preference* (there is nothing subjective about "an app cannot return a PDF"). |
 
-**Disposition:** RECORDED. This is the **confirmation of F8-2's prediction** — the
-header gap, met "from a different direction" in WP106 — plus a distinct, sharper
-gap: **no buffered binary body at all**. The board ships attachment upload
-(buffered + spool) and metadata; byte download is carried as a framework finding.
-Two independent needs now point at the same missing surface (a public way to set
-headers, and a public way to emit typed bytes). **Not applied in Phase 8; carried
-for the owner's review**, and a natural pairing with the F8-2 `web.set_header`
-proposal.
+**Disposition:** **RESOLVED by corrective WP C2 (2026-07-24)**, paired with F8-2.
+`web.bytes(ctx, status, content_type, data)` is now the buffered binary responder:
+a caller-chosen `Content-Type` (validated against control bytes) and a `[]u8` body
+the `Response` owns like `web.text`'s. With `web.set_header` (F8-2) it makes an
+auth-gated file download expressible — `set_header(ctx, "Content-Disposition", …);
+bytes(ctx, .OK, ct, data)` — so the board can serve attachment bytes at its next
+re-pin instead of only metadata. Pinned by `tests/c2-response-surface` +
+`check_c2_controls.sh`, Amendment 33. (Originally RECORDED in Phase 8 as the
+confirmation of F8-2's prediction: no public way to emit typed bytes.)
 
 ---
 

@@ -85,6 +85,7 @@ bash -n "$URUQUIM_ROOT/build/check_c04_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_security_backlog.sh"
 bash -n "$URUQUIM_ROOT/build/check_h3_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c1_controls.sh"
+bash -n "$URUQUIM_ROOT/build/check_c2_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c05_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c06_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c07_controls.sh"
@@ -1157,6 +1158,10 @@ timeout 120 env URUQUIM_COMPILER="$URUQUIM_COMPILER" \
 echo "--- C1 (F8-1): Status gains 409/413/429/503, wired and proven ---"
 timeout 120 env URUQUIM_ODIN_BIN="$URUQUIM_COMPILER" \
   bash "$URUQUIM_ROOT/build/check_c1_controls.sh"
+
+echo "--- C2 (F8-2/F8-4): set_header + bytes, wired and proven ---"
+timeout 120 env URUQUIM_ODIN_BIN="$URUQUIM_COMPILER" \
+  bash "$URUQUIM_ROOT/build/check_c2_controls.sh"
 
 echo "--- C-02 readiness matrix: every resource x limit/deadline/cancel/saturation/metric/shutdown ---"
 bash "$URUQUIM_ROOT/build/check_readiness_matrix.sh"

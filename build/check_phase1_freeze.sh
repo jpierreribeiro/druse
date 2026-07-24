@@ -268,12 +268,12 @@ URUQUIM_FREEZE_APP_COUNT="$(grep -c '^application	' "$URUQUIM_FREEZE_ACTUAL_SIG"
 URUQUIM_FREEZE_TS_COUNT="$(grep -c '^test-support	' "$URUQUIM_FREEZE_ACTUAL_SIG" || true)"
 URUQUIM_FREEZE_TOTAL="$(( URUQUIM_FREEZE_APP_COUNT + URUQUIM_FREEZE_TS_COUNT ))"
 
-[ "$URUQUIM_FREEZE_APP_COUNT" -eq 75 ] ||
-  fail "the application ledger holds $URUQUIM_FREEZE_APP_COUNT symbols, not the recorded 75 (… WP96 stream/Stream/stream_send/Stream_Send/stream_close, plus WP7.5-C2 enable_upload/upload/upload_persist/Upload/Upload_Config, plus Closure-H3 stats/Server_Stats)"
+[ "$URUQUIM_FREEZE_APP_COUNT" -eq 77 ] ||
+  fail "the application ledger holds $URUQUIM_FREEZE_APP_COUNT symbols, not the recorded 77 (… plus Closure-H3 stats/Server_Stats, plus C2 set_header/bytes)"
 [ "$URUQUIM_FREEZE_TS_COUNT" -eq 2 ] ||
   fail "the test-support ledger holds $URUQUIM_FREEZE_TS_COUNT symbols, not the frozen 2"
-[ "$URUQUIM_FREEZE_TOTAL" -eq 77 ] ||
-  fail "the exported union is $URUQUIM_FREEZE_TOTAL, not the recorded 77"
+[ "$URUQUIM_FREEZE_TOTAL" -eq 79 ] ||
+  fail "the exported union is $URUQUIM_FREEZE_TOTAL, not the recorded 79"
 
 # ---------------------------------------------------------------------------
 # 5. Named assertions on the contracts most likely to be eroded quietly.
