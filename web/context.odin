@@ -119,6 +119,22 @@ Context_Internal :: struct {
 	// content type exceeding this is rejected by `web.bytes`.
 	content_type_buffer: [CONTENT_TYPE_MAX]u8,
 
+	// C7 (friction F8-3) — ONE typed, request-scoped value (`web.request_state`),
+	// the narrow reopening of ADR-028: NOT an untyped `Context` bag, NOT the
+	// type-erased dynamic keying that ADR was right to reject. A single
+	// application-declared type per request, stored zero-allocation in this fixed
+	// request-local buffer. `request_state_set` is false on a fresh Context (one
+	// is built per request in `serve_dispatch`/`test_request`, so keep-alive gets
+	// a clean slate); the first `request_state` call zeroes the buffer and stamps
+	// the type, and every later call in the same request asserts the same type —
+	// so a middleware that wrote `^Auth` and a handler that reads `^Auth` share it,
+	// while a handler asking for a different type aborts on the typeid mismatch
+	// (the type confusion ADR-028 feared, made impossible rather than merely
+	// discouraged).
+	request_state_buffer: [REQUEST_STATE_MAX]u8,
+	request_state_type:   typeid,
+	request_state_set:    bool,
+
 	// WP5 — request-local storage for the extractor error envelope, on exactly
 	// the same terms as `allow_buffer` above and for exactly the same reason:
 	// the committed response holds a VIEW over it, and it is read after the

@@ -78,12 +78,18 @@ RECORDED in Phase 8: the framework had removed a plan-required capability.)
 | **8. Public cost / reversibility** | If ADR-028 is reopened: a new public generic and a request-local storage slot — additive, but a genuine surface and lifetime commitment (who owns the value, when it is cleared), so **not** a trivial add. Recorded here as evidence toward that decision, deliberately **not** proposed as a Phase-8 change. |
 | **9. RED test** | Deferred until/unless ADR-028 reopens: a test where a `web.use` middleware resolves an identity, stores it via the candidate typed slot, and a downstream handler reads the *same typed value* without re-querying — RED today (no such slot), GREEN after. Until then this is an evidence entry, not a change request. |
 
-**Disposition:** RECORDED as **measured boilerplate** (the plan's WP104 mandate:
-"Measure repeated auth/authorization boilerplate ... this is the evidence ADR-028
-requires; the application does not smuggle an extension bag into `Context`"). The
-board honors ADR-028 — no `Context` bag — and pays the repetition explicitly.
-One data point toward reopening ADR-028; **not** a Phase-8 change. Revisit when
-WP105–108 add more protected handlers and the cluster is larger.
+**Disposition:** **RESOLVED by corrective WP C7 (2026-07-24) — an ADR-028
+amendment the owner must ratify at release.** `web.request_state(ctx, $R) -> ^R`
+adds ONE typed request-scoped value: a middleware resolves an identity and stamps
+it; the handler reads it without re-querying, removing the measured auth-prologue
+repetition. It is NOT the untyped/dynamically-keyed bag ADR-028 rejected — one
+app-declared type, typeid-checked, fixed request-local storage. Because it
+reverses a *stated* principle ("there will not be one"), the design and the
+reversal are recorded in `planning/adr-028-amendment.md` with my ADOPT
+recommendation, and `planning/release-readiness.md` gates on the owner confirming
+it. Pinned by `tests/c7-request-state` + `check_c7_controls.sh`, Amendment 37.
+(Originally RECORDED in Phase 8 as measured boilerplate — the G-09 evidence
+ADR-028 said it would want.)
 
 ---
 

@@ -210,6 +210,17 @@ mirroring the Hardening H-1 pattern.
   the only failure was the known **c03 real-socket contention flake under load**
   (F-C03-2 — unrelated to Expect; the machine was saturated by the soak poller +
   back-to-back gates).
-- [ ] C7 F8-3 ADR-028 request-scoped state
+- [x] **C7 F8-3 request_state — DONE (2026-07-24).** `web.request_state(ctx,$R)->^R`,
+  ONE typed request-scoped value (the narrow ADR-028 reopening — flagged for owner
+  ratification in `planning/adr-028-amendment.md`). NOT an untyped bag: one
+  app-declared type, typeid-stamped on first access, asserted after; fixed
+  request-local storage (`REQUEST_STATE_MAX=256`, no allocation); fresh Context per
+  request = no cross-request leak. Closes the measured auth-prologue boilerplate
+  (F8-3): a middleware writes, the handler reads. Ledger 79→80, union 82. Full
+  ritual + Amendment 37 + ADR-028 amendment doc + `tests/c7-request-state` (3 tests:
+  mw→handler flow, no leak, same-type→same-pointer) + `check_c7_controls.sh`. C7
+  control + tests green standalone; the full gate aborted on the known
+  **wp41 phase_determinism env flake** before reaching the C7 control step (5 prior
+  controls green, 189 PASS).
 - [ ] Scale/robustness campaign + report
 - [ ] Release-readiness: all six green → my approval

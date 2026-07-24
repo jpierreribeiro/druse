@@ -2343,3 +2343,45 @@ are unchanged. Adapter helper: `expect_is_100_continue` (allocation-free).
 
 **Rollback.** Reversible before release (restore the unconditional 417). Fifth of
 the C1..C7 corrective batch.
+
+## Amendment 37 — Corrective WP C7 (friction F8-3): `request_state` (ADR-028 reopening)
+
+**Date: 2026-07-24. Authority: the Corrective Program, owner-mandated.**
+**Ledger effect: application 79 → 80.** 80 application + 2 test-support = union
+**82**. One symbol:
+
+```
+application	proc	request_state :: proc(ctx: ^Context, $R: typeid) -> ^R
+```
+
+**THIS ONE REVERSES A STATED PRINCIPLE — flagged for the owner's release review.**
+ADR-028 decided request-scoped state "does not exist, and there will not be one."
+C7 reopens that on a NARROW reading and the fix is deliberately not the pattern
+ADR-028 rejected: not Go's `context.WithValue`, not Rust's `http::Extensions`
+(type-erased, dynamically-keyed state crossing library boundaries — which Uruquim
+does not have). It is ONE application-declared TYPE per request, typeid-checked —
+`web.state`'s `rawptr`+`typeid` discipline applied per request instead of per
+application.
+
+**WHY.** Proof-by-use (Phase 8, WP104) MEASURED the cost ADR-028 left standing:
+every protected handler repeats the auth-resolve prologue because a `web.use`
+middleware has nowhere to leave a typed result for the handler (friction F8-3).
+`request_state` is the typed hand-off — a middleware resolves an identity and
+stamps it; the handler reads it without re-querying.
+
+**NOT AN UNTYPED BAG.** Exactly one value per request, exactly one type: the first
+call zeroes a fixed request-local buffer (`REQUEST_STATE_MAX = 256`, no allocation)
+and stamps `$R`; every later call asserts the same `$R`, so a handler asking for a
+different type aborts on the typeid mismatch (the type confusion ADR-028 feared,
+made impossible). A fresh `Context` per request (`serve_dispatch`/`test_request`)
+means keep-alive never leaks one request's value into the next. `size_of(R) >
+REQUEST_STATE_MAX` is a `#assert` (compile-time).
+
+| Symbol | Ledger | WP | Signature evidence | Behaviour evidence | Doc | Notes |
+|---|---|---|---|---|---|---|
+| `request_state` | A | C7 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c7-request-state/request_state_test.odin::c7_request_state_flows_from_middleware_to_handler` + `::c7_request_state_does_not_leak_across_requests` + `::c7_same_type_returns_same_pointer` | `docs/ai-context.md::web.request_state` | one typed request-scoped value; typeid-checked; fixed request-local storage; ADR-028 amendment |
+
+**Rollback.** Reversible before release (remove the proc + the Context fields;
+restore the ADR-028 statement). Sixth of the C1..C7 corrective batch. **This is
+the amendment the release-readiness review must ratify as a philosophy change, not
+merely a gap fix — see `planning/adr-028-amendment.md`.**

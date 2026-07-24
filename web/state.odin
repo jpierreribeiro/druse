@@ -9,15 +9,17 @@
 // handle, a configuration struct, a template cache. It is created before the
 // first request and read by every one of them.
 //
-// WHAT IT IS NOT FOR, and this is the boundary that keeps it small:
-// REQUEST-SCOPED state. ADR-028 decided that question separately and decided it
-// **does not exist** (option 1, ACCEPTED 2026-07-20 under the ADR-029
-// delegation). C-6 found that Go's `context.WithValue` and Rust's
-// `http::Extensions` exist for type-erased, dynamically-keyed state crossing
-// library boundaries — which Uruquim does not have — and concluded that this
-// SUPPORTS G-03 rather than challenging it. The honest consequence is stated
-// where an application will meet it: the canonical auth pattern's revalidation
-// cost (WP24) stands, and nothing here promises to remove it.
+// REQUEST-SCOPED state is a SEPARATE thing, `web.request_state` (below). ADR-028
+// originally decided it "does not exist"; corrective WP C7 (friction F8-3, an
+// ADR-028 amendment) reopened that under the Corrective Program's owner mandate,
+// on a narrow reading: ADR-028 was right to reject Go's `context.WithValue` and
+// Rust's `http::Extensions` — TYPE-ERASED, dynamically-keyed state crossing
+// library boundaries, which Uruquim does not have — but a SINGLE
+// application-declared TYPE per request, typeid-checked, is not that pattern. It
+// is the same `rawptr`+`typeid` discipline as `web.state`, applied per request,
+// which is what lets a middleware hand a handler a computed value (the measured
+// auth-prologue boilerplate F8-3 recorded) without an untyped bag. See
+// `web.request_state`.
 //
 // WHY THE CALL SITE HAS NO GENERIC NOISE. ADR-004 weighed option B — a
 // parametric `App(S)`/`Context(S)` — and rejected it because it puts a type
@@ -121,4 +123,55 @@ state :: proc(ctx: ^Context, $T: typeid) -> ^T {
 		"uruquim: web.state was asked for a type other than the one registered with web.app_with_state; the requested and registered types must match exactly (ADR-004, AMEND-1).",
 	)
 	return (^T)(ctx.private.state)
+}
+
+// REQUEST_STATE_MAX bounds the ONE request-scoped value `request_state` stores in
+// fixed request-local storage (no allocation, no teardown). A request-state type
+// larger than this aborts at the call site — a programmer error, discovered in
+// development, never by a client (ADR-020). 256 bytes holds the realistic case (a
+// resolved identity: an id, a role, a couple of string views) with room to spare.
+@(private)
+REQUEST_STATE_MAX :: 256
+
+// request_state returns a pointer to the request's ONE typed, request-scoped
+// value — corrective WP C7 (friction F8-3), the narrow ADR-028 reopening.
+//
+// WHAT IT IS FOR. A value one part of a request computes and another reads: a
+// middleware resolves the caller's identity and stamps it here; the handler reads
+// it without re-querying. It is the typed hand-off F8-3 measured the absence of —
+// every protected handler repeating the auth-resolve prologue because a `web.use`
+// middleware had nowhere to leave a typed result.
+//
+// IT IS NOT AN UNTYPED BAG (the ADR-028 boundary). There is exactly ONE value per
+// request and it has exactly ONE type: the first call in a request zeroes the
+// buffer and stamps `$R`; every later call ASSERTS the same `$R`, so a handler
+// asking for a type other than the one the middleware wrote aborts on the typeid
+// mismatch rather than reinterpreting the bytes. This is `web.state`'s discipline
+// (a private `rawptr` sealed between typed boundaries, kept honest by a `typeid`),
+// applied per request instead of per application.
+//
+// LIFETIME. The storage is the Context's, valid for the request and no longer; a
+// `^R` must not escape the request. A fresh Context is built per request
+// (`serve_dispatch`, `test_request`), so `request_state_set` starts false and a
+// keep-alive connection never leaks one request's value into the next. Zero
+// allocation, no teardown.
+//
+// The returned pointer is stable within the request: two calls with the same `$R`
+// return the SAME `^R`, so the middleware's writes are what the handler reads.
+request_state :: proc(ctx: ^Context, $R: typeid) -> ^R {
+	#assert(size_of(R) <= REQUEST_STATE_MAX)
+	if !ctx.private.request_state_set {
+		// Zero the fixed buffer (all of it — the array zero needs no allocator and
+		// no import) so the caller reads a clean value, not a previous request's
+		// bytes, before anyone writes.
+		ctx.private.request_state_buffer = {}
+		ctx.private.request_state_type = typeid_of(R)
+		ctx.private.request_state_set = true
+	} else {
+		assert(
+			ctx.private.request_state_type == typeid_of(R),
+			"uruquim: web.request_state was asked for a type other than the one first stored this request; a request holds exactly one typed value and every access must use that same type (ADR-028 amendment / C7).",
+		)
+	}
+	return (^R)(&ctx.private.request_state_buffer)
 }

@@ -39,6 +39,7 @@ application	proc	query_int_opt :: proc(ctx: ^Context, name: string) -> (value: i
 application	proc	query_int_or :: proc(ctx: ^Context, name: string, default_value: int) -> (value: int, ok: bool)
 application	proc	refused_connections :: proc() -> int
 application	proc	request_id :: proc(ctx: ^Context)
+application	proc	request_state :: proc(ctx: ^Context, $R: typeid) -> ^R
 application	proc	route :: proc(ctx: ^Context) -> string
 application	proc	router :: proc() -> Router
 application	proc	secure_headers :: proc(ctx: ^Context)

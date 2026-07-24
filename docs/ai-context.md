@@ -40,10 +40,12 @@ a standardized JSON envelope.
   connection closed.
 
 **Not available yet** — do not emit any of it: graceful shutdown with a
-deadline (Phase 4). There is **no request-scoped state** and there will not be one
-(ADR-028): `ctx` is not an extension bag, and a value a middleware computes for
-a handler is passed down or recomputed. Panic recovery does not exist and never will: Odin has
-no recoverable panic (ADR-020). See the appendix.
+deadline (Phase 4). Request-scoped state is **ONE typed value**, `web.request_state`
+(corrective WP C7, the narrow ADR-028 reopening) — a middleware computes a value
+and the handler reads it back; `ctx` is still **not** an untyped extension bag and
+there is no dynamically-keyed `context.WithValue`-style storage. Panic recovery
+does not exist and never will: Odin has no recoverable panic (ADR-020). See the
+appendix.
 
 **Fault behaviour — state it accurately, both halves (ADR-020).**
 
@@ -58,7 +60,7 @@ no recoverable panic (ADR-020). See the appendix.
 - Never emit `web.recovery`, a `recovery` middleware, or advice to "wrap the
   handler to catch the panic". None of it exists, and none of it can.
 
-**Two ledgers.** The application API is exactly **79** symbols (32 frozen in
+**Two ledgers.** The application API is exactly **80** symbols (32 frozen in
 Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 `header`/`bearer_token`, `observe`/`Framework_Event`/`Framework_Error`,
 `logger` and `request_id` from Phase 2, and `route`, `app_with_state`,
@@ -68,8 +70,8 @@ Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 from Phases 5-6, `stream`/`Stream`/`stream_send`/`Stream_Send`/`stream_close` from
 Phase 7, `enable_upload`/`upload`/`upload_persist`/`Upload`/`Upload_Config` from
 Phase 7.5, `stats`/`Server_Stats` from the Closure, `set_header`/`bytes` from
-corrective WP C2, `query_int_opt` from C3, and `stream_live` from C4).
-The test-support API is a separate ledger of exactly **2**. Union: **81**. Do not
+corrective WP C2, `query_int_opt` from C3, `stream_live` from C4, and `request_state` from C7).
+The test-support API is a separate ledger of exactly **2**. Union: **82**. Do not
 fold them together and do not invent a third form.
 
 ## Application
@@ -388,7 +390,22 @@ the operating system.
 
 ```text
 app_with_state(&state) -> App     app() plus ONE typed value; rejects nil
-state(ctx, T) -> ^T               that value, typed; asserts before it casts
+state(ctx, T) -> ^T               that APP-scoped value, typed; asserts before it casts
+request_state(ctx, R) -> ^R       ONE typed REQUEST-scoped value (C7); middleware writes, handler reads
+```
+
+`web.request_state(ctx, R)` (C7) is the per-request counterpart of `web.state`:
+one typed value that lives for the request, so a middleware can hand a handler a
+computed result. The first call in a request zeroes it and stamps the type `R`;
+every later call asserts the same `R` (a different type aborts — the same
+programming error `web.state` catches). Storage is fixed request-local (no
+allocation), so a `^R` must not escape the request. Use it for a resolved
+identity a `web.use` middleware writes and the handler reads:
+
+```text
+Auth :: struct { account_id: i64 }
+auth :: proc(ctx: ^web.Context) { web.request_state(ctx, Auth).account_id = 42; web.next(ctx) }
+me   :: proc(ctx: ^web.Context) { web.ok(ctx, web.request_state(ctx, Auth)^) }
 ```
 
 <!-- fragment: phase3/app-state -->
