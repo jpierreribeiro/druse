@@ -10,7 +10,7 @@ remaining gap. I approve to the quality bar, not to optimism.
 evidence supports a **CONTROLLED PILOT** release now, with GA gated on the scale
 campaign. So each gate is scored for BOTH tiers:
 
-- **CONTROLLED PILOT — APPROVED (2026-07-24), all six gates GREEN for pilot scope.**
+- **CONTROLLED PILOT — RELEASED (2026-07-24), all six gates GREEN, tagged `v0.9.0-pilot`.**
   Approved under the owner's delegated quality authority ("só será lançado quando
   você aprovar, o seu padrão" + "tome iniciativa... nunca pare"). Pilot scope =
   behind a proxy with `proxy_buffering off`, a supervisor with a kill timeout >

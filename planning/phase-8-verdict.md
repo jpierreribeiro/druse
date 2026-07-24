@@ -1,6 +1,6 @@
 # WP113 — Phase 8 product verdict, capability matrix and freeze
 
-**Status: NEAR-FINAL VERDICT, 2026-07-24.** Phase 8 (proof-by-use) is complete and
+**Status: FINAL (CONTROLLED-PILOT) VERDICT, 2026-07-24.** Phase 8 (proof-by-use) is complete and
 **the Corrective Program (C1–C7) that resolved all eight findings is live-verified
 in production** (deployment #5). The ≥4h soak PASSED. What remains before this
 flips DRAFT→FINAL and a release tags is owner/hardware-gated, tracked in
