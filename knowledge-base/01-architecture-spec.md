@@ -149,7 +149,9 @@ Advanced users MAY inject a transport explicitly:
 web.serve_transport(&app, &custom_transport, web.Serve_Config{port = 8080})
 ```
 
-This appears only in advanced documentation, never in the Quick Start.
+This appears only in advanced documentation, never in the Quick Start. It shares
+the reserved `Serve_Config` shape described under *Serving* (ADR-045): a
+structured address with an explicit family, no `host: string`.
 
 ## Public API Surface
 
@@ -447,12 +449,19 @@ relaxed through a spec-first amendment. Until then, value-only is normative.
 
 ```odin
 web.serve(&app, 8080)                              // canonical
-web.serve_with(&app, web.Serve_Config{             // explicit configuration
-	host = "0.0.0.0",
-	port = 8080,
+web.serve_with(&app, web.Serve_Config{             // RESERVED shape — ADR-045
+	address = <structured, explicit family>,       //   never `host: string`
+	port    = 8080,
 })
 web.serve_transport(&app, &transport, config)      // advanced: inject transport
 ```
+
+`Serve_Config` is a RESERVED shape (ADR-045), not a shipped signature: its
+address is STRUCTURED with an explicit address family — never a stringly-typed
+`host` — and an unavailable family fails startup rather than falling back
+silently. `serve_with` and `serve_transport` do not exist today; every gate
+rejects them. The final field set is gated on future-research #21 (whether
+`IPV6_V6ONLY` can be set on this stack at all).
 
 ### Canonical vocabulary (provisionally frozen)
 

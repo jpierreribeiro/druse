@@ -999,8 +999,12 @@ only so an agent recognizes the names and refuses them.
 
 <!-- phase: 4; unavailable -->
 ```odin
-// Phase 4 — unavailable in Phase 1.
-web.serve_with(&app, web.Serve_Config{host = "0.0.0.0", port = 8080})
+// Phase 4 — unavailable in Phase 1. RESERVED SHAPE ONLY (ADR-045): the address
+// is STRUCTURED with an EXPLICIT family, never a `host: string`; an unavailable
+// family fails startup, never a silent fallback. The final contract is gated on
+// future-research #21 (the `IPV6_V6ONLY` evidence), so the field below is a
+// placeholder, not a promised signature.
+web.serve_with(&app, web.Serve_Config{address = <structured, explicit family>, port = 8080})
 ```
 
 Other names reserved for later phases, none of which exist today:

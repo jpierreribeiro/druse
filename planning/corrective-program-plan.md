@@ -232,3 +232,42 @@ mirroring the Hardening H-1 pattern.
   controls green, 189 PASS).
 - [ ] Scale/robustness campaign + report
 - [ ] Release-readiness: all six green → my approval
+
+## 6. Addendum — review-prompted work package (NOT one of the eight findings)
+
+**BD1 — boot-time effective-endpoint diagnostic.** Origin is external review, not
+the friction ledger: the golang/go#77430 analysis (ADR-045) plus the fact that
+WP112's usability study already scores "compiler and boot diagnostic quality"
+(`phase-8-plan.md`), and that the pilot runs a proxy on the same host with the
+real-proxy round still owed (`closure-proxy-contract.md`). It is filed here, not
+as a C-WP, because it closes **no** F8 finding — the ledger records zero network
+frictions — and it is **not** a demand signal for configurable binding (that stays
+`future-research.md` #21).
+
+- **What.** One log line at startup, after `http.listen` succeeds, naming the
+  **effective** listening endpoint — e.g. `listening address=0.0.0.0 port=8080`.
+  It emits near the existing `on_ready` hook in
+  `web/internal/transport/odin_http_adapter.odin` (which today signals readiness
+  but logs no address). The value is that the bind is a fixed **all-interfaces**
+  `0.0.0.0`; surfacing that tells an operator the app must sit behind a proxy or
+  firewall — precisely the pilot's latent exposure (no firewall guidance was
+  located in `ops/`/`docs/`; absence found by grep, not a claim the VPS is open).
+
+- **Honesty constraint.** Log the endpoint **as confirmed by the backend** after
+  the listen call returns, never a re-echoed compile-time constant, so the line
+  stays truthful if the bind policy ever changes.
+
+- **Scope / non-goals.** Log-only. **No public symbol; the ledger stays 80+2=82.**
+  No new configuration, no IPv6, no bind option — those are #21, gated on evidence.
+
+- **Definition of done.** (a) the boot line appears exactly once with the
+  effective address and port; (b) **one observable-contract test** pins it — RED
+  before, GREEN after; (c) the public-surface and ledger gates still report **82**
+  and still **reject** `serve_with`/`serve_transport` (proof no symbol was added);
+  (d) no ledger-amendment ritual is owed, because no public symbol is added — only
+  the observable-output test and its control.
+
+- **Status.** PROPOSED WP, spec only. **Not implemented in this branch**, which is
+  documentation/decision work (ADR-045 + reserved-shape amendment + #21). Sequence
+  it after the scale campaign or whenever a boot-diagnostics pass is scheduled; it
+  is independent of C1–C7.

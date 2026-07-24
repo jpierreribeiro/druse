@@ -2137,3 +2137,91 @@ none; the requirement it keeps is the one nobody disputes.
 
 - **Reversibility. MEDIUM.** Private machinery until names freeze in WP101;
   the public token/send/close surface, once shipped, is frozen ledger.
+
+## ADR-045 — Explicit listener binding: no address-family inference
+
+- **Status.** PROPOSED, 2026-07-24. Documentation-only: it ratifies the shipped
+  bind policy as principle and re-scopes a *reserved, unbuilt* design. It adds no
+  public symbol and does not touch the ledger. It stays PROPOSED until the future
+  research that unblocks configurable binding (`future-research.md` #21) reports
+  evidence; only then can any of the reserved contract below become code.
+
+- **Context.** A public thread on **golang/go#77430** described a
+  `net.Listen("tcp", "[::]:9100")` that silently ends up bound to `0.0.0.0`
+  because Go's internal dual-stack probe fails under a BPF filter, and Go 1.25's
+  `go vet hostport` analyzer that flags `fmt.Sprintf("%s:%d", host, port)`
+  precisely because the stringly-typed form breaks on IPv6. The shared root cause
+  is **inference**: the runtime guesses an address family and a dual-stack mode
+  from a textual address, then silently downgrades when the guess fails.
+
+  Uruquim cannot reproduce that bug. `web.serve(a, port: int)` takes an integer
+  port and no textual `host:port` surface, and the bootstrap adapter binds one
+  fixed policy — `net.Endpoint{address = net.IP4_Address{0,0,0,0}, port =
+  cfg.port}` (`web/internal/transport/odin_http_adapter.odin`) — with no probe, no
+  family detection and no fallback. Inference is structurally absent.
+
+  The exposure is elsewhere. The **reserved, unshipped** `Serve_Config` sketched
+  in `docs/ai-context.md` and `knowledge-base/01-architecture-spec.md` carried a
+  `host: string` field. That is the same stringly-typed representation the Go
+  footgun rests on: it makes IPv6 ambiguous (`[::1]:8080` vs a bare `::1`), hides
+  the address family, and has nowhere to express `IPV6_V6ONLY`, dual-stack or
+  fallback. `serve_with`/`serve_transport` do not exist — every gate rejects them —
+  so correcting the sketch costs a documentation edit today; after GA it is an API
+  break. `v0.9.0-pilot` is tagged and GA is one scale campaign away, so the window
+  is open and dated.
+
+- **Decision.**
+  1. **Principle ratified.** The shipped policy — one explicit bind, no
+     inference — is the normative principle. A `host: string` surface that invites
+     parse-and-guess is rejected as *inconsistent with the code that already
+     ships*, not merely as a future risk.
+  2. **Reserved contract, when bind ever becomes configurable.** A **structured
+     address plus an explicit `family`** — never a textual `host`. **No `.Auto`
+     mode**: the framework does not probe or guess a family.
+  3. **Dual stack is explicit, not implicit.** IPv4+IPv6 is expressed as **two
+     explicit listeners** — `AF_INET` on `0.0.0.0` and `AF_INET6` on `::` with
+     `IPV6_V6ONLY` set — never as a single IPv6 socket relying on `IPV6_V6ONLY=0`
+     and IPv4-mapped addresses (the Go footgun).
+  4. **No silent fallback.** A requested family that is unavailable is a
+     **startup failure with a diagnostic**, never a silent downgrade to another
+     family. This mirrors `serve`'s existing contract: an invalid port is logged
+     and refuses to bind rather than binding something else.
+  5. **Reserved, not promised.** The contract above is a *shape*, not a schedule.
+     Its finalization is gated on `future-research.md` #21, whose first evidence
+     item is whether `IPV6_V6ONLY` can be set at all on this stack — see Costs.
+
+- **Options considered.**
+  - `host: string` (**rejected**): stringly-typed; ambiguous IPv6; hides family;
+    no seam for `IPV6_V6ONLY`/dual-stack/fallback; imports the Go footgun one layer
+    up.
+  - A single IPv6 listener with `IPV6_V6ONLY=0` + IPv4-mapped addresses for
+    dual stack (**rejected**): exactly the implicit dual-stack Go#77430 shows to
+    be fragile and platform-dependent.
+  - An `.Auto`/probe family mode (**rejected**): inference is the property this
+    ADR rejects; a failing probe is precisely how the Go bind silently degrades.
+  - Silent IPv4 fallback when IPv6 is unavailable (**rejected**): hides operator
+    error; a bind the operator did not ask for is worse than a refusal.
+
+- **Costs / open dependency.** The reserved contract is **not buildable today**,
+  and the ADR records why rather than implying it is ready. `nbio.listen_tcp`
+  already accepts an IPv6 endpoint — `core/nbio/impl.odin` derives the family via
+  `family_from_endpoint`, and `core/nbio/net.odin` re-exports `IP6_Address`/
+  `IP6_Any` — so *binding* IPv6 is not the blocker. The blocker is
+  **`IPV6_V6ONLY`**: `core:net`'s `Socket_Option` enum does not expose it, and
+  `nbio` owns the `socket()`→bind() sequence, setting only `Reuse_Address`. Clause
+  3's explicit-dual-stack contract therefore needs a vendor/backend seam or an
+  upstream socket-option addition before it can ship. That gap is the substance of
+  the research item, not an afterthought.
+
+- **Non-goals.** This ADR builds nothing, adds no public symbol, and does not put
+  configurable binding or IPv6 on the roadmap. The demand gate is explicit: the
+  Phase-8 friction ledger records eight real frictions and **none** concerns bind,
+  port, interface, network or IPv6 (`planning/phase-8-friction-ledger.md`).
+  Configurable binding stays a research question (#21) until real demand and the
+  `IPV6_V6ONLY` evidence both arrive.
+
+- **Reversibility. HIGH.** Nothing here is frozen ledger — it is a documentation
+  correction of a reserved sketch plus a research gate. The reserved contract can
+  be revised freely up until the research item promotes it into an implementing
+  ADR. See ADR-009 (the transport boundary that keeps this an adapter concern, not
+  a public-API one) and `future-research.md` #21.
