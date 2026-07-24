@@ -49,9 +49,11 @@ capacity/cost envelope. **Blocked on: owner-provided access to the larger VPS(s)
 **PARTIAL.** MET: ≥5 immutable migrations (7, incl. backfill + expand/contract);
 ≥4h soak (PASS); dataset (5 projects / 600 tasks / 2400 comments / spooled
 attachment); the drill set (kill, PG restart, graceful restart, malformed,
-checksum-tamper). OPEN: **≥10 deployments** (5 recorded — the rest accrue through
-the scale campaign and continued operation); the **deferred WP110 cells** (fold
-into Gate 2).
+checksum-tamper). the deferred WP110 **upload-interruption** cell GREEN; the **network-interruption**
+cell found a real gap (readiness unbounded under a silent partition) and shipped a
+mitigation (`tcp_user_timeout`) whose full validation needs a REMOTE DB (folded
+into Gate 2 — the loopback repro cannot exercise it). OPEN: **≥10 deployments**
+(5 recorded — the rest accrue through the scale campaign).
 
 ## Gate 4 — Owner ratification of the ADR-028 amendment (C7)
 
@@ -94,7 +96,7 @@ explicit go, which this document gates.
 | 2 scale | SSH to the larger VPS(s) | owner provides; then me |
 | 3 deploys | accrues via Gate 2 + operation | me (on hardware) |
 | 4 ADR-028 | ADOPT / REVERT decision | owner |
-| 5 hygiene | run scan + privacy review | me (scan) + owner (privacy) |
+| 5 hygiene | ~~scan (DONE)~~ + privacy review | owner (privacy) |
 | 6 verdict/merge/tag | human WP112 + release go | owner |
 
 **My standing recommendation:** the framework is **ready for a controlled
