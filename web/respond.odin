@@ -199,7 +199,16 @@ set_header :: proc(ctx: ^Context, name: string, value: string) -> bool {
 	if ctx.private.response.committed {
 		return false
 	}
-	if len(name) == 0 || header_field_has_control(name) || header_field_has_control(value) {
+	// The NAME must be a valid HTTP field-name token (RFC 9110 §5.1): non-empty,
+	// no control bytes, no separators. This is stricter than the value's control-
+	// byte check on purpose — a name with a space or `:` produces a malformed
+	// header line that a proxy may reparse, so an app passing untrusted input as a
+	// name is rejected here rather than emitting an ambiguous header.
+	if !header_name_is_token(name) {
+		return false
+	}
+	// The VALUE may contain most bytes, but never CR/LF/NUL (the splitting vector).
+	if header_field_has_control(value) {
 		return false
 	}
 	if header_name_is_reserved(name) {
@@ -278,9 +287,8 @@ bytes :: proc(ctx: ^Context, status: Status, content_type: string, data: []u8) {
 	)
 }
 
-// header_field_has_control reports whether a header name or value carries a byte
-// that must never reach the wire unescaped: CR or LF (header/response splitting)
-// or NUL. Any of them makes the field unusable, so the responder refuses it.
+// header_field_has_control reports whether a header value carries a byte that must
+// never reach the wire unescaped: CR or LF (header/response splitting) or NUL.
 @(private)
 header_field_has_control :: proc(s: string) -> bool {
 	for b in transmute([]byte)s {
@@ -289,6 +297,31 @@ header_field_has_control :: proc(s: string) -> bool {
 		}
 	}
 	return false
+}
+
+// header_name_is_token reports whether `name` is a valid HTTP field-name token
+// (RFC 9110 §5.1 / RFC 9110 `token` = 1*tchar). tchar excludes controls,
+// whitespace and the separators `()<>@,;:\"/[]?={}`, so a name that could produce
+// an ambiguous or malformed header line is rejected. Empty is not a token.
+@(private)
+header_name_is_token :: proc(name: string) -> bool {
+	if len(name) == 0 {
+		return false
+	}
+	for b in transmute([]byte)name {
+		// tchar = "!#$%&'*+-.^_`|~" / DIGIT / ALPHA
+		is_alpha := (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')
+		is_digit := b >= '0' && b <= '9'
+		is_sym := false
+		switch b {
+		case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+			is_sym = true
+		}
+		if !(is_alpha || is_digit || is_sym) {
+			return false
+		}
+	}
+	return true
 }
 
 // header_name_is_reserved reports whether a header name is framework- or

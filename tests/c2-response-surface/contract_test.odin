@@ -49,11 +49,14 @@ c2_set_header_rides_on_the_response :: proc(t: ^testing.T) {
 @(private = "file")
 reject_handler :: proc(ctx: ^web.Context) {
 	reserved := web.set_header(ctx, "Content-Type", "text/evil")     // framework-owned
-	injected := web.set_header(ctx, "X-Bad", "a\r\nInjected: yes")   // header injection
+	injected := web.set_header(ctx, "X-Bad", "a\r\nInjected: yes")   // value injection
 	empty := web.set_header(ctx, "", "x")                            // empty name
+	bad_name := web.set_header(ctx, "X Bad", "y")                    // non-token name (space)
+	colon_name := web.set_header(ctx, "X:Bad", "y")                  // non-token name (colon)
+	crlf_name := web.set_header(ctx, "X\r\nSet-Cookie", "y")         // name injection
 	// A legitimate one still works alongside the refusals.
 	good := web.set_header(ctx, "X-Ok", "1")
-	if reserved || injected || empty || !good {
+	if reserved || injected || empty || bad_name || colon_name || crlf_name || !good {
 		web.text(ctx, .Internal_Server_Error, "validation wrong")
 		return
 	}
