@@ -211,11 +211,12 @@ deployment #2 until the header was stripped.)
 | **8. Public cost / reversibility** | Both additive: a new param builder and a new validator, no change to existing signatures. `arg_timestamptz` pulls `core:time` into the param surface (a small dependency decision). Reversible. Recorded as evidence; the board ships the text-cast workaround, so nothing is blocked. |
 | **9. RED test** | For (a): a test binds a timestamp through the candidate `arg_timestamptz` and reads it back equal — RED today (no such builder), GREEN after. For (b): `validate.rfc3339` rejects `"not-a-date"` with a field error, so the handler returns `400` not `500` — RED today, GREEN after. Each distinguishes *improvement* (a typed, validated timestamp path) from *preference* (the text-cast works; the gap is discoverability + the 500-on-bad-input). |
 
-**Disposition:** RECORDED with the **strongest provenance in the ledger — three
-independent WP112 coding agents (2× sonnet, 1× opus), in isolated copies, each
-surfaced BOTH facets unprompted** while converging on the same canonical
-implementation (see `planning/phase-8-wp112-usability-study.md`). That the
-usability instrument itself produced a framework finding is proof the proof-by-use
-loop holds even inside the study. **Not applied in Phase 8; carried for the
-owner's review**, likely paired with F8-1 (the enum) as a batch of small,
-additive Crystal/enum completions.
+**Disposition:** **RESOLVED by corrective WP C5 (2026-07-24)** — in the crystals
+repo (branch `corrective` off the board-pinned `36db55c`). Both facets closed:
+`validate.rfc3339` makes a malformed date a boundary 400 (not a database 500), and
+`pg.arg_timestamptz` binds an ISO string typed as `timestamptz` by OID 1184
+(threaded through `encode_params`→`exec_with_deadline`→`PQexecParams`), so no
+`$N::timestamptz` cast is needed. `validate.rfc3339` fully tested locally; the pg
+runtime is VPS-verified at board re-pin (libpq-gated). (Originally RECORDED with
+the strongest provenance in the ledger — three independent WP112 agents surfaced
+both facets unprompted.) **All eight findings F8-1..F8-8 are now RESOLVED.**

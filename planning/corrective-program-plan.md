@@ -197,7 +197,15 @@ mirroring the Hardening H-1 pattern.
   Ledger 78 → 79, union 81. Full ritual + Amendment 35 + `tests/c4-stream-live`
   (registry unit test: open→live, close/stale/out-of-range→dead) +
   `check_c4_controls.sh`. Full gate: 188 PASS, C1-C4 green (only the wp41 flake).
-- [ ] C5 F8-8 crystals timestamp+validator
+- [x] **C5 F8-8 crystals timestamp+validator — DONE (2026-07-24).** In the CRYSTALS
+  repo, branch `corrective` off the board-pinned `36db55c` (push normal). Two
+  additive pieces: `validate.rfc3339`/`rfc3339_valid` (pure RFC 3339 validator — a
+  malformed date is now a boundary 400, not a database 500; 3 tests green locally)
+  and `pg.arg_timestamptz(v: string)` (binds an ISO string typed as timestamptz by
+  OID 1184, threaded through encode_params→exec_with_deadline→PQexecParams, so no
+  `$N::timestamptz` cast is needed). pg half typechecks locally; its runtime
+  (cast-free timestamp write) is VPS-verified at board re-pin (libpq-gated, like the
+  board's own link). validate.rfc3339 fully verified locally.
 - [x] **C6 F8-7 Expect: 100-continue — DONE (2026-07-24).** The adapter honors
   `Expect: 100-continue` by READING THE BODY (RFC 9110 §10.1.1) instead of a hard
   417, so default clients (curl, python-requests) can complete large uploads; any
