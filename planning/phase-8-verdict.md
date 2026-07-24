@@ -1,15 +1,25 @@
 # WP113 — Phase 8 product verdict, capability matrix and freeze
 
-**Status: DRAFT VERDICT, 2026-07-24.** Substantially complete; two inputs remain
-explicitly PENDING and are marked so throughout — the ≥4h soak's final RSS number
-(running; early signal strong) and the WP112 **human** usability condition
-(owner). The release/tag decision is reserved to the owner (plan §WP113). This
-document is the capstone of Phase 8 (proof-by-use); it does not itself freeze
-anything until the two pending inputs land.
+**Status: NEAR-FINAL VERDICT, 2026-07-24.** Phase 8 (proof-by-use) is complete and
+**the Corrective Program (C1–C7) that resolved all eight findings is live-verified
+in production** (deployment #5). The ≥4h soak PASSED. What remains before this
+flips DRAFT→FINAL and a release tags is owner/hardware-gated, tracked in
+`planning/release-readiness.md`: the multi-host scale campaign (Gate 2), owner
+ratification of the ADR-028 amendment (Gate 4), pre-release hygiene (Gate 5), and
+the WP112 human condition + merge/tag (Gate 6). This document does not itself
+freeze or tag anything.
 
-The reference application is `jpierreribeiro/uruquim-board` (board `master`
-`c0df594`); framework findings live in `planning/phase-8-friction-ledger.md`
-(core `phase8`).
+The reference application is `jpierreribeiro/uruquim-board`; the deployment-#5
+line is board `corrective-repin` `c5e1dfd` on the corrective core (`phase8`
+`03c2bce`) + crystals (`corrective` `7c64d47`). Framework findings and their
+resolutions live in `planning/phase-8-friction-ledger.md`.
+
+**Headline:** every one of the eight friction findings F8-1..F8-8 is RESOLVED and
+**verified running against real PostgreSQL and real clients** — including the two
+facets that could only be runtime-checked (the `arg_timestamptz` OID typing and
+the `Expect: 100-continue` socket behaviour). The framework moved from "controlled
+pilot" toward general readiness; the release itself waits on the scale evidence and
+the owner's sign-offs.
 
 ---
 
@@ -59,7 +69,7 @@ incl. a spooled >max_body file.
 | **G8-2** Evolvable data | ✅ MET | 7 immutable migrations, checksum-guarded (tamper **refused** live), ≥1 backfill + an expand/contract deployment |
 | **G8-3** Concurrent product correctness | ✅ MET | two-user conflict → 409; blocked queries + pool saturation → fast 503; SSE notify + reconnect; no silent last-write |
 | **G8-4** Operable failure | ✅ MET (core cells) | process kill, PG restart, graceful restart, malformed input — each detected, bounded, recovered with the declared invariant. Network/upload-interruption cells deferred behind the soak |
-| **G8-5** Bounded resources | ◑ PENDING soak-final | named caps measured (pool 8, max_body 4 MiB, attachment 50 MiB, streams); post-drill counters return to baseline; **soak RSS plateau strong but the ≥4h final number is pending** |
+| **G8-5** Bounded resources | ✅ MET | named caps measured (pool 8, max_body 4 MiB, attachment 50 MiB, streams); post-drill counters return to baseline; **≥4h soak PASSED (2026-07-24): 2750 cycles, 16745 responses, errors=0, RSS plateaued flat at 41,780 kB after a 12→41 MB warm-up — no runaway growth (<64 MiB); session-expiry boundary uncrossed at 24h TTL, flagged)** |
 | **G8-6** Joy | ◑ agents MET / human PENDING | 3 agent conditions completed canonical tasks from the public surface without a second architecture; the **human** condition is the owner's |
 | **G8-7** Honest positioning | ✅ on track | see §6; capability claims below match the evidence |
 
@@ -89,26 +99,26 @@ No hypothesis was falsified. Two produced findings rather than failures
 
 ---
 
-## 4. Friction ledger disposition (F8-1..F8-8)
+## 4. Friction ledger disposition (F8-1..F8-8) — ALL RESOLVED
 
-All recorded with nine fields; **none applied** (Phase 8 is a veto/evidence
-source — corrective WPs are the owner's call, with the original gates).
+Recorded in Phase 8 as evidence; **all eight RESOLVED by the Corrective Program
+(C1–C7)**, each an additive, separately-gated change with the original freeze
+ritual and a RED→GREEN test, and each **verified live in deployment #5**.
 
-| ID | One-line | Class | Provenance |
+| ID | One-line | Corrective WP | Verified live |
 |---|---|---|---|
-| **F8-1** | `web.Status` enum lacks 503/429/409/413 | capability (enum) | 2 independent apps |
-| **F8-2** | no public way to set a response header (→ no `Set-Cookie`) | capability | forced bearer tokens |
-| **F8-3** | no request-scoped typed state (ADR-028) → repeated auth prologue | DX/evidence | measured boilerplate |
-| **F8-4** | no buffered binary responder / `Content-Disposition` → no file download | capability | confirmed F8-2 from another angle |
-| **F8-5** | no stream client-disconnect signal → idle subscriber leak | DX | live (WP107) |
-| **F8-6** | no optional TYPED query param (`query_int` 400s on absence) | DX | **a live bug that shipped**, caught by smoke |
-| **F8-7** | `Expect: 100-continue` → 417, large uploads from default clients fail | interop | live (spool proof) |
-| **F8-8** | no typed timestamp input + no date validator (→ 500 on bad date) | DX/Crystal | **3 independent WP112 agents** |
+| **F8-1** | `web.Status` lacks 409/413/429/503 | **C1** | 409/503/413 on the wire |
+| **F8-2** | no way to set a response header (→ no `Set-Cookie`) | **C2** `set_header` | header on the wire |
+| **F8-3** | no request-scoped typed state (ADR-028) | **C7** `request_state` | in binary; ADR ratification pending |
+| **F8-4** | no buffered binary responder / `Content-Disposition` | **C2** `bytes` | download → 200 + disposition |
+| **F8-5** | no stream client-disconnect signal | **C4** `stream_live` | registry-tested; in binary |
+| **F8-6** | no optional TYPED query param | **C3** `query_int_opt` | unfiltered list → 200 |
+| **F8-7** | `Expect: 100-continue` → 417 | **C6** (transport) | 5 MiB default upload → 201 |
+| **F8-8** | no typed timestamp input + no date validator | **C5** `arg_timestamptz`+`rfc3339` | stored timestamptz no cast; bad → 400 |
 
-Natural batching for a corrective WP: **enum/type completions** (F8-1 + F8-8),
-**response surface** (F8-2 + F8-4, a `web.set_header` + `web.bytes` pair),
-**transport** (F8-7), **DX/evidence** (F8-3, F8-5, F8-6) weighed against their
-ADRs.
+The one that is more than a gap fix: **C7 reverses ADR-028's stated "there will
+not be one"** — a narrow, typed reopening recorded in `planning/adr-028-amendment.md`
+with an ADOPT recommendation, awaiting the owner's ratification (release Gate 4).
 
 ---
 
@@ -168,9 +178,9 @@ candidates. **The release/tag decision itself is the owner's.**
 
 ## 8. Explicitly PENDING before Phase 8 can be declared frozen
 
-1. **Soak ≥4h final result** — read `/opt/uruquim-verify/soak.log` at completion
-   (~18:14 UTC 2026-07-24); pass = no runaway RSS growth. Crossing a session-expiry
-   boundary needs a shortened TTL (a parameter decision).
+1. **Soak ≥4h** — ✅ DONE. PASSED 2026-07-24 (4 h, 2750 cycles, errors=0, RSS flat
+   at 41,780 kB steady-state). Crossing a session-expiry boundary needs a shortened
+   TTL (a parameter decision) — a follow-up, not a blocker.
 2. **WP112 human condition** — a human contributor implements the canonical tasks
    from public docs; compare to the agent convergence.
 3. **≥6 more deployments** toward the ≥10 threshold (naturally from the corrective
