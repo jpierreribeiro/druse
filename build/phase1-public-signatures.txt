@@ -35,6 +35,7 @@ application	proc	post :: proc(a: ^App, pattern: string, handler: Handler)
 application	proc	put :: proc(a: ^App, pattern: string, handler: Handler)
 application	proc	query :: proc(ctx: ^Context, name: string) -> (value: string, found: bool)
 application	proc	query_int :: proc(ctx: ^Context, name: string) -> (value: int, ok: bool)
+application	proc	query_int_opt :: proc(ctx: ^Context, name: string) -> (value: int, present: bool, ok: bool)
 application	proc	query_int_or :: proc(ctx: ^Context, name: string, default_value: int) -> (value: int, ok: bool)
 application	proc	refused_connections :: proc() -> int
 application	proc	request_id :: proc(ctx: ^Context)

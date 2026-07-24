@@ -256,6 +256,50 @@ query_int_or :: proc(ctx: ^Context, name: string, default_value: int) -> (value:
 	return parsed, true
 }
 
+// query_int_opt reads an OPTIONAL typed query parameter and reports its PRESENCE
+// distinctly (corrective WP C3, friction F8-6). It is the reader an optional
+// typed filter needs, which neither of the others is:
+//
+//   - `query_int` is the REQUIRED reader — it commits a 400 `'<name>' is required`
+//     on absence, so merely reading an optional filter the client did not send
+//     fails the whole request (the live bug F8-6 recorded);
+//   - `query_int_or` does not commit on absence, but its `ok` is `true` for BOTH
+//     absent (→default) and present-valid, so it cannot tell "filter with value D"
+//     from "no filter".
+//
+// This distinguishes the three states with a `present` result:
+//
+//   - ABSENT — `present=false, ok=true`. No filter; nothing is committed.
+//   - PRESENT and valid — `present=true, ok=true`, `value` set.
+//   - PRESENT but malformed — `present=false, ok=false`. A 400 is committed: a
+//     `?assignee=banana` is a mistake the caller should hear about, never silently
+//     ignored. Presence is decided by the KEY, so `?assignee=` (empty value) is
+//     present-but-malformed — a 400, not an absence — exactly like `query_int_or`.
+//
+// Canonical use:
+//
+//	if v, present, ok := web.query_int_opt(ctx, "assignee"); !ok {
+//		return // malformed: the 400 is already committed
+//	} else if present {
+//		// apply the filter with `v`
+//	}
+//
+// It has no `#optional_ok` (ADR-002): the three results are all load-bearing and
+// none may be silently dropped.
+query_int_opt :: proc(ctx: ^Context, name: string) -> (value: int, present: bool, ok: bool) {
+	raw, found := query(ctx, name)
+	if !found {
+		return 0, false, true
+	}
+
+	parsed, parsed_ok := parse_int_strict(raw)
+	if !parsed_ok {
+		error_invalid_query_parameter(ctx, name)
+		return 0, false, false
+	}
+	return parsed, true, true
+}
+
 // body decodes the JSON request body into a caller-owned destination.
 //
 // The destination form keeps ownership and storage explicit. On failure the

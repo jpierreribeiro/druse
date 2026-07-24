@@ -58,7 +58,7 @@ no recoverable panic (ADR-020). See the appendix.
 - Never emit `web.recovery`, a `recovery` middleware, or advice to "wrap the
   handler to catch the panic". None of it exists, and none of it can.
 
-**Two ledgers.** The application API is exactly **77** symbols (32 frozen in
+**Two ledgers.** The application API is exactly **78** symbols (32 frozen in
 Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 `header`/`bearer_token`, `observe`/`Framework_Event`/`Framework_Error`,
 `logger` and `request_id` from Phase 2, and `route`, `app_with_state`,
@@ -67,9 +67,9 @@ Phase 1, plus `use`/`next`, `Router`/`router`/`mount`,
 `cors`/`Cors_Options`, `static`/`Static_Options`, `form_field`/`form_file`/`Uploaded_File`
 from Phases 5-6, `stream`/`Stream`/`stream_send`/`Stream_Send`/`stream_close` from
 Phase 7, `enable_upload`/`upload`/`upload_persist`/`Upload`/`Upload_Config` from
-Phase 7.5, `stats`/`Server_Stats` from the Closure, and `set_header`/`bytes` from
-corrective WP C2).
-The test-support API is a separate ledger of exactly **2**. Union: **79**. Do not
+Phase 7.5, `stats`/`Server_Stats` from the Closure, `set_header`/`bytes` from
+corrective WP C2, and `query_int_opt` from C3).
+The test-support API is a separate ledger of exactly **2**. Union: **80**. Do not
 fold them together and do not invent a third form.
 
 ## Application
@@ -596,7 +596,17 @@ path_int(ctx, name)        -> (int, ok)       responds 400 on failure
 query(ctx, name)           -> (string, found) never responds
 query_int(ctx, name)       -> (int, ok)       responds 400 when absent or malformed
 query_int_or(ctx, n, def)  -> (int, ok)       default ONLY when absent
+query_int_opt(ctx, name)   -> (int, present, ok)  OPTIONAL typed (C3): absent=present:false,ok:true (no 400); present+valid=both true; malformed=400
 body(ctx, &dst)            -> bool            responds 400/413 on failure
+```
+
+For an OPTIONAL typed query filter, use `query_int_opt` — not `query_int` (which
+400s on absence) nor `query_int_or` (whose `ok` cannot tell absent from present).
+Canonical:
+
+```text
+if v, present, ok := web.query_int_opt(ctx, "assignee"); !ok { return }  // malformed → 400 committed
+else if present { /* apply the filter with v */ }
 ```
 
 <!-- fragment: phase1/query -->

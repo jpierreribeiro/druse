@@ -150,12 +150,15 @@ cheap, reversible improvement for the owner's review.
 | **8. Public cost / reversibility** | (a) is additive — one new public proc, no change to the existing three, fully reversible; it must not itself grow an `#optional_ok` (the ADR-002 line). (b) is docs-only. Recorded as evidence; the board ships the two-call workaround, so nothing is blocked. |
 | **9. RED test** | For (a): `GET /list` with no `assignee` → the handler reads `web.query_int_opt(ctx,"assignee")`, gets `present=false, ok=true`, and returns 200 with no filter — RED today (no such proc; the nearest, `query_int`, 400s on absence), GREEN after. It distinguishes *improvement* (an optional typed read exists) from *preference* (the required/`_or` split is a real design, but there is no optional-typed member at all). |
 
-**Disposition:** RECORDED, with a **live-bug provenance**: proof-by-use shipped
-the wrong call (`query_int` for an optional filter), production traffic 400'd,
-and the smoke test caught it — exactly the evidence loop the phase exists for.
-The board carries the `web.query` + `query_int_or` workaround. Smallest fix is
-likely docs (name the idiom); a soft typed reader is the fuller answer. **Not
-applied in Phase 8; carried for the owner's review.**
+**Disposition:** **RESOLVED by corrective WP C3 (2026-07-24).** `web.query_int_opt(ctx,
+name) -> (value: int, present: bool, ok: bool)` is the soft typed reader that
+reports presence: ABSENT (`present=false, ok=true`, no commit), PRESENT+valid
+(both true), PRESENT+malformed (`ok=false`, a 400). The board drops the
+`web.query` + `query_int_or` two-call workaround for the single call at its next
+re-pin. Pinned by `tests/c3-query-opt` + `check_c3_controls.sh`, Amendment 34.
+(Originally RECORDED in Phase 8 with live-bug provenance — the wrong call
+`query_int` for an optional filter 400'd production traffic until the smoke test
+caught it.)
 
 ---
 

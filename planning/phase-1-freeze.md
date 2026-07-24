@@ -2254,3 +2254,30 @@ bounded by `APP_HEADER_MAX`/`APP_HEADER_BUFFER`/`CONTENT_TYPE_MAX`.
 
 **Rollback.** Reversible before release; from the corrective freeze onward the two
 names are a public contract. Second of the C1..C7 corrective batch.
+
+## Amendment 34 — Corrective WP C3 (friction F8-6): `query_int_opt`
+
+**Date: 2026-07-24. Authority: the Corrective Program, owner-mandated.**
+**Ledger effect: application 77 → 78.** 78 application + 2 test-support = union
+**80**. One symbol:
+
+```
+application	proc	query_int_opt :: proc(ctx: ^Context, name: string) -> (value: int, present: bool, ok: bool)
+```
+
+**WHY.** Proof-by-use (Phase 8) shipped a live bug: the board read an OPTIONAL
+`?assignee=` filter with `web.query_int`, the REQUIRED reader, which commits a
+`400 '<name>' is required` on absence — so every unfiltered list 400'd until the
+deployment-#2 smoke test caught it. The existing trio had no member for the
+common case: `query_int` fails closed on absence, and `query_int_or`'s `ok` is
+`true` for both absent and present-valid, so it cannot report presence. This
+reader distinguishes the three states an optional typed filter needs — ABSENT
+(`present=false, ok=true`, no commit), PRESENT+valid (`present=true, ok=true`),
+PRESENT+malformed (`present=false, ok=false`, a committed 400). It carries no
+`#optional_ok` (ADR-002); all three results are load-bearing.
+
+| Symbol | Ledger | WP | Signature evidence | Behaviour evidence | Doc | Notes |
+|---|---|---|---|---|---|---|
+| `query_int_opt` | A | C3 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c3-query-opt/contract_test.odin::c3_absent_is_present_false_ok_true` + `::c3_present_valid_carries_the_value` + `::c3_present_malformed_is_a_400` | `docs/ai-context.md::web.query_int_opt` | optional typed query reader; absent ≠ present ≠ malformed; empty value is present-but-malformed (a 400) |
+
+**Rollback.** Reversible before release. Third of the C1..C7 corrective batch.

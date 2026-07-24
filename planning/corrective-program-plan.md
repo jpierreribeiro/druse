@@ -182,7 +182,14 @@ mirroring the Hardening H-1 pattern.
   RED→GREEN `tests/c2-response-surface` + `check_c2_controls.sh` wired. Full gate:
   186 checks PASS, C1+C2 green (only the known wp41 timing flake, green on re-run).
   Unblocks cookies/CSRF (F8-2) and auth-gated file download (F8-4).
-- [ ] C3 F8-6 query_int_opt
+- [x] **C3 F8-6 query_int_opt — DONE (2026-07-24).** `web.query_int_opt(ctx, name)
+  -> (value: int, present: bool, ok: bool)`: the optional typed query reader that
+  reports presence distinctly (absent=present:false/ok:true no-commit; present+valid
+  both true; malformed=400). Closes the foot-gun that shipped a live bug (the board
+  read an optional filter with `query_int` and every unfiltered list 400'd). Ledger
+  77 → 78, union 80. Full ritual (signatures, counts, Amendment 34, RED→GREEN
+  `tests/c3-query-opt` + `check_c3_controls.sh`). Full gate: 187 PASS, C1+C2+C3
+  green (only the known wp41 timing flake under load).
 - [ ] C4 F8-5 stream_live
 - [ ] C5 F8-8 crystals timestamp+validator
 - [ ] C6 F8-7 Expect: 100-continue
