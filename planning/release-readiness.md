@@ -67,14 +67,15 @@ REVERT** (C7 is built to roll back cleanly).
 
 ## Gate 5 — Pre-release hygiene: privacy, security re-scan, docs
 
-**OPEN.** Before any real (non-synthetic) user data: a **privacy review** (the
-plan's standing non-goal). A **targeted security re-scan** of the new public
-surface (C2 `set_header`/`bytes` and C7 `request_state` add real attack surface —
-header injection and request-scoped state; the injection guards are tested, but a
-fresh scan of the additions is in scope; the 14 prior findings stay pinned).
-**Docs:** every new symbol is documented (done in `docs/ai-context.md`); the
-capability matrix / non-capabilities in the verdict updated as gaps closed (done);
-a README positioning re-check for "microframework" (Gate 6 / G8-7).
+**PARTIAL — my half DONE, privacy is the owner's.** The **targeted security
+re-scan** of the new public surface is **DONE**
+(`planning/corrective-security-review.md`): adversarial review of C1–C7 — no new
+vulnerability, and `web.set_header`'s name is now hardened to a strict RFC 9110
+token; the 14 prior findings stay pinned. **Docs:** every new symbol documented in
+`docs/ai-context.md`; the capability matrix / non-capabilities updated (done); a
+README positioning re-check for "microframework" (Gate 6 / G8-7). **Still OPEN:** a
+**privacy review** before any real (non-synthetic) user data — the plan's standing
+non-goal, owner-gated.
 
 ## Gate 6 — WP112 human condition + WP113 verdict + merge/tag
 
