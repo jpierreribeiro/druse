@@ -127,3 +127,49 @@ real only for idle projects, and closing it fully needs either a small framework
 predicate (`stream_live`) or an app heartbeat thread the framework does not help
 build. **Not applied in Phase 8**; the targeted `stream_live` is offered as the
 cheap, reversible improvement for the owner's review.
+
+---
+
+## F8-6 — no optional TYPED query parameter: `query_int` 400s on absence, `query_int_or` can't report presence
+
+| Field | Value |
+|---|---|
+| **1. Task attempted** | An OPTIONAL typed filter on the task list — `GET /projects/:id/tasks?assignee=<int>` narrows to that assignee, and its ABSENCE means "no assignee filter" (WP106 dynamic filters). |
+| **2. Public API used** | `web.query` (string, soft), `web.query_int` (typed, required), `web.query_int_or` (typed, with default). |
+| **3. Boilerplate / concepts** | Neither typed reader expresses "optional typed". `web.query_int` is the REQUIRED reader: on absence it **commits a 400** `invalid_query_parameter: '<name>' is required` and returns ok=false — so merely *reading* an optional filter that the client did not send fails the whole request. `web.query_int_or(name, default)` does not commit on absence, but it returns **ok=true for BOTH absent (→default) and present-valid**, so the handler cannot tell "filter with value D" from "no filter". The only way to get optional-typed is to combine two calls: `web.query` (presence) then `web.query_int_or` (to still 400 a present-but-malformed value). |
+| **4. Safety / ownership problem** | No unsafety, but a **live bug that shipped**: the board used `web.query_int("assignee")` for the optional filter, so EVERY unfiltered task list returned `400 "'assignee' is required"` — caught only by the deployment-#2 smoke test against real query strings, not by any typecheck. The sharp edge is that `query_int`'s auto-commit-on-absence is invisible at the call site; it reads like a soft typed getter and is not. |
+| **5. Workaround** | `if _, has := web.query(ctx, "assignee"); has { a, ok := web.query_int_or(ctx, "assignee", 0); if !ok { return }; use a }` — presence via the string reader, value+malformed-400 via `query_int_or`. Implemented in `board/tasks.odin list_tasks`. Correct, but two calls and a non-obvious idiom for what reads like a one-liner. |
+| **6. Application-specific?** | **No.** Optional typed query parameters (`?limit=`, `?after=`, `?assignee=`, `?since=`) are universal in list/filter endpoints. The `query`/`query_int`/`query_int_or` trio is deliberately designed (ADR-002 forbids `#optional_ok`), and the design is defensible — but it has **no member for the most common case**, and the closest-named one (`query_int`) fails closed in a way that silently breaks an optional read. |
+| **7. Smallest candidate improvement** | Either (a) a soft typed reader that reports presence distinctly, e.g. `web.query_int_opt(ctx, name) -> (value: int, present: bool, ok: bool)` — present=false on absence (no commit), ok=false only on a present-but-malformed value (commits the 400); or (b) documentation that names the `web.query` + `query_int_or` pairing as THE optional-typed idiom, with a compiling example. (a) removes the foot-gun; (b) is the zero-code minimum. |
+| **8. Public cost / reversibility** | (a) is additive — one new public proc, no change to the existing three, fully reversible; it must not itself grow an `#optional_ok` (the ADR-002 line). (b) is docs-only. Recorded as evidence; the board ships the two-call workaround, so nothing is blocked. |
+| **9. RED test** | For (a): `GET /list` with no `assignee` → the handler reads `web.query_int_opt(ctx,"assignee")`, gets `present=false, ok=true`, and returns 200 with no filter — RED today (no such proc; the nearest, `query_int`, 400s on absence), GREEN after. It distinguishes *improvement* (an optional typed read exists) from *preference* (the required/`_or` split is a real design, but there is no optional-typed member at all). |
+
+**Disposition:** RECORDED, with a **live-bug provenance**: proof-by-use shipped
+the wrong call (`query_int` for an optional filter), production traffic 400'd,
+and the smoke test caught it — exactly the evidence loop the phase exists for.
+The board carries the `web.query` + `query_int_or` workaround. Smallest fix is
+likely docs (name the idiom); a soft typed reader is the fuller answer. **Not
+applied in Phase 8; carried for the owner's review.**
+
+---
+
+## F8-7 — `Expect: 100-continue` is answered `417`, so large uploads from default clients fail
+
+| Field | Value |
+|---|---|
+| **1. Task attempted** | Upload an attachment larger than `max_body` (the Phase-7 spool path) with an ordinary HTTP client (curl) — `POST /tasks/:id/attachments` with a 5 MiB body (WP106). |
+| **2. Public API used** | The request path into `web.enable_upload`/`web.upload`; no application call is at fault — this is the framework's HTTP/1.1 request handling. |
+| **3. Boilerplate / concepts** | curl (and python-requests, and other clients) automatically add `Expect: 100-continue` for a large request body, then wait for a `100 Continue` interim response before sending the body. The framework answers **`417` (Expectation Failed) with an empty body** and never reads the body, so the upload fails before the handler runs. The application cannot fix this — it is below the handler, in the wire protocol. |
+| **4. Safety / ownership problem** | A hard interop gap: the **exact feature the large-body spool exists to serve** is unreachable from a default-configured mainstream client. `100-continue` is the universal HTTP/1.1 mechanism precisely for large uploads (let the server reject on headers before the body is sent), so failing it hits the large-upload path hardest. It is silent to the application (no handler diagnostic — the smoke's large-file step just got a bare 417). |
+| **5. Workaround** | Strip the header client-side: curl `-H "Expect:"`. With it removed, the same 5 MiB upload returns `201` with `spooled=true` — the spool path itself is correct and proven live. The workaround is client-side only; a browser `fetch`/`XMLHttpRequest` does not send `Expect`, so browsers are unaffected, but server-to-server and CLI clients are. Documented in `ops/deploy-runbook.md`. |
+| **6. Application-specific?** | **No.** `Expect: 100-continue` handling is framework/transport behaviour, identical for every application. RFC 9110 §10.1.1 lets a server that cannot meet the expectation respond `417`, so this is not a spec violation — but the pragmatic norm is to **ignore an unsupported `Expect` and read the body anyway** (what most servers do), because a hard `417` breaks large uploads from default clients. |
+| **7. Smallest candidate improvement** | Treat `Expect: 100-continue` as ignorable: either send the `100 Continue` interim and read the body, or drop the expectation and read the body regardless — instead of `417`. Even the minimal "ignore the header, read the body" (no interim response) restores default-client large uploads and stays within the RFC. |
+| **8. Public cost / reversibility** | No public API change — it is internal request handling, behaviour-only. The cost is transport work (recognize the header; optionally emit a `100 Continue` line). Reversible; no signature moves. It should be measured against the C-0x wire tests so the interim response does not disturb the single-commit/response model. |
+| **9. RED test** | A raw-wire test: send `POST` with `Expect: 100-continue` and a body over `max_body`; assert the server reads the body and the handler runs (spool created), rather than answering `417` — RED today (`417`, body unread), GREEN after. It distinguishes *improvement* (default clients can upload large bodies) from *preference* (whether a real `100 Continue` interim is sent is a sub-choice; either honoring or ignoring passes). |
+
+**Disposition:** RECORDED with **live provenance** — found proving the spool path
+on deployment #2 (a 5 MiB curl upload got `417`; the same upload with `-H
+"Expect:"` got `201 spooled=true`). The spool path is correct; the gap is the
+transport's hard `417` to a universal expectation. Browsers are unaffected; CLI
+and server-to-server clients need the header stripped. **Not applied in Phase 8;
+carried for the owner's review** as a transport-level robustness fix.
