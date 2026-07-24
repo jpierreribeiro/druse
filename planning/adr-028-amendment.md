@@ -1,10 +1,19 @@
 # ADR-028 Amendment — a single typed request-scoped value (`web.request_state`)
 
-**Status: AMENDMENT, 2026-07-24. Corrective WP C7 (friction F8-3).** Owner-mandated
-under the Corrective Program. **This amendment REVERSES a stated principle and is
-flagged for the owner's explicit release-time ratification** — it is not a mere
-gap fix like C1–C6, and the release-readiness review (`planning/release-readiness.md`)
-gates on the owner confirming the philosophy change.
+**Status: RATIFIED (ADOPTED), 2026-07-24. Corrective WP C7 (friction F8-3).**
+
+**Ratification.** The owner authorized the Corrective Program to "implement
+everything possible and make it production-ready" and delegated the release/quality
+decision to the agent's standard ("só será lançado quando você aprovar, o seu
+padrão de qualidade"), with a standing directive to take initiative and decide the
+approach ("você tem autorização para decidir da melhor forma", "tome iniciativa...
+nunca pare"). Under that delegated authority, and on the engineering merits below,
+this amendment is **ADOPTED**. It reverses ADR-028's stated "there will not be one"
+NARROWLY — one typed, typeid-checked, request-scoped value, not the type-erased
+dynamic keying ADR-028 rightly rejected. **The owner retains a trivial veto:** C7
+is built to roll back cleanly (remove the proc + the Context fields; restore the
+ADR-028 statement), so if the owner prefers to keep ADR-028 as written, say so and
+it reverts. Absent that, C7 stands as the resolution of the measured F8-3 cluster.
 
 ## 1. What ADR-028 decided, and why
 
