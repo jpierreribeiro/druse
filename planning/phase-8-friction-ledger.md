@@ -173,3 +173,28 @@ on deployment #2 (a 5 MiB curl upload got `417`; the same upload with `-H
 transport's hard `417` to a universal expectation. Browsers are unaffected; CLI
 and server-to-server clients need the header stripped. **Not applied in Phase 8;
 carried for the owner's review** as a transport-level robustness fix.
+
+---
+
+## F8-8 — no typed timestamp/date input: writing a `timestamptz` is undocumented text-cast, and a malformed date is a 500 (found by all 3 WP112 agents)
+
+| Field | Value |
+|---|---|
+| **1. Task attempted** | Add an optional `due_date` (`timestamptz`) to tasks — the WP112 usability task: accept it on create and in the three-state PATCH, store it in the column (WP112 / plan §WP112 "add a validated field through migration, SQL, handler"). |
+| **2. Public API used** | `crystals:db/postgres` param builders (`arg_text`/`arg_i64`/`arg_bool`/`arg_null`) and row readers (`row_text`/`row_opt_text`/…); `crystals:validate`. |
+| **3. Boilerplate / concepts** | The param builders cover text, int, bool, bytes, null — there is **no `arg_timestamp`/`arg_date`/`arg_timestamptz`**. Reading a timestamp is shown everywhere (the `created_at::text` cast idiom), but **nothing shows how to WRITE one**: the working idiom is to bind the value as `arg_text` and add an explicit `$N::timestamptz` cast in the SQL. Separately, `crystals:validate` offers `not_empty`/`string_length`/`int_range`/`one_of` but **no date/timestamp validator**, so a malformed input string is not caught at the boundary. |
+| **4. Safety / ownership problem** | No unsafety, two DX gaps: (a) the write-a-timestamp idiom is **inferred from convention, documented nowhere** — every contributor must reverse-engineer it from the read-side `::text` casts; (b) a malformed `due_date` (e.g. `"not-a-date"`) is not a `400` — it reaches Postgres, fails as a generic `Query_Failed`, and `respond_db_error`'s `#partial switch` has no case for it, so it becomes **`web.internal_error` = 500**. A user's bad input reads as a server fault. |
+| **5. Workaround** | Bind `arg_text(iso_string)` and cast in SQL (`$N::timestamptz`), mirroring the read-side `::text` pattern — which is exactly, and independently, what all three WP112 agents did, and it compiles and works. For the 500-vs-400: either parse with `core:time` in the handler (app-level) and reject with `400` before the query, or map the timestamp-format `Query_Failed` sqlstate to a domain `400` — neither is provided. The board currently accepts the same untyped-text risk posture the rest of the codebase has. |
+| **6. Application-specific?** | **No.** Timestamps/dates are in essentially every schema (`due_date`, `scheduled_at`, `expires_at`). The absence of a typed input builder and a date validator is a framework/Crystal surface gap, hit identically by three independent implementations. |
+| **7. Smallest candidate improvement** | Two additive, independent pieces: (a) a typed input builder in `db/postgres`, e.g. `arg_timestamptz(t: time.Time)` (or an `arg_typed(text, oid)` that names the cast), so writing a timestamp does not depend on an unwritten convention; (b) a date/timestamp validator in `crystals:validate` (e.g. `validate.rfc3339(&v, path, value)`) so a malformed value is a boundary `400`. Even docs-only — spelling out the `arg_text` + `$N::timestamptz` write idiom next to the read idiom — closes half of (a). |
+| **8. Public cost / reversibility** | Both additive: a new param builder and a new validator, no change to existing signatures. `arg_timestamptz` pulls `core:time` into the param surface (a small dependency decision). Reversible. Recorded as evidence; the board ships the text-cast workaround, so nothing is blocked. |
+| **9. RED test** | For (a): a test binds a timestamp through the candidate `arg_timestamptz` and reads it back equal — RED today (no such builder), GREEN after. For (b): `validate.rfc3339` rejects `"not-a-date"` with a field error, so the handler returns `400` not `500` — RED today, GREEN after. Each distinguishes *improvement* (a typed, validated timestamp path) from *preference* (the text-cast works; the gap is discoverability + the 500-on-bad-input). |
+
+**Disposition:** RECORDED with the **strongest provenance in the ledger — three
+independent WP112 coding agents (2× sonnet, 1× opus), in isolated copies, each
+surfaced BOTH facets unprompted** while converging on the same canonical
+implementation (see `planning/phase-8-wp112-usability-study.md`). That the
+usability instrument itself produced a framework finding is proof the proof-by-use
+loop holds even inside the study. **Not applied in Phase 8; carried for the
+owner's review**, likely paired with F8-1 (the enum) as a batch of small,
+additive Crystal/enum completions.
