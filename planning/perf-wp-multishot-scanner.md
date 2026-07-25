@@ -22,7 +22,9 @@ put io_uring echo at ~1/3 of epoll at depth-1). Cheap fixes were tried and
 many keep-alive requests. That is a substantial transport-internal rewrite, and
 its real payoff can only be confirmed on a **two-box benchmark** (loopback both
 under-measures io_uring and confounds server/client on one box). This WP specifies
-that work and gates it on the two-box result.
+that work and gates it on the two-box result. **The premise is now measured (§4b):
+we issue ~5 `io_uring_enter` syscalls per request vs fasthttp's 0.02 `epoll_wait` —
+a ~250× gap — so the amortization headroom multishot targets is real and large.**
 
 ---
 
@@ -102,6 +104,43 @@ the scanner*, not the primitives.
   buffer; multishot delivers arbitrary fragments across ring buffers. The HTTP
   request assembler must handle a header split across two buffers, which the
   single-shot path rarely exercises. New corpus required.
+
+## 4b. The premise, QUANTIFIED — syscalls per request (2026-07-25, single-box)
+
+The one thing that could have killed this WP before it starts: *is there actually
+amortization headroom, or does the loop already batch many requests per `enter`?*
+Measured directly with `perf stat -a -e syscalls:sys_enter_io_uring_enter` (and
+`epoll_pwait` for fasthttp) over a 10s window under distributed load — a **ratio,
+not a throughput**, so it is single-box-valid:
+
+| server | syscalls **per request** | rps |
+|---|---|---|
+| **Uruquim framework** (`web.app`) | **4.97 `io_uring_enter`/req** | 80.7k |
+| **bare nbio echo** (no framework) | **4.99 `io_uring_enter`/req** | 79.0k |
+| **fasthttp** (Go netpoller) | **0.02 `epoll_pwait`/req** | 281k |
+
+**The headroom is real and enormous — a ~250× gap in syscalls per request.** Every
+request today costs ~5 `io_uring_enter` syscalls (arm-recv, wait-recv, arm-send,
+wait-send, plus loop overhead); fasthttp's edge-triggered epoll returns ~50 ready
+sockets per `epoll_wait`, so it spends **0.02** waits per request. Research B's
+~1.9µs-per-`enter` cost, multiplied by ~5, is a per-request syscall tax the
+netpoller simply does not pay.
+
+Two things this pins:
+1. **The premise holds.** There is not "maybe" headroom — we do 250× the syscalls.
+   Multishot recv (kernel delivers many requests' bytes per `enter`, no per-request
+   re-submit) targets exactly this number. The WP is worth its risk *if* the
+   two-box test (§5.1) shows the syscall tax actually bounds throughput on a real
+   NIC and not just on loopback.
+2. **It explains every refuted lever.** Busy-poll (`tick(0)`) removed the *blocking*
+   but not the *count* — each request still issues ~5 submits, so throughput did
+   not move. DEFER_TASKRUN reorders completion delivery, not the count. Only
+   cutting the **enters-per-request count** — which multishot does and none of the
+   flags do — can close this. That is why the cheap fixes were dead and this one
+   is not.
+3. **It is nbio-level, not framework-level.** Framework 4.97 ≈ bare echo 4.99: the
+   syscall pattern is the shared nbio I/O loop, confirming §1's "zero framework
+   overhead" from a second angle.
 
 ## 5. Validation plan (the WP is gated on this, in order)
 
