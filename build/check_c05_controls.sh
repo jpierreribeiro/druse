@@ -63,20 +63,22 @@ grep -q 'total_lane_503 > 0' "$URUQUIM_SUITE" ||
 grep -q 'Retry-After' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
   fail "the lane-refusal 503 no longer sets Retry-After (H-4). The refusal path at dispatch_exchange must add the header before respond()."
 
-# --- 2. The F-C05-1 fix ------------------------------------------------------
-grep -q 'HANDLER_ACCEPT_CANCEL_WAIT' "$URUQUIM_SERVER" || fail "$(cat <<'EOF'
-the accept-cancel wait in handler_lane_enter is unbounded again (vendored patch
-27 / F-C05-1). That spin runs on the LANE THREAD: a lane parked in it never
-returns to its event loop, never observes s.closing, never calls
-_server_thread_shutdown — and serve waits on threads_closed for EVERY lane. So
-one lane in the spin is a process that cannot be stopped, past max_drain_time,
-which bounds the drain and cannot bound a lane that never reaches the drain.
-Measured: 4 runs in 6 wedged on the unpatched tree, and web.stop did not return
-in 60 s against a 3 s drain deadline.
-EOF
-)"
-grep -q 'cancel_observed = false' "$URUQUIM_SERVER" ||
-  fail "the accept-cancel wait no longer records that it gave up; without that flag it would reattach an operation record whose completion may still arrive, trading a wedge for a use-after-free"
+# --- 2. The F-C05-1 fix, now STRONGER: PATCH 28 removed the spin entirely -----
+# Patch 27 bounded the accept-cancel spin at 250ms/request to stop the wedge.
+# PATCH 28 (perf) deletes the spin: handler_lane_enter cancels the accept and
+# pushes it to the kernel with a single non-blocking nbio.tick(0), so no lane
+# thread ever waits. The wedge is now impossible by CONSTRUCTION (no wait), not
+# merely bounded — a strictly stronger property than F-C05-1 required — and the
+# 250ms/request tail it caused (measured p99 517ms → 151µs) is gone. The
+# behavioural proof is part 4 below: the saturation lab, which reproduced the
+# wedge, now shuts down cleanly.
+if grep -qE 'for +target\.accept\.client == 0' "$URUQUIM_SERVER"; then
+  fail "the accept-cancel SPIN is back in handler_lane_enter. PATCH 28 removed it because it was the p99 tail and the C-05 wedge (a lane parked in the spin never observes s.closing). Do not reintroduce a lane-thread wait; cancel + a single non-blocking nbio.tick(0) is the suspension."
+fi
+grep -q 'PATCH 28' "$URUQUIM_SERVER" ||
+  fail "the PATCH 28 non-spinning accept suspension is gone. handler_lane_enter must still cancel the accept before a synchronous handler (the WP71 guarantee), just without the spin."
+grep -q 'nbio.tick(0)' "$URUQUIM_SERVER" ||
+  fail "the non-blocking cancel push (nbio.tick(0)) is gone; without it the async_cancel is only enqueued in userspace and is not submitted to the kernel before the handler runs, so the accept stays live and the WP71 suspension does not take effect"
 
 # --- 3. The measurement and the specification --------------------------------
 URUQUIM_FLAT="$(tr '\n' ' ' <"$URUQUIM_DOC" | tr -s ' ')"
@@ -94,6 +96,6 @@ env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
   "-out:$URUQUIM_TMP/c05"
 
 echo "c05: the six refusal outcomes stay distinguishable; the binding constraint is still reported"
-echo "c05: the accept-cancel wait stays bounded and still refuses to reattach on expiry (F-C05-1)"
+echo "c05: the accept-cancel spin is GONE (PATCH 28) — the wedge is impossible by construction, not merely bounded (F-C05-1 superseded)"
 echo "c05: the perimeter-6 finding and the perimeter-7 Server_Stats specification are on record"
 echo "PASS: C-05 combined-saturation and write-observability controls"
