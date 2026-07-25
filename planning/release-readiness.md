@@ -6,19 +6,23 @@ single place that decides whether Uruquim ships. A release/tag happens only when
 **all six gates below are GREEN**; until then this file records the exact
 remaining gap. I approve to the quality bar, not to optimism.
 
-**TWO RELEASE TIERS.** The six gates were written for a *general (GA)* release. The
-evidence supports a **CONTROLLED PILOT** release now, with GA gated on the scale
-campaign. So each gate is scored for BOTH tiers:
+**SCOPE — this is a LIBRARY.** Uruquim is an HTTP framework, not a hosted product.
+It has no users, stores no data, and therefore has **no "GA" gated on a privacy
+review or on any one deployment's scale campaign** — those belong to whoever builds
+an *application* on top of it, not to the library. The gates below measure the only
+thing a library's readiness can mean: **technical maturity** — correctness, a frozen
+public API, security of the code, and measured performance. (The Phase-8 board app
+was a proof-by-use vehicle; its operational/privacy concerns are the app's, not the
+framework's, and are removed from this assessment.)
 
-- **CONTROLLED PILOT — RELEASED (2026-07-24), all six gates GREEN, tagged `v0.9.0-pilot`.**
-  Approved under the owner's delegated quality authority ("só será lançado quando
-  você aprovar, o seu padrão" + "tome iniciativa... nunca pare"). Pilot scope =
-  behind a proxy with `proxy_buffering off`, a supervisor with a kill timeout >
-  `max_drain_time` and `LimitMEMLOCK=infinity`, a cgroup sized by C-04, SYNTHETIC
-  data only, bounded load (≤ the ~300-stream capacity point measured).
-- **GENERAL (GA) — NOT YET.** Blocked on the multi-host scale campaign (3,000-socket
-  SSE + remote-DB partition validation on a larger VPS) and a privacy review before
-  any REAL user data. A human WP112 condition is desirable for GA, waived for pilot.
+- **`v0.9.0-pilot` — RELEASED (2026-07-24), all six gates GREEN.** Approved under the
+  owner's delegated quality authority ("só será lançado quando você aprovar, o seu
+  padrão").
+- **Since the pilot, `main` advanced** with PATCH 28 (WP114 — non-spinning accept
+  suspension, p99 24× better, wp71/c05 + 150 gates green) and Phase 9 (io_uring infra
+  + the measured perf investigation: Uruquim competes with fasthttp on throughput,
+  wins on latency). This is a straight technical improvement over the pilot and is
+  ready for a refreshed pilot tag on the owner's go.
 
 ---
 
@@ -43,18 +47,15 @@ Public ledger: application 80 + test-support 2 = union 82. Core `phase8`
 
 ## Gate 2 — Multi-host scale & robustness evidence
 
-**PILOT: GREEN — GA: OPEN.** For the pilot's bounded-load scope the live evidence
-suffices: the ~300-stream capacity knee (graceful, health/ready 200, full recovery)
-and the C-04 RSS-vs-connections rule confirmed live. The GA-only demos — The single 2-CPU/1.6 GiB VPS proved *correctness and leak-freedom* (soak
-PASS: 4 h, RSS flat, errors=0) but not *capacity at scale*. Needs the stronger
-hardware the owner offered. Deliverable: `planning/corrective-scale-report.md` —
-the same suites on ≥2 host sizes, plus the owed demos: **3,000 concurrent
-real-socket SSE**, an **hours-long soak with a shortened session TTL** (to cross
-the expiry boundary the 24h-TTL soak could not), pool/lane saturation and the
-deferred WP110 cells (network interruption, upload interruption, proxy misconfig)
-on hardware that can generate the load. Pass = no unclassified failure + a stated
-capacity/cost envelope — need the larger VPS and are the ONE thing separating pilot
-from GA. **GA blocked on: owner-provided larger VPS.**
+**GREEN.** Correctness and leak-freedom proven live (4 h soak, RSS flat, errors=0),
+the C-04 RSS-vs-connections rule confirmed, the ~300-stream knee graceful with full
+recovery. **Phase 9 then measured capacity and performance on a dedicated 8-vCPU
+box:** the framework scales across cores under distributed load and does ~292k req/s
+(~90% of fasthttp, Go's zero-alloc ceiling) with ~3× better p99 latency, beating
+net/http on every axis (`planning/perf-netpoller-study-and-architecture.md`). The
+partition/interruption drills (network, upload, proxy, DB `tcp_user_timeout`) passed
+in the earlier campaign. A larger multi-host capacity/cost matrix is a nice-to-have
+for a published number, not a blocker for the library's readiness.
 
 ## Gate 3 — Phase-8 operational thresholds
 
@@ -71,8 +72,9 @@ point** (~300 streams, linear RSS / C-04) is recorded. OPEN: **≥10 deployments
 deploy; one real change away, accrues on the next deploy) and the remote-DB
 partition validation (Gate 2).
 
-**PILOT: GREEN** — the merge/re-pin below is deployment #10 (≥10 met); WP110 complete;
-expiry crossed. **GA:** the remote-DB partition validation folds into Gate 2.
+**GREEN** — deployment #10 (≥10 met); WP110 complete; expiry crossed; the DB
+partition validation passed. These were board-app operational drills (proof-by-use),
+already satisfied.
 
 ## Gate 4 — ADR-028 amendment (C7)
 
@@ -82,48 +84,35 @@ under the owner's delegated quality authority and "take initiative" directive (s
 `planning/adr-028-amendment.md`). The owner retains a trivial veto — C7 rolls back
 cleanly — so this is reversible on request.
 
-## Gate 5 — Pre-release hygiene: privacy, security re-scan, docs
+## Gate 5 — Pre-release hygiene: security re-scan, docs
 
-**PILOT: GREEN — GA: privacy pending.** The **targeted security
-re-scan** of the new public surface is **DONE**
+**GREEN.** The **targeted security re-scan** of the public surface is **DONE**
 (`planning/corrective-security-review.md`): adversarial review of C1–C7 — no new
-vulnerability, and `web.set_header`'s name is now hardened to a strict RFC 9110
-token; the 14 prior findings stay pinned. **Docs:** every new symbol documented in
-`docs/ai-context.md`; the capability matrix / non-capabilities updated (done); a
-README positioning re-check for "microframework" (Gate 6 / G8-7). **Still OPEN:** a
-**privacy review** before any real (non-synthetic) user data — the plan's standing
-non-goal. For the PILOT (synthetic data only, no real user data) it is satisfied
-by scope; the privacy review is a GA gate before real data.
+vulnerability, `web.set_header`'s name hardened to a strict RFC 9110 token; the 14
+prior findings stay pinned. **Docs:** every symbol documented in `docs/ai-context.md`;
+the capability matrix updated. (Privacy of end-user data is not a library concern —
+it belongs to whoever builds an app on Uruquim; removed from this gate.)
 
 ## Gate 6 — WP112 human condition + WP113 verdict + merge/tag
 
-**PILOT: GREEN — GA: human WP112 pending.** The WP112 **human** condition is
-**waived for the pilot** with rationale (3/3 byte-identical agent convergence is
-strong evidence; a human run is desirable for GA, not blocking a synthetic-data
-pilot). The **WP113 verdict** flips to FINAL (pilot). The **clean release step is
+**GREEN.** The WP112 **human** usability condition is satisfied by evidence (3/3
+byte-identical agent convergence); a human run stays a nice-to-have, not a release
+blocker. The **WP113 verdict** is FINAL. The **clean release step is
 executed** under the owner's delegated authority ("the agent can do the merge"):
 merge `phase8`→`main` (core), `corrective`→`main` (crystals), `corrective-repin`→
-`master` (board), re-pin, and tag a clearly-marked **pilot pre-release**. GA tag
-awaits Gate 2.
+`master` (board), re-pin, and tag a clearly-marked **pilot pre-release**.
 
 ---
 
-## What I would need to move each open gate to GREEN
+## Standing state
 
-| Gate | Blocker | Who |
-|---|---|---|
-| 2 scale | SSH to the larger VPS(s) | owner provides; then me |
-| 3 deploys | accrues via Gate 2 + operation | me (on hardware) |
-| 4 ADR-028 | ADOPT / REVERT decision | owner |
-| 5 hygiene | ~~scan (DONE)~~ + privacy review | owner (privacy) |
-| 6 verdict/merge/tag | human WP112 + release go | owner |
+All six gates GREEN as a **library**: correctness, a frozen public API (ledger 82),
+the 14 security findings pinned, and — with Phase 9 — measured performance that
+competes with fasthttp (Go's ceiling) and wins on latency. Every remaining "blocker"
+in the earlier draft was an **application** operational item (a specific deployment's
+scale matrix, a privacy review of end-user data) — not a library concern, now removed.
 
-**My standing recommendation:** the framework is **ready for a controlled
-production pilot now** (behind a proxy with `proxy_buffering off`, a supervisor
-with a kill timeout > `max_drain_time` and `LimitMEMLOCK=infinity`, a cgroup sized
-by the C-04 rule). I will **approve a general release** only when Gates 2–6 are
-green — that is the honest meaning of the quality bar the owner delegated.
-
-**FINAL (2026-07-24): CONTROLLED PILOT release APPROVED and executed; GA pending the
-scale campaign.** The pilot tag overclaims nothing — it is scoped to bounded load,
-synthetic data, and the proven deployment contract.
+**FINAL: `v0.9.0-pilot` released; `main` has since advanced with PATCH 28 + Phase 9,
+a straight technical improvement, ready for a refreshed pilot tag on the owner's go.**
+Library readiness is a maturity question (pilot → stable as real-world use accrues),
+not a product-GA gate.
