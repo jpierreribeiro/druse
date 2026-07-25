@@ -12,9 +12,11 @@ updated at every measurement. All numbers were measured on a dedicated AWS c5-cl
 > FRAMEWORK: `web.app` measures ~79–141k req/s on 4 cores (29–52% of fasthttp's 274k), and the
 > 292k figure appears to belong to the `echo_rp` reuseport prototype, not the framework on main.
 > The re-measurement also **refutes the "runs on one core" root cause** recorded here: per-core
-> `mpstat` shows the framework saturating all four cores but spending **~50% in iowait** — it is
-> I/O-wait-bound, not core-distribution-bound. The **latency** results below (world-class, flat
-> under load) DID reproduce and stand.
+> `mpstat` shows the framework saturating all four cores (idle=0) but spending **~28% in iowait**
+> (blocked in `io_uring_enter`, `wait_nr=1`) vs fasthttp's 0% — it is **blocking-loop-bound**, not
+> core-distribution-bound, and the cheap flag fixes (COOP already on, DEFER_TASKRUN refuted by
+> measurement) do not help; see §2. The **latency** results below (world-class, flat under load)
+> DID reproduce and stand.
 
 ## Why this phase exists
 
@@ -432,14 +434,43 @@ spread connections"). **Per-core `mpstat` under distributed load refutes that fo
 | **Uruquim framework** | 100% | 100% | 100% | 100% | **%iowait ≈ 49% per core** (usr ≈20, sys ≈26) |
 | **fasthttp** | 100% | 100% | 100% | 100% | **%iowait = 0%** (usr ≈40, sys ≈37, soft ≈22) |
 
-Both saturate all four cores. The difference is *what* the cores do: fasthttp spends 100% of each
-core doing work; **the framework spends ~half of each core in `iowait` — stalled waiting for
-io_uring completions.** The throughput ceiling is therefore not "too few cores" (it uses them
-all) but an **I/O pattern that leaves the CPU waiting** — per-request submit/complete round-trips
-rather than batched/multishot submission. This is the real lever, and it is exactly the
-`io_uring` multishot direction Phase 9 began (`bench/echo_multishot`, WP116–119): reduce the
-per-request completion stalls so the ~50% iowait becomes work. It is a code lever inside the
-transport, invisible to the public API.
+Both saturate all four cores (`%idle = 0` for both). The difference is *what* the cores do. A
+precise per-field `mpstat` (distributed load, cores 0-3, corrected reading — `%iowait` is *idle
+time with an outstanding I/O*, NOT busy-waiting):
+
+| | usr | sys | **iowait** | soft | idle | rps |
+|---|---|---|---|---|---|---|
+| **fasthttp** | 40 | 37 | **0** | **22** | 0 | 274k |
+| **Uruquim (COOP_TASKRUN, on main)** | 24 | 37 | **28** | **11** | 0 | 79k |
+
+The tell is the **iowait/softirq pair**: fasthttp has **0% iowait and 22% softirq** — its
+epoll-edge-triggered netpoller never blocks and processes network softirq (packets) continuously.
+Uruquim has **28% iowait and 11% softirq** — the event loop **blocks in `io_uring_enter`**
+(`nbio` submits with `wait_nr=1`, `vendor/nbio/impl_linux.odin`) waiting for the next completion,
+and consequently pushes **half the packets/s**. The ceiling is not "too few cores" (idle=0, all
+four used) — it is the **blocking submit/complete loop pattern**, which leaves the CPU parked in
+the enter syscall instead of processing the next request.
+
+**MEASURED lever eliminations (2026-07-25) — this is NOT a setup-flag fix:**
+- **`COOP_TASKRUN` + `SINGLE_ISSUER`** are **already set** (`impl_linux.odin:139`). Not a lever —
+  already taken.
+- **`DEFER_TASKRUN`** (the modern single-issuer network-server pairing) was **tried and refuted**:
+  patched into `nbio`, rebuilt, benchmarked — throughput flat (77–82k vs 79–82k) and iowait
+  *slightly worse* (deferring task work lengthens the wait). Not the lever.
+- **`IORING_ENTER_NO_IOWAIT`** (Linux 6.15) would only **relabel** the iowait as idle in
+  accounting; it adds no throughput, and is absent from the pinned Odin toolchain's enter flags.
+- **NAPI busy-poll** (`IORING_REGISTER_NAPI`) targets *latency* (RTT 55→38µs in upstream tests);
+  Uruquim's latency is already 44µs — not our problem, not our lever.
+- **multishot recv** was benched at the **`echo_multishot` prototype** level and showed no HTTP
+  win — but the framework's request reader (`vendor/odin-http/scanner.odin`) still does
+  **single-shot `recv_poly`**. Wiring multishot recv + a provided-buffer ring **into the scanner**
+  (so the kernel delivers each keep-alive request without a per-request re-submit) is the
+  **untested, real** version of this lever, and is a substantial transport WP — not a flag.
+
+The honest conclusion: closing the throughput gap is a **transport-internal rewrite of the I/O
+loop** (continuous multishot delivery and/or fewer enter syscalls per request), gated by
+measurement, invisible to the public API — not a configuration change. The cheap fixes were
+tested and refuted. It belongs to a future perf WP with a two-box benchmark, not to this pilot.
 
 ### 3. What reproduced and stands: latency
 
