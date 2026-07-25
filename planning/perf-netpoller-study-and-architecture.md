@@ -97,7 +97,7 @@ The WP breakdown and definitions of done live in the phase plan
 | WP115 | provided-buffer ring (from scratch) | — | — | — | — | ✅ unit | **DONE** — ABI built + proven vs kernel 6.8 (vendor/uring_buf_ring); test GREEN |
 | WP116 | multishot recv (prep + proof) | — | — | — | — | ✅ unit | **DONE** — 1 SQE → N CQEs, buffer-select, F_MORE proven; test GREEN |
 | WP117 | scanner multishot recv (odin-http integration) | — | — | — | — | — | in progress; target: CPU → 176% |
-| WP118 | accept_multishot | — | — | — | — | — | pending |
+| WP118 | multishot accept (prep + proof) | — | — | — | — | ✅ unit | **DONE** — 1 SQE accepts N conns, F_MORE proven; test GREEN |
 | WP119 | dedicated accept path | — | — | — | — | — | target: ≥ 241k + guarantee |
 | WP121 | Phase 9 final | — | — | — | — | — | full picture vs Go |
 

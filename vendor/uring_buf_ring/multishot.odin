@@ -29,3 +29,18 @@ prep_recv_multishot :: proc "contextless" (sqe: ^linux.IO_Uring_SQE, fd: linux.F
 	sqe.sq_send_recv_flags = {.RECV_MULTISHOT}
 	sqe.user_data = user_data
 }
+
+// prep_accept_multishot fills `sqe` as a multishot accept on listen socket `fd`.
+// One SQE stays armed and posts a CQE per incoming connection (the new fd in
+// `cqe.res`, F_MORE set while armed) — no per-connection accept re-arm, and the
+// basis for taking accept off the handler lanes entirely (WP119). We pass no
+// sockaddr out (addr/off zero): the peer address, when needed, comes from the
+// connection later. Re-arm on a completion WITHOUT F_MORE.
+prep_accept_multishot :: proc "contextless" (sqe: ^linux.IO_Uring_SQE, fd: linux.Fd, user_data: u64) {
+	sqe.opcode = .ACCEPT
+	sqe.fd = fd
+	sqe.addr = 0 // no sockaddr out
+	sqe.off = 0  // no addr_len out
+	sqe.sq_accept_flags = {.MULTISHOT}
+	sqe.user_data = user_data
+}
