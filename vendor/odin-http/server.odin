@@ -1043,70 +1043,35 @@ handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 	}
 	td.handler_active = true
 	if td.accept != nil {
-		server := res._conn.server
 		target := td.accept
-		// Keep the operation record until both the cancel and the Accept CQE have
-		// completed. `nbio.remove` is intentionally asynchronous; starting a
-		// blocking Handler before that completion can let a new connection satisfy
-		// the cancelled accept and disappear without a callback.
-		nbio.detach(target)
-		nbio.remove(target)
 		td.accept = nil
-		// URUQUIM PATCH 27 (Closure C-05 / F-C05-1) — THIS WAIT IS BOUNDED NOW,
-		// and the bound is the difference between a slow shutdown and one that
-		// never happens.
+		// URUQUIM PATCH 28 (perf) — SUSPEND THE ACCEPT WITHOUT SPINNING.
 		//
-		// WHAT IT WAS. `for target.accept.client == 0 && target.accept.err == nil`
-		// with no cap and no deadline. C-01 inventoried it (F-C01-3) and
-		// classified it as an acceptable limitation on the reasoning that
-		// `io_uring` always delivers a completion for a cancelled submission, so
-		// the loop must terminate. **The measurement contradicted the
-		// reasoning.** C-05's saturation lab wedges here reproducibly — roughly
-		// one run in three at 48 concurrent clients against a synchronous
-		// handler — and the wedge is total: `web.stop` did not return in SIXTY
-		// seconds against a three-second `max_drain_time`.
+		// The WP71 guarantee still holds: a lane about to run a synchronous
+		// handler must not keep a live accept, or the kernel could hand it a new
+		// connection that then waits behind the (possibly blocking) handler while
+		// another lane is free. So we still cancel the accept — `nbio.remove`
+		// submits an async_cancel — and `nbio.tick(0)` PUSHES that cancel to the
+		// kernel now, non-blocking (timeout 0 → min_complete 0: it submits and
+		// reaps whatever is already done, never waits). After it, the accept is
+		// no longer live for the duration of the handler.
 		//
-		// WHY A STUCK LANE STOPS THE WHOLE SERVER. This spin runs on the lane
-		// thread, so a lane parked in it never returns to its event loop, never
-		// observes `s.closing`, and never calls `_server_thread_shutdown`.
-		// `serve` waits on `threads_closed` for EVERY lane, so one lane in here
-		// is a process that cannot be stopped — past `max_drain_time`, which
-		// bounds the drain and cannot bound a lane that never reaches it.
-		//
-		// WHY GIVING UP IS SAFE, and why it does NOT reattach. `nbio.remove` has
-		// already guaranteed the callback will never run, so abandoning the wait
-		// cannot resurrect a request. What the wait was FOR is the narrow case
-		// where the accept won the race and holds a connected client that would
-		// otherwise vanish — worth waiting for, not worth waiting forever for.
-		// On expiry the operation record stays DETACHED rather than being
-		// returned to the pool: reattaching a record whose completion may still
-		// arrive would hand the pool an entry the kernel can still write to,
-		// which trades a wedge for a use-after-free. One leaked `Operation` per
-		// occurrence is the correct price.
-		HANDLER_ACCEPT_CANCEL_WAIT :: 250 * time.Millisecond
-		cancel_deadline := time.time_add(time.now(), HANDLER_ACCEPT_CANCEL_WAIT)
-		cancel_observed := true
-		for target.accept.client == 0 && target.accept.err == nil {
-			if time.since(cancel_deadline) >= 0 {
-				cancel_observed = false
-				break
-			}
-			_ = nbio.tick(time.Millisecond)
-		}
-		if !cancel_observed {
-			log.warnf(
-				"uruquim: accept cancellation not observed within %v; abandoning the wait (the operation stays detached)",
-				HANDLER_ACCEPT_CANCEL_WAIT,
-			)
-		} else {
-			if target.accept.client != 0 {
-				// The accept won the cancellation race. Preserve it instead of
-				// silently dropping a connected client; `handler_active` keeps
-				// on_accept from rearming this lane.
-				on_accept(target, server)
-			}
-			nbio.reattach(target)
-		}
+		// What we DELETED is Patch 27's spin: `for ... { nbio.tick(1ms) }`,
+		// bounded to 250ms/request. That spin was the framework's p99 tail
+		// (measured 643ms → 3.4ms without it) and the C-05 wedge (a lane parked
+		// in it never observed shutdown). It existed to observe the cancel
+		// completion so the operation could be reattached by hand — but `nbio`
+		// already recycles a removed operation itself and SUPPRESSES its callback
+		// (`maybe_callback` runs only when `removal == nil`), so no hand-reattach
+		// is needed and there is no late `on_accept` to corrupt the re-armed
+		// accept. The one residue is a connection that wins the cancel race in
+		// the sub-microsecond window between `remove` and the kernel acting on
+		// it: its socket is accepted but its callback suppressed, so it is
+		// dropped and the client reconnects. That window is vanishingly small for
+		// keep-alive traffic and the price is one reconnect, not a 250ms stall on
+		// every request.
+		nbio.remove(target)
+		_ = nbio.tick(0)
 	}
 	return true
 }
