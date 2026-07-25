@@ -53,7 +53,10 @@ refused_connections :: proc() -> int {
 // invisible: how many responses left, how many bytes, how many sends failed,
 // how many slow readers the write deadline cut off — and the three stream
 // counters that were maintained in the registry and reachable from no public
-// API, so a slow-consumer abort was counted and then unseeable.
+// API, so a slow-consumer abort was counted and then unseeable. Item 2 adds
+// `lane_collisions`: the framework's FIRST saturation point (C-05), whose 503
+// on a busy lane can arrive with other lanes idle and so was visible in neither
+// latency nor the admission counter.
 //
 // WHY A STRUCT OF INTEGERS AND NOT A METRICS API. The same reason as
 // `refused_connections`: a framework that exports a metrics abstraction has
@@ -75,6 +78,14 @@ Server_Stats :: struct {
 	response_bytes:        i64, // bytes reported on-the-wire for those sends
 	send_errors:           int, // sends that completed with an error
 	write_deadline_aborts: int, // connections the sweep aborted for a stalled write
+	// Handler saturation (item 2). The FIRST resource to bind (C-05: capacity is
+	// lanes / dwell), and the one whose refusal was invisible: a 503 on lane
+	// collision can arrive with other lanes idle, so it shows in neither latency
+	// nor `refused_connections` (which counts connection admission, a different
+	// resource). Rising `lane_collisions` says raise `max_handlers`, shorten the
+	// handler, or move blocking work off the lane — the sizing signal for the
+	// bound the readiness matrix (row 4) calls the first to saturate.
+	lane_collisions:       int, // requests refused 503 because their lane was busy
 	// Detached streams (the WP92 registry counters, previously unreachable).
 	stream_refused_full:   int, // a per-stream event/byte cap refused a send
 	stream_refused_budget: int, // the process-wide byte budget refused a send
@@ -82,7 +93,7 @@ Server_Stats :: struct {
 }
 
 // stats returns the running server's write-side counters, or the zero value
-// when no server is running. It allocates nothing and reads eight integers under
+// when no server is running. It allocates nothing and reads nine integers under
 // one lock, so the snapshot is coherent.
 stats :: proc() -> Server_Stats {
 	s := transport.server_stats()
@@ -92,6 +103,7 @@ stats :: proc() -> Server_Stats {
 		response_bytes        = s.response_bytes,
 		send_errors           = s.send_errors,
 		write_deadline_aborts = s.write_deadline_aborts,
+		lane_collisions       = s.lane_collisions,
 		stream_refused_full   = s.stream_refused_full,
 		stream_refused_budget = s.stream_refused_budget,
 		stream_aborted_slow   = s.stream_aborted_slow,

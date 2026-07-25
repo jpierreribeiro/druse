@@ -341,6 +341,19 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	// A healthy request after the ramp: saturation must be transient.
 	after := one_request(server.port)
 	fmt.printf("[c05] after the ramp: %v\n", after)
+
+	// item 2 — the lane-collision counter must be VISIBLE, not just felt as a
+	// 503. Read it on the server BEFORE stop. Every lane 503 a client saw was
+	// counted on the server first, so the server total is at least the
+	// client-observed total; a decorative counter (never incremented) would read
+	// zero while the clients saw hundreds of 503s.
+	stats := web.stats()
+	fmt.printf(
+		"[c05] web.stats().lane_collisions=%d (clients observed %d lane 503s)\n",
+		stats.lane_collisions,
+		total_lane_503,
+	)
+
 	returned := false
 	{
 		web.stop(&server.app)
@@ -393,5 +406,17 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		total_lane_503_no_retry == 0,
 		"%d lane 503s arrived without a Retry-After header; a refusal that does not say when to retry invites an immediate re-collision (H-4)",
 		total_lane_503_no_retry,
+	)
+	// item 2 — the counter is WIRED, not decorative: the server counted at least
+	// every lane 503 a client observed. Equality is the common case; the server
+	// count can only exceed it (a collision whose 503 lost a connect race still
+	// incremented). A zero here beside hundreds of client 503s is the bug this
+	// assertion exists to catch.
+	testing.expectf(
+		t,
+		int(stats.lane_collisions) >= total_lane_503,
+		"web.stats().lane_collisions=%d is below the %d lane 503s clients observed; the saturation counter is not wired to the refusal site",
+		stats.lane_collisions,
+		total_lane_503,
 	)
 }

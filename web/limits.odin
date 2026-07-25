@@ -111,6 +111,37 @@ Limits :: struct {
 	// reason recorded on `max_request_time`.
 	max_write_time:   i64,
 
+	// C-04 / ADR-045 — the largest response body the framework will BUILD, in
+	// bytes. Zero means no limit, which is what shipped before this field
+	// existed and follows the `max_write_time`/`max_idle_time` convention: a
+	// framework-chosen number would refuse responses applications legitimately
+	// serve today.
+	//
+	// THE MIRROR OF `max_body` ON THE WRITE SIDE. `max_body` caps what a client
+	// may SEND; this caps what a handler may BUILD. It exists because response
+	// size was the one framework-owned resource with no bound at all (C-04
+	// amber cell #1): responses are buffered whole (ADR-014) and a connection
+	// retains ~1× the largest response it ever served (measured, F-C04-1), so
+	// the worst case is `max_connections × largest response` — 1024× at the
+	// defaults, bounded by nothing.
+	//
+	// A BREACH IS A 500, NOT A TRUNCATION. Exactly this many bytes is allowed;
+	// a strictly larger committed body is replaced — before it is copied to the
+	// transport — with the standardized `internal_error` 500 and reported as
+	// `Framework_Error.Response_Too_Large`, so an observer sees it with a route
+	// and a status. This converts an out-of-memory that kills every in-flight
+	// request on the process into one typed failure, the same argument ADR-039
+	// made for the write deadline. Enforced on the SHARED response path, so the
+	// in-memory transport and the socket agree by construction (R-10); it counts
+	// the body the framework BUILT, so a HEAD whose body is suppressed on the
+	// wire is still measured by what it allocated.
+	//
+	// DELEGATION REMAINS THE OTHER HALF. This limit bounds ONE response; total
+	// process memory across `max_connections` is still sized by a cgroup, per
+	// the C-04 rule in `planning/closure-response-size-and-memory.md`. The limit
+	// is the per-response guard; the cgroup is the aggregate one.
+	max_response_bytes: int,
+
 	// WP90 / ADR-039 — how long a keep-alive connection may sit IDLE between
 	// requests before the server closes it, in nanoseconds. Zero means no
 	// timeout, which is what shipped before this field existed.
@@ -208,6 +239,10 @@ DEFAULT_LIMITS :: Limits {
 	// the framework can guess — and a default that resets real slow readers
 	// would be a behaviour change for every shipped application.
 	max_write_time   = 0,
+	// C-04: default OFF, like the two deadline fields above and for the same
+	// reason — a framework-chosen ceiling would refuse responses applications
+	// serve today. Set it to convert an OOM into a typed 500.
+	max_response_bytes = 0,
 	max_idle_time    = 0,
 	max_connections  = CONNECTION_LIMIT,
 	reserved_conns   = RESERVED_CONNECTION_LIMIT,
@@ -360,6 +395,12 @@ limits :: proc(a: ^App, l: Limits) {
 	// WP90 / ADR-039 — the write and idle deadlines follow the identical
 	// zero-means-off, negative-is-a-mistake convention.
 	if l.max_write_time < 0 || l.max_idle_time < 0 {
+		limits_poison(a, FRAMEWORK_MESSAGE_LIMITS_INVALID)
+		return
+	}
+	// C-04 — the response-size budget follows the same convention: zero means
+	// no limit (a meaningful choice), negative is a mistake.
+	if l.max_response_bytes < 0 {
 		limits_poison(a, FRAMEWORK_MESSAGE_LIMITS_INVALID)
 		return
 	}

@@ -2137,3 +2137,158 @@ none; the requirement it keeps is the one nobody disputes.
 
 - **Reversibility. MEDIUM.** Private machinery until names freeze in WP101;
   the public token/send/close surface, once shipped, is frozen ledger.
+
+## ADR-045 — a per-response size limit, `max_response_bytes`
+
+- **Status.** **ACCEPTED, 2026-07-25, implemented by the readiness-hardening
+  program (item 5a).** Specified ahead of time by the Closure's C-04
+  (`planning/closure-response-size-and-memory.md` §2, "the specification, handed
+  forward"); this ADR ratifies that specification and records the implementation.
+
+- **Context.** Response write was the one framework-owned resource in the C-02
+  matrix (row 5) whose *size* had **no bound at all**. `max_write_time` bounds
+  how long a response may take to leave, not how many bytes it is. Responses are
+  buffered whole (ADR-014), and C-04 *measured* that a connection retains ~1.0×
+  the largest response it ever served and still holds ~0.75× after 1,600 small
+  ones (F-C04-1/3). The worst case is therefore `max_connections × largest
+  response` — 1024× at the defaults — bounded by nothing an operator could set.
+  `max_body` caps what a client may *send*; nothing capped what a handler could
+  *build*.
+
+- **Decision.** Add `max_response_bytes: int` to `Limits`, **default 0 = off**,
+  matching the `max_write_time`/`max_idle_time` convention: a framework-chosen
+  ceiling would refuse responses applications legitimately serve today. A
+  committed body strictly larger than the limit is replaced — on the **shared**
+  response path (`driver_run`), before the transport copy, so `test_request` and
+  a socket agree by construction (R-10) — with the standardized `internal_error`
+  500, reported through a new `Framework_Error.Response_Too_Large` so the typed
+  observer sees it with a route and a status. It measures the body the framework
+  *built* (`len(res.body)`), which a HEAD suppresses on the wire but still
+  allocated. A detached stream carries no buffered body and is exempt.
+
+- **Why a 500 and not a truncation, and why 500 and not 4xx.** A half-sent body
+  is a corrupt response; a 500 is an honest one. The client did nothing wrong —
+  the application built a response the operator's declared budget refuses — so it
+  is a server error, the write-side mirror of the request-side 413 in shape but
+  not in status. The value of the limit is that it converts an out-of-memory,
+  which kills *every* in-flight request on the process, into *one* typed failure
+  an observer can see: the same argument ADR-039 made for the write deadline.
+
+- **Ledger.** **No growth.** `max_response_bytes` is a field of the existing
+  public `Limits` struct and `Response_Too_Large` a member of the existing public
+  `Framework_Error` enum — both frozen surfaces whose *shape* changes (the freeze
+  snapshot moves) but whose *symbol count* does not. Application ledger stays 80,
+  union 82.
+
+- **Aggregate memory remains delegated.** This bounds ONE response. Total process
+  memory across `max_connections` is still sized by a memory cgroup per the C-04
+  rule; the per-response limit is the local guard, the cgroup the aggregate one.
+  Both are documented in `docs/operations.md`.
+
+- **Reversibility. MEDIUM.** A new public `Limits` field is frozen once shipped;
+  defaulting to 0 (off) means it changes nothing for an application that never
+  sets it, and if the bound proved to belong only at the proxy the field could
+  stay at 0 rather than be removed. The enforcement is pure `package web` (not a
+  vendored BRIDGE patch), so it survives the `core:net/http` transition unchanged.
+
+## ADR-046 — dual-stack bind (IPv6 + IPv4), and TLS stays delegated
+
+- **Status.** **ACCEPTED, 2026-07-25, implemented by the readiness-hardening
+  program (item 5b).** Resolves the "binds IPv4 only" limitation the readiness
+  audit named, and reaffirms the standing TLS-delegation decision (item 5c).
+
+- **Context.** `web.serve` bound `net.IP4_Address{0,0,0,0}` — IPv4 Any — so an
+  IPv6 client could not reach the server at all. The audit flagged this alongside
+  "no native TLS." The two are not the same kind of gap: IPv6 ingress is a bind
+  choice the framework can make correctly; TLS termination is an attack surface
+  the framework deliberately does not own.
+
+- **Decision (IPv6).** Bind **dual-stack**: `web.serve` binds IPv6 Any (`::`)
+  when the host has IPv6, which on a standard Linux (`net.ipv6.bindv6only` = 0)
+  accepts IPv4 clients on the same socket as IPv4-mapped addresses. The family is
+  chosen ONCE, before the backend server is built, by a cheap non-racy probe
+  (`ipv6_available` — create+close an AF_INET6 socket); a host with IPv6 disabled
+  (`ipv6.disable=1`) fails that probe and falls back to IPv4 Any, so **no existing
+  deployment regresses**. The probe avoids a bind-and-retry, which is unsound: a
+  failed `http.listen` marks the backend `Server` `closing`, and a second listen
+  on the same value would refuse.
+
+- **The security-critical half — peer unmapping.** On a dual-stack socket an IPv4
+  client arrives as an IPv4-mapped IPv6 address, and Odin's `address_to_string`
+  renders it `::ffff:7f00:1` (hex groups), not a dotted quad. `web.trust_proxies`
+  matches textual PREFIXES against the peer string, so without unmapping a `"10."`
+  trust prefix would silently stop matching an IPv4 proxy the moment the listener
+  became dual-stack — a trust decision changing with the socket family, exactly
+  the IPv4-mapped-IPv6 edge the `trust_proxies` contract names as "a place to be
+  subtly wrong in a security boundary." The adapter's `render_peer` therefore
+  unmaps `::ffff:a.b.c.d` back to `a.b.c.d` (a fixed-prefix rewrite, not address
+  arithmetic) before stringifying, so `client_ip`/`trust_proxies` behave
+  **identically** on an IPv4 and a dual-stack bind. A real-socket test proves an
+  IPv4 client resolves to `127.0.0.1` (not the mapped form) and an IPv6 client to
+  `::1`, on one listener.
+
+- **Decision (TLS — item 5c, reaffirmed, NOT changed).** TLS termination stays
+  **delegated to the reverse proxy**, unchanged from `docs/operations.md` §1 and
+  the C-06 proxy-contract proof. In-process TLS would import an enormous attack
+  surface into a framework whose value is a small, frozen, gate-enforced one; the
+  proxy holds the certificate and asserts HSTS (which a framework on a cleartext
+  hop cannot). This ADR records that the audit's "no native TLS" item is answered
+  by the mandatory topology, not by adding TLS — the same reasoning as total
+  memory (cgroup), backlog (kernel) and restart (supervisor).
+
+- **Ledger.** **No growth.** `web.serve`'s signature is unchanged; the bind
+  family is an internal transport decision (ADR-009), and the helpers
+  (`ipv6_available`, `render_peer`) are `@(private)` in the transport package.
+
+- **Reversibility. HIGH.** The bind family and the unmapping are pure adapter
+  code, no public API and no vendored patch. Reverting to IPv4-only is a
+  one-line change. The dual-stack default relies on the standard Linux
+  `bindv6only = 0`; a host that sets it to 1 gets IPv6-only on that socket and
+  should front the service with the proxy the topology already mandates.
+
+## ADR-047 — the core installs no crash signal handler; the supervisor + coredump own a fault
+
+- **Status.** **ACCEPTED, 2026-07-25, readiness-hardening program (item 1).**
+  Records the decision behind item 1's deliverable — the turnkey supervisor unit
+  (`ops/deploy/uruquim.service`) and the fault-diagnosis workflow — and closes the
+  question the audit raised: "a faulting handler aborts the whole process; how is
+  that made operable and not a silent trap?"
+
+- **Context.** A handler fault (nil deref, failed assertion, OOB, div0) aborts the
+  process — Odin has no recoverable panic, and there will never be recovery
+  (ADR-020). The audit noted the operational tax: this *mandates* a supervisor, and
+  an operator hitting it wants to know *which request* killed the process. A
+  tempting answer is a core-installed `SIGSEGV`/`SIGABRT` handler that writes a
+  breadcrumb (the in-flight method + route) before re-aborting.
+
+- **Decision — the core installs NO crash signal handler, by choice.** Two
+  reasons, both consistent with the framework's minimal-core discipline:
+  1. **A library must not fight the operator's crash tooling.** Global signal
+     handlers are process-wide state. A framework that claims `SIGSEGV` collides
+     with the supervisor's core-dump capture, an APM agent's crash reporter, or a
+     debugger — and a library hijacking the operator's fault path is exactly the
+     kind of invasive default this project refuses.
+  2. **A core dump is safer and strictly more informative than a breadcrumb.** An
+     async-signal handler may only touch async-signal-safe operations; getting
+     that wrong turns a clean crash into a hang or a corrupted core. And the most a
+     safe handler could emit is "method + route," while `coredumpctl gdb` gives the
+     faulting handler *on the stack with its full call chain* — more information,
+     at zero risk, using tooling the mandatory supervisor already provides.
+
+- **What item 1 ships instead.** The turnkey `ops/deploy/uruquim.service` (item
+  1a) makes the mandatory topology copy-paste — `Restart=on-failure`,
+  `TimeoutStopSec` past `max_drain_time`, `MemoryMax` by the C-04 rule, and
+  `LimitMEMLOCK` for io_uring (F-C03-2) — and `docs/operations.md` §"Diagnosing a
+  handler fault" documents the `systemd-coredump` + `coredumpctl` workflow. The
+  failures that do NOT abort remain observable through the typed observer
+  (`web.observe`) and `web.stats()` — an uncommitted response is a logged 500, a
+  busy lane is a counted 503 (item 2). The abort path is owned by the platform,
+  loudly and by design, not by a signal handler in a frozen core.
+
+- **Ledger.** **No growth.** Docs and an ops artifact only; no code, no public
+  symbol. `web.serve`'s abort semantics are unchanged.
+
+- **Reversibility. N/A (a non-addition).** Nothing was added to reverse. If real
+  evidence later shows a core-side breadcrumb earns its risk, it would be its own
+  ADR with an async-signal-safety proof — this ADR records why it is not shipped
+  now, not that it is forbidden forever.

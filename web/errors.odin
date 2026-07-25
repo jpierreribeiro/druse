@@ -618,6 +618,52 @@ error_commit_static :: proc(ctx: ^Context, status: Status, body: string) {
 	)
 }
 
+// error_enforce_response_size replaces an over-limit committed response with the
+// standardized `internal_error` 500 BEFORE it is copied to the transport
+// (C-04 / ADR-045). It runs on the SHARED response path, so `test_request` and a
+// socket agree by construction (R-10).
+//
+// WHY 500 AND NOT A TRUNCATION. A half-sent body is a corrupt response; a 500 is
+// an honest one. The application built a response larger than the operator's
+// declared budget — that is the application's bug or an attacker's amplification,
+// and either way the framework must not spend the memory. Replacing it here, at
+// the one point the framework is about to hand the body to the transport, is what
+// turns an out-of-memory that kills every in-flight request into one typed
+// failure the observer sees with a route and a status.
+//
+// WHY IT MEASURES `len(body)` AND NOT THE WIRE. The retention C-04 measured is
+// the body the framework BUILT (F-C04-1), which a HEAD suppresses on the wire but
+// still allocated. Counting the built body is what makes the guard match the
+// resource it protects.
+//
+// Zero is unbounded (the default), so an application that never sets the limit
+// pays neither the branch cost past the first compare nor any behaviour change.
+@(private)
+error_enforce_response_size :: proc(ctx: ^Context) {
+	limit := ctx.private.limits.max_response_bytes
+	if limit <= 0 {
+		return
+	}
+	res := &ctx.private.response
+	// Nothing committed yet is `driver_finalize`'s concern, which authors its own
+	// 500; a detached stream carries no buffered body to measure.
+	if !res.committed || ctx.private.stream_detached {
+		return
+	}
+	if len(res.body) <= limit {
+		return
+	}
+
+	// Log on the server BEFORE the re-commit, the R-05 ordering every framework
+	// failure keeps, then discard the abandoned body and author the 500 exactly
+	// as `driver_finalize` does — the headers rebuild from request-local state,
+	// so the replacement carries the request ID and `secure_headers`.
+	framework_report(App, .Response_Too_Large)
+	response_reset_for_override(res)
+	error_commit_static(ctx, .Internal_Server_Error, ERROR_BODY_INTERNAL)
+	framework_observe_request(App, ctx, .Response_Too_Large)
+}
+
 // error_commit_message renders an envelope carrying an arbitrary message and
 // commits it as an OWNED body.
 //
@@ -719,6 +765,13 @@ Framework_Error :: enum {
 	// ADR-023 first-dispatch sub-decision). The spec proposes this exact name
 	// for the Phase-2 public observer (WP20).
 	Use_After_Route,
+	// C-04 / ADR-045 — a committed response body was larger than
+	// `Limits.max_response_bytes`. The framework replaces it with the
+	// standardized `internal_error` 500 BEFORE it is copied to the transport,
+	// so an out-of-memory that would kill every in-flight request becomes one
+	// typed failure an observer sees with a route and a status. Never fires when
+	// `max_response_bytes` is zero (the default), which is unbounded.
+	Response_Too_Large,
 }
 
 // Framework_Report is the typed event. `payload_type` is a `typeid`, so the
@@ -989,10 +1042,27 @@ framework_report :: proc($T: typeid, kind: Framework_Error, loc := #caller_locat
 		message = FRAMEWORK_MESSAGE_LISTEN_FAILED
 	case .Use_After_Route:
 		message = FRAMEWORK_MESSAGE_USE_AFTER_ROUTE
+	case .Response_Too_Large:
+		message = FRAMEWORK_MESSAGE_RESPONSE_TOO_LARGE
 	}
 
 	logger.procedure(logger.data, .Error, message, logger.options, loc)
 }
+
+// C-04 / ADR-045 — a response body larger than `Limits.max_response_bytes`. It
+// is the write-side mirror of the 413 for an oversized request body, but a 500
+// rather than a 4xx: the client did nothing wrong, the application built a
+// response the operator's declared budget refuses, and the framework replaces it
+// before spending the memory. The message names no bytes — the size is a
+// property of the response, and the typed observer carries the route and status.
+@(private)
+FRAMEWORK_MESSAGE_RESPONSE_TOO_LARGE ::
+	"uruquim: a handler built a response larger than Limits.max_response_bytes, " +
+	"so the framework replaced it with a 500 before copying it to the transport. " +
+	"A response is buffered whole (ADR-014) and retained per connection, so an " +
+	"unbounded one is an out-of-memory that would kill every in-flight request. " +
+	"Lower the response size, raise max_response_bytes, or stream large output " +
+	"with web.stream."
 
 // WP60 — the three cross-origin members of the fail-closed family.
 //

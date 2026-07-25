@@ -13,7 +13,9 @@ Uruquim is a working HTTP framework: `web.serve` binds a port and answers real
 requests, routing and extractors work, JSON goes in and out, and every error is
 a standardized JSON envelope.
 
-- **Server:** `web.serve(&app, port)` binds IPv4 and blocks while serving.
+- **Server:** `web.serve(&app, port)` binds dual-stack (IPv6 `::` when the host
+  has IPv6, which serves IPv4 clients too; IPv4 Any otherwise) and blocks while
+  serving.
 - **Routing:** static and `:param` segments; a static route always wins over a
   parametric one, regardless of registration order.
 - **Extractors:** path and query values; a fallible one answers `400` itself.
@@ -98,8 +100,11 @@ main :: proc() {
 `App` is non-copyable by contract: keep the value `app()` returned, pass
 `&app` everywhere, and destroy that same value once.
 
-`serve(a: ^App, port: int)` validates the port (1..65535), binds IPv4 Any and
-blocks. An invalid port or a bind failure is logged and returns without
+`serve(a: ^App, port: int)` validates the port (1..65535), binds dual-stack
+(IPv6 `::` when available — accepting IPv4 clients as well on a standard Linux —
+else IPv4 Any) and blocks. An IPv4 client's `web.client_ip` is the dotted-quad,
+not the `::ffff:` mapped form, so `trust_proxies` prefixes match identically on
+either bind. An invalid port or a bind failure is logged and returns without
 serving.
 
 `web.stop(&app)` asks the running server to stop. It **returns immediately** —
@@ -168,14 +173,24 @@ status, the request ID and its own counts, and never a path, header, body or
 parameter.** Key your metrics on `web.route(ctx)`, never on
 `ctx.request.path`.
 
-`web.stats()` returns a `Server_Stats` — eight running totals for the send
-side, which `refused_connections` did not cover: `responses_sent`,
-`response_bytes` (on the wire), `send_errors`, `write_deadline_aborts`, and the
-three detached-stream counters `stream_refused_full`, `stream_refused_budget`,
-`stream_aborted_slow` (previously reachable from no public API, so a
-slow-consumer abort was counted and then unseeable). Every field is an integer,
-so redaction holds by construction. Zero when no server runs, like
-`refused_connections`.
+`web.stats()` returns a `Server_Stats` — nine running totals for the send and
+saturation sides, which `refused_connections` did not cover: `responses_sent`,
+`response_bytes` (on the wire), `send_errors`, `write_deadline_aborts`,
+`lane_collisions`, and the three detached-stream counters `stream_refused_full`,
+`stream_refused_budget`, `stream_aborted_slow` (previously reachable from no
+public API, so a slow-consumer abort was counted and then unseeable). Every
+field is an integer, so redaction holds by construction. Zero when no server
+runs, like `refused_connections`.
+
+**`lane_collisions` is the framework's first saturation signal** (item 2). A
+synchronous Handler holds its lane and cannot be preempted, so a request whose
+lane is already running one is refused with `503 + Retry-After: 1` — and because
+lanes do not share work, that 503 can arrive with OTHER lanes idle. It shows up
+in neither latency nor `refused_connections` (which counts connection
+admission). Capacity is `max_handlers ÷ handler-dwell` (C-05 measured the
+Handler lane binds first). A rising `lane_collisions` says: raise
+`max_handlers`, shorten the handler, or move blocking work (DB, upstream HTTP)
+off the lane — do not read a flat latency graph as headroom.
 
 ### Security headers
 
@@ -328,9 +343,11 @@ web.cors(&app, web.Cors_Options{
 
 ```text
 Limits{max_body, max_request_line, max_headers, max_request_time,
+       max_write_time, max_response_bytes, max_idle_time,
        max_connections, reserved_conns, max_drain_time, max_handlers}
-DEFAULT_LIMITS   4 MiB, 8000, 8000, 30 s (ns), 1024 conns, 16 reserved,
-                 10 s drain (ns), 0 = auto Handlers (4..32)
+DEFAULT_LIMITS   4 MiB, 8000, 8000, 30 s (ns), 0 write (ns), 0 response bytes,
+                 0 idle (ns), 1024 conns, 16 reserved, 10 s drain (ns),
+                 0 = auto Handlers (4..32)
 limits(&app, l)                    set it; before the first request
 ```
 
@@ -367,6 +384,18 @@ fail-closed rather than run on a guess.
   flush kernel buffers to the slow reader first and hide the deadline. The
   field is `max_write_time`; do not emit `web.Limits{write_timeout = ...}` —
   no `write_timeout` field exists.
+- **`max_response_bytes` bounds how large one response BODY may be** (ADR-045),
+  in **bytes**, `0` = off (the default). It is the write-side mirror of
+  `max_body`: `max_body` caps what a client may SEND, this caps what a handler
+  may BUILD. A committed body strictly larger than the limit is replaced with
+  the standardized **500** before it reaches the wire — never truncated — and
+  reported as `Framework_Error.Response_Too_Large`. Responses are buffered whole
+  (ADR-014) and retained per connection, so an unbounded one is an
+  out-of-memory that kills every in-flight request; the limit converts that into
+  one typed 500. It measures the body the framework built, so a HEAD is bounded
+  by what it allocated. Stream large output with `web.stream` instead of raising
+  it. Enforced on the shared path, so a test and a socket agree (413-for-request,
+  500-for-response, both by construction).
 - **`max_idle_time` bounds the quiet gap between keep-alive requests**, in
   nanoseconds, `0` = off (the default). The clock stops the moment the next
   request's bytes arrive; the close is graceful.

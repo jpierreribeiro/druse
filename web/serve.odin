@@ -22,7 +22,9 @@ import transport "uruquim:web/internal/transport"
 //
 // It validates the port (1..65535); an invalid port is logged and `serve`
 // returns WITHOUT binding. A bind/listen failure is likewise logged and
-// returns. On success it listens on IPv4 Any and blocks while serving. Full
+// returns. On success it listens DUAL-STACK — IPv6 Any (`::`) when the host has
+// IPv6, which on a standard Linux accepts IPv4 clients too, falling back to IPv4
+// Any where IPv6 is unavailable (item 5b) — and blocks while serving. Full
 // graceful-shutdown deadlines are Phase 4; configurable timeouts are Phase 3.
 serve :: proc(a: ^App, port: int) {
 	// ADR-019: a poisoned application never binds. The dispatch-path guard
@@ -225,6 +227,11 @@ driver_run :: proc(a: ^App, ctx: ^Context, inbound: transport.Inbound) {
 	// middleware chain — files get `secure_headers` and auth like handlers.
 
 	dispatch(a, ctx)
+	// C-04 / ADR-045: a committed response larger than `max_response_bytes` is
+	// replaced with the standardized 500 here, on the shared path before the
+	// driver copies it out, so both transports agree (R-10). A no-op when the
+	// limit is off (the default).
+	error_enforce_response_size(ctx)
 	driver_finalize(ctx)
 }
 

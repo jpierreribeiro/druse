@@ -24,23 +24,61 @@ frozen, gate-enforced one. The proxy holds the certificate, and it is also the
 thing that should assert HSTS — a framework behind it asserting HSTS on a
 cleartext hop is asserting something it cannot know.
 
+**IPv6.** `web.serve` binds **dual-stack** (ADR-046): IPv6 `::` when the host has
+IPv6 — which on a standard Linux (`net.ipv6.bindv6only` = 0) serves IPv4 clients
+on the same socket — falling back to IPv4 Any where IPv6 is disabled. An IPv4
+client's `web.client_ip` is the dotted-quad, not the `::ffff:` mapped form, so
+`trust_proxies` prefixes match identically either way. A host that sets
+`bindv6only = 1` gets IPv6-only on that socket; front it with the proxy this
+topology already mandates. (TLS is delegated; IPv6 ingress in that topology is
+naturally the proxy's job too — the native dual-stack bind is for a direct
+deployment.)
+
 **Why a supervisor, and this is not a nicety.** **A faulting handler aborts the
 process.** Odin has no recoverable panic (ADR-020), so a nil dereference, a
 failed assertion or an out-of-bounds index in your handler ends the program. The
 supervisor restarting it *is* the recovery mechanism. There is no other one and
-there will not be.
+there will not be. **This is also how Gin is deployed in practice** — the
+difference is that this document writes the boundary down instead of leaving it
+folklore.
 
-`systemd` is the ordinary answer:
+**The canonical unit is `ops/deploy/uruquim.service`** — copy it, edit three
+values, `systemctl enable --now`. It encodes the whole mandatory topology in one
+place: `Restart=on-failure` (the recovery), `TimeoutStopSec` (the shutdown outer
+bound, kept longer than `max_drain_time`), `MemoryMax` (the C-04 cgroup bound),
+and — easy to forget and load-bearing — **`LimitMEMLOCK`**, because io_uring pins
+memory per Handler lane and a too-low limit makes `serve` fail to acquire its
+event loop (F-C03-2). The essentials:
 
 ```ini
 [Service]
 ExecStart=/usr/local/bin/your-app
-Restart=always
+Restart=on-failure
 RestartSec=1
+TimeoutStopSec=30      # > Limits.max_drain_time (10s default), < orchestrator grace
+LimitMEMLOCK=64M       # io_uring locked memory, per lane; raise with max_handlers
+MemoryMax=1G           # the C-04 aggregate bound — see §"What the framework bounds"
 ```
 
-**This is also how Gin is deployed in practice.** The difference is that this
-document writes the boundary down instead of leaving it folklore.
+### Diagnosing a handler fault
+
+When a fault aborts the process, the thing you want is *which request killed it*.
+The core installs **no crash signal handler** and deliberately does not (ADR-047):
+a library that hijacks `SIGSEGV` fights the operator's own crash tooling, and a
+core dump is both safer and more informative than any breadcrumb the framework
+could write from a signal handler. So let systemd capture the core:
+
+```
+apt install systemd-coredump      # or your distro's equivalent
+coredumpctl gdb uruquim           # opens the last crash; `bt` shows the stack
+```
+
+The faulting handler is on the stack — the request that killed the process,
+named precisely, with its call chain — which is more than "method + route" and
+does not risk deadlocking inside an async-signal context to get it. Pair it with
+the typed observer (`web.observe`) and `web.stats()` for the failures that do
+*not* abort (an uncommitted response is a logged 500, a busy lane is a counted
+503).
 
 ---
 
@@ -378,16 +416,26 @@ the topology those limitations make mandatory:
   panic (ADR-020) — and a handler blocked in foreign code cannot be preempted,
   so the supervisor's kill is the outer bound on shutdown. Keep
   `max_drain_time` (default 10 s) well inside `TimeoutStopSec`.
-* **Run under a memory cgroup, sized by a measured rule.** The core caps a
-  request body (`max_body`) but not a response, so total process memory is
-  delegated. C-04 measured the shape: a connection retains **~1.0× the largest
-  response it ever served**, held for the connection's life, and there is no
-  per-request leak. So size the cgroup for
+* **Set `max_response_bytes`, then run under a memory cgroup sized by a measured
+  rule.** `max_response_bytes` (ADR-045, default 0 = off) caps ONE response: a
+  handler that builds a larger body gets a standardized 500 before the bytes are
+  copied to the wire, converting an out-of-memory that kills every in-flight
+  request into one typed `Response_Too_Large` an observer sees. Set it to the
+  largest response any handler legitimately builds. It is the write-side mirror of
+  `max_body`.
 
-  > `max_connections × (largest response your handlers can build) + baseline`
+  The cgroup is still the AGGREGATE guard, because the per-response limit bounds
+  one response and total process memory is `max_connections` of them. C-04
+  measured the shape: a connection retains **~1.0× the largest response it ever
+  served**, held for the connection's life, and there is no per-request leak. So
+  size the cgroup for
 
-  which is **1024 ×** your largest response at the defaults. `max_connections` is
-  the only setting that moves that product. Two levers reduce it further:
+  > `max_connections × min(max_response_bytes, largest response your handlers can build) + baseline`
+
+  which, with `max_response_bytes` set, is a number you control directly rather
+  than one your handlers imply. Unset, it is **1024 ×** your largest response at
+  the defaults, and `max_connections` is the only setting that moves the product.
+  Two further levers reduce it:
   - **`max_idle_time` is a memory control, not only a slot economy.** Closing an
     idle keep-alive connection **destroys its arena**, returning the retained
     response memory; a connection you keep alive keeps its peak footprint.

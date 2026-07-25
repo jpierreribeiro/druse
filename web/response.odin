@@ -154,6 +154,28 @@ response_destroy :: proc(res: ^Response) {
 	res^ = Response{}
 }
 
+// response_reset_for_override frees an owned body and clears the commit guard so
+// the FRAMEWORK — never a handler — can replace a committed response with a
+// standardized error before it reaches the transport (C-04 / ADR-045).
+//
+// It is NOT a hole in the single-commit guard. That guard exists so a HANDLER's
+// second write cannot clobber its first; a driver-side finalizer that detects an
+// over-limit body is exactly the same class of action as `driver_finalize`'s 500
+// for a handler that committed nothing. The re-commit that follows rebuilds its
+// headers from request-local state (the request ID, `secure_headers`), so the
+// replacement 500 carries them just like the driver's own 500 — this proc only
+// drops the abandoned body, it does not touch that state.
+@(private)
+response_reset_for_override :: proc(res: ^Response) {
+	if res.owned_body {
+		delete_slice(res.body, res.body_allocator)
+	}
+	res.body = nil
+	res.owned_body = false
+	res.body_allocator = {}
+	res.committed = false
+}
+
 // ---------------------------------------------------------------------------
 // WP6 — response headers (plan D3).
 //
