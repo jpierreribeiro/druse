@@ -34,6 +34,18 @@ topology already mandates. (TLS is delegated; IPv6 ingress in that topology is
 naturally the proxy's job too — the native dual-stack bind is for a direct
 deployment.)
 
+**Restart caveat — the dual-stack socket and a lingering IPv4 bind.** Because the
+listener is IPv6 `::` (dual-stack), it overlaps the whole IPv4 space: a `::8080`
+bind and an old `0.0.0.0:8080` bind **conflict**. If you restart the process
+without the previous instance's listening socket having fully closed — killing
+`-9` and immediately re-execing, or running two instances on one port — the new
+`web.serve` can fail to bind. This is standard socket behaviour, not a framework
+fault (a clean stop, or waiting for the socket to leave the table, avoids it),
+but it is sharper for a dual-stack listener than it was for the old IPv4-only
+one: the supervisor should let the old process's socket close before starting
+the replacement. `systemd` does this correctly by default; a hand-rolled
+kill-and-restart loop must not race the port.
+
 **Why a supervisor, and this is not a nicety.** **A faulting handler aborts the
 process.** Odin has no recoverable panic (ADR-020), so a nil dereference, a
 failed assertion or an out-of-bounds index in your handler ends the program. The

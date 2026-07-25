@@ -6,6 +6,16 @@ the measured evidence that motivates the phase, the architecture, and a living r
 updated at every measurement. All numbers were measured on a dedicated AWS c5-class 8-vCPU box
 (non-burstable), pilot toolchain `819fdc7`, base `origin/main@79a40ce`.
 
+> **⚠️ CORRECTION (2026-07-25, re-measurement) — read `## Re-measurement and root-cause
+> correction` at the end of this file before trusting the `~90% of fasthttp / 292k` throughput
+> claim below.** An independent re-run on the same class of box could NOT reproduce 292k for the
+> FRAMEWORK: `web.app` measures ~79–141k req/s on 4 cores (29–52% of fasthttp's 274k), and the
+> 292k figure appears to belong to the `echo_rp` reuseport prototype, not the framework on main.
+> The re-measurement also **refutes the "runs on one core" root cause** recorded here: per-core
+> `mpstat` shows the framework saturating all four cores but spending **~50% in iowait** — it is
+> I/O-wait-bound, not core-distribution-bound. The **latency** results below (world-class, flat
+> under load) DID reproduce and stand.
+
 ## Why this phase exists
 
 A measured optimization campaign proved Uruquim can compete with Go net/http on a trivial
@@ -351,18 +361,23 @@ generator on 4-7, distributed load, 2 stable rounds:
 
 | server (4 cores) | req/s | p99 |
 |---|---|---|
-| **Uruquim (framework, on main)** | **292k** | **~1ms** |
+| **Uruquim (framework, on main)** | **292k** ⚠️ | **~1ms** |
 | fasthttp (Go's zero-alloc ceiling) | 326k | ~2.9ms |
 | Go net/http | ~200k | ~2.5ms |
 
+> ⚠️ **The 292k row did not reproduce** on re-measurement (see the correction at the top and the
+> section at the end). The framework measures ~79–141k on 4 cores; 292k appears to be the
+> `echo_rp` reuseport prototype, not `web.app`. The latency column stands.
+
 **Uruquim does ~90% of fasthttp's throughput (292k vs 326k) AND ~3× better p99 latency
-(~1ms vs 2.9ms) — and under light load its p99 is ~118µs, ~7-80× better.** It beats net/http on
-every axis. The goal — "compete with mature native libraries" — is MET: Uruquim competes with
-**fasthttp, the fastest thing in the Go ecosystem**, on throughput, and wins on latency.
+(~1ms vs 2.9ms) — and under light load its p99 is ~118µs, ~7-80× better.** ⚠️ *The throughput half
+of this sentence is the disputed claim; the latency half reproduced.* It beats net/http on
+every axis.
 
 ### The honest scorecard vs the Go ceiling (fasthttp)
-- **Latency: Uruquim WINS** (p99 ~1ms vs 2.9ms under load; ~118µs vs 860µs light). World-class.
-- **Throughput: ~90% of fasthttp** (292k vs 326k on 4 cores) — competitive, ~11% behind/core.
+- **Latency: Uruquim WINS** (p99 ~1ms vs 2.9ms under load; ~118µs vs 860µs light). World-class. ✅ reproduced.
+- **Throughput: ~90% of fasthttp** ⚠️ **DISPUTED** — re-measurement puts the *framework* at 29–52%
+  of fasthttp on 4 cores; see the end-of-file correction. The per-core cause is iowait, not cores.
 - **Correctness/safety, io_uring infra, memory model:** built and measured across Phase 9.
 
 ### What the whole investigation refuted (measurement > hypothesis, six times)
@@ -373,3 +388,90 @@ rewrite. The framework was already excellent; the work was proving WHERE it stan
 **Phase 9 outcome: Uruquim is a world-class-latency HTTP framework whose throughput competes with
 the Go ceiling.** Remaining upside (the ~11%/core throughput gap vs fasthttp) is a real but
 minor optimization target, not a structural flaw. p28 — already on main — delivers this.
+
+---
+
+## Re-measurement and root-cause correction (2026-07-25, post-merge of items 1/2/5)
+
+**Why this section exists.** The `~90% of fasthttp / 292k` claim above is **methodology-fragile
+and did not reproduce** on an independent re-run. A benchmark number that swings 3–4× with the
+load-distribution setup is a reproducibility problem, and this project's rule is that an
+unreproducible number is "an anecdote with decimal places" (benchmark-methodology.md §3). The
+honest re-measured picture is recorded here rather than silently overwriting the disputed number,
+so the next reader inherits the discrepancy and its cause, not a second unverified figure.
+
+**Box:** AWS c5.2xlarge, 8 vCPU Intel Xeon 8124M @ 3.00 GHz, kernel 6.17, toolchain `819fdc7`.
+Server pinned to cores 0–3, `wrk` to cores 4–7 (disjoint), keep-alive. Two load shapes tried:
+a single destination (`wrk -t4 -c100 → 127.0.0.1`) and a distributed one (4× `wrk -t1` → four
+loopback IPs `127.0.0.{1..4}` to vary the 4-tuple, the setup the original 292k invoked).
+
+### 1. Throughput — the framework does NOT reach 90% of fasthttp on 4 cores
+
+| server (4 cores, `/ping`) | c100 req/s | c400 req/s | vs fasthttp |
+|---|---|---|---|
+| **Uruquim framework — auto lanes (4)** | ~80k | ~78k | **29%** |
+| **Uruquim framework — `max_handlers=32`** | ~116k | ~115k | **42%** |
+| **fasthttp** (zero-alloc Go ceiling) | ~274k | ~290k | 100% |
+| **Go net/http** | ~162k | ~162k | 59% |
+
+Under the *distributed* load the framework was **~79k regardless** of lane count or dst-IP spread
+(78–80k across every run). Giving the server 6 cores and `wrk` 2 raised `max_handlers=32` to
+~141k (67% of a then-wrk-bound fasthttp), but **no single-box configuration reproduced 292k for
+`web.app`.** The 292k figure is best explained as the **`echo_rp` reuseport echo prototype**
+(a bare `SetBodyString("pong")` loop over `SO_REUSEPORT`), which is not the framework: `web.app`
+uses one shared accept socket, links no reuseport, and runs the full parse → route → arena →
+response pipeline.
+
+### 2. Root cause — CORRECTED: iowait-bound, not core-bound
+
+The earlier record blamed core distribution ("the framework runs on one core; nbio does not
+spread connections"). **Per-core `mpstat` under distributed load refutes that for `web.app`:**
+
+| | core 0 | core 1 | core 2 | core 3 | dominant time |
+|---|---|---|---|---|---|
+| **Uruquim framework** | 100% | 100% | 100% | 100% | **%iowait ≈ 49% per core** (usr ≈20, sys ≈26) |
+| **fasthttp** | 100% | 100% | 100% | 100% | **%iowait = 0%** (usr ≈40, sys ≈37, soft ≈22) |
+
+Both saturate all four cores. The difference is *what* the cores do: fasthttp spends 100% of each
+core doing work; **the framework spends ~half of each core in `iowait` — stalled waiting for
+io_uring completions.** The throughput ceiling is therefore not "too few cores" (it uses them
+all) but an **I/O pattern that leaves the CPU waiting** — per-request submit/complete round-trips
+rather than batched/multishot submission. This is the real lever, and it is exactly the
+`io_uring` multishot direction Phase 9 began (`bench/echo_multishot`, WP116–119): reduce the
+per-request completion stalls so the ~50% iowait becomes work. It is a code lever inside the
+transport, invisible to the public API.
+
+### 3. What reproduced and stands: latency
+
+Every latency measurement reproduced the original finding decisively. `web.app`, 4 lanes, `/ping`:
+
+| | Uruquim (4-lane) | fasthttp | Go net/http |
+|---|---|---|---|
+| p50 (c100) | **44 µs** | 332 µs | 567 µs |
+| p99 (c100) | **67 µs** | 1.15 ms | 2.49 ms |
+| p99 (c400) | **69 µs** (flat) | 2.77 ms | 8.3 ms |
+
+At c400 Uruquim's p99 is **~40× better than fasthttp and ~120× better than net/http**, and it
+stays **flat** from c100 to c400 while both competitors degrade an order of magnitude. This is the
+bounded-lane, no-queue model working as designed: it sheds excess load (the 503-on-collision
+counted by `web.stats().lane_collisions`, item 2) rather than queueing, which is precisely why
+latency does not degrade.
+
+### 4. The honest architectural trade, restated
+
+Uruquim's synchronous bounded-lane model trades **peak throughput** for **flat, world-class
+latency**. Its throughput is `lanes ÷ per-request-latency` and, on 4 cores, is additionally capped
+by the ~50% io_uring iowait. fasthttp's async goroutine model has no lane bound and no iowait, so
+it wins raw throughput; it pays in tail latency under load. For a p99-SLA web service the trade
+favours Uruquim; for a maximum-RPS proxy it favours fasthttp.
+
+### 5. What is still owed (unchanged from the original study, and now sharper)
+
+- **A two-box benchmark** (server on all 8 cores, dedicated load generator) is the only way to
+  settle absolute throughput — single-box, server and `wrk` fight for cores. Owed.
+- **Attack the iowait** (io_uring multishot recv/send, deeper SQ depth, `SQPOLL`) — the now-isolated
+  lever. If it removes the ~50% iowait, framework throughput could roughly double toward the
+  fasthttp neighbourhood without touching the public API or the latency win.
+- **Do NOT** claim "~90% of fasthttp" until a two-box run with the iowait addressed shows it.
+  Claim what reproduced: **world-class, flat latency; throughput 29–52% of fasthttp on 4 cores
+  single-box, iowait-bound.**
