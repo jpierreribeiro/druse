@@ -1042,72 +1042,24 @@ handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 		return false
 	}
 	td.handler_active = true
-	if td.accept != nil {
-		server := res._conn.server
-		target := td.accept
-		// Keep the operation record until both the cancel and the Accept CQE have
-		// completed. `nbio.remove` is intentionally asynchronous; starting a
-		// blocking Handler before that completion can let a new connection satisfy
-		// the cancelled accept and disappear without a callback.
-		nbio.detach(target)
-		nbio.remove(target)
-		td.accept = nil
-		// URUQUIM PATCH 27 (Closure C-05 / F-C05-1) — THIS WAIT IS BOUNDED NOW,
-		// and the bound is the difference between a slow shutdown and one that
-		// never happens.
-		//
-		// WHAT IT WAS. `for target.accept.client == 0 && target.accept.err == nil`
-		// with no cap and no deadline. C-01 inventoried it (F-C01-3) and
-		// classified it as an acceptable limitation on the reasoning that
-		// `io_uring` always delivers a completion for a cancelled submission, so
-		// the loop must terminate. **The measurement contradicted the
-		// reasoning.** C-05's saturation lab wedges here reproducibly — roughly
-		// one run in three at 48 concurrent clients against a synchronous
-		// handler — and the wedge is total: `web.stop` did not return in SIXTY
-		// seconds against a three-second `max_drain_time`.
-		//
-		// WHY A STUCK LANE STOPS THE WHOLE SERVER. This spin runs on the lane
-		// thread, so a lane parked in it never returns to its event loop, never
-		// observes `s.closing`, and never calls `_server_thread_shutdown`.
-		// `serve` waits on `threads_closed` for EVERY lane, so one lane in here
-		// is a process that cannot be stopped — past `max_drain_time`, which
-		// bounds the drain and cannot bound a lane that never reaches it.
-		//
-		// WHY GIVING UP IS SAFE, and why it does NOT reattach. `nbio.remove` has
-		// already guaranteed the callback will never run, so abandoning the wait
-		// cannot resurrect a request. What the wait was FOR is the narrow case
-		// where the accept won the race and holds a connected client that would
-		// otherwise vanish — worth waiting for, not worth waiting forever for.
-		// On expiry the operation record stays DETACHED rather than being
-		// returned to the pool: reattaching a record whose completion may still
-		// arrive would hand the pool an entry the kernel can still write to,
-		// which trades a wedge for a use-after-free. One leaked `Operation` per
-		// occurrence is the correct price.
-		HANDLER_ACCEPT_CANCEL_WAIT :: 250 * time.Millisecond
-		cancel_deadline := time.time_add(time.now(), HANDLER_ACCEPT_CANCEL_WAIT)
-		cancel_observed := true
-		for target.accept.client == 0 && target.accept.err == nil {
-			if time.since(cancel_deadline) >= 0 {
-				cancel_observed = false
-				break
-			}
-			_ = nbio.tick(time.Millisecond)
-		}
-		if !cancel_observed {
-			log.warnf(
-				"uruquim: accept cancellation not observed within %v; abandoning the wait (the operation stays detached)",
-				HANDLER_ACCEPT_CANCEL_WAIT,
-			)
-		} else {
-			if target.accept.client != 0 {
-				// The accept won the cancellation race. Preserve it instead of
-				// silently dropping a connected client; `handler_active` keeps
-				// on_accept from rearming this lane.
-				on_accept(target, server)
-			}
-			nbio.reattach(target)
-		}
-	}
+	// V1 (perf tournament, claude/perf-work) — the per-request accept
+	// cancel/spin/re-arm dance is REMOVED. It was the #1 suspect for BOTH the
+	// p99 tail (Patch 27 already had to bound this spin at 250ms/request to stop
+	// a reproducible total wedge — C-05/F-C05-1) and the ~7x CPU/request gap vs
+	// Go (cancel + remove + spin-tick + reattach per request, even on keep-alive).
+	//
+	// With the cancel gone, the accept stays armed during the handler; a
+	// connection accepted mid-handler is simply processed when the loop resumes
+	// (on_accept re-arms after each successful accept). handler_lane_leave is
+	// unchanged: its `td.accept == nil` guard already skips re-arming here, since
+	// td.accept is now non-nil at leave (never cancelled), so no double-arm.
+	//
+	// TRADE-OFF (VENDOR.md Patch 13 / WP71): without the cancel, a connection can
+	// land on a lane blocked in a slow (e.g. PostgreSQL) handler while another
+	// lane is free — reintroducing cross-lane head-of-line for BLOCKING handlers.
+	// A PURE WIN for fast handlers (the /ping benchmark); it MUST be measured on a
+	// blocking-handler workload (the board's DB path) before adoption. This is
+	// exactly why the tournament tests multiple models rather than assuming one.
 	return true
 }
 
