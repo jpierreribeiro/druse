@@ -42,6 +42,59 @@ resolve_handler_concurrency :: proc(requested: int) -> int {
 	)
 }
 
+// ipv6_available reports whether this host can open an IPv6 socket at all (item
+// 5b). It is a cheap, synchronous, non-racy probe — socket-family availability
+// does not flap while a process runs — used ONCE at `serve` to choose the bind
+// family. A host booted with `ipv6.disable=1` fails to create an AF_INET6
+// socket; there the server falls back to IPv4 Any, unchanged from before this
+// feature existed.
+@(private)
+ipv6_available :: proc() -> bool {
+	sock, err := net.create_socket(.IP6, .TCP)
+	if err != nil {
+		return false
+	}
+	net.close(sock)
+	return true
+}
+
+// render_peer stringifies the connected peer, UNMAPPING an IPv4-mapped IPv6
+// address (`::ffff:a.b.c.d`) back to its dotted-quad `a.b.c.d` (item 5b).
+//
+// WHY THIS IS SECURITY, NOT COSMETICS. On a dual-stack listener an IPv4 client
+// arrives as an IPv4-mapped IPv6 address, and Odin's `net.address_to_string`
+// renders that as `::ffff:7f00:1` — hex groups, not a dotted quad.
+// `web.trust_proxies` matches textual PREFIXES against the peer string, so
+// without unmapping a `"10."` trust prefix would silently fail to match an IPv4
+// proxy the moment the listener is dual-stack. A trust decision that changes
+// with the socket family is precisely the IPv4-mapped-IPv6 edge the
+// `trust_proxies` contract names as "a place to be subtly wrong in a security
+// boundary." Unmapping makes the peer string identical whether the socket is
+// IPv4 or dual-stack, so `client_ip`/`trust_proxies` behave the same on both.
+//
+// It is a fixed-prefix rewrite (ten zero bytes, then `0xffff`), not address
+// arithmetic: deterministic, allocation-free until the final stringify, and
+// unit-tested.
+@(private)
+render_peer :: proc(addr: net.Address, allocator: mem.Allocator) -> string {
+	if v6, ok := addr.(net.IP6_Address); ok {
+		if v6[0] == 0 &&
+		   v6[1] == 0 &&
+		   v6[2] == 0 &&
+		   v6[3] == 0 &&
+		   v6[4] == 0 &&
+		   v6[5] == u16be(0xffff) {
+			// Groups 6 and 7 hold the four IPv4 octets, big-endian:
+			// `::ffff:(a<<8|b):(c<<8|d)`.
+			g6 := u16(v6[6])
+			g7 := u16(v6[7])
+			v4 := net.IP4_Address{u8(g6 >> 8), u8(g6 & 0xff), u8(g7 >> 8), u8(g7 & 0xff)}
+			return net.address_to_string(v4, allocator)
+		}
+	}
+	return net.address_to_string(addr, allocator)
+}
+
 // WP43 — PER-SERVER STATE. The config no longer lives in a package global.
 //
 // WHY THIS MATTERS AND IS NOT TIDYING. `web.serve` used to write its `Config`
@@ -234,9 +287,23 @@ serve :: proc(cfg: Config) -> Serve_Error {
 	// `catch_all` instead, and the connection closes.
 	opts.auto_expect_continue = false
 
+	// item 5b — bind DUAL-STACK when IPv6 is available, so IPv4 and IPv6 clients
+	// are both served on one socket. On a standard Linux (`net.ipv6.bindv6only`
+	// = 0) a `::` listener accepts IPv4 connections as IPv4-mapped addresses;
+	// `render_peer` below unmaps those so `client_ip`/`trust_proxies` see the
+	// dotted-quad, identical to a pure-IPv4 listener. If IPv6 is unavailable — a
+	// host booted with `ipv6.disable=1`, where creating an AF_INET6 socket fails
+	// — fall back to the historical IPv4 Any, so no existing deployment
+	// regresses. The family is chosen ONCE here, by a cheap non-racy probe,
+	// rather than by binding and retrying: a failed `http.listen` marks the
+	// backend `Server` closing, which a second `listen` on the same value would
+	// refuse.
 	endpoint := net.Endpoint {
 		address = net.IP4_Address{0, 0, 0, 0},
 		port    = cfg.port,
+	}
+	if ipv6_available() {
+		endpoint.address = net.IP6_Address{} // `::` — the all-zero IPv6 Any
 	}
 
 	if err := http.listen(&s, endpoint, opts); err != nil {
@@ -289,8 +356,8 @@ _refused_connections :: proc() -> int {
 	return sync.atomic_load(&server.refused_total)
 }
 
-// _server_stats reads every write-side counter under the one lock, so the eight
-// numbers are a coherent snapshot rather than eight independently-timed reads.
+// _server_stats reads every write-side counter under the one lock, so the nine
+// numbers are a coherent snapshot rather than nine independently-timed reads.
 // Through `g_server`, like `_refused_connections`, and zero when no server runs.
 @(private)
 _server_stats :: proc() -> Server_Stats {
@@ -306,6 +373,7 @@ _server_stats :: proc() -> Server_Stats {
 		response_bytes        = sync.atomic_load(&server.response_bytes),
 		send_errors           = sync.atomic_load(&server.send_errors),
 		write_deadline_aborts = sync.atomic_load(&server.write_deadline_aborts),
+		lane_collisions       = sync.atomic_load(&server.lane_collisions),
 	}
 	if g_server.streams != nil {
 		c := stream.counters(g_server.streams)
@@ -543,7 +611,7 @@ dispatch_upload :: proc(exchange: ^Exchange) {
 		path     = req.url.path,
 		query    = req.url.query,
 		headers  = neutral_headers(req, context.temp_allocator),
-		peer     = net.address_to_string(req.client.address, context.temp_allocator),
+		peer     = render_peer(req.client.address, context.temp_allocator),
 		upload   = rawptr(&exchange.spool),
 	}
 	dispatch_exchange(exchange)
@@ -573,7 +641,7 @@ on_body :: proc(user_data: rawptr, body: http.Body, err: http.Body_Error) {
 		// WP48: the peer, from the accepted connection rather than from any
 		// header. Rendered into the request's own temp allocator, so it lives
 		// exactly as long as every other request-scoped view.
-		peer       = net.address_to_string(req.client.address, context.temp_allocator),
+		peer       = render_peer(req.client.address, context.temp_allocator),
 		over_limit = err == .Too_Long,
 	}
 	if !exchange.inbound.over_limit {
@@ -616,6 +684,10 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 		// own backoff on top.
 		http.headers_set(&res.headers, "Retry-After", "1")
 		res.status = http.Status.Service_Unavailable
+		// PATCH 31 (item 2) — count the collision so it is visible in web.stats().
+		// This is the framework's first saturation point (C-05: lanes ÷ dwell), and
+		// a 503 here can arrive with other lanes idle — invisible otherwise.
+		sync.atomic_add(&res._conn.server.lane_collisions, 1)
 		http.respond(res)
 		return
 	}

@@ -82,6 +82,7 @@ bash -n "$URUQUIM_ROOT/build/check_c01_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_readiness_matrix.sh"
 bash -n "$URUQUIM_ROOT/build/check_c03_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c04_controls.sh"
+bash -n "$URUQUIM_ROOT/build/check_c04b_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_security_backlog.sh"
 bash -n "$URUQUIM_ROOT/build/check_h3_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c1_controls.sh"
@@ -780,6 +781,19 @@ timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/u
   "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_BIN_TMP/wp21-socket" ||
   fail "the WP21 socket fault-behaviour contract did not pass within the timeout"
 
+# item 5b — dual-stack bind over a real socket. It belongs on a socket for the
+# same reason WP21 does: the property (an IPv4 client reaches a `::` listener
+# and its client_ip is the UNMAPPED dotted-quad, and an IPv6 client reaches the
+# same listener) has no in-memory representation — test_request has no socket
+# family. Without the peer unmapping an IPv4 client on a dual-stack socket would
+# render as `::ffff:...` and silently break trust_proxies (ADR-046). External
+# timeout, like every socket suite.
+echo "--- item 5b dual-stack bind + IPv4-mapped peer unmapping over a real socket (odin test) ---"
+timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+  "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/item5b-dual-stack" \
+  "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_BIN_TMP/item5b-dual-stack" ||
+  fail "the item-5b dual-stack socket contract did not pass within the timeout"
+
 # ---------------------------------------------------------------------------
 # WP22 — THE `logger` MIDDLEWARE (application ledger 42 -> 43).
 #
@@ -1199,6 +1213,15 @@ timeout 300 env URUQUIM_COMPILER="$URUQUIM_COMPILER" \
 echo "--- C-04 response size and memory retention: the two-phase soak ---"
 timeout 180 env URUQUIM_COMPILER="$URUQUIM_COMPILER" \
   bash "$URUQUIM_ROOT/build/check_c04_controls.sh"
+
+# C-04b (ADR-045) — the per-response size limit the C-04 audit specified and
+# handed forward. It runs in the gate because it converts an out-of-memory that
+# kills every in-flight request into one typed 500, and a guard that is not
+# wired on the SHARED path would let test_request and a socket disagree (R-10) —
+# exactly the divergence class the whole two-transport design exists to prevent.
+echo "--- C-04b per-response limit: max_response_bytes replaces an over-limit response with a 500 ---"
+timeout 120 env URUQUIM_ODIN_BIN="$URUQUIM_COMPILER" \
+  bash "$URUQUIM_ROOT/build/check_c04b_controls.sh"
 
 # C-08 (Closure) — the httprouter comparative corpus. It runs in the gate for
 # two reasons that have nothing to do with performance: the BSD-3 attribution

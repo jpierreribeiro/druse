@@ -168,6 +168,7 @@ Server_Stats :: struct {
 	response_bytes:        i64,
 	send_errors:           int,
 	write_deadline_aborts: int,
+	lane_collisions:       int,
 	stream_refused_full:   int,
 	stream_refused_budget: int,
 	stream_aborted_slow:   int,

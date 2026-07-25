@@ -194,6 +194,16 @@ Server :: struct {
 	response_bytes:       i64, // bytes handed to the socket for those responses
 	send_errors:          int, // buffered-response sends that completed with an error
 	write_deadline_aborts:int, // connections aborted by the sweep's write-deadline branch
+	// URUQUIM PATCH 31 (item 2 — lane-collision observability) — BRIDGE. How many
+	// requests were refused with 503 because their lane was already running a
+	// synchronous Handler (`handler_lane_enter` returned false). This is the ONLY
+	// visible signal of the framework's first saturation point: C-05 measured that
+	// the Handler lane binds first (capacity is `lanes ÷ dwell`), and a 503 on
+	// collision can arrive with OTHER lanes idle, so it is invisible in latency and
+	// in `refused_total` (which counts connection admission, a different resource).
+	// Written by the adapter at the collision site, read without a request in hand —
+	// same atomic discipline as the counters above. Deletable with the backend.
+	lane_collisions:      int,
 	// Once the server starts closing/shutdown this is set to true, all threads will check it
 	// and start their thread local shutdown procedure.
 	//

@@ -216,8 +216,9 @@ main :: proc() {
   exactly like `web.app()` but installs neither the 404 nor the 405, so an
   unmatched request produces no response at all.
 - `web.serve(&app, port)` — the canonical and only entry point. It validates
-  the port, binds IPv4 Any, and blocks while the server runs. Host selection
-  and other options are a later phase.
+  the port, binds dual-stack (IPv6 `::` when the host has IPv6, serving IPv4
+  clients too; IPv4 Any otherwise), and blocks while the server runs. Host
+  selection and other options are a later phase.
 
 `App` owns resources and is non-copyable by contract. Keep the value returned
 by `web.app()`, pass its address, and destroy that same value exactly once.

@@ -84,7 +84,9 @@ work regardless of who wrote the fix.
 
 | 30 | A server that cannot acquire its io_uring event loop UNWINDS GRACEFULLY instead of terminating: `listen` returns `net.Listen_Error.Insufficient_Resources`, a failing lane flags `init_failed` + elects shutdown (the wake loop made nil-safe) + signals the wait group, and `serve` returns the error (Closure H-2 follow-up / F-C03-2) | **Yes** — the completion of patch 29. Upstream asserted the acquire; patch 29 diagnosed it; this returns a supervisor-restartable error from `web.serve` rather than aborting the process on a startup resource shortfall | **OFFER UPSTREAM.** General server-startup robustness — a resource failure at init should be a return value, not a crash — independent of Uruquim policy |
 
-**Sixteen of thirty are or contain upstream bugs; the rest are deliberate divergences.** WP70's
+| 31 | A `lane_collisions` counter on the backend `Server` — incremented by the adapter when `handler_lane_enter` returns false and the request is refused 503 — read by the adapter for `web.Server_Stats` (item 2) | **No** — upstream has no handler-lane model and no such accounting; exposing the framework's first saturation point (C-05: lanes ÷ dwell) is Uruquim's operational contract, the twin of patch 28's send counters on the write side | **CARRY AS BRIDGE.** Deletable with the vendored backend when `core:net/http` lands; the official adapter must expose an equivalent, or `web.stats().lane_collisions` loses its source |
+
+**Sixteen of thirty-one are or contain upstream bugs; the rest are deliberate divergences.** WP70's
 multi-lane lifecycle correction joins the upstream group; WP59's absolute drain
 deadline joins the policy group. The bridge label changes expected lifetime,
 not the evidence or upstream-offer obligation.

@@ -60,6 +60,11 @@ grep -q 'total_lane_503_no_retry == 0' "$URUQUIM_SUITE" ||
   fail "the Retry-After assertion is gone. A 503 lane refusal that does not tell the client when to come back invites an immediate retry onto the same contended pool, which collides again. The ramp reliably produces 503s, so the property is checked over real refusals."
 grep -q 'total_lane_503 > 0' "$URUQUIM_SUITE" ||
   fail "the assertion that the ramp actually produces a lane 503 is gone; without it the Retry-After check is vacuous"
+# item 2 — the lane-collision counter must be OBSERVABLE, not just felt as a 503.
+grep -q 'stats.lane_collisions) >= total_lane_503' "$URUQUIM_SUITE" ||
+  fail "the assertion that web.stats().lane_collisions covers the client-observed lane 503s is gone. A saturation counter that reads zero while clients see hundreds of 503s is decorative; this ties the counter to the refusal site (item 2)."
+grep -q 'atomic_add(&res._conn.server.lane_collisions' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+  fail "the lane-collision counter is no longer incremented at the 503 refusal site in dispatch_exchange; web.stats().lane_collisions would then be decorative (item 2)."
 grep -q 'Retry-After' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
   fail "the lane-refusal 503 no longer sets Retry-After (H-4). The refusal path at dispatch_exchange must add the header before respond()."
 
