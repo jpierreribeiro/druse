@@ -93,13 +93,20 @@ The WP breakdown and definitions of done live in the phase plan
 
 | WP | Change | req/s | p99 | CPU | syscalls/req | Gates | Notes |
 |---|---|---|---|---|---|---|---|
-| WP114 | PATCH 28 (non-spin accept suspension) | 108k | 149µs | 355% | — | ✅ 141 PASS | committed 651804b; beats Go on latency |
-| WP115 | provided-buffer ring | — | — | — | — | — | pending |
-| WP116 | recv_multishot (nbio) | — | — | — | — | — | pending |
-| WP117 | scanner multishot recv | — | — | — | — | — | target: CPU → 176% |
+| WP114 | PATCH 28 (non-spin accept suspension) | 108k | 149µs | 355% | — | ✅ 141 PASS | **MERGED** (main f69d51e); beats Go on latency |
+| WP115 | provided-buffer ring (from scratch) | — | — | — | — | ✅ unit | **DONE** — ABI built + proven vs kernel 6.8 (vendor/uring_buf_ring); test GREEN |
+| WP116 | multishot recv (prep + proof) | — | — | — | — | ✅ unit | **DONE** — 1 SQE → N CQEs, buffer-select, F_MORE proven; test GREEN |
+| WP117 | scanner multishot recv (odin-http integration) | — | — | — | — | — | in progress; target: CPU → 176% |
 | WP118 | accept_multishot | — | — | — | — | — | pending |
 | WP119 | dedicated accept path | — | — | — | — | — | target: ≥ 241k + guarantee |
 | WP121 | Phase 9 final | — | — | — | — | — | full picture vs Go |
+
+**WP115–116 note:** the I/O infrastructure Odin lacked (provided-buffer ring + multishot recv)
+is now built from scratch and proven against a real kernel, unit-tested locally. WP117 is the
+integration step: replace odin-http's one-shot recv path (`scanner.odin`) with this, preserving
+every HTTP framing invariant. That integration is a deeper rewrite (the scanner is the request
+parser) and pairs naturally with WP119's dedicated-accept path — the two together are the
+"correct I/O base" rewrite. It needs the c5 for the CPU measurement that closes the WP.
 
 ## Rules of engagement (what got us here)
 
