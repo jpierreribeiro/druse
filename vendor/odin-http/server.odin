@@ -21,6 +21,12 @@ import "core:sync"
 import "core:thread"
 import "core:time"
 
+// URUQUIM PATCH 32 (adopted performance path) — one acceptor owns the shared
+// listen socket and assigns each connection once to an available lane. The
+// previous shared-accept implementation remains available as a build-time
+// rollback control.
+URUQUIM_DEDICATED_ACCEPT :: #config(URUQUIM_DEDICATED_ACCEPT, true)
+
 Server_Opts :: struct {
 	// Whether the server should accept every request that sends a "Expect: 100-continue" header automatically.
 	// Defaults to true.
@@ -174,6 +180,16 @@ Server :: struct {
 	handler:        Handler,
 
 	threads:        []Server_Thread,
+	// Dedicated ingress state.  Only the serve thread touches accept/pending;
+	// handler lanes merely publish availability and wake this loop.
+	accept_loop:     ^nbio.Event_Loop,
+	accept:          ^nbio.Operation,
+	pending_accept:  Accepted_Connection,
+	pending_waiting: bool,
+	next_lane:       int,
+	accept_failures: int,
+	refused_connections: int,
+	lanes_ready:     sync.Wait_Group,
 	// URUQUIM PATCH 8 (WP47, amended by WP71) — the admission budget is
 	// server-wide. A lane-local `len(td.conns)` multiplied the public limit by
 	// the number of Handler lanes once concurrent serving shipped.
@@ -234,6 +250,8 @@ Server_Thread :: struct {
 	// URUQUIM PATCH 13 (WP71) — BRIDGE. Synchronous Handler execution owns one
 	// lane; its accept stays suspended until application code returns.
 	handler_active: bool,
+	assigned_connections: int,
+	queued_handoffs:      int,
 
 	// URUQUIM PATCH 8 (WP47) — refusals since admission was last available.
 	//
@@ -254,11 +272,25 @@ Server_Thread :: struct {
 	// free_temp_blocks_count: int,
 }
 
+@(private)
+Accepted_Connection :: struct {
+	server:   ^Server,
+	socket:   net.TCP_Socket,
+	endpoint: net.Endpoint,
+	valid:    bool,
+}
+
 // URUQUIM PATCH 21 (WP90 / F9) — accept-error tolerance bounds.
 @(private)
 URUQUIM_ACCEPT_FAILURE_LIMIT :: 128
 @(private)
 URUQUIM_ACCEPT_RETRY_DELAY :: 10 * time.Millisecond
+// A handoff is a `next_tick` callback on the destination lane. A hostile
+// connect/RST loop can otherwise enqueue callbacks faster than a lane can
+// observe that their sockets are already dead. Established keep-alive
+// connections do not consume this bounded queue.
+@(private)
+URUQUIM_ACCEPT_HANDOFF_LIMIT :: 8
 
 @(private, disabled = ODIN_DISABLE_ASSERT)
 assert_has_td :: #force_inline proc(loc := #caller_location) {
@@ -330,19 +362,37 @@ serve :: proc(s: ^Server, h: Handler) -> (err: net.Network_Error) {
 	thread_count := max(1, s.opts.thread_count)
 	sync.wait_group_add(&s.threads_closed, thread_count)
 	s.threads = make([]Server_Thread, thread_count, s.conn_allocator)
-	for &td in s.threads[1:] {
-		td.thread = thread.create_and_start_with_poly_data2(s, &td, _server_thread_init, context)
+	when URUQUIM_DEDICATED_ACCEPT {
+		sync.wait_group_add(&s.lanes_ready, thread_count)
+		for &lane in s.threads {
+			lane.thread = thread.create_and_start_with_poly_data2(s, &lane, _server_thread_init, context)
+		}
+		sync.wait(&s.lanes_ready)
+		if !atomic_load(&s.init_failed) {
+			_server_accept_loop(s)
+		} else {
+			// `listen` acquired the caller's event loop for the acceptor.  No
+			// accept loop will run after a lane-init failure, so release it here.
+			nbio.release_thread_event_loop()
+		}
+		sync.wait(&s.threads_closed)
+	} else {
+		for &lane in s.threads[1:] {
+			lane.thread = thread.create_and_start_with_poly_data2(s, &lane, _server_thread_init, context)
+		}
+		_server_thread_init(s, &s.threads[0])
+		sync.wait(&s.threads_closed)
 	}
-
-	_server_thread_init(s, &s.threads[0])
-
-	sync.wait(&s.threads_closed)
 
 	log.debug("server threads are done, shutting down")
 
 	net.shutdown(s.tcp_sock, .Both)
 	net.close(s.tcp_sock)
-	for t in s.threads[1:] { thread.destroy(t.thread) }
+	when URUQUIM_DEDICATED_ACCEPT {
+		for t in s.threads { thread.destroy(t.thread) }
+	} else {
+		for t in s.threads[1:] { thread.destroy(t.thread) }
+	}
 	delete(s.threads)
 
 	// URUQUIM PATCH 30 (Closure H-2 follow-up / F-C03-2) — a lane that could not
@@ -372,16 +422,8 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 	td.conns = make(map[net.TCP_Socket]^Connection)
 	// td.free_temp_blocks = make(map[int]queue.Queue(^Block))
 
-	if td != &s.threads[0] {
+	when URUQUIM_DEDICATED_ACCEPT {
 		err := nbio.acquire_thread_event_loop()
-		// URUQUIM PATCH 29+30 (Closure H-2 / F-C03-2) — the lane-thread twin of
-		// the graceful acquire handling in `listen`; same cause
-		// (RLIMIT_MEMLOCK / memory). Instead of asserting, this lane UNWINDS: it
-		// flags the failure so `serve` returns an error, elects the shutdown so
-		// the already-running lanes exit (the wake loop is nil-safe, so peers
-		// still racing through init are handled), releases what this init
-		// allocated, signals the wait group, and returns WITHOUT ever touching a
-		// loop it does not have.
 		if err != nil {
 			log.errorf(
 				"uruquim: a Handler lane could not acquire its io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — raise the locked-memory limit or lower max_handlers. (F-C03-2)",
@@ -391,8 +433,33 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 			server_shutdown(s)
 			delete(td.conns)
 			td.state = .Closed
+			sync.wait_group_done(&s.lanes_ready)
 			sync.wait_group_done(&s.threads_closed)
 			return
+		}
+	} else {
+		if td != &s.threads[0] {
+			err := nbio.acquire_thread_event_loop()
+		// URUQUIM PATCH 29+30 (Closure H-2 / F-C03-2) — the lane-thread twin of
+		// the graceful acquire handling in `listen`; same cause
+		// (RLIMIT_MEMLOCK / memory). Instead of asserting, this lane UNWINDS: it
+		// flags the failure so `serve` returns an error, elects the shutdown so
+		// the already-running lanes exit (the wake loop is nil-safe, so peers
+		// still racing through init are handled), releases what this init
+		// allocated, signals the wait group, and returns WITHOUT ever touching a
+		// loop it does not have.
+			if err != nil {
+			log.errorf(
+				"uruquim: a Handler lane could not acquire its io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — raise the locked-memory limit or lower max_handlers. (F-C03-2)",
+				err,
+			)
+			atomic_store(&s.init_failed, true)
+			server_shutdown(s)
+			delete(td.conns)
+			td.state = .Closed
+			sync.wait_group_done(&s.threads_closed)
+				return
+			}
 		}
 	}
 
@@ -403,9 +470,12 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 	// data race even though the bytes usually looked harmless.
 	server_date_start(s)
 
-	log.debug("accepting connections")
-
-	td.accept = nbio.accept_poly(s.tcp_sock, s, on_accept)
+	when URUQUIM_DEDICATED_ACCEPT {
+		sync.wait_group_done(&s.lanes_ready)
+	} else {
+		log.debug("accepting connections")
+		td.accept = nbio.accept_poly(s.tcp_sock, s, on_accept)
+	}
 
 	log.debug("starting event loop")
 	td.state = .Serving
@@ -423,8 +493,12 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 
 	log.debug("event loop end")
 
-	if td != &s.threads[0] {
+	when URUQUIM_DEDICATED_ACCEPT {
 		runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
+	} else {
+		if td != &s.threads[0] {
+			runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
+		}
 	}
 	sync.wait_group_done(&s.threads_closed)
 }
@@ -453,6 +527,12 @@ server_shutdown :: proc(s: ^Server) {
 	_ = previous
 	if !changed {
 		return
+	}
+	when URUQUIM_DEDICATED_ACCEPT {
+		accept_loop := sync.atomic_load_explicit(&s.accept_loop, .Acquire)
+		if accept_loop != nil {
+			nbio.wake_up(accept_loop)
+		}
 	}
 	for t in s.threads {
 		// URUQUIM PATCH 30 (Closure H-2 follow-up) — a lane that has not yet
@@ -586,8 +666,10 @@ _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 
 	td.state = .Cleaning
 
-	nbio.remove(td.accept)
-	td.accept = nil
+	when !URUQUIM_DEDICATED_ACCEPT {
+		nbio.remove(td.accept)
+		td.accept = nil
+	}
 
 	// The final drain. Every connection is closed by here, but their close
 	// timeouts and `close` operations are still outstanding, and PATCH 10 has
@@ -871,6 +953,9 @@ connection_teardown :: proc(_: ^nbio.Operation, c: ^Connection) {
 
 	scanner_destroy(&c.scanner)
 	delete_key(&td.conns, c.socket)
+	when URUQUIM_DEDICATED_ACCEPT {
+		_ = sync.atomic_add(&td.assigned_connections, -1)
+	}
 	_ = sync.atomic_add(&c.server.active_connections, -1)
 	free(c, c.server.conn_allocator)
 }
@@ -918,6 +1003,250 @@ connection_abort :: proc(c: ^Connection, loc := #caller_location) {
 	_ = linux.setsockopt_base(linux.Fd(i32(c.socket)), 1, 13, &lv)
 
 	nbio.close_poly(c.socket, c, connection_teardown)
+}
+
+// --- Dedicated accept / connection-affinity ingress ------------------------
+
+@(private)
+accept_arm :: proc(s: ^Server) {
+	if !atomic_load(&s.closing) && s.accept == nil && !s.pending_accept.valid {
+		s.accept = nbio.accept_poly(s.tcp_sock, s, on_accept_dedicated)
+	}
+}
+
+@(private)
+accept_choose_lane :: proc(s: ^Server) -> ^Server_Thread {
+	n := len(s.threads)
+	if n == 0 {
+		return nil
+	}
+	best: ^Server_Thread
+	best_load := 0
+	for offset in 0 ..< n {
+		i := (s.next_lane + offset) % n
+		lane := &s.threads[i]
+		if lane.event_loop == nil ||
+		   sync.atomic_load_explicit(&lane.handler_active, .Acquire) ||
+		   sync.atomic_load(&lane.queued_handoffs) >= URUQUIM_ACCEPT_HANDOFF_LIMIT {
+			continue
+		}
+		load := sync.atomic_load(&lane.assigned_connections)
+		if best == nil || load < best_load {
+			best = lane
+			best_load = load
+			if load == 0 {
+				s.next_lane = (i + 1) % n
+				break
+			}
+		}
+	}
+	if best != nil && best_load != 0 {
+		for i in 0 ..< n {
+			if best == &s.threads[i] {
+				s.next_lane = (i + 1) % n
+				break
+			}
+		}
+	}
+	return best
+}
+
+@(private)
+accept_try_assign_pending :: proc(s: ^Server) -> bool {
+	if !s.pending_accept.valid {
+		return true
+	}
+	lane := accept_choose_lane(s)
+	if lane == nil {
+		sync.atomic_store_explicit(&s.pending_waiting, true, .Release)
+		return false
+	}
+	item := new(Accepted_Connection, s.conn_allocator)
+	item^ = s.pending_accept
+	s.pending_accept = {}
+	sync.atomic_store_explicit(&s.pending_waiting, false, .Release)
+	_ = sync.atomic_add(&lane.assigned_connections, 1)
+	_ = sync.atomic_add(&lane.queued_handoffs, 1)
+	nbio.next_tick_poly(item, on_connection_assigned, lane.event_loop)
+	return true
+}
+
+@(private)
+accept_all_handlers_active :: proc(s: ^Server) -> bool {
+	if len(s.threads) == 0 {
+		return false
+	}
+	for &lane in s.threads {
+		if !sync.atomic_load_explicit(&lane.handler_active, .Acquire) {
+			return false
+		}
+	}
+	return true
+}
+
+@(private)
+ACCEPT_OVERLOAD_RESPONSE: string : (
+	"HTTP/1.1 503 Service Unavailable\r\n" +
+	"Content-Length: 0\r\n" +
+	"Connection: close\r\n" +
+	"Retry-After: 1\r\n\r\n"
+)
+
+// The dedicated acceptor cannot run the HTTP adapter when every application
+// lane is blocked, but it can still make the existing saturation contract
+// observable: a complete, bounded 503 response followed by close.  The
+// explicit one-lane compatibility mode deliberately keeps its old wait.
+@(private)
+accept_refuse_handler_saturation :: proc(s: ^Server) {
+	if !s.pending_accept.valid {
+		return
+	}
+	sock := s.pending_accept.socket
+	s.pending_accept = {}
+	sync.atomic_store_explicit(&s.pending_waiting, false, .Release)
+	sent := 0
+	data := transmute([]u8)ACCEPT_OVERLOAD_RESPONSE
+	for sent < len(data) {
+		n, err := net.send_tcp(sock, data[sent:])
+		if err != nil || n <= 0 {
+			break
+		}
+		sent += n
+	}
+	net.close(sock)
+	_ = sync.atomic_add(&s.active_connections, -1)
+	_ = sync.atomic_add(&s.lane_collisions, 1)
+}
+
+@(private)
+on_connection_assigned :: proc(_: ^nbio.Operation, item: ^Accepted_Connection) {
+	server := item.server
+	_ = sync.atomic_add(&td.queued_handoffs, -1)
+	if sync.atomic_load_explicit(&server.pending_waiting, .Acquire) {
+		accept_loop := sync.atomic_load_explicit(&server.accept_loop, .Acquire)
+		if accept_loop != nil {
+			nbio.wake_up(accept_loop)
+		}
+	}
+	if atomic_load(&server.closing) {
+		net.close(item.socket)
+		_ = sync.atomic_add(&td.assigned_connections, -1)
+		_ = sync.atomic_add(&server.active_connections, -1)
+		free(item, server.conn_allocator)
+		return
+	}
+
+	c := new(Connection, server.conn_allocator)
+	c.state = .New
+	c.server = server
+	c.socket = item.socket
+	c.loop.req.client = item.endpoint
+	td.conns[c.socket] = c
+	free(item, server.conn_allocator)
+	conn_handle_reqs(c)
+}
+
+@(private)
+on_accept_dedicated :: proc(op: ^nbio.Operation, s: ^Server) {
+	s.accept = nil
+	if op.accept.err != nil {
+		#partial switch op.accept.err {
+		case .Insufficient_Resources:
+			nbio.timeout_poly(time.Second, s, proc(_: ^nbio.Operation, server: ^Server) {
+				accept_arm(server)
+			})
+			return
+		}
+		s.accept_failures += 1
+		if s.accept_failures >= URUQUIM_ACCEPT_FAILURE_LIMIT {
+			fmt.panicf(
+				"accept failing persistently (%d consecutive), last error: %v",
+				s.accept_failures, op.accept.err,
+			)
+		}
+		nbio.timeout_poly(URUQUIM_ACCEPT_RETRY_DELAY, s, proc(_: ^nbio.Operation, server: ^Server) {
+			accept_arm(server)
+		})
+		return
+	}
+	s.accept_failures = 0
+
+	active_connections := sync.atomic_add(&s.active_connections, 1) + 1
+	if s.opts.max_connections > 0 {
+		budget := max(1, s.opts.max_connections - s.opts.reserved_connections)
+		if active_connections > budget {
+			_ = sync.atomic_add(&s.active_connections, -1)
+			s.refused_connections += 1
+			_ = sync.atomic_add(&s.refused_total, 1)
+			if s.refused_connections == 1 {
+				log.warnf(
+					"uruquim: admission limit reached (%i of %i slots, %i reserved for shutdown); refusing connections. This is logged ONCE per exhausted period, not per refusal.",
+					active_connections - 1,
+					s.opts.max_connections,
+					s.opts.reserved_connections,
+				)
+			}
+			net.close(op.accept.client)
+			accept_arm(s)
+			return
+		}
+		if s.refused_connections > 0 {
+			log.infof(
+				"uruquim: admission resumed after refusing %i connection(s)",
+				s.refused_connections,
+			)
+			s.refused_connections = 0
+		}
+	}
+
+	s.pending_accept = Accepted_Connection {
+		server   = s,
+		socket   = op.accept.client,
+		endpoint = op.accept.client_endpoint,
+		valid    = true,
+	}
+	if accept_try_assign_pending(s) {
+		accept_arm(s)
+	} else if len(s.threads) > 1 && accept_all_handlers_active(s) {
+		accept_refuse_handler_saturation(s)
+		accept_arm(s)
+	}
+}
+
+@(private)
+_server_accept_loop :: proc(s: ^Server) {
+	sync.atomic_store_explicit(&s.accept_loop, nbio.current_thread_event_loop(), .Release)
+	accept_arm(s)
+	for !atomic_load(&s.closing) {
+		if accept_try_assign_pending(s) {
+			accept_arm(s)
+		}
+		err := nbio.tick()
+		if err != nil {
+			log.errorf("dedicated accept loop error: %v", err)
+			server_shutdown(s)
+			break
+		}
+	}
+	if s.accept != nil {
+		nbio.remove(s.accept)
+		s.accept = nil
+	}
+	if s.pending_accept.valid {
+		net.close(s.pending_accept.socket)
+		_ = sync.atomic_add(&s.active_connections, -1)
+		s.pending_accept = {}
+		sync.atomic_store_explicit(&s.pending_waiting, false, .Release)
+	}
+	// Flush the cancelled accept/retry timers before releasing the loop.
+	for nbio.num_waiting() > 0 {
+		err := nbio.tick(SHUTDOWN_INTERVAL)
+		if err != nil {
+			break
+		}
+	}
+	sync.atomic_store_explicit(&s.accept_loop, nil, .Release)
+	nbio.release_thread_event_loop()
 }
 
 @(private)
@@ -1048,13 +1377,20 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 // capacity unit.
 handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 	assert_has_td(loc)
-	if td.handler_active {
-		return false
-	}
-	td.handler_active = true
-	if td.accept != nil {
-		target := td.accept
-		td.accept = nil
+	when URUQUIM_DEDICATED_ACCEPT {
+		if td.handler_active {
+			return false
+		}
+		sync.atomic_store_explicit(&td.handler_active, true, .Release)
+		return true
+	} else {
+		if td.handler_active {
+			return false
+		}
+		td.handler_active = true
+		if td.accept != nil {
+			target := td.accept
+			td.accept = nil
 		// URUQUIM PATCH 28 (perf) — SUSPEND THE ACCEPT WITHOUT SPINNING.
 		//
 		// The WP71 guarantee still holds: a lane about to run a synchronous
@@ -1080,21 +1416,35 @@ handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 		// dropped and the client reconnects. That window is vanishingly small for
 		// keep-alive traffic and the price is one reconnect, not a 250ms stall on
 		// every request.
-		nbio.remove(target)
-		_ = nbio.tick(0)
+			nbio.remove(target)
+			_ = nbio.tick(0)
+		}
+		return true
 	}
-	return true
 }
 
 // Re-arm this lane only after application code returns. If stop won the race,
 // shutdown owns admission and the accept remains absent.
 handler_lane_leave :: proc(res: ^Response, loc := #caller_location) {
 	assert_has_td(loc)
-	assert(td.handler_active, "handler lane leave without enter", loc)
-	td.handler_active = false
-	server := res._conn.server
-	if !atomic_load(&server.closing) && td.accept == nil {
-		td.accept = nbio.accept_poly(server.tcp_sock, server, on_accept)
+	when URUQUIM_DEDICATED_ACCEPT {
+		assert(td.handler_active, "handler lane leave without enter", loc)
+		sync.atomic_store_explicit(&td.handler_active, false, .Release)
+		server := res._conn.server
+		accept_loop := sync.atomic_load_explicit(&server.accept_loop, .Acquire)
+		if !atomic_load(&server.closing) &&
+		   sync.atomic_load_explicit(&server.pending_waiting, .Acquire) &&
+		   accept_loop != nil {
+			nbio.wake_up(accept_loop)
+		}
+		return
+	} else {
+		assert(td.handler_active, "handler lane leave without enter", loc)
+		td.handler_active = false
+		server := res._conn.server
+		if !atomic_load(&server.closing) && td.accept == nil {
+			td.accept = nbio.accept_poly(server.tcp_sock, server, on_accept)
+		}
 	}
 }
 
@@ -1116,7 +1466,12 @@ conn_handle_reqs :: proc(c: ^Connection) {
 conn_handle_req :: proc(c: ^Connection, allocator := context.temp_allocator) {
 	// URUQUIM PATCH 6 (WP46) — stamp the start of this request's arrival. The
 	// sweep in `server_deadline_sweep` reads it; `clean_request_loop` clears it.
-	c.request_started = time.now()
+	// Do not pay a clock syscall on the default-off path.
+	if c.server.opts.request_read_timeout > 0 {
+		c.request_started = time.now()
+	} else {
+		c.request_started = {}
+	}
 
 	on_rline1 :: proc(loop: rawptr, token: string, err: bufio.Scanner_Error) {
 		l := cast(^Loop)loop

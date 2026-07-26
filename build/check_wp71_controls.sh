@@ -29,6 +29,7 @@ trap 'rm -rf "$URUQUIM_TMP"' EXIT
 run_test() { # package, collection, binary
   timeout 25 env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test "$1" \
     "-collection:uruquim=$2" -define:ODIN_TEST_THREADS=1 \
+    -define:URUQUIM_DEDICATED_ACCEPT=true \
     "-out:$URUQUIM_TMP/$3"
 }
 
@@ -78,15 +79,16 @@ if run_test "$URUQUIM_ROOT/tests/wp71-concurrent-serving/validation" "$LIMIT_MUT
   fail "maximum-capacity mutation unexpectedly passed"
 fi
 
-# Control 3: Patch 13 must actually suspend accept on a blocked lane. Leaving
-# the accept posted is caught by white-box state plus recovery on the wire.
+# Control 3: the dedicated acceptor must distribute new connections across
+# available lanes. Pinning every handoff to lane zero makes the second blocker
+# wait behind the first and the behavioural corpus catches it.
 SUSPEND_MUTANT="$URUQUIM_TMP/mutant-suspend"
 make_mutant_collection "$SUSPEND_MUTANT"
-sed -i '/handler_lane_enter ::/,/return true/ s/if td.accept != nil {/if false {/' \
+sed -i 's/i := (s.next_lane + offset) % n/i := 0/' \
   "$SUSPEND_MUTANT/vendor/odin-http/server.odin"
-if run_test "$URUQUIM_ROOT/tests/wp71-concurrent-serving/vendor_suspend" "$SUSPEND_MUTANT" mutant-suspend \
+if run_test "$URUQUIM_ROOT/tests/wp71-concurrent-serving/auto" "$SUSPEND_MUTANT" mutant-suspend \
     >/dev/null 2>&1; then
-  fail "accept-suspension mutation unexpectedly passed"
+  fail "single-lane dedicated-accept mutation unexpectedly passed"
 fi
 
 # Control 4: `max_connections` is one server budget, not one budget per lane.
@@ -106,9 +108,13 @@ grep -qF 'max_handlers:     int' "$URUQUIM_ROOT/web/internal/transport/boundary.
 grep -qF 'This names application capacity, never backend threads or event loops.' \
   "$URUQUIM_ROOT/web/limits.odin" ||
   fail "public capacity contract does not state its transport-neutral meaning"
+grep -qF 'URUQUIM_DEDICATED_ACCEPT :: #config(URUQUIM_DEDICATED_ACCEPT, true)' \
+  "$URUQUIM_ROOT/vendor/odin-http/server.odin" ||
+  fail "the measured dedicated-accept path must remain the adopted default"
 
 echo "wp71: automatic capacity and explicit four-lane liveness are green"
 echo "wp71: explicit one-lane saturation and recovery are green"
-echo "wp71: asynchronous accept cancellation race is controlled"
+echo "wp71: one dedicated acceptor keeps accepts off blocked Handler lanes"
 echo "wp71: max_connections remains one server-wide budget across lanes"
+echo "wp71: dedicated accept is the adopted default; the old path remains a build-time rollback"
 echo "PASS: WP71 bounded Handler-concurrency controls"

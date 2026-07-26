@@ -1,10 +1,17 @@
 # Perf WP (Phase 10 candidate) — multishot recv into the HTTP scanner
 
-**Status: SPEC + VALIDATION RECORD, 2026-07-25.** Not scheduled; this is the
+**Status: SPEC + VALIDATION RECORD, SUPERSEDED BY MEASUREMENT, 2026-07-25.** Not scheduled; this is the
 measured case for (and the honest scoping of) the one throughput lever that
 survived investigation. It follows the perf correction in
 `planning/perf-netpoller-study-and-architecture.md` and its `## Re-measurement`
 and iowait sections. Read those first.
+
+> **2026-07-25 adopted result:** the default dedicated shared acceptor with
+> connection-affine lane handoff reached 259k req/s at c100 and 283k at c400,
+> while cutting `io_uring_enter` from ~5.03 to **0.160/request**. The scanner
+> was not changed. This refutes the premise that multishot recv is the next
+> measured throughput lever. See
+> `docs/reports/2026-07-25-dedicated-accept-throughput.md`.
 
 ---
 
@@ -172,3 +179,26 @@ p99-SLA service does not need. Schedule it only when (a) a two-box run shows the
 gap is real (not a loopback artifact) **and** (b) throughput becomes a stated
 product requirement. The lever, its site, its infrastructure, and the refuted
 alternatives are recorded here so that work starts from evidence, not from zero.
+
+## 7. Post-spec validation: do not build the scanner rewrite
+
+The available c5 validation could not satisfy the required two-box topology,
+but it did isolate a lower-risk structural lever before any scanner code was
+written. Moving shared accept ownership off Handler lanes removes the
+per-request accept cancel/re-arm and lets each connection remain affine to one
+lane. On four server cores this produced:
+
+| load | Uruquim | fasthttp | Uruquim p99 | fasthttp p99 |
+|---|---:|---:|---:|---:|
+| c100 | 259–260k req/s | 278k req/s | 619–625 µs | 1.13 ms |
+| c400 | 283k req/s | 290k req/s | 2.46 ms | 2.76 ms |
+
+The decisive counter was 415,259 `io_uring_enter` calls over 2,594,180
+requests, or **0.160/request**. This is already below the WP's intended
+less-than-one target, without fragmenting scanner buffers or introducing a
+connection-spanning recv operation.
+
+Therefore Phase 2's multishot prototype is **not authorized by the evidence**.
+Keep this specification as the ownership checklist if a future real-NIC run
+isolates recv submissions again; do not pay its UAF and teardown risk merely
+because the primitives exist.

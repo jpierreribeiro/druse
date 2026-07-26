@@ -341,7 +341,14 @@ response_send_got_body :: proc(r: ^Response, will_close: bool) {
 	// URUQUIM PATCH 19 (WP90 / ADR-039) — the write-deadline clock starts when
 	// the completed response is handed to the event loop, and the operation
 	// handle is retained so a deadline abort (or any close) can cancel it.
-	conn.send_started = time.now()
+	// URUQUIM PATCH 32 (performance candidate) — the timestamp is observable
+	// only when a buffered-write deadline is enabled. Avoid a clock syscall per
+	// response on the default-off path.
+	if conn.server.opts.response_write_timeout > 0 {
+		conn.send_started = time.now()
+	} else {
+		conn.send_started = {}
+	}
 	conn.pending_send = nbio.send_poly(conn.socket, {buf}, conn, on_response_sent)
 }
 
@@ -401,7 +408,12 @@ clean_request_loop :: proc(conn: ^Connection, close: Maybe(bool) = nil) {
 		// and ends when the next request's bytes arrive (`on_rline1`). The
 		// idle sweep reads this stamp; `request_started` keeps its Patch-6
 		// meaning untouched.
-		conn.idle_since = time.now()
+		// Likewise, an idle timestamp has no consumer when the timeout is off.
+		if conn.server.opts.idle_timeout > 0 {
+			conn.idle_since = time.now()
+		} else {
+			conn.idle_since = {}
+		}
 		conn_handle_req(conn, context.temp_allocator)
 	}
 }
