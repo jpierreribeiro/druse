@@ -1,0 +1,16 @@
+[package]
+name = "uruquim-application-matrix-axum"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "0.8.9"
+serde = { version = "1", features = ["derive", "rc"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+strip = true

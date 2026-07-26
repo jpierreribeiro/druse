@@ -451,7 +451,16 @@ T="$(fresh_tree)"; TREES+=("$T")
 mutate_sed "unmarshal into context.allocator" "$T/web/extract.odin" \
   's/request_arena_allocator(ctx)/context.allocator/'
 expect_reject "$T" "unmarshal into context.allocator" \
-  "does not decode into the request arena allocator"
+  "unmarshals with context.allocator"
+
+# 35b. The fused decoder must obey the same arena ownership rule as the stdlib
+#      fallback; proving only one branch would leave the default fast path
+#      outside ADR-006.
+T="$(fresh_tree)"; TREES+=("$T")
+mutate_sed "fused decode into context.allocator" "$T/web/json_decode.odin" \
+  's/request_arena_allocator(ctx)/context.allocator/'
+expect_reject "$T" "fused decode into context.allocator" \
+  "fused decoder uses context.allocator"
 
 # 36. Dropping strict .JSON mode (defaulting to JSON5).
 T="$(fresh_tree)"; TREES+=("$T")

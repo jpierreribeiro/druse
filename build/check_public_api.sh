@@ -1377,13 +1377,18 @@ grep -qE 'unmarshal\([a-z_]+, dst, \.JSON,' <<<"$URUQUIM_WEB_PUBLIC_CODE" ||
   fail "web.body does not unmarshal in strict .JSON mode; JSON5 would be accepted (WP7 D5)"
 
 # 10d-v. Body data is decoded into the ARENA, never context.allocator directly.
-#        The unmarshal allocator must be the request arena, or nested data would
-#        outlive nothing and leak (ADR-006).
+#        Both the stdlib fallback and the fused tree decoder must receive the
+#        request arena, or nested data would outlive nothing and leak (ADR-006).
 grep -qE 'request_arena_allocator\(ctx\)' <<<"$URUQUIM_WEB_PUBLIC_CODE" ||
   fail "web.body does not decode into the request arena allocator (ADR-006 / WP7 D4)"
 if grep -nE 'unmarshal\([^)]*context\.allocator' <<<"$URUQUIM_WEB_PUBLIC_CODE"; then
   fail "web.body unmarshals with context.allocator; decoded data must live in the request arena (ADR-006)"
 fi
+if grep -nE 'json_tree_decode\([^)]*context\.allocator' <<<"$URUQUIM_WEB_PUBLIC_CODE"; then
+  fail "web.body fused decoder uses context.allocator; decoded data must live in the request arena (ADR-006)"
+fi
+grep -qE 'json_tree_decode\([^)]*request_arena_allocator\(ctx\)' <<<"$URUQUIM_WEB_PUBLIC_CODE" ||
+  fail "web.body fused decoder does not use the request arena allocator (ADR-006)"
 
 # 10d-vi. The single-consumer state machine exists and consumes BEFORE parsing.
 #         `.Consumed` must be assigned before the unmarshal call (ADR-012 A).
@@ -1404,7 +1409,8 @@ grep -qE 'driver_cleanup\(' "${URUQUIM_TS_FILES[@]}" ||
   fail "the test-support facade does not call driver_cleanup; the driver must free the response and the arena (WP7 D4)"
 grep -qE 'driver_cleanup\(' "$URUQUIM_WEB/serve.odin" ||
   fail "web/serve.odin does not call driver_cleanup; the real transport must free the response and the arena (WP7 D4)"
-sed -E 's://.*$::' "$URUQUIM_WEB/serve.odin" | grep -qE 'request_arena_destroy\([a-z_]+\)' ||
+URUQUIM_SERVE_WITHOUT_COMMENTS="$(sed -E 's://.*$::' "$URUQUIM_WEB/serve.odin")"
+grep -qE 'request_arena_destroy\([a-z_]+\)' <<<"$URUQUIM_SERVE_WITHOUT_COMMENTS" ||
   fail "driver_cleanup does not release the request arena (WP7 D4)"
 
 # 10d-viii. NO configurable body limit, replay, or cache entered the package.

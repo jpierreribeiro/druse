@@ -24,6 +24,37 @@ Unsupported_Input :: struct {
 	callback: proc() `json:"callback"`,
 }
 
+Repeated_Item :: struct {
+	value: int `json:"value"`,
+}
+
+Repeated_Input :: struct {
+	items: []Repeated_Item `json:"items"`,
+}
+
+Fallback_Level :: enum {
+	Low,
+	High,
+}
+
+Fallback_Input :: struct {
+	labels: map[string]int `json:"labels"`,
+	level:  Fallback_Level `json:"level"`,
+}
+
+Fixed_Input :: struct {
+	values: [3]int `json:"values"`,
+}
+
+Scalar_Input :: struct {
+	flag:     bool   `json:"flag"`,
+	small:    i8     `json:"small"`,
+	unsigned: u16    `json:"unsigned"`,
+	ratio:    f32    `json:"ratio"`,
+	name:     string `json:"name"`,
+	values:   []i16  `json:"values"`,
+}
+
 Log_Filter :: struct {
 	inner: log.Logger,
 }
@@ -70,6 +101,85 @@ bind_unsupported :: proc(ctx: ^web.Context) {
 	web.no_content(ctx)
 }
 
+bind_repeated :: proc(ctx: ^web.Context) {
+	dst: Repeated_Input
+	if !web.body(ctx, &dst) {
+		return
+	}
+	if len(dst.items) != 2 || dst.items[0].value != 1 || dst.items[1].value != 2 {
+		web.text(ctx, .Internal_Server_Error, "decoded values drifted")
+		return
+	}
+	web.no_content(ctx)
+}
+
+bind_fallback :: proc(ctx: ^web.Context) {
+	dst: Fallback_Input
+	if !web.body(ctx, &dst) {
+		return
+	}
+	if dst.labels["answer"] != 42 || dst.level != .High {
+		web.text(ctx, .Internal_Server_Error, "fallback values drifted")
+		return
+	}
+	web.no_content(ctx)
+}
+
+bind_fixed :: proc(ctx: ^web.Context) {
+	dst: Fixed_Input
+	if !web.body(ctx, &dst) {
+		return
+	}
+	if dst.values != {1, 2, 3} {
+		web.text(ctx, .Internal_Server_Error, "fixed values drifted")
+		return
+	}
+	web.no_content(ctx)
+}
+
+bind_scalars :: proc(ctx: ^web.Context) {
+	dst: Scalar_Input
+	if !web.body(ctx, &dst) {
+		return
+	}
+	if !dst.flag ||
+	   dst.small != -12 ||
+	   dst.unsigned != 65000 ||
+	   dst.ratio != 1.5 ||
+	   dst.name != "Ada" ||
+	   len(dst.values) != 3 ||
+	   dst.values[0] != -1 ||
+	   dst.values[1] != 2 ||
+	   dst.values[2] != 300 {
+		web.text(ctx, .Internal_Server_Error, "scalar values drifted")
+		return
+	}
+	web.no_content(ctx)
+}
+
+bind_null_scalars :: proc(ctx: ^web.Context) {
+	dst := Scalar_Input {
+		flag = true,
+		small = 7,
+		unsigned = 9,
+		ratio = 3.5,
+		name = "seed",
+	}
+	if !web.body(ctx, &dst) {
+		return
+	}
+	if dst.flag ||
+	   dst.small != 0 ||
+	   dst.unsigned != 0 ||
+	   dst.ratio != 0 ||
+	   dst.name != "" ||
+	   len(dst.values) != 0 {
+		web.text(ctx, .Internal_Server_Error, "null did not zero fields")
+		return
+	}
+	web.no_content(ctx)
+}
+
 expect_error :: proc(
 	t: ^testing.T,
 	path, raw: string,
@@ -84,6 +194,9 @@ expect_error :: proc(
 	defer web.destroy(&a)
 	web.post(&a, "/input", bind_input)
 	web.post(&a, "/unsupported", bind_unsupported)
+	web.post(&a, "/repeated", bind_repeated)
+	web.post(&a, "/fallback", bind_fallback)
+	web.post(&a, "/fixed", bind_fixed)
 
 	res := web.test_request(&a, .POST, path, raw)
 	testing.expect_value(t, res.status, status, loc = loc)
@@ -166,6 +279,113 @@ wp68_nested_unknown_field_carries_its_full_path :: proc(t: ^testing.T) {
 @(test)
 wp68_multiple_unknown_fields_choose_a_stable_result :: proc(t: ^testing.T) {
 	expect_error(t, "/input", `{"z":1,"a":2}`, .Bad_Request, "unknown_field", "a")
+}
+
+@(test)
+wp68_repeated_struct_schema_preserves_nested_unknown_refusal :: proc(t: ^testing.T) {
+	expect_error(
+		t,
+		"/repeated",
+		`{"items":[{"value":1},{"value":2,"extra":true}]}`,
+		.Bad_Request,
+		"unknown_field",
+		"items.extra",
+	)
+}
+
+@(test)
+wp68_repeated_struct_values_are_decoded_from_the_strict_tree :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/repeated", bind_repeated)
+
+	res := web.test_request(&a, .POST, "/repeated", `{"items":[{"value":1},{"value":2}]}`)
+	testing.expect_value(t, res.status, web.Status.No_Content)
+}
+
+@(test)
+wp68_value_level_fused_miss_falls_back_without_semantic_drift :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/repeated", bind_repeated)
+
+	// The pinned stdlib accepts numeric strings for integer destinations. The
+	// fused scalar subset deliberately does not; it must fall back and preserve
+	// the established successful result.
+	res := web.test_request(
+		&a,
+		.POST,
+		"/repeated",
+		`{"items":[{"value":"1"},{"value":"2"}]}`,
+	)
+	testing.expect_value(t, res.status, web.Status.No_Content)
+}
+
+@(test)
+wp68_unsupported_fused_shape_falls_back_to_the_stdlib_decoder :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/fallback", bind_fallback)
+
+	res := web.test_request(
+		&a,
+		.POST,
+		"/fallback",
+		`{"labels":{"answer":42},"level":"High"}`,
+	)
+	testing.expect_value(t, res.status, web.Status.No_Content)
+}
+
+@(test)
+wp68_fixed_array_values_are_decoded_from_the_strict_tree :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/fixed", bind_fixed)
+
+	res := web.test_request(&a, .POST, "/fixed", `{"values":[1,2,3]}`)
+	testing.expect_value(t, res.status, web.Status.No_Content)
+}
+
+@(test)
+wp68_fused_scalar_subset_preserves_typed_values :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/scalars", bind_scalars)
+
+	res := web.test_request(
+		&a,
+		.POST,
+		"/scalars",
+		`{"flag":true,"small":-12,"unsigned":65000,"ratio":1.5,"name":"Ada","values":[-1,2,300]}`,
+	)
+	testing.expect_value(t, res.status, web.Status.No_Content)
+}
+
+@(test)
+wp68_null_preserves_the_stdlib_zero_value_contract :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/null-scalars", bind_null_scalars)
+
+	res := web.test_request(
+		&a,
+		.POST,
+		"/null-scalars",
+		`{"flag":null,"small":null,"unsigned":null,"ratio":null,"name":null,"values":null}`,
+	)
+	testing.expect_value(t, res.status, web.Status.No_Content)
 }
 
 @(test)
