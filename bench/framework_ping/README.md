@@ -26,3 +26,9 @@ cores, and omit the `4` argument (or pass the actual CPU allocation).
 
 Dedicated accept is the default. To build the retained rollback control, add
 `-define:URUQUIM_DEDICATED_ACCEPT=false`.
+
+No runtime tuning is required for the measured path. The default also carries
+the C-03-validated limit of two not-yet-consumed connection handoffs per lane.
+Do not raise that private constant as a throughput tweak: values three, four
+and eight reproduced healthy-client starvation under a high-rate RST flood,
+while two stayed within 1.6% of eight in steady-state `/ping`.

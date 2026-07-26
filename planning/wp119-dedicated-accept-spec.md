@@ -89,12 +89,23 @@ dispatch, send, deadlines, and teardown. This preserves strict WP71 because the
 acceptor never blocks in application code and does not assign new connections
 to a lane whose Handler is active.
 
-The handoff queue is bounded at eight pending callbacks per lane. If the queue
-is full, accept pauses with one owned pending socket until a lane consumes a
+The handoff queue is bounded at two pending callbacks per lane. If the queue is
+full, accept pauses with one owned pending socket until a lane consumes a
 handoff. If every Handler is active, the acceptor returns the existing complete
-503 plus `Retry-After: 1`. This distinction was required by C-03: an unbounded
-handoff queue served only 19/59 healthy probes during an RST flood; the bounded
-version served 47/58, 46/57, and 45/56 in three runs and recovered 20/20.
+503 plus `Retry-After: 1`.
+
+The first adoption used a bound of eight after three green campaigns at a lower
+flood rate. A 2026-07-26 re-run on the reference host showed that result was not
+stable: eight accepted about 49-52k RST connections/s and served only 18-24/58
+healthy probes. Four failed 25/58; three was mixed (37/57 then 19/58); two
+passed three consecutive campaigns at 57/57, including one at 6.3k/s. The
+pre-#140 shared-accept control also passed 57/57. Two is therefore the largest
+tested stable value and is pinned by `check_c03_controls.sh`.
+
+A contemporary five-run A/B measured the cost of two versus eight at -1.16%
+c100 throughput and -1.58% c400 throughput. Median p99 changed from 0.613 to
+0.646 ms at c100 and 2.34 to 2.38 ms at c400. The liveness repair retains the
+same throughput class and the lower p99 than the recorded fasthttp control.
 
 Measured on the available one-box c5 rig (`-o:speed`, server cores 0–3, wrk
 cores 4–7):
