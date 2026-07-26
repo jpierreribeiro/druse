@@ -506,3 +506,30 @@ favours Uruquim; for a maximum-RPS proxy it favours fasthttp.
 - **Do NOT** claim "~90% of fasthttp" until a two-box run with the iowait addressed shows it.
   Claim what reproduced: **world-class, flat latency; throughput 29–52% of fasthttp on 4 cores
   single-box, iowait-bound.**
+
+## Addendum: dedicated accept adoption re-measurement (2026-07-25)
+
+The correction above accurately describes `origin/main`, but its conclusion
+that scanner multishot was the only surviving lever is superseded by a measured
+implementation. One dedicated accept loop now owns the shared listener and assigns
+each accepted connection once to a Handler lane. That removes the WP71
+accept-cancel/re-arm from the request hot path without weakening the guarantee.
+
+On the same c5 one-box topology, with release (`-o:speed`) builds:
+
+| load | Uruquim dedicated accept | fasthttp | Uruquim p99 | fasthttp p99 |
+|---|---:|---:|---:|---:|
+| c100 | 261k req/s | 283k req/s | 622 µs | 1.12 ms |
+| c400 | 286k req/s | 292k req/s | 2.11 ms | 2.59 ms |
+
+The decisive system-wide perf run measured 415,259
+`io_uring_enter` calls for 2,594,180 requests: **0.160/request**, down from
+about 5.03. Thus the main bottleneck was the request-coupled accept lifecycle,
+not scanner recv. Multishot is not the next justified change.
+
+This does not erase the owed two-box run. The implementation passed the complete
+gate and the owner explicitly accepted the absolute p99 and the closed-loop
+c100→c400 queueing interpretation on 2026-07-25. Dedicated accept is therefore
+the default, with the old path retained as a build-time rollback for one
+release. See
+`docs/reports/2026-07-25-dedicated-accept-throughput.md`.

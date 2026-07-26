@@ -86,7 +86,9 @@ work regardless of who wrote the fix.
 
 | 31 | A `lane_collisions` counter on the backend `Server` — incremented by the adapter when `handler_lane_enter` returns false and the request is refused 503 — read by the adapter for `web.Server_Stats` (item 2) | **No** — upstream has no handler-lane model and no such accounting; exposing the framework's first saturation point (C-05: lanes ÷ dwell) is Uruquim's operational contract, the twin of patch 28's send counters on the write side | **CARRY AS BRIDGE.** Deletable with the vendored backend when `core:net/http` lands; the official adapter must expose an equivalent, or `web.stats().lane_collisions` loses its source |
 
-**Sixteen of thirty-one are or contain upstream bugs; the rest are deliberate divergences.** WP70's
+| 32 | Default dedicated shared acceptor: accept on one event loop, hand each connection once to the least-loaded available Handler lane, bound pending handoffs, retain strict WP71 and skip deadline timestamps whose timeout is disabled; the old shared-accept path remains a build-time rollback | **No** — this is Uruquim's Handler-capacity/performance model, not an upstream correctness defect. It removes the request-coupled patch-13 accept cancellation and reduced `io_uring_enter` from ~5.03 to 0.160/request; the bounded handoff is required because the first form served only 19/59 healthy probes during an RST flood | **CARRY AS AN ADOPTED BRIDGE.** The owner accepted the one-box evidence and absolute p99 on 2026-07-25; the two-box/NIC run remains an explicitly documented follow-up, not silently claimed evidence. Keep the rollback flag for one release. Delete with patch 13 when the official adapter replaces this backend; evidence is the full fault/raw-wire gate and `docs/reports/2026-07-25-dedicated-accept-throughput.md` |
+
+**Sixteen of thirty-two are or contain upstream bugs; the rest are deliberate divergences.** WP70's
 multi-lane lifecycle correction joins the upstream group; WP59's absolute drain
 deadline joins the policy group. The bridge label changes expected lifetime,
 not the evidence or upstream-offer obligation.

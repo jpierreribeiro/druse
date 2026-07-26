@@ -1,8 +1,11 @@
 # WP119 — dedicated accept / thread-per-core (Spec Gate)
 
-**Status: SPEC, 2026-07-25.** The flamegraph named WP119 the #1 lever for BOTH CPU and
-throughput. This is its Spec Gate: the model, the honest WP71 trade-off, and the
-prototype-first validation plan. No framework rewrite until the prototype measures the gain.
+**Status: IMPLEMENTED CANDIDATE, ADOPTION PENDING TWO-BOX GATE, 2026-07-25.**
+The original SO_REUSEPORT model below was refuted by its prototype. A second
+model — one shared dedicated acceptor plus one connection-affine handoff —
+measured 259k req/s at c100 and 283k at c400 while keeping WP71 and the full
+fault/conformance gate green. It is recorded after the original spec so the
+change in evidence remains visible.
 
 ## Why (measured, not assumed)
 
@@ -72,3 +75,41 @@ and the operational guarantee that actually matters (health checks answer), at l
 - `vendor/odin-http/server.odin` — the ingress to rewrite IF validated (`listen_tcp`,
   `_server_thread_init`, `handler_lane_enter`/`leave`, `on_accept`).
 - `planning/perf-netpoller-study-and-architecture.md` — the measured context.
+
+## Implementation record — shared dedicated acceptor
+
+SO_REUSEPORT was not the necessary property. The hot-path property was removing
+accept ownership from Handler lanes, so a request no longer cancels and re-arms
+an accept before synchronous application dispatch.
+
+The implemented candidate keeps the existing shared listener and adds one
+accept event loop. Each accepted connection is assigned once to the
+least-loaded Handler lane; the connection then remains on that lane for parse,
+dispatch, send, deadlines, and teardown. This preserves strict WP71 because the
+acceptor never blocks in application code and does not assign new connections
+to a lane whose Handler is active.
+
+The handoff queue is bounded at eight pending callbacks per lane. If the queue
+is full, accept pauses with one owned pending socket until a lane consumes a
+handoff. If every Handler is active, the acceptor returns the existing complete
+503 plus `Retry-After: 1`. This distinction was required by C-03: an unbounded
+handoff queue served only 19/59 healthy probes during an RST flood; the bounded
+version served 47/58, 46/57, and 45/56 in three runs and recovered 20/20.
+
+Measured on the available one-box c5 rig (`-o:speed`, server cores 0–3, wrk
+cores 4–7):
+
+| load | candidate | fasthttp | ratio | candidate p99 | fasthttp p99 |
+|---|---:|---:|---:|---:|---:|
+| c100 | 259–260k | 278k | 93.3% | 619–625 µs | 1.13 ms |
+| c400 | 283k | 290k | 97.9% | 2.46 ms | 2.76 ms |
+
+`io_uring_enter` fell from about 5.03/request to 0.160/request. This both
+validates dedicated accept as the throughput lever and removes the measured
+case for a multishot scanner rewrite.
+
+Adoption remains pending because the formal two-box/NIC gate is unavailable,
+the c100 p99 ratio narrowly missed the pre-registered 50% ceiling, and p99 grew
+about 3.9× from c100 to c400 on four server cores. Full results and gate
+evidence are in
+`docs/reports/2026-07-25-dedicated-accept-throughput.md`.

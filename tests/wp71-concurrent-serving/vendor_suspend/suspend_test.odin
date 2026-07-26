@@ -5,7 +5,7 @@ import "core:time"
 import lab "uruquim:tests/support/blocking_lab"
 
 @(test)
-blocked_handler_lane_suspends_accept_until_application_returns :: proc(t: ^testing.T) {
+blocked_handler_lane_never_owns_the_dedicated_accept :: proc(t: ^testing.T) {
 	s: lab.Server
 	blocked: lab.Call
 	defer {
@@ -17,12 +17,13 @@ blocked_handler_lane_suspends_accept_until_application_returns :: proc(t: ^testi
 	lab.Start_Call(&blocked, s.port, "/block")
 	testing.expect(t, lab.Wait_Entered(&s))
 
-	active, active_with_accept := lab.Suspended_Lane_State(&s)
+	active, active_with_accept, dedicated_accept_active := lab.Suspended_Lane_State(&s)
 	testing.expect_value(t, active, 1)
 	testing.expect_value(t, active_with_accept, 0)
+	testing.expect(t, dedicated_accept_active, "the dedicated acceptor must remain armed while another lane is free")
 
 	lab.Release(&s, 1)
 	testing.expect(t, lab.Wait_Call(&blocked, 2 * time.Second))
 	status, _, ok := lab.Request(s.port, "/health")
-	testing.expect(t, ok && status == 200, "the lane must re-arm admission after Handler return")
+	testing.expect(t, ok && status == 200, "dedicated admission must remain healthy after Handler return")
 }

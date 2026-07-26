@@ -41,10 +41,10 @@ toolchain, `core/nbio/nbio.odin`):
 
 ## 1. The inventory
 
-**Twenty-three operation-creating call sites**, in nine kinds, across
+**Twenty-seven operation-creating call sites**, in nine kinds, across
 `vendor/odin-http/` and `web/internal/transport/`. The count is machine-checked:
 
-<!-- c01-op-sites: 23 -->
+<!-- c01-op-sites: 27 -->
 
 `build/check_c01_controls.sh` counts `nbio.*_poly*(` call sites in the tree and
 compares them with the number on the marker line above. The number lives in
@@ -76,6 +76,10 @@ a defect.
 | 15 | `open` | `respond_file` | **dropped** T | — | nowhere | nobody | n/a | **yes, if ever reached** ⚠ **F-C01-6** | `on_open` chains to `stat` | `respond_with_status` | **not cancellable** | none | n/a — unreachable |
 | 16 | `stat` | `respond_file` `on_open` | **dropped** T | — | nowhere | nobody | n/a | **yes, if ever reached** | `on_stat` chains to `read` | `nbio.close` + 404 | **not cancellable** | none | n/a — unreachable |
 | 17 | `read` (`all=true`) | `respond_file` `on_stat` | **dropped** T | — | nowhere | nobody | n/a | **yes, if ever reached** | `on_read` → `respond` | `nbio.close` + 500 | **not cancellable** | none | n/a — unreachable |
+| 18 | dedicated `accept` (arm) | `accept_arm` | `s.accept` | dedicated acceptor | `Server.accept` | `_server_accept_loop`, on the owning accept loop | no (`remove` is final) | no (`Server` outlives acceptor and lanes) | `on_accept_dedicated` clears, assigns once, then re-arms | bounded retry rows 19/20 | acceptor removes before releasing its loop | none (listener operation by design) | ✅ wp69, wp71, c03 |
+| 19 | timeout 1 s → re-arm dedicated `accept` | `on_accept_dedicated` `.Insufficient_Resources` | **dropped** L | acceptor | nowhere | nobody | n/a | no (`Server` outlives accept loop) | guarded `accept_arm` | — | accept loop drains it before release | 1 s | ✅ c01/wp71 startup-shutdown corpus |
+| 20 | timeout 10 ms → re-arm dedicated `accept` | `on_accept_dedicated` transient | **dropped** L | acceptor | nowhere | nobody | n/a | no (`Server` outlives accept loop) | guarded `accept_arm` | persistent failures remain fatal | accept loop drains it before release | 10 ms | ✅ c03 accept-failure campaign |
+| 21 | `next_tick` — accepted connection handoff | `accept_try_assign_pending` | **dropped** L | acceptor | nowhere; payload is the owned `Accepted_Connection` | nobody (next owner tick) | n/a | no — payload is heap-owned; callback checks `server.closing` before touching lane state | owner lane creates `Connection`, then frees payload | closing branch closes socket, returns both counters, frees payload | every lane loop drains next-tick work before release | next tick | ✅ wp69, wp71, c03 disconnect/drain |
 
 **The census caught its first change the moment it was written.** Closure C-03
 added the peer-gone fast close (vendored patch 25), which is a third

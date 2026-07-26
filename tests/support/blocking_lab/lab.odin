@@ -132,22 +132,24 @@ Start :: proc(s: ^Server, port, lanes: int) -> bool {
 	return start(s, port, lanes, false)
 }
 
-// Start_Suspended brackets the blocking application call with Patch 13's
-// admission suspension. It is a white-box control instrument, not a second
-// server model: WP71 uses it to prove that a blocked lane has no accept posted.
+// Start_Suspended brackets the blocking application call with the WP71
+// admission discipline. It is a white-box control instrument, not a second
+// server model: WP71 proves that accepts belong to the dedicated acceptor,
+// never to a blocked Handler lane.
 Start_Suspended :: proc(s: ^Server, port, lanes: int) -> bool {
 	return start(s, port, lanes, true)
 }
 
-Suspended_Lane_State :: proc(s: ^Server) -> (active, active_with_accept: int) {
+Suspended_Lane_State :: proc(s: ^Server) -> (active, active_with_lane_accept: int, dedicated_accept_active: bool) {
 	for &lane in s.backend.threads {
 		if lane.handler_active {
 			active += 1
 			if lane.accept != nil {
-				active_with_accept += 1
+				active_with_lane_accept += 1
 			}
 		}
 	}
+	dedicated_accept_active = s.backend.accept != nil
 	return
 }
 

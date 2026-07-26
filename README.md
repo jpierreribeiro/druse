@@ -61,6 +61,41 @@ get_user :: proc(ctx: ^web.Context) {
 }
 ```
 
+## Minimal HTTP benchmark
+
+This is a deliberately narrow transport benchmark, not a claim that a
+four-byte response represents a complete application. Each server returned
+`200`, a four-byte `pong` body, and `text/plain; charset=utf-8` over HTTP/1.1
+keep-alive.
+
+AWS c5.2xlarge (8 vCPU), Linux 6.17; server pinned to CPUs 0–3 and
+`wrk -t4` pinned to CPUs 4–7. Values are the median of three consecutive
+10-second runs. Uruquim used Odin
+`dev-2026-07-nightly:819fdc7`, `-o:speed`, four Handler lanes, and the
+default dedicated-accept path.
+
+| framework/runtime | c100 req/s | c100 p99 | c400 req/s | c400 p99 |
+|---|---:|---:|---:|---:|
+| fasthttp 1.72 / Go 1.26.5 | 282,625 | 1.12 ms | 292,457 | 2.59 ms |
+| **Uruquim / Odin** | **261,274** | **0.622 ms** | **285,736** | **2.11 ms** |
+| Axum 0.8.9 / Rust 1.97.1 | 250,214 | 0.706 ms | 269,230 | 2.69 ms |
+| Go `net/http` 1.26.5 | 151,226 | 2.54 ms | 150,419 | 7.98 ms |
+| Gin 1.12 / Go 1.26.5 | 148,958 | 2.69 ms | 149,931 | 8.49 ms |
+| Fastify 5.10 / Node 26.5 | 122,769 | 2.00 ms | 123,183 | 3.85 ms |
+
+In this workload Uruquim delivered 92.5% of fasthttp at c100 and 97.7% at
+c400, while its measured p99 was lower. The build command, raw methodology,
+syscall count, fault evidence, and limitations are in the
+[dedicated-accept report](docs/reports/2026-07-25-dedicated-accept-throughput.md);
+the Uruquim application is in
+[`bench/framework_ping`](bench/framework_ping/README.md).
+
+What this table does **not** measure: JSON encode/decode, routing-heavy
+applications, middleware chains, request bodies, streaming throughput, TLS,
+connection churn, memory per connection, or application/database work. Use it
+as evidence about the minimum HTTP transport path, not as a universal framework
+ranking.
+
 No allocator configuration, no transport selection, no manual context assembly.
 The systems-level machinery exists — it lives behind the API, available through
 an explicit advanced surface when needed.
