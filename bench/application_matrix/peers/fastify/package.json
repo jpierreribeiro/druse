@@ -1,0 +1,11 @@
+{
+  "name": "uruquim-application-matrix-fastify",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "fastify": "5.8.5"
+  }
+}

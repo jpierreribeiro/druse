@@ -287,10 +287,12 @@ URUQUIM_ACCEPT_FAILURE_LIMIT :: 128
 URUQUIM_ACCEPT_RETRY_DELAY :: 10 * time.Millisecond
 // A handoff is a `next_tick` callback on the destination lane. A hostile
 // connect/RST loop can otherwise enqueue callbacks faster than a lane can
-// observe that their sockets are already dead. Established keep-alive
+// observe that their sockets are already dead. Two preserves one callback
+// being consumed plus one queued; three or more reproduced the C-03 liveness
+// failure under a ~49k connection/s RST flood. Established keep-alive
 // connections do not consume this bounded queue.
 @(private)
-URUQUIM_ACCEPT_HANDOFF_LIMIT :: 8
+URUQUIM_ACCEPT_HANDOFF_LIMIT :: 2
 
 @(private, disabled = ODIN_DISABLE_ASSERT)
 assert_has_td :: #force_inline proc(loc := #caller_location) {

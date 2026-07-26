@@ -69,21 +69,21 @@ four-byte response represents a complete application. Each server returned
 keep-alive.
 
 AWS c5.2xlarge (8 vCPU), Linux 6.17; server pinned to CPUs 0–3 and
-`wrk -t4` pinned to CPUs 4–7. Values are the median of three consecutive
-10-second runs. Uruquim used Odin
+`wrk -t4` pinned to CPUs 4–7. Peer values are the median of three consecutive
+10-second runs; the corrected Uruquim default is a five-run median. Uruquim used Odin
 `dev-2026-07-nightly:819fdc7`, `-o:speed`, four Handler lanes, and the
 default dedicated-accept path.
 
 | framework/runtime | c100 req/s | c100 p99 | c400 req/s | c400 p99 |
 |---|---:|---:|---:|---:|
 | fasthttp 1.72 / Go 1.26.5 | 282,625 | 1.12 ms | 292,457 | 2.59 ms |
-| **Uruquim / Odin** | **261,274** | **0.622 ms** | **285,736** | **2.11 ms** |
+| **Uruquim / Odin** | **259,233** | **0.646 ms** | **282,426** | **2.38 ms** |
 | Axum 0.8.9 / Rust 1.97.1 | 250,214 | 0.706 ms | 269,230 | 2.69 ms |
 | Go `net/http` 1.26.5 | 151,226 | 2.54 ms | 150,419 | 7.98 ms |
 | Gin 1.12 / Go 1.26.5 | 148,958 | 2.69 ms | 149,931 | 8.49 ms |
 | Fastify 5.10 / Node 26.5 | 122,769 | 2.00 ms | 123,183 | 3.85 ms |
 
-In this workload Uruquim delivered 92.5% of fasthttp at c100 and 97.7% at
+In this workload Uruquim delivered 91.7% of fasthttp at c100 and 96.6% at
 c400, while its measured p99 was lower. The build command, raw methodology,
 syscall count, fault evidence, and limitations are in the
 [dedicated-accept report](docs/reports/2026-07-25-dedicated-accept-throughput.md);

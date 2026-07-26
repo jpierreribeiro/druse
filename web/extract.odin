@@ -378,7 +378,14 @@ body :: proc(ctx: ^Context, dst: ^$T) -> bool {
 	// 4. Preflight with the stdlib grammar plus the bounded WP68 field-stack
 	// checker. It rejects unknown keys and classifies type errors without
 	// exposing Odin type names or decoder internals.
-	issue := body_json_preflight(raw, type_info_of(T))
+	fused_decoded := false
+	issue := body_json_preflight(
+		raw,
+		type_info_of(T),
+		rawptr(dst),
+		ctx,
+		&fused_decoded,
+	)
 	switch issue.kind {
 	case .None:
 		// continue to the authoritative typed decoder below
@@ -396,6 +403,10 @@ body :: proc(ctx: ^Context, dst: ^$T) -> bool {
 		error_commit_static(ctx, .Internal_Server_Error, ERROR_BODY_INTERNAL)
 		framework_observe_request(T, ctx, .Body_Decode_Failed)
 		return false
+	}
+
+	if fused_decoded {
+		return true
 	}
 
 	// 5. Decode into the request-lifetime arena, strict JSON.

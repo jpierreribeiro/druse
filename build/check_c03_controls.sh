@@ -100,6 +100,14 @@ EOF
 grep -q 'peer_gone = true' "$URUQUIM_ROOT/vendor/odin-http/scanner.odin" ||
   fail "the scanner no longer records peer_gone; the patch-25 fast close can then never trigger and the RST-flood wedge returns silently"
 
+# The dedicated acceptor originally shipped with eight callbacks queued per
+# lane. On the reference host that admitted ~50k RST connections/s and starved
+# the healthy probe (18-24/58). Three and four reproduced the failure; two
+# passed three consecutive campaigns while keeping steady-state /ping within
+# 1.6% of the eight-item control. Keep the measured bound executable.
+grep -q 'URUQUIM_ACCEPT_HANDOFF_LIMIT :: 2' "$URUQUIM_SERVER" ||
+  fail "the dedicated-accept handoff bound is no longer the C-03-validated value 2; re-run the RST campaign and steady-state A/B before changing it"
+
 # --- 4. The measurement survives ---------------------------------------------
 grep -q 'c03-rst-verdict:start' "$URUQUIM_GRID" ||
   fail "the RST-flood verdict block is gone from the campaign record; a fix whose evidence is deleted is a fix nobody can re-derive"

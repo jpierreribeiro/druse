@@ -12,6 +12,33 @@ import json "core:encoding/json"
 import "core:mem"
 import "core:reflect"
 import "core:strconv"
+import "core:strings"
+
+// The parser is already the syntax authority and reports every malformed,
+// duplicate-key and trailing-token case the preceding `json.is_valid` pass
+// reported. Its disposable tree lives in `temporary`, and `context.allocator`
+// is set to that same arena for the whole parse so partial-tree cleanup cannot
+// cross allocators. Parsing directly therefore preserves the strict contract
+// while avoiding a redundant full tokenization pass on every valid request.
+//
+// Keep a private build-time rollback control for one release, matching the
+// dedicated-accept rollout discipline. Applications do not configure this:
+// the efficient path is the native default and the public API is unchanged.
+@(private)
+JSON_DIRECT_PREFLIGHT_PARSE :: #config(URUQUIM_JSON_DIRECT_PREFLIGHT_PARSE, true)
+
+// Experimental fused decode: after the strict parser and shape checker have
+// accepted a tree made only of the ordinary DTO subset (structs, slices,
+// arrays and scalar fields), populate the destination from that tree instead
+// of tokenizing the same bytes again in the stdlib unmarshaller. Types outside
+// that subset, recursive schemas and registered custom unmarshalers fall back
+// to the authoritative stdlib path before any destination write.
+//
+// The efficient path is the native default after the dedicated A/B cleared the
+// adoption floor. Keep a private rollback for one release while the stdlib
+// fallback remains the compatibility authority for the wider type surface.
+@(private)
+JSON_FUSED_TREE_DECODE :: #config(URUQUIM_JSON_FUSED_TREE_DECODE, true)
 
 @(private)
 JSON_FIELD_PATH_MAX :: ERROR_NAME_ESCAPED_MAX
@@ -149,6 +176,236 @@ json_struct_field :: proc(info: ^reflect.Type_Info, key: string) -> (field_type:
 		}
 	}
 	return nil, false
+}
+
+// json_struct_target follows the pinned stdlib decoder's field precedence:
+// explicit json tags, then ordinary field names, then flattened `using _`
+// children. It returns an offset from the outer destination.
+@(private)
+json_struct_target :: proc(
+	info: ^reflect.Type_Info,
+	key: string,
+	base_offset: uintptr = 0,
+) -> (offset: uintptr, field_type: ^reflect.Type_Info, found: bool) {
+	fields := reflect.struct_fields_zipped(info.id)
+	for field in fields {
+		tag, explicit := reflect.struct_tag_lookup(field.tag, "json")
+		if !explicit {
+			continue
+		}
+		name := tag
+		for i in 0 ..< len(tag) {
+			if tag[i] == ',' {
+				name = tag[:i]
+				break
+			}
+		}
+		if name == key {
+			return base_offset + field.offset, field.type, true
+		}
+	}
+	for field in fields {
+		tag := reflect.struct_tag_get(field.tag, "json")
+		name := tag
+		for i in 0 ..< len(tag) {
+			if tag[i] == ',' {
+				name = tag[:i]
+				break
+			}
+		}
+		if name == "" && field.name == key {
+			return base_offset + field.offset, field.type, true
+		}
+	}
+	for field in fields {
+		if field.is_using && field.name == "_" {
+			base := reflect.type_info_base(field.type)
+			if _, ok := base.variant.(reflect.Type_Info_Struct); ok {
+				if nested_offset, nested_type, nested_ok := json_struct_target(
+					base,
+					key,
+					base_offset + field.offset,
+				); nested_ok {
+					return nested_offset, nested_type, true
+				}
+			}
+		}
+	}
+	return 0, nil, false
+}
+
+@(private)
+Json_Tree_Decode_Result :: enum {
+	Success,
+	Unsupported,
+	Internal,
+}
+
+// json_tree_type_supported is deliberately narrower than web.body. A false
+// result means "use the existing stdlib decoder", never "reject the request".
+// The depth ceiling also breaks recursive schemas such as `[]Node`.
+@(private)
+json_tree_type_supported :: proc(info: ^reflect.Type_Info, depth: int = 0) -> bool {
+	if info == nil || depth > 64 {
+		return false
+	}
+	if json._user_unmarshalers != nil {
+		if unmarshaler, found := json._user_unmarshalers[info.id]; found && unmarshaler != nil {
+			return false
+		}
+	}
+
+	base_info := reflect.type_info_base(info)
+	#partial switch t in base_info.variant {
+	case reflect.Type_Info_Boolean:
+		return base_info.id == typeid_of(bool)
+	case reflect.Type_Info_Integer:
+		return t.endianness == .Platform &&
+		       (base_info.size == 1 || base_info.size == 2 ||
+		        base_info.size == 4 || base_info.size == 8)
+	case reflect.Type_Info_Float:
+		return t.endianness == .Platform &&
+		       (base_info.size == 4 || base_info.size == 8)
+	case reflect.Type_Info_String:
+		return !t.is_cstring && t.encoding == .UTF_8 && base_info.id == typeid_of(string)
+	case reflect.Type_Info_Struct:
+		// Raw unions have no independent fields; packed/SOA layouts require
+		// layout-specific writes. Keep all three on the stdlib path.
+		if .raw_union in t.flags || .packed in t.flags || t.soa_kind != .None {
+			return false
+		}
+		for field in reflect.struct_fields_zipped(base_info.id) {
+			if !json_tree_type_supported(field.type, depth + 1) {
+				return false
+			}
+		}
+		return true
+	case reflect.Type_Info_Slice:
+		return json_tree_type_supported(t.elem, depth + 1)
+	case reflect.Type_Info_Array:
+		return json_tree_type_supported(t.elem, depth + 1)
+	}
+	return false
+}
+
+@(private)
+json_tree_assign_integer :: proc(dst: rawptr, info: ^reflect.Type_Info, value: i64) {
+	t := reflect.type_info_base(info).variant.(reflect.Type_Info_Integer)
+	switch info.size {
+	case 1:
+		if t.signed { (^i8)(dst)^ = i8(value) } else { (^u8)(dst)^ = u8(value) }
+	case 2:
+		if t.signed { (^i16)(dst)^ = i16(value) } else { (^u16)(dst)^ = u16(value) }
+	case 4:
+		if t.signed { (^i32)(dst)^ = i32(value) } else { (^u32)(dst)^ = u32(value) }
+	case 8:
+		if t.signed { (^i64)(dst)^ = i64(value) } else { (^u64)(dst)^ = u64(value) }
+	}
+}
+
+@(private)
+json_tree_assign_float :: proc(dst: rawptr, info: ^reflect.Type_Info, value: f64) {
+	switch info.size {
+	case 4: (^f32)(dst)^ = f32(value)
+	case 8: (^f64)(dst)^ = value
+	}
+}
+
+@(private)
+json_tree_decode :: proc(
+	value: json.Value,
+	dst: rawptr,
+	info: ^reflect.Type_Info,
+	allocator: mem.Allocator,
+) -> Json_Tree_Decode_Result {
+	info := reflect.type_info_base(info)
+
+	#partial switch v in value {
+	case json.Null:
+		mem.zero(dst, info.size)
+		return .Success
+
+	case json.Boolean:
+		if _, ok := info.variant.(reflect.Type_Info_Boolean); !ok {
+			return .Unsupported
+		}
+		(^bool)(dst)^ = bool(v)
+		return .Success
+
+	case json.Integer:
+		#partial switch _ in info.variant {
+		case reflect.Type_Info_Integer:
+			json_tree_assign_integer(dst, info, i64(v))
+			return .Success
+		case reflect.Type_Info_Float:
+			json_tree_assign_float(dst, info, f64(v))
+			return .Success
+		}
+		return .Unsupported
+
+	case json.Float:
+		#partial switch _ in info.variant {
+		case reflect.Type_Info_Float:
+			json_tree_assign_float(dst, info, f64(v))
+			return .Success
+		}
+		return .Unsupported
+
+	case json.String:
+		if _, ok := info.variant.(reflect.Type_Info_String); !ok {
+			return .Unsupported
+		}
+		cloned, err := strings.clone(string(v), allocator)
+		if err != nil {
+			return .Internal
+		}
+		(^string)(dst)^ = cloned
+		return .Success
+
+	case json.Array:
+		elem: ^reflect.Type_Info
+		base := dst
+		#partial switch t in info.variant {
+		case reflect.Type_Info_Slice:
+			elem = t.elem
+			bytes, err := mem.alloc_bytes(t.elem.size * len(v), t.elem.align, allocator)
+			if err != nil {
+				return .Internal
+			}
+			raw := (^mem.Raw_Slice)(dst)
+			raw.data = raw_data(bytes)
+			raw.len = len(v)
+			base = raw.data
+		case reflect.Type_Info_Array:
+			elem = t.elem
+		case:
+			return .Unsupported
+		}
+		for child, i in v {
+			child_dst := rawptr(uintptr(base) + uintptr(i * elem.size))
+			if result := json_tree_decode(child, child_dst, elem, allocator); result != .Success {
+				return result
+			}
+		}
+		return .Success
+
+	case json.Object:
+		if _, ok := info.variant.(reflect.Type_Info_Struct); !ok {
+			return .Unsupported
+		}
+		for key, child in v {
+			offset, field_type, found := json_struct_target(info, key)
+			if !found {
+				return .Unsupported
+			}
+			field_dst := rawptr(uintptr(dst) + offset)
+			if result := json_tree_decode(child, field_dst, field_type, allocator); result != .Success {
+				return result
+			}
+		}
+		return .Success
+	}
+	return .Unsupported
 }
 
 @(private)
@@ -383,7 +640,14 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 // destroyed before the real typed decode, so the caller never owns the
 // preflight tree and every failure path has one obvious cleanup point.
 @(private)
-body_json_preflight :: proc(raw: []u8, info: ^reflect.Type_Info) -> Json_Decode_Issue {
+body_json_preflight :: proc(
+	raw: []u8,
+	info: ^reflect.Type_Info,
+	dst: rawptr,
+	ctx: ^Context,
+	decoded: ^bool,
+) -> Json_Decode_Issue {
+	decoded^ = false
 	// Reject pathological structural nesting BEFORE the recursive-descent
 	// validator and parser ever see the input: neither bounds its own depth, so
 	// a body of nothing but `[` overflows the stack and aborts the process. This
@@ -423,10 +687,11 @@ body_json_preflight :: proc(raw: []u8, info: ^reflect.Type_Info) -> Json_Decode_
 		}
 	}
 
-	// The stdlib parser's partial-tree cleanup uses context.allocator on some
-	// syntax-error paths. Validate allocation-free first, so malformed input
-	// never creates a partial tree and cannot free through the wrong allocator.
-	if !json.is_valid(raw, .JSON, true) {
+	// Rollback control only. Before direct parsing shipped, this allocation-free
+	// validator guarded a parser whose partial-tree cleanup consulted
+	// `context.allocator`. The direct path below now binds that allocator to the
+	// disposable arena for the complete parse, including every error path.
+	if !JSON_DIRECT_PREFLIGHT_PARSE && !json.is_valid(raw, .JSON, true) {
 		return Json_Decode_Issue{kind = .Invalid_Json}
 	}
 
@@ -465,6 +730,21 @@ body_json_preflight :: proc(raw: []u8, info: ^reflect.Type_Info) -> Json_Decode_
 	if issue.kind == .Invalid_Field && issue.path.len == 0 {
 		issue.path.bytes[0] = '$'
 		issue.path.len = 1
+	}
+	if issue.kind == .None &&
+	   JSON_FUSED_TREE_DECODE &&
+	   json_tree_type_supported(info) {
+		request_arena_init(ctx)
+		switch json_tree_decode(value, dst, info, request_arena_allocator(ctx)) {
+		case .Success:
+			decoded^ = true
+		case .Unsupported:
+			// The type-level eligibility check is intentionally conservative,
+			// but a value-level edge (for example a string accepted by the
+			// stdlib for a numeric destination) can still require fallback.
+		case .Internal:
+			return Json_Decode_Issue{kind = .Internal}
+		}
 	}
 	return issue
 }
