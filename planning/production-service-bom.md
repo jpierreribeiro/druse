@@ -34,7 +34,8 @@ composicional novo entra aqui com classificação no mesmo PR que o menciona.
 | TLS de entrada | DELEGADO (proxy) | `docs/operations.md` §1 — decisão congelada |
 | CSP e HSTS | DELEGADO (proxy) | `docs/operations.md` §8 |
 | Compressão de resposta (gzip/br) | DELEGADO (proxy) | nomear em `docs/operations.md` (WP100) |
-| Rate limiting / fairness por cliente | DELEGADO (proxy) | nomear em `docs/operations.md` (WP100) |
+| Rate limiting / fairness por cliente (borda: por IP, flood, conexões) | DELEGADO (proxy) | nomear em `docs/operations.md` (WP100) |
+| Rate limiting **semântico** (por usuário, por API key, por operação) | ABERTO | a linha acima cobre a borda e só ela; um limite como "100 e-mails por usuário/dia" precisa de identidade e de domínio, que o proxy não tem. Gatilho: a primeira aplicação que precise limitar por sujeito em vez de por IP |
 | `application/x-www-form-urlencoded` | ABERTO | gatilho: demanda de aplicação real (ledger de fricção da Fase 8) |
 
 ## 2. Saída (outbound)
@@ -69,8 +70,26 @@ composicional novo entra aqui com classificação no mesmo PR que o menciona.
 
 | Item | Classificação | Onde/gatilho |
 |---|---|---|
-| Carregamento e validação de config | ABERTO | padrão de aplicação hoje; gatilho para Crystal: ledger de fricção da Fase 8 |
+| Carregamento e validação de config | CRYSTAL | `config` (`uruquim-crystals` PR #14): env vars → valores tipados, todas as falhas agregadas antes do boot, `Secret` com redação estrutural (guarda um índice de slot, nunca a credencial), parsing estrito de duration/tamanho/enum. **Reclassificado de ABERTO**: o gatilho registrado era o ledger de fricção da Fase 8, que fechou sem registrar fricção de configuração — a promoção NÃO vem daí, vem de decisão do dono (2026-07-25) de construir o lote de identidade. Registrado assim para não fingir uma evidência que não existe. **NÃO CONGELADO** |
 | Segredos | DELEGADO (supervisor/ambiente) | env vars via systemd/orquestrador; nunca em config versionada |
+
+## 5.1 Identidade e sessão
+
+**Origem:** lote de identidade em `uruquim-crystals` (PR #14 + track ID),
+construído por decisão do dono em 2026-07-25. Toda esta seção é **NÃO CONGELADA**:
+os ledgers são verificados pelo gate, as superfícies ainda podem mudar.
+
+| Item | Classificação | Onde/gatilho |
+|---|---|---|
+| Hashing de senha | CRYSTAL | `auth/password`: Argon2id sobre `core:crypto`, formato PHC padrão (corpus portável nos dois sentidos, verificado contra vetor de referência do `phc-winner-argon2`), `Valid_Needs_Rehash` para migrar custo, parâmetros de um hash armazenado tratados como entrada não confiável. Custo calibrado por medição (`cmd/password-bench`), não por citação |
+| Cookies | CRYSTAL | `web/cookie` sobre `web.set_header` (C2/F8-2). Existe porque o core barra CR/LF/NUL mas não pode saber que `;` num VALOR de cookie abre um atributo novo |
+| Sessão server-side | CRYSTAL | `auth/session` (engine) + `auth/session_memory` + `auth/session_postgres` (stores) + `web/session` (adaptador). Só `sha256(token)` é armazenado; TTL absoluto e por inatividade no relógio do servidor; `rotate` serializado por claim atômico |
+| Proteção CSRF | CRYSTAL | `csrf` + `web/csrf`: token assinado e **vinculado** à sessão (`nonce \|\| HMAC(key, nonce \|\| binding)`), não double-submit ingênuo. Não é opcional para quem usa `web/session`: a sessão por cookie é o que cria a exposição |
+| Limpeza da tabela de sessões | CRYSTAL (Tool) | `cmd/session-purge`, ao lado do `cmd/migrate`. Nunca uma thread dentro do servidor |
+| Autorização (policies) | ABERTO | `auth/session` responde "quem é você", nada responde "você pode". Gatilho: a primeira aplicação que espalhe checagem de papel por mais de um handler |
+| API keys / bearer tokens de serviço | ABERTO | sessão de navegador e autenticação de serviço são problemas distintos. Gatilho: a primeira integração servidor-a-servidor |
+| Idempotência de operações | ABERTO | gatilho: a primeira operação com efeito externo não repetível (pagamento, cobrança, envio) |
+| **Prova por uso** | ABERTO | **item ID-9.** Nenhuma aplicação fora do repo usa estes pacotes. A epistemologia do programa é que teste não prova composição — a Fase 8 existe por isso. Gatilho: a primeira aplicação externa que adote `config` ou `auth/session` abre um ledger de fricção; só então se discute freeze |
 
 ## 6. Ciclo de vida e plataforma
 
