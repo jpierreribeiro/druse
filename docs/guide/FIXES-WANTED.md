@@ -161,3 +161,56 @@ migration runner that refuses a `MIGRATE_DIR` it did not resolve absolutely.
 
 **Cost of not doing it.** The failure appears on a colleague's machine, not on
 the machine that made it.
+
+---
+
+## 9 — No server-rendered reference program exists
+
+**Where the warning lives:** [`README.md`](README.md).
+
+`web/template`, `web/form`, `web/html` and `web/redirect` are shipped and
+frozen. No program under `examples/` imports any of them.
+
+That blocks four chapters of the build-along. Their acceptance rule is that
+chapter code is extracted from a program the build check compiles, and there is
+nothing to extract from. Written any other way, the chapters would be untested
+code in markdown — the exact failure this repository has already recorded twice.
+
+**Proposal.** One server-rendered example, the size of `examples/session`: a
+page, a form that posts, CSRF on that form, and a redirect after post. It
+unblocks the chapters and gives the frozen packages a compiled user.
+
+**Cost of not doing it.** The whole server-rendered half of the framework has
+no narrative anywhere, and `quick-start.md` keeps saying the framework is
+"aimed at JSON APIs" — which stays true in practice for as long as nothing
+demonstrates otherwise.
+
+---
+
+## 10 — `examples/session` namespaces its variables with the old product name
+
+**Where the warning lives:** nowhere. Found while writing chapter 5.
+
+The example calls `config.loader` with the former product name as its prefix,
+so it reads `<OLDNAME>_PORT`, `<OLDNAME>_CSRF_KEY` and so on.
+
+**Proposal.** Change the prefix with the rename. The guide shows a neutral
+`APP_` and says the prefix is the application's own, so the guide is not wrong
+today — but the example and the guide disagree until this lands.
+
+---
+
+## 11 — The plan's own correction for the migration command is stale
+
+**Where the warning lives:** `planning/documentation-program.md` §3 and W7.
+
+The program records entry #16 as "`migrations.md` names `migrate adopt`; the
+command is `schema adopt`". Neither exists. `cmd/migrate` accepts `new`,
+`status`, `dry-run`, `up`, `down`, `inspect` and `repair`.
+
+**Proposal.** Re-check `docs/migrations.md` against the runner's own usage text
+and correct both the document and the plan entry. Chapter 2 of the build-along
+already lists the seven real commands.
+
+**Cost of not doing it.** A reader follows a documented command that does not
+exist, during an incident, which is when they reached for `migrate` at all.
