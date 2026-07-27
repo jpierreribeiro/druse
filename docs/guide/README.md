@@ -36,6 +36,16 @@ This note appears once, here. No other page repeats it.
 | [`core-and-crystals.md`](01-concepts/core-and-crystals.md) | Where is the boundary between Druse and Crystals, and how do I vendor them? |
 | [`shape-of-an-application.md`](01-concepts/shape-of-an-application.md) | Where do services live? What does `main` look like? |
 
+### 02-build-notes — build a real service, one step at a time
+
+Narrates `druse-crystals/examples/notes`, a CRUD service the build check
+compiles and runs against a real PostgreSQL.
+
+| Page | Answers |
+|---|---|
+| [`01-nothing-to-hello.md`](02-build-notes/01-nothing-to-hello.md) | How do I get one process listening on a port? |
+| [`02-database-and-migrations.md`](02-build-notes/02-database-and-migrations.md) | How do I get a schema and a pool, and why does the server never migrate itself? |
+
 ### 04-rules — the rules no single package can teach
 
 Read `ownership-and-lifetime.md` before you write a handler that returns a
