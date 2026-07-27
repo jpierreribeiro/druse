@@ -60,6 +60,18 @@ JSON_NEST_DEPTH_MAX :: 128
 // only needs the value to be non-negative; narrower types are bounds-checked
 // against their exact range so an out-of-range value is refused rather than
 // silently truncated by the authoritative decode.
+// json_f64_is_finite rejects NaN and both infinities without importing
+// `core:math`, which `package web` deliberately does not depend on. NaN is the
+// only value unequal to itself; for either infinity `f - f` is NaN, which is
+// unequal to zero. Every finite value passes both.
+@(private)
+json_f64_is_finite :: proc(f: f64) -> bool {
+	if f != f {
+		return false
+	}
+	return f - f == 0
+}
+
 @(private)
 json_int_fits :: proc(value: i64, size: int, signed: bool) -> bool {
 	switch size {
@@ -521,9 +533,50 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 		return json_issue_at(.Invalid_Field, path)
 
 	case json.Float:
-		#partial switch _ in info.variant {
-		case reflect.Type_Info_Integer, reflect.Type_Info_Float,
-		     reflect.Type_Info_Complex, reflect.Type_Info_Quaternion:
+		#partial switch dst in info.variant {
+		case reflect.Type_Info_Integer:
+			// THE SAME RULE THE `json.Integer` ARM ENFORCES, VIA THE OTHER TOKEN.
+			//
+			// This arm used to accept any float for an integer destination, which
+			// re-opened the exact hole the range check above exists to close:
+			// `{"count":1e6}` and `{"count":999999.0}` tokenize as Float, not
+			// Integer, so they skipped the bounds test, fell through to the stdlib
+			// decode, and were assigned with a truncating f64->u8 cast — the
+			// attacker-chosen wrapped value, answered 200. `{"count":3.7}` was
+			// silently truncated to 3 by the same path.
+			//
+			// A JSON number written with an exponent or a `.0` fraction is still
+			// an integer value, so it is accepted when it is integral AND in
+			// range; a fractional value is not an integer and is refused rather
+			// than rounded.
+			f := f64(v)
+			if !json_f64_is_finite(f) {
+				return json_issue_at(.Invalid_Field, path)
+			}
+			// Outside i64 the conversion below is itself undefined, so bound it
+			// before converting rather than after.
+			if f < -9223372036854775808.0 || f >= 9223372036854775808.0 {
+				return json_issue_at(.Invalid_Field, path)
+			}
+			n := i64(f)
+			if f64(n) != f {
+				return json_issue_at(.Invalid_Field, path) // fractional, not an integer
+			}
+			if !json_int_fits(n, info.size, dst.signed) {
+				return json_issue_at(.Invalid_Field, path)
+			}
+			return {}
+		case reflect.Type_Info_Float, reflect.Type_Info_Complex,
+		     reflect.Type_Info_Quaternion:
+			// A non-finite inbound value (`1e999` saturates to +Inf in the
+			// tokenizer) is refused here rather than handed to the application:
+			// the encoder's NUM-001 guard would turn any attempt to echo it into
+			// a logged 500, so a six-byte field could drive error volume. Refusing
+			// at the boundary keeps the inbound and outbound numeric contracts
+			// symmetric.
+			if !json_f64_is_finite(f64(v)) {
+				return json_issue_at(.Invalid_Field, path)
+			}
 			return {}
 		}
 		return json_issue_at(.Invalid_Field, path)
@@ -541,11 +594,24 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 			}
 			return json_issue_at(.Invalid_Field, path)
 		case reflect.Type_Info_Integer:
-			_, ok := strconv.parse_i128(text)
-			if ok {
-				return {}
+			// RANGE-CHECK THE QUOTED FORM TOO. This only asked "does it parse as
+			// some i128", never "does it fit the destination" — so `{"small":
+			// "999999"}` into a `u8` passed the preflight and was truncated by
+			// the stdlib decode exactly like the bare-integer form the check
+			// above was written to stop. The pinned stdlib accepts quoted
+			// numerics for integer destinations (pinned by the WP68 fallback
+			// contract), so this arm is reachable in production, not theoretical.
+			n, ok := strconv.parse_i128(text)
+			if !ok {
+				return json_issue_at(.Invalid_Field, path)
 			}
-			return json_issue_at(.Invalid_Field, path)
+			if n < -9223372036854775808 || n > 9223372036854775807 {
+				return json_issue_at(.Invalid_Field, path)
+			}
+			if !json_int_fits(i64(n), info.size, t.signed) {
+				return json_issue_at(.Invalid_Field, path)
+			}
+			return {}
 		case reflect.Type_Info_Float:
 			_, ok := strconv.parse_f64(text)
 			if ok {

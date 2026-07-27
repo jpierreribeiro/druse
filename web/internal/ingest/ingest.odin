@@ -122,6 +122,20 @@ admit :: proc(a: ^Admission) -> Ingest_Result {
 	return .Ready
 }
 
+// release_slot returns one reservation taken by `admit` when no spool will ever
+// own it. `cancel` is the release path for a spool that opened; this is the
+// release path for one that did not.
+release_slot :: proc(a: ^Admission) {
+	if !a.initialized {
+		return
+	}
+	sync.mutex_lock(&a.mu)
+	if a.active > 0 {
+		a.active -= 1
+	}
+	sync.mutex_unlock(&a.mu)
+}
+
 // admission_drain stops admission; it does not touch in-flight spools, which
 // are owned by the synchronous Handler holding them and are cancelled by that
 // request's teardown at the process drain deadline (WP95, spec §2).
@@ -150,6 +164,15 @@ begin :: proc(a: ^Admission, s: ^Spool) -> Ingest_Result {
 	f, err := os.open(path, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, os.perm_number(0o600))
 	if err != nil {
 		delete(path)
+		// URUQUIM (ingest audit F2) — RELEASE THE SLOT WE NEVER GOT TO USE.
+		// Every caller reserves with `admit` before calling `begin`, and the
+		// only release path is `cancel`, which reaches the admission through
+		// `s.admission` — a field this failure leaves unset. So an `os.open`
+		// failure used to consume a slot permanently: a spool directory that
+		// was briefly unwritable would retire `max_concurrent` slots and refuse
+		// every subsequent upload with 503 for the life of the process, long
+		// after the disk condition cleared.
+		release_slot(a)
 		return .Disk_Full
 	}
 	s^ = Spool {

@@ -311,17 +311,41 @@ multipart_parse :: proc(form: ^Multipart_Form, body: []u8, boundary: string) -> 
 		headers := text[cursor:cursor + header_end]
 		cursor += header_end + 4
 
-		next := strings.index(text[cursor:], "\r\n" + "--")
+		// MULTIPART AUDIT F6 — KEEP LOOKING UNTIL THE MATCH IS THE DELIMITER.
+		//
+		// This took the FIRST `\r\n--` in the remaining body and then required it
+		// to be the boundary, returning false for the whole form otherwise. But
+		// `\r\n--` is four ordinary bytes: any binary part (parts run to
+		// `MULTIPART_PART_LIMIT`) can contain it by chance, and a PNG or zip that
+		// did made `form_file`/`form_field` fail for the entire form — an upload
+		// that failed intermittently and non-deterministically, on content rather
+		// than on anything the user did.
+		//
+		// The delimiter is only a delimiter when the boundary follows it, so scan
+		// forward past occurrences that do not qualify. Fail-closed either way:
+		// a truncated body still ends with no match and is still refused.
+		search := cursor
+		content_end := -1
+		for {
+			hit := strings.index(text[search:], "\r\n" + "--")
+			if hit < 0 {
+				break
+			}
+			abs := search + hit
+			if strings.has_prefix(text[abs + 2:], delimiter) {
+				content_end = abs
+				break
+			}
+			// Not our boundary — a content byte sequence that merely looks like
+			// one. Step past this `\r\n` and keep scanning the same part.
+			search = abs + 2
+		}
 		// A part with no following delimiter is a truncated body.
-		if next < 0 {
+		if content_end < 0 {
 			return false
 		}
-		content := text[cursor:cursor + next]
-		cursor += next + 2
-		if !strings.has_prefix(text[cursor:], delimiter) {
-			return false
-		}
-		cursor += len(delimiter)
+		content := text[cursor:content_end]
+		cursor = content_end + 2 + len(delimiter)
 
 		if len(content) > MULTIPART_PART_LIMIT {
 			return false

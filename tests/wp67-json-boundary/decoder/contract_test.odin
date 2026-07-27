@@ -457,3 +457,159 @@ wp67_unsupported_destination_remains_an_internal_error :: proc(t: ^testing.T) {
 		"internal_error",
 	)
 }
+
+// --- JSON audit: the integer-range contract, through every token form --------
+
+// A `u8` destination and an `i64` one, so both the narrow-truncation case and
+// the "no wider integer exists" case are covered by the same bodies.
+Ranged :: struct {
+	small: u8  `json:"small"`,
+	big:   i64 `json:"big"`,
+}
+
+bind_ranged :: proc(ctx: ^web.Context) {
+	dst: Ranged
+	if !web.body(ctx, &dst) {
+		return
+	}
+	web.ok(ctx, dst)
+}
+
+Ratio :: struct {
+	ratio: f64 `json:"ratio"`,
+}
+
+bind_ratio :: proc(ctx: ^web.Context) {
+	dst: Ratio
+	if !web.body(ctx, &dst) {
+		return
+	}
+	web.ok(ctx, dst)
+}
+
+@(test)
+audit_out_of_range_integer_is_refused_in_every_token_form :: proc(t: ^testing.T) {
+	// THE DEFECT THIS PINS. `wp68_out_of_range_integer_is_an_invalid_field`
+	// covers only the bare-integer form, and the range check it exercises ran
+	// only on the `json.Integer` arm of the shape check. JSON can write the same
+	// magnitude two other ways, and both skipped the check entirely:
+	//
+	//   {"small":1e6}      tokenizes as json.Float  -> no range check
+	//   {"small":"999999"} tokenizes as json.String -> "parses as i128?" only
+	//
+	// Both then reached the stdlib decode, which assigns with a truncating cast,
+	// so a field feeding a length, quota, index or authorization decision
+	// carried an attacker-chosen wrapped value under a 200 — the precise outcome
+	// the original check was written to prevent, reachable by changing how the
+	// number is spelled.
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/ranged", bind_ranged)
+
+	refused :: []string {
+		`{"small":1e6,"big":1}`,          // exponent form
+		`{"small":999999.0,"big":1}`,     // fraction-zero form
+		`{"small":"999999","big":1}`,     // quoted form
+		`{"small":3.7,"big":1}`,          // fractional: an integer field is not a rounder
+		`{"small":-1,"big":1}`,           // unsigned destination, negative value
+		`{"small":1,"big":"99999999999999999999999"}`, // quoted, past i64
+	}
+	for body in refused {
+		res := web.test_request(&a, .POST, "/ranged", body)
+		testing.expectf(
+			t,
+			res.status == web.Status.Bad_Request,
+			"%s must be refused, got %v (%s)",
+			body,
+			res.status,
+			res.body,
+		)
+		testing.expectf(t, strings.contains(res.body, "invalid_field"), "%s -> invalid_field", body)
+	}
+
+	// The negative control: forms that ARE in range must still be accepted, or
+	// the fix above would be indistinguishable from refusing all floats.
+	accepted :: []string {
+		`{"small":200,"big":9007199254740993}`, // plain integers
+		`{"small":2e2,"big":1}`,                // 200 written with an exponent
+		`{"small":200.0,"big":1}`,              // 200 written with a zero fraction
+		`{"small":"200","big":"42"}`,           // quoted, in range
+	}
+	for body in accepted {
+		res := web.test_request(&a, .POST, "/ranged", body)
+		testing.expectf(
+			t,
+			res.status == web.Status.OK,
+			"%s must be accepted, got %v (%s)",
+			body,
+			res.status,
+			res.body,
+		)
+	}
+}
+
+@(test)
+audit_non_finite_float_is_refused_at_the_boundary :: proc(t: ^testing.T) {
+	// `1e999` saturates to +Inf in the tokenizer. Accepting it hands the handler
+	// a value it never asked for, and the encoder's NUM-001 guard turns any
+	// attempt to echo it into a logged 500 — so six bytes of body could drive
+	// 500s and error-log volume. The inbound and outbound numeric contracts are
+	// now symmetric: what cannot be encoded is not decoded either.
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/ratio", bind_ratio)
+
+	non_finite :: []string{`{"ratio":1e999}`, `{"ratio":-1e999}`}
+	for body in non_finite {
+		res := web.test_request(&a, .POST, "/ratio", body)
+		testing.expectf(
+			t,
+			res.status == web.Status.Bad_Request,
+			"%s is refused, got %v (%s)",
+			body,
+			res.status,
+			res.body,
+		)
+	}
+
+	ok := web.test_request(&a, .POST, "/ratio", `{"ratio":1.5}`)
+	testing.expectf(t, ok.status == web.Status.OK, "a finite float is accepted, got %v (%s)", ok.status, ok.body)
+}
+
+@(test)
+audit_duplicate_object_keys_are_refused :: proc(t: ^testing.T) {
+	// THE UNTESTED CLAIM. The strict-decoder contract states that duplicate keys
+	// are refused, and the implementation delegates that entirely to the pinned
+	// stdlib parser — with no test anywhere in the tree asserting it. That makes
+	// the guarantee invisible to the gate and free to disappear under a
+	// toolchain bump, on a nightly pin. Both spellings are checked: the plain
+	// form, and the escaped form (`a` is `a`), which only collapses to a
+	// duplicate if unquoting happens before the key is inserted.
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/input", bind_input)
+
+	plain := web.test_request(&a, .POST, "/input", `{"name":"a","name":"b"}`)
+	testing.expectf(
+		t,
+		plain.status == web.Status.Bad_Request,
+		"a duplicate key is refused, got %v (%s)",
+		plain.status,
+		plain.body,
+	)
+
+	escaped := web.test_request(&a, .POST, "/input", `{"name":"a","name":"b"}`)
+	testing.expectf(
+		t,
+		escaped.status == web.Status.Bad_Request,
+		"an escape-spelled duplicate key is refused, got %v (%s)",
+		escaped.status,
+		escaped.body,
+	)
+}
