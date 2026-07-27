@@ -9,20 +9,28 @@ What a composition call copies, and what it costs on every request.
 ```odin
 	r := health.routes()
 	web.mount(&app, "/internal", &r)
+	web.destroy(&r)
 ```
 
-`mount` copies every route into the application and then marks the router
-closed. The application owns everything after the call.
+`mount` copies every route into the application and then marks the source
+closed. The application owns its copy from that point.
 
-Three rules follow, and each one is enforced rather than advised:
+Three rules follow:
 
-- **A `Router` needs no teardown.** There is no `web.destroy_router`. Do not
-  look for one.
+- **Destroy the source router.** It still owns the storage its own routes and
+  middleware were built in, and `mount` copied out of that storage rather than
+  taking it. `Router` embeds `App`, so the same `web.destroy` accepts a
+  `^Router`. There is no separate `destroy_router`.
 - **Registering on a router after you mount it is a boot failure.** The router
   is closed, and a later `web.get` on it is refused loudly. It is not a
   silently dead route.
-- **Mounting a closed router poisons the application.** So is mounting the same
-  router twice. Build one router, mount it once.
+- **Mounting a closed router poisons the application.** So does mounting the
+  same router twice. Build one router, mount it once.
+
+Skipping the `destroy` in a `main` that serves for the whole process life leaks
+nothing that outlives the process, and `examples/05-route-groups` does skip it.
+The reference application destroys it anyway. Do that: the habit is what keeps
+it correct when the same code moves into a test that runs a thousand times.
 
 **Pass `&r`, never `r`.** `web.router()` returns a `Router` by value. Treat it
 exactly as you treat a `strings.Builder`: after you register a route on it, a

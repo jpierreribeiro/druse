@@ -14,7 +14,7 @@ visible in your code.
 ```odin
 r, e := pg.query_one(&c, "user_by_email", `
 	SELECT id, password_hash FROM users WHERE email = $1
-`, {pg.text(email)})
+`, {pg.arg_text(email)})
 ```
 
 **Why.** An ORM has to model your schema a second time, in a second language,

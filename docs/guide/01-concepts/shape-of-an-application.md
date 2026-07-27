@@ -93,17 +93,17 @@ cannot change it (ADR-C002). You choose the prefix, the order and the
 middleware:
 
 ```odin
-	r := health.routes()
-	web.mount(&app, "/internal", &r)
+	liveness := health.routes()
+	web.mount(&app, "/health", &liveness)
+	web.destroy(&liveness)
 ```
 
-**`mount` copies the routes, then closes the router.** After the call the
-application owns everything, and the router needs no teardown. There is no
-`destroy` for a `Router`.
+**`mount` copies the routes, then closes the source.** The application owns its
+copy. You still own the source, and you destroy it — `Router` embeds `App`, so
+the same `web.destroy` accepts it.
 
-Two rules follow from that, and
 [`../04-rules/composition-and-cost.md`](../04-rules/composition-and-cost.md)
-states them.
+states what else follows from that copy.
 
 ## Request-scoped state is one typed value
 

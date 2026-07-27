@@ -143,7 +143,7 @@ Zero rows from `query_one` is `Row_Not_Found`. More than one is
 Read a `query_one` result directly:
 
 ```odin
-	r, e := pg.query_one(&c, "user_by_email", sql, {pg.text(email)})
+	r, e := pg.query_one(&c, "user_by_email", sql, {pg.arg_text(email)})
 	if pg.is_err(e) { return }         // Row_Not_Found when there was none
 	defer pg.rows_close(&r)
 
