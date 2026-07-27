@@ -54,33 +54,31 @@ Two approved prose terms, one meaning each. `GLOSSARY.md` fixes them in W0:
 text. Do not write `Druse core`, `the Druse framework` or `the Crystals
 library` — the two approved terms already carry those meanings.
 
-### The code rename is a precondition, not part of this program
+### The documentation is renamed first. The source follows.
 
-The name `uruquim` is load-bearing in the source, not decorative:
+The rename applies to the documentation now. The source keeps the old name
+until the repositories are renamed, which is a separate change:
 
 | Tree | `.odin` files with `uruquim` | build / CI scripts |
 |---|---|---|
 | `druse` (core) | 202 | 61 |
 | `druse-crystals` | 60 | 9 |
 
-Every code sample in the guide shows `import web "druse:web"`. That line is
-false until the collection is renamed. §8 extracts snippets from real source
-and §10 forbids inventing API, so the two cannot disagree: a guide that shows
-`druse:` against a tree that builds with `uruquim:` fails its own gate on the
-first extraction.
+No work package waits for that change. The guide is written in the target
+vocabulary throughout, because the guide is what the new name is for.
 
-Therefore:
+One mechanical detail crosses the boundary: the collection flag. The guide
+writes `-collection:druse=...` and `import web "druse:web"`. Against today's
+tree the flag is still `-collection:uruquim=...`. That is **one line, declared
+once**, in `guide/README.md`:
 
-- **W0 and W1 may start now.** They are prose. They name the product, not the
-  collection.
-- **W2 and W4 through W7 are blocked** until the code rename lands. Each shows
-  a code sample, a runnable example program, or a command.
-- The code rename is its own change, with its own review, in both repositories
-  at once. It is not a work package here.
+> The collection is named `druse` from the repository rename onward. If your
+> checkout still builds with `-collection:uruquim=`, use that name in the flag
+> and in every `import`. Nothing else on this page changes.
 
-Until it lands, the plan is written in the target vocabulary. That is
-deliberate: the guide is the reason the rename is worth doing now, while no
-external application depends on either name.
+Do not repeat that note in any other file. A caveat repeated in forty files is
+how a rename half-lands. The note is deleted when the source rename lands, and
+§8's gate rule makes its removal detectable.
 
 ---
 
@@ -295,8 +293,6 @@ run without the author present.
 
 ### W2 — `04-rules/ownership-and-lifetime.md` — highest value
 
-Blocked by the code rename (§2): it ships a runnable program.
-
 Fills a 7-line placeholder. Covers the largest friction cluster: #6, #9, #20,
 #21, #26, #28, #30.
 
@@ -326,8 +322,6 @@ that no document currently shows), `bytes-and-encoding.md` (#19, #24, #29),
 
 ### W4 — `02-build-notes/`
 
-Blocked by the code rename (§2): every chapter shows `druse:` imports.
-
 - **In:** `examples/notes/`, the miniature, `quick-start.md`.
 - The narrative extends `quick-start.md` into the server-rendered stack. Fix
   the "aimed at JSON APIs" framing at the same time.
@@ -341,8 +335,6 @@ Blocked by the code rename (§2): every chapter shows `druse:` imports.
 
 ### W5 — `03-build-intake/`
 
-Blocked by the code rename (§2).
-
 Same method, `cmd/intake` as the source. Covers the seven packages the first
 application never touched. A worker is a different shape of program from a
 web service, and no document currently shows that shape.
@@ -354,15 +346,11 @@ natural guess and currently shown nowhere.
 
 ### W6 — `05-recipes/`
 
-Blocked by the code rename (§2).
-
 Seeded by the ledger's own list of what the application had to do that the
 library could not. One problem per file. No narrative, no teaching — a reader
 here already knows the framework and wants an answer.
 
 ### W7 — Wiring and truth pass
-
-Blocked by the code rename (§2): it executes every command it documents.
 
 - `guide/README.md`: the map. Which file answers which question, and what each
   page assumes you have already read. One line at the top of every file
@@ -462,9 +450,8 @@ it.
 - **Never invent API.** Grep the source for every symbol before writing it. The
   ledger's first four entries are all guessed names that were wrong.
 - **Never write a command you have not run.**
-- **Write `druse`, never `uruquim` (§2).** If the tree you are reading still
-  builds with the old collection, you are in a blocked work package. Stop and
-  report; do not write a sample you cannot build.
+- **Write `druse`, never `uruquim` (§2).** The one exception is the collection
+  note in `guide/README.md`. Do not add a second one.
 - **Do not rewrite `canonical-patterns.md`, `ai-context.md`, or
   `crystals.md`.** Harvest and link. Duplicated reference is guaranteed to
   diverge.
