@@ -252,12 +252,22 @@ fix the server keeps serving at reduced capacity with two connections stranded;
 after it, the server shuts down. Assert the post-fix behaviour: the process
 exits rather than silently losing a lane.
 
-**B4. `timespec` split.**
+**B4. `timespec` split — ALREADY DONE, AND THE CONTROL FALSIFIED THE CLAIM.**
 
-Trivial and deterministic: call `nbio.tick(2 * time.Second)` directly. Before the
-fix it returns EINVAL; after, it waits ~2 s and returns cleanly. This one needs
-no stress box — but it should still land as a committed unit test, because it is
-the only one of the four that can have one.
+`tests/nbio-timeout` is committed and green. Its control was run: with
+`ts.time_nsec = uint(timeout)` restored, all three cases still pass on Linux
+6.18.5, because the kernel normalises an over-large `tv_nsec` on the io_uring
+EXT_ARG path rather than rejecting it with EINVAL as the audit predicted.
+
+So the split is a conformance repair, not a fix for an observed failure, and the
+test is a regression guard rather than controlled evidence. Both the report and
+the test header now say so. **No stress-box work is owed for B4.**
+
+The agent should still re-run it on the campaign host: a different kernel or a
+different io_uring feature level may not normalise, and if the control fails
+*there*, that is worth recording — it would mean the defect was real on some
+kernels, which changes nothing about the fix but does change what the project
+knows.
 
 **Acceptance:** for each of B1–B3, either (control failed → fix ran clean) or an
 explicit "could not reproduce" statement. B4 green as a committed test.

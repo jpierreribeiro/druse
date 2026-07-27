@@ -10,3 +10,4 @@ tests/wp61-public-surface/fixture/
 /*-response-surface
 /*-query-opt
 /*-stream-live
+artifacts/

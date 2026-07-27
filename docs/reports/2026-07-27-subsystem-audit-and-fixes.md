@@ -169,9 +169,22 @@ including delivering a zero-length file.
   `EAGAIN` are real io_uring errnos that reach there. **Fixed** by routing a
   tick error into `server_shutdown`, as the acceptor loop already did for itself.
 - **`timespec` built wrong.** `_flush_submissions` put the whole duration in
-  `tv_nsec`, so any bounded tick of ≥ 1 s produced `tv_nsec ≥ 1e9` and EINVAL —
-  which, per the previous item, killed the lane. Dormant only because every
-  bounded tick in the tree was under a second. **Fixed** by splitting sec/nsec.
+  `tv_nsec`, so any bounded tick of ≥ 1 s produced `tv_nsec ≥ 1e9`, which POSIX
+  defines as invalid. **Fixed** by splitting sec/nsec.
+
+  **CORRECTION (2026-07-27, after this report was first written).** The claim
+  above originally continued "…and EINVAL — which, per the previous item, killed
+  the lane." That is **wrong on this kernel**. `tests/nbio-timeout` was written
+  to pin it and the control was run: with `ts.time_nsec = uint(timeout)`
+  restored, a 1 s and a 2.5 s bounded tick both return cleanly and wait the
+  correct duration on Linux 6.18.5. The kernel normalises an over-large
+  `tv_nsec` on the io_uring EXT_ARG path instead of rejecting it. The split is
+  retained as a conformance repair — depending on an undocumented normalisation
+  across kernels and io_uring paths is fragile and avoiding it is free — but it
+  fixed no observed failure, and `tests/nbio-timeout` is a regression guard that
+  passes with and without it. Recorded here rather than quietly dropped: this
+  report's own rule is that a green run with no failing control is not evidence,
+  and that applies to its author.
 
 **No control was run for these four.** They are timing-dependent races and a
 latent arithmetic bug; the fixes are argued from the code and validated only by
