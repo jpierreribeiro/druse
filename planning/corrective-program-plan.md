@@ -232,3 +232,44 @@ mirroring the Hardening H-1 pattern.
   controls green, 189 PASS).
 - [ ] Scale/robustness campaign + report
 - [ ] Release-readiness: all six green → my approval
+
+---
+
+## 6. C8 — a ninth finding, recorded after the program was declared complete
+
+The Corrective Program closed on 2026-07-24 with F8-1..F8-8 RESOLVED. **C8 is not
+a reopening of that verdict**; it is the same instrument continuing to work. The
+friction ledger is marked LIVE precisely so that a finding arriving after the
+batch has somewhere to land, and F8-9 arrived from a *different* application —
+`uruquim-miniature`, built outside the Crystals repository to use the public
+surface as a stranger would.
+
+| WP | Finding | Repo | Kind | Risk | Value |
+|---|---|---|---|---|---|
+| **C8** | F8-9 — `web.Status` gains `Moved_Permanently=301`, `Found=302`, `See_Other=303`, `Temporary_Redirect=307`, `Permanent_Redirect=308` | core | enum additions (5 members) | LOW | HIGH — POST/Redirect/GET is otherwise inexpressible |
+
+**Why it is the same shape as C1, and why that matters.** C1 named the codes a
+production *API* returns (409/413/429/503). C8 names the codes a production
+*server-rendered application* returns. Both are additive widenings of one already
+counted symbol, so the ledger does not grow; both replace a raw-int cast with a
+checked name; both are proven by a suite that asserts the member equals its code
+*and* reaches the wire. C1's execution is the literal template — the same six
+artefacts (signature snapshot, freeze declaration, public-api control, mutation
+probe, `docs/ai-context.md`, a `check_c8_controls.sh` wired into `check.sh`).
+
+**What C8 deliberately does NOT add.** No `web.redirect` responder. `web.set_header`
+(C2) plus `web.text` already put a `Location` and a status on the wire, so a
+redirect responder would be a second public name for an operation the surface
+already performs — the exact accretion G-01 forbids, and a ledger-growing one.
+`docs/canonical-patterns.md` has advertised `web.redirect(...)` as "Phase 3,
+unavailable" since Phase 1; no phase ever owned it, and C8 replaces that row with
+the two-call form that works rather than leaving a promise no plan schedules.
+
+**Retirement it causes elsewhere.** The `web/redirect` Crystal exists only to hold
+these five casts, and its own header states it should be retired when the core
+grows the members. It cannot be deleted the moment C8 merges — the Crystals repo
+pins the core at a commit (`COMPATIBILITY.md`), so retirement happens at the next
+re-pin, not before.
+
+### Progress (C8)
+- [ ] **C8 F8-9 redirect statuses.** Branch off `main`, PR only.

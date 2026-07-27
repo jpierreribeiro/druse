@@ -7,6 +7,12 @@ with all nine fields. A core/Crystal change happens only in a separately
 reviewed corrective WP with its original gates — this ledger is a **veto and
 evidence source, not an accretion exception.**
 
+The instrument is not limited to one application. F8-1..F8-8 came from
+`uruquim-board`; **F8-9 came from `uruquim-miniature`**, a second, independently
+built application whose whole purpose was to use the Crystals from outside their
+own repository. A ledger that only ever hears from one application measures that
+application as much as the framework.
+
 `application-specific?` = the friction is the app's own design problem, not the
 framework's. Only non-application-specific items are candidate framework
 findings.
@@ -220,3 +226,19 @@ repo (branch `corrective` off the board-pinned `36db55c`). Both facets closed:
 runtime is VPS-verified at board re-pin (libpq-gated). (Originally RECORDED with
 the strongest provenance in the ledger — three independent WP112 agents surfaced
 both facets unprompted.) **All eight findings F8-1..F8-8 are now RESOLVED.**
+
+---
+
+## F8-9 — the public `web.Status` enum has no 3xx at all, so POST/Redirect/GET is not expressible
+
+| Field | Value |
+|---|---|
+| **1. Task attempted** | Saving a note from a plain HTML `<form>` and then sending the browser to `GET /` — **POST/Redirect/GET**, the pattern that makes a refresh after a form post safe. Found by `uruquim-miniature`, a second application built outside the Crystals repository for the express purpose of using the public surface as a stranger would. |
+| **2. Public API used** | `web.Status`; `web.text(ctx, status, s)`; `web.set_header(ctx, name, value)` (C2); and the server-rendered Crystals `web/form`, `web/csrf` (form-field mode), `web/html`, `web/template`. |
+| **3. Boilerplate / concepts** | `web.Status` has **no 3xx member whatsoever** — not 301, 302, 303, 307 or 308 — and there is no redirect responder. The application must **cast a raw integer**: `web.set_header(ctx, "Location", "/")` then `web.text(ctx, web.Status(303), "")`. Nothing in the public surface says this is the way; `docs/canonical-patterns.md` points at `web.redirect(...)`, marked "Phase 3, unavailable", which no phase owns and no plan schedules. |
+| **4. Safety / ownership problem** | Two, and the second is new. (a) As in F8-1, the cast defeats the enum: `web.Status(303)` is unchecked, and `web.Status(330)` compiles. (b) **The cast corrupts diagnostics.** An unnamed enum value formats as `%!(BAD ENUM VALUE=303)` under `%v`, so every log line, every test-failure message and every `expect_value` mismatch that prints the status of a redirect prints garbage instead of the code. F8-1's codes were undiscoverable; this one is undiscoverable *and* illegible after the fact, in exactly the responses whose only content is the status. |
+| **5. Workaround** | Verified end-to-end on the wire: `set_header("Location", …)` is accepted, the raw cast forwards the numeric value, and the browser follows. `uruquim-miniature` shipped it, then packaged it as the `web/redirect` Crystal (`SEE_OTHER`, `FOUND`, `MOVED_PERMANENTLY`, `TEMPORARY`, `PERMANENT` constants over the same casts). That Crystal's own header records that **it should be retired when `web.Status` grows 3xx members** — the workaround names its own expiry. |
+| **6. Application-specific?** | **No.** POST/Redirect/GET is required by every server-rendered form on the web; so is the redirect after login and after logout. It is conspicuous rather than marginal because the *entire* server-rendered stack already ships — `web/form` exists so a plain `<form>` works, `web/csrf` has a form-field mode precisely because forms cannot set headers, `web/html` and `web/template` render the pages — and the one status that ties the flow together is the one the core cannot name. |
+| **7. Smallest candidate improvement** | Add the redirect family to the public `web.Status`, in numeric order: **`Moved_Permanently = 301`, `Found = 302`, `See_Other = 303`, `Temporary_Redirect = 307`, `Permanent_Redirect = 308`**. **No new procedure**: `web.set_header(ctx, "Location", …)` + `web.text(ctx, .See_Other, "")` already expresses a redirect with the symbols C2 delivered, so a `web.redirect` responder would be a second public name for an operation the surface already performs (G-01). The whole family lands on one review because 4-of-5 guarantees the same raw-int cast returns for the next application, and because the choice *between* them is a safety decision that deserves names: 301/308 are cached by browsers, sometimes indefinitely; 307/308 preserve the method and body and are therefore the wrong answer to a form post. `304` stays a private `Status(304)` — framework-internal cache negotiation a handler never returns, the same reasoning C1 recorded. `300`, `305` and `306` are not added: no use, and the last two are deprecated. |
+| **8. Public cost / reversibility** | Additive to a frozen public enum — the Phase-1 freeze evidence ritual — with **no ledger growth**: `Status` is one already-counted symbol. No member moves, no signature changes, no behaviour changes: the vendored status table already carries all five codes *with their reason phrases*, so the bytes on the wire are identical before and after. Enum additions do not break a `case` match on the current members. Fully reversible before release. |
+| **9. RED test** | A public-surface test asserting `int(web.Status.See_Other) == 303` and the same for the four siblings, plus a handler that calls `web.set_header(ctx, "Location", "/")` and `web.text(ctx, .See_Other, "")` producing a `303` **with the `Location` header** on the wire — RED today (no such members), GREEN after. It distinguishes *improvement* (a named 303 exists, and a redirect's status prints as itself in a log) from *preference* (nothing about the cast is a matter of taste: it is unchecked, and it renders as `%!(BAD ENUM VALUE=303)`). |
