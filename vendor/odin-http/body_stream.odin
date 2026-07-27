@@ -226,8 +226,11 @@ _on_chunk_size :: proc(user_data: rawptr, size_line: string, err: bufio.Scanner_
 	// PATCH 14 (F3): a chunk size is unsigned hex; reject a negative/overflowed
 	// parse the same way a malformed line is rejected, so a hostile size can
 	// never reach the scanner's `n >= 0` assertion.
+	// PATCH 33 (HTTP audit F1) — see `_is_plain_hex`: the streaming path carried
+	// the same leniency as the buffered one and needs the same strictness, or the
+	// two disagree with each other as well as with a front-end proxy.
 	size, ok := strconv.parse_int(string(size_line), 16)
-	if !ok || size < 0 {
+	if !_is_plain_hex(string(size_line)) || !ok || size < 0 {
 		s.on_done(s.user_data, .Failed, .Bad_Read_Count)
 		return
 	}

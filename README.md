@@ -90,6 +90,22 @@ syscall count, fault evidence, and limitations are in the
 the Uruquim application is in
 [`bench/framework_ping`](bench/framework_ping/README.md).
 
+**Reproducibility, stated plainly.** Only the Uruquim server of this table is
+committed. `bench/framework_ping/` holds no fasthttp, Axum, `net/http`, Gin or
+Fastify `/ping` peer, no orchestration script pins each peer's worker count or
+CPU affinity, and no raw `wrk` output is kept — nothing in the repository
+invokes `wrk` at all. The peer numbers above therefore cannot be regenerated
+from this checkout, and their toolchain versions do not match the lockfiles that
+back the application matrix (`bench/application_matrix/`, which pins Fastify
+5.8.5 / Node 25.1.0 / Go 1.26.1). Two further caveats belong with the latency
+column: the peer medians are over three runs against Uruquim's five, with no
+variance reported, and every figure is closed-loop `wrk` at each server's own
+attained throughput — `--latency` prints a histogram, it does not correct for
+coordinated omission, so these p99s mix service time with queueing and are not
+an equal-offered-rate comparison. Treat the table as a recorded observation on
+one box, not as a reproducible result, until the peers and an orchestrator are
+committed.
+
 What this table does **not** measure: JSON encode/decode, routing-heavy
 applications, middleware chains, request bodies, streaming throughput, TLS,
 connection churn, memory per connection, or application/database work. Use it

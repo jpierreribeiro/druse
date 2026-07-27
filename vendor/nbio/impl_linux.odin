@@ -280,8 +280,18 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> General_Error {
 
 	_flush_submissions :: proc(l: ^Event_Loop, timeout: time.Duration) -> linux.Errno {
 		for {
+			// URUQUIM PATCH 33 (transport audit F8) — SPLIT SECONDS FROM
+			// NANOSECONDS. This stuffed the whole duration into `tv_nsec` and
+			// never set `tv_sec`, so any timeout of one second or more produced
+			// `tv_nsec >= 1e9`, which io_uring's EXT_ARG path rejects with
+			// EINVAL. That surfaced as a tick error, and a tick error kills the
+			// lane's event loop. It was dormant only because every bounded tick
+			// in the tree happened to be well under a second.
 			ts: linux.Time_Spec
-			ts.time_nsec = uint(timeout)
+			if timeout > 0 {
+				ts.time_sec = uint(timeout / time.Duration(time.Second))
+				ts.time_nsec = uint(timeout % time.Duration(time.Second))
+			}
 			_, err := uring.submit(&l.ring, 0 if timeout == 0 else 1, nil if timeout < 0 else &ts)
 			#partial switch err {
 			case .NONE, .ETIME:

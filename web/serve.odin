@@ -133,6 +133,13 @@ serve_dispatch :: proc(
 		response_body_view(&ctx),
 		allocator,
 	)
+	// ROUTER AUDIT C4 — a HEAD keeps every header the GET produced, so it must
+	// keep the GET's `content-length` too. The body view above is empty by
+	// design; carry the real length across the boundary so the adapter announces
+	// it rather than computing 0 from the suppressed slice.
+	if ctx.private.implicit == .Head {
+		out.suppressed_body_len = len(ctx.private.response.body)
+	}
 
 	driver_cleanup(&ctx)
 }
