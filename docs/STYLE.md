@@ -59,7 +59,7 @@ The length caps relax by directory:
 
 | Directory | Sentence cap | Notes |
 |---|---|---|
-| `guide/04-rules/`, `guide/05-recipes/`, `operations.md`, every warning | 20 words, imperative, one action per sentence | |
+| `guide/03-subjects/`, `guide/04-rules/`, `guide/05-recipes/`, `operations.md`, every warning | 20 words, imperative, one action per sentence | |
 | `guide/02-build-*`, `guide/03-build-*` | 25 words | Connective prose is permitted |
 | `guide/01-concepts/` | Relaxed | Argument is the point. Vocabulary rules still hold |
 
@@ -94,8 +94,12 @@ files.
 Every page starts with one line that states what it assumes you have read.
 
 Size limits: a concepts page is 150 lines. A build-along chapter is 250 lines.
-A rules page is 200 lines. A recipe is 80 lines. A guide nobody finishes
-teaches nothing.
+A rules page is 200 lines. A subject page is 120 lines. A recipe is 80 lines.
+A guide nobody finishes teaches nothing.
+
+A subject page is the one a reader arrives at with a question — `routing.md`,
+`request.md`, `response.md`. Name it for the question, not for the packages it
+touches.
 
 ## 8. What the reader is told about risk
 

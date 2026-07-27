@@ -25,53 +25,24 @@ That flag makes `import web "druse:web"` resolve.
 
 This note appears once, here. No other page repeats it.
 
-## Which page answers which question
+## Start here
 
-### 01-concepts — what this is, before you build
+**[Quickstart](00-quickstart.md)** — a running server in five minutes. You type
+it; you do not read about it.
 
-| Page | Answers |
-|---|---|
-| [`what-this-is.md`](01-concepts/what-this-is.md) | What does Druse do, and what shape of program does it produce? |
-| [`what-it-refuses.md`](01-concepts/what-it-refuses.md) | Why is there no ORM, no dependency injection, no panic recovery? What does the refusal cost me? |
-| [`core-and-crystals.md`](01-concepts/core-and-crystals.md) | Where is the boundary between Druse and Crystals, and how do I vendor them? |
-| [`shape-of-an-application.md`](01-concepts/shape-of-an-application.md) | Where do services live? What does `main` look like? |
+## By subject
 
-### 02-build-notes — build a real service, one step at a time
-
-Narrates two programs the build check compiles: `druse-crystals/examples/notes`,
-a CRUD service run against a real PostgreSQL, and `examples/session`, a complete
-signed-in application.
-
-**These chapters are JSON-shaped, not server-rendered.** The program specifies a
-server-rendered build-along — pages, forms, redirects — and no reference program
-for it exists yet. Writing those chapters means typing untested code, which
-`STYLE.md` §6 forbids. The gap is recorded in
-[`FIXES-WANTED.md`](FIXES-WANTED.md).
+The page you want when you arrive with a question.
 
 | Page | Answers |
 |---|---|
-| [`01-nothing-to-hello.md`](02-build-notes/01-nothing-to-hello.md) | How do I get one process listening on a port? |
-| [`02-database-and-migrations.md`](02-build-notes/02-database-and-migrations.md) | How do I get a schema and a pool, and why does the server never migrate itself? |
-| [`03-handlers-and-validation.md`](02-build-notes/03-handlers-and-validation.md) | What shape does every handler repeat? |
-| [`04-listing-patch-and-failure.md`](02-build-notes/04-listing-patch-and-failure.md) | How do I page a list, express a three-state PATCH, and map a database failure to a status? |
-| [`05-sessions-and-login.md`](02-build-notes/05-sessions-and-login.md) | How do I sign a user in, know who they are, and stop a forged request? |
+| [`routing.md`](03-subjects/routing.md) | The five verbs, parameters, why static beats parametric, and groups, without a `group` helper |
+| [`request.md`](03-subjects/request.md) | Every way to read input, which extractors answer for you, and the lifetime rule over all of it |
+| [`response.md`](03-subjects/response.md) | Sending output, the status enum, headers, and the two things with no limit |
 
-### 04-rules — the rules no single package can teach
+## By task — recipes
 
-Read `ownership-and-lifetime.md` before you write a handler that returns a
-string. It is the largest single source of recorded defects.
-
-| Page | Answers |
-|---|---|
-| [`ownership-and-lifetime.md`](04-rules/ownership-and-lifetime.md) | Who owns these bytes, and how long do they stay valid? |
-| [`result-vocabularies.md`](04-rules/result-vocabularies.md) | Five packages report success five different ways. Which is which? |
-| [`configuration.md`](04-rules/configuration.md) | How do I configure a package without listing every field? |
-| [`bytes-and-encoding.md`](04-rules/bytes-and-encoding.md) | Who allocates a decoded string, and who frees it? |
-| [`composition-and-cost.md`](04-rules/composition-and-cost.md) | What does `mount` copy, and what does a middleware cost per request? |
-
-### 05-recipes — one problem, one answer
-
-For a reader who already knows Druse and wants the answer, not the teaching.
+One problem, one answer. For a reader who wants the answer, not the teaching.
 
 | Page | Answers |
 |---|---|
@@ -85,20 +56,48 @@ For a reader who already knows Druse and wants the answer, not the teaching.
 | [`observe-the-framework.md`](05-recipes/observe-the-framework.md) | What failed, how often, and am I draining? |
 | [`serve-a-browser-app.md`](05-recipes/serve-a-browser-app.md) | CORS, static files, security headers, and the real client IP behind a proxy? |
 
-### Also here
+## Build something real
+
+A service with a database, then one with users signed in. Both narrate programs
+the build check compiles: `druse-crystals/examples/notes` against a real
+PostgreSQL, and `examples/session`.
 
 | Page | Answers |
 |---|---|
-| [`FIXES-WANTED.md`](FIXES-WANTED.md) | Which hazards in this guide should be an API change instead of a warning? |
+| [`01-nothing-to-hello.md`](02-build-notes/01-nothing-to-hello.md) | The running process, and the four behaviours that surprise people |
+| [`02-database-and-migrations.md`](02-build-notes/02-database-and-migrations.md) | A schema and a pool, and why the server never migrates itself |
+| [`03-handlers-and-validation.md`](02-build-notes/03-handlers-and-validation.md) | The shape every handler repeats |
+| [`04-listing-patch-and-failure.md`](02-build-notes/04-listing-patch-and-failure.md) | Paging, a three-state PATCH, and one place for database failure |
+| [`05-sessions-and-login.md`](02-build-notes/05-sessions-and-login.md) | Signing a user in, knowing who they are, stopping a forged request |
 
-## Reading order
+**These are JSON-shaped, not server-rendered.** No reference program exists for
+the server-rendered stack yet, and writing those chapters would mean typing
+untested code — see [`FIXES-WANTED.md`](FIXES-WANTED.md).
 
-The number prefixes are the order. For a framework with no precedent, reading
-order is part of the teaching.
+## The rules no single package can teach
 
-If you have 20 minutes, read `01-concepts/what-this-is.md`, then
-`04-rules/ownership-and-lifetime.md`. Those two prevent more defects than
-everything else here.
+This is the half a reference cannot give you. Manual memory management makes
+these load-bearing.
+
+| Page | Answers |
+|---|---|
+| [`ownership-and-lifetime.md`](04-rules/ownership-and-lifetime.md) | **Read this one.** Who owns these bytes, and how long do they stay valid? |
+| [`result-vocabularies.md`](04-rules/result-vocabularies.md) | Five packages report success five different ways. Which is which? |
+| [`configuration.md`](04-rules/configuration.md) | How do I configure a package without listing every field? |
+| [`bytes-and-encoding.md`](04-rules/bytes-and-encoding.md) | Who allocates a decoded string, and who frees it? |
+| [`composition-and-cost.md`](04-rules/composition-and-cost.md) | What does `mount` copy, and what does a middleware cost per request? |
+
+## Why it is like this
+
+Read when you want the reasoning, not the instruction.
+
+| Page | Answers |
+|---|---|
+| [`what-this-is.md`](01-concepts/what-this-is.md) | What does Druse do, and what shape of program does it produce? |
+| [`what-it-refuses.md`](01-concepts/what-it-refuses.md) | No ORM, no DI, no panic recovery — and what each refusal costs me |
+| [`core-and-crystals.md`](01-concepts/core-and-crystals.md) | The boundary between the two repositories, and vendoring that works |
+| [`shape-of-an-application.md`](01-concepts/shape-of-an-application.md) | Where services live, and what `main` looks like |
+| [`FIXES-WANTED.md`](FIXES-WANTED.md) | Which hazards here should be an API change instead of a warning? |
 
 ## What this guide does not yet teach
 
@@ -137,5 +136,6 @@ and `rate_limit` appear only in a table or a single sentence.
 - `friction-map.md` — blocked. It is built from `druse-miniature/FRICTION.md`,
   which is not reachable from this repository.
 
-Until they exist, `docs/quick-start.md` is the build-along and
-`docs/canonical-patterns.md` is the recipe list.
+**Subjects with no page yet**, where Echo-style guides would have one:
+templates, cookies, and sessions as a subject rather than a build chapter.
+Templates and cookies are blocked on the same missing example program.
