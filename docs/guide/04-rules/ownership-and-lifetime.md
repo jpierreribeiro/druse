@@ -85,7 +85,7 @@ A connection is lent by the pool. You must give it back:
 ```odin
 	c, e := pg.acquire(&s.pool)
 	if pg.is_err(e) {
-		web.internal_error(ctx, "database unavailable")
+		web.internal_error(ctx)
 		return
 	}
 	defer pg.release(&s.pool, &c)

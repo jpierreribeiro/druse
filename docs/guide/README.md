@@ -69,6 +69,16 @@ string. It is the largest single source of recorded defects.
 | [`bytes-and-encoding.md`](04-rules/bytes-and-encoding.md) | Who allocates a decoded string, and who frees it? |
 | [`composition-and-cost.md`](04-rules/composition-and-cost.md) | What does `mount` copy, and what does a middleware cost per request? |
 
+### 05-recipes — one problem, one answer
+
+For a reader who already knows Druse and wants the answer, not the teaching.
+
+| Page | Answers |
+|---|---|
+| [`error-responses.md`](05-recipes/error-responses.md) | Which responder do I call, and which errors do I get for free? |
+| [`read-a-query-parameter.md`](05-recipes/read-a-query-parameter.md) | Four extractors — which one, and what happens when the parameter is missing? |
+| [`who-is-the-user.md`](05-recipes/who-is-the-user.md) | How do I write the `who` helper without corrupting the subject? |
+
 ### Also here
 
 | Page | Answers |
@@ -104,7 +114,7 @@ guide has not reached it yet.
 | The full error envelope | `docs/errors.md` |
 | Operations and shutdown | `docs/operations.md` |
 
-The guide names 45 of the 82 core symbols. The other 37 are real, and
+The guide names 64 of the 82 core symbols. The other 18 are real, and
 `docs/ai-context.md` is the complete list. If a symbol is not there, it does
 not exist — do not guess a name.
 
@@ -125,7 +135,6 @@ and `rate_limit` appear only in a table or a single sentence.
   form, authorization, Docker. Blocked on a reference program.
 - `03-build-intake/` — the asynchronous, worker-shaped stack: jobs, mail,
   storage, idempotency, SSE, API keys.
-- `05-recipes/` — one problem per file, for a reader who already knows Druse.
 - `friction-map.md` — blocked. It is built from `druse-miniature/FRICTION.md`,
   which is not reachable from this repository.
 
