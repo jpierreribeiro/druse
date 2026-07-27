@@ -190,6 +190,17 @@ Server :: struct {
 	accept_failures: int,
 	refused_connections: int,
 	lanes_ready:     sync.Wait_Group,
+	// URUQUIM PATCH 33 (transport audit F2) — the acceptor assigns work into a
+	// LANE'S event loop (`next_tick_poly` allocates from the lane's operation
+	// pool, enqueues on the lane's MPSC and writes the lane's eventfd). Nothing
+	// used to order "the acceptor stopped assigning" against "the lane released
+	// its loop", and `release_thread_event_loop` destroys the pool arena, frees
+	// the queue buffer, closes the eventfd and zeroes the whole `Event_Loop`.
+	// An idle lane completes its shutdown in microseconds, so a client that
+	// connected in the same millisecond as `web.stop()` could have its handoff
+	// allocated from a destroyed arena. Set once by the acceptor when no further
+	// assignment is possible; every lane waits for it before releasing.
+	accept_drained: Atomic(bool),
 	// URUQUIM PATCH 8 (WP47, amended by WP71) — the admission budget is
 	// server-wide. A lane-local `len(td.conns)` multiplied the public limit by
 	// the number of Handler lanes once concurrent serving shipped.
@@ -372,12 +383,21 @@ serve :: proc(s: ^Server, h: Handler) -> (err: net.Network_Error) {
 		sync.wait(&s.lanes_ready)
 		if !atomic_load(&s.init_failed) {
 			_server_accept_loop(s)
+			// URUQUIM PATCH 33 (transport audit F4) — release the acceptor's
+			// event loop only once every lane has finished, because a lane's
+			// `handler_lane_leave` can still be calling `nbio.wake_up` on it.
+			sync.wait(&s.threads_closed)
+			sync.atomic_store_explicit(&s.accept_loop, nil, .Release)
+			nbio.release_thread_event_loop()
 		} else {
 			// `listen` acquired the caller's event loop for the acceptor.  No
 			// accept loop will run after a lane-init failure, so release it here.
+			// Lanes wait on `accept_drained` before releasing their own loops, so
+			// it must be set even on this path or shutdown would hang.
+			atomic_store(&s.accept_drained, true)
 			nbio.release_thread_event_loop()
+			sync.wait(&s.threads_closed)
 		}
-		sync.wait(&s.threads_closed)
 	} else {
 		for &lane in s.threads[1:] {
 			lane.thread = thread.create_and_start_with_poly_data2(s, &lane, _server_thread_init, context)
@@ -488,8 +508,25 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 
 		err := nbio.tick()
 		if err != nil {
-			log.errorf("non-blocking io tick error: %v", err)
-			break
+			// URUQUIM PATCH 33 (transport audit F3) — A DEAD LANE MUST NOT LOOK
+			// ALIVE. This used to `break` and nothing else: `td.event_loop` stayed
+			// non-nil, so `accept_choose_lane` kept selecting this lane, the next
+			// two connections were assigned into an MPSC nobody would ever drain,
+			// `queued_handoffs` stuck at the cap, and from then on the lane was
+			// silently skipped — permanent capacity loss with one log line as the
+			// only trace. Worse, an acceptor that later found that queue full
+			// would spin in `wake_up + yield` forever, freezing all accepts.
+			// `EBUSY` (CQ-overflow backpressure) and `EAGAIN` are real io_uring
+			// errnos and reach here, so this is not hypothetical. Take the whole
+			// server down instead — the acceptor loop already does exactly this
+			// for its own tick errors, and a supervisor can restart a process it
+			// can see has died.
+			log.errorf("non-blocking io tick error, shutting down server: %v", err)
+			server_shutdown(s)
+			// Fall through to the normal shutdown path at the top of the loop
+			// rather than tearing down here, so this lane retires its connections
+			// and releases its loop under the same discipline as every other.
+			continue
 		}
 	}
 
@@ -509,6 +546,12 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 // The time between checks and closes of connections in a graceful shutdown.
 @(private)
 SHUTDOWN_INTERVAL :: time.Millisecond * 100
+
+// URUQUIM PATCH 33 (transport audit F1) — how often the dedicated acceptor
+// re-evaluates lane availability while it is holding a connection it could not
+// place. Only reached in the saturated state; see `_server_accept_loop`.
+@(private)
+ACCEPT_STALL_RECHECK :: time.Millisecond * 100
 
 // Starts a graceful shutdown.
 //
@@ -663,7 +706,7 @@ _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 		// sends nothing produces no events — so the deadline above would only be
 		// evaluated when the thing it exists to interrupt happened to stop.
 		err := nbio.tick(SHUTDOWN_INTERVAL if drain_bounded else nbio.NO_TIMEOUT)
-		fmt.assertf(err == nil, "IO tick error during shutdown: %v")
+		fmt.assertf(err == nil, "IO tick error during shutdown: %v", err)
 	}
 
 	td.state = .Cleaning
@@ -697,9 +740,24 @@ _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 			break
 		}
 		err := nbio.tick(SHUTDOWN_INTERVAL if drain_bounded else nbio.NO_TIMEOUT)
-		fmt.assertf(err == nil, "IO tick error during shutdown drain: %v")
+		fmt.assertf(err == nil, "IO tick error during shutdown drain: %v", err)
 	}
 	_ = drain_expired
+	when URUQUIM_DEDICATED_ACCEPT {
+		// URUQUIM PATCH 33 (transport audit F2) — DO NOT DESTROY THIS LOOP WHILE
+		// THE ACCEPTOR CAN STILL ASSIGN INTO IT. `release_thread_event_loop`
+		// destroys the operation-pool arena, frees the MPSC buffer, closes the
+		// eventfd and zeroes the `Event_Loop`. The acceptor reaches all four
+		// through `next_tick_poly` when it places a connection on this lane, and
+		// an idle lane completes its shutdown in microseconds — so a connection
+		// accepted in the same millisecond as `web.stop()` could be allocated
+		// from an arena that no longer exists. The acceptor publishes
+		// `accept_drained` once no further assignment is possible; it never waits
+		// on lanes, so this cannot deadlock.
+		for !atomic_load(&s.accept_drained) {
+			linux.sched_yield()
+		}
+	}
 	nbio.release_thread_event_loop()
 
 	td.state = .Closed
@@ -1027,9 +1085,12 @@ accept_choose_lane :: proc(s: ^Server) -> ^Server_Thread {
 	for offset in 0 ..< n {
 		i := (s.next_lane + offset) % n
 		lane := &s.threads[i]
+		// URUQUIM PATCH 33 (transport audit F1) — these two loads are the
+		// acceptor's half of the Dekker handshake in `accept_try_assign_pending`
+		// and must be sequentially consistent with the lane-side stores.
 		if lane.event_loop == nil ||
-		   sync.atomic_load_explicit(&lane.handler_active, .Acquire) ||
-		   sync.atomic_load(&lane.queued_handoffs) >= URUQUIM_ACCEPT_HANDOFF_LIMIT {
+		   sync.atomic_load_explicit(&lane.handler_active, .Seq_Cst) ||
+		   sync.atomic_load_explicit(&lane.queued_handoffs, .Seq_Cst) >= URUQUIM_ACCEPT_HANDOFF_LIMIT {
 			continue
 		}
 		load := sync.atomic_load(&lane.assigned_connections)
@@ -1060,8 +1121,30 @@ accept_try_assign_pending :: proc(s: ^Server) -> bool {
 	}
 	lane := accept_choose_lane(s)
 	if lane == nil {
-		sync.atomic_store_explicit(&s.pending_waiting, true, .Release)
-		return false
+		// URUQUIM PATCH 33 (transport audit F1) — PUBLISH INTENT, THEN RE-SCAN.
+		//
+		// This is a two-flag (Dekker) handshake: the acceptor publishes "I am
+		// about to park" and each lane publishes "I became available", and each
+		// side then reads the other's flag. Release/Acquire is NOT sufficient
+		// for it — the case that matters is store-then-load reordering, which
+		// only sequential consistency forbids. With the old `.Release` store and
+		// no re-scan, a lane that freed a slot in the window between the scan
+		// above and this store could read a stale `false` (so it did not wake
+		// us) while we had already read a stale "lane full" (so we parked). The
+		// acceptor then blocks in `nbio.tick()` with NO timeout and no periodic
+		// timer of its own, `pending_accept.valid` stays true so `accept_arm`
+		// refuses to re-arm, and the server accepts NOTHING until some unrelated
+		// lane event happens to occur — unbounded if traffic pauses.
+		//
+		// The seq-cst store followed by a second scan closes it: if the lane's
+		// release lands before our store, the re-scan sees the free lane; if it
+		// lands after, the lane's own seq-cst load of `pending_waiting` sees our
+		// `true` and wakes us. Both sides cannot miss each other.
+		sync.atomic_store_explicit(&s.pending_waiting, true, .Seq_Cst)
+		lane = accept_choose_lane(s)
+		if lane == nil {
+			return false
+		}
 	}
 	item := new(Accepted_Connection, s.conn_allocator)
 	item^ = s.pending_accept
@@ -1123,8 +1206,11 @@ accept_refuse_handler_saturation :: proc(s: ^Server) {
 @(private)
 on_connection_assigned :: proc(_: ^nbio.Operation, item: ^Accepted_Connection) {
 	server := item.server
+	// URUQUIM PATCH 33 (transport audit F1) — lane half of the Dekker handshake:
+	// `atomic_add` is already sequentially consistent, and the paired load below
+	// must be too or the acceptor can park while this lane believes it signalled.
 	_ = sync.atomic_add(&td.queued_handoffs, -1)
-	if sync.atomic_load_explicit(&server.pending_waiting, .Acquire) {
+	if sync.atomic_load_explicit(&server.pending_waiting, .Seq_Cst) {
 		accept_loop := sync.atomic_load_explicit(&server.accept_loop, .Acquire)
 		if accept_loop != nil {
 			nbio.wake_up(accept_loop)
@@ -1151,6 +1237,19 @@ on_connection_assigned :: proc(_: ^nbio.Operation, item: ^Accepted_Connection) {
 @(private)
 on_accept_dedicated :: proc(op: ^nbio.Operation, s: ^Server) {
 	s.accept = nil
+	// URUQUIM PATCH 33 (transport audit F2) — REFUSE LATE ARRIVALS. This
+	// callback runs from a CQE that may already have been queued in the
+	// acceptor's ring when `server_shutdown` set `closing`, and it is also
+	// reachable from the final flush loop below. Without this check it would
+	// admit the connection and hand it to a lane that may already have released
+	// its event loop. The socket is closed rather than served, and the accept is
+	// deliberately NOT re-armed: the server is going away.
+	if atomic_load(&s.closing) {
+		if op.accept.err == nil {
+			net.close(op.accept.client)
+		}
+		return
+	}
 	if op.accept.err != nil {
 		#partial switch op.accept.err {
 		case .Insufficient_Resources:
@@ -1220,10 +1319,18 @@ _server_accept_loop :: proc(s: ^Server) {
 	sync.atomic_store_explicit(&s.accept_loop, nbio.current_thread_event_loop(), .Release)
 	accept_arm(s)
 	for !atomic_load(&s.closing) {
-		if accept_try_assign_pending(s) {
+		assigned := accept_try_assign_pending(s)
+		if assigned {
 			accept_arm(s)
 		}
-		err := nbio.tick()
+		// URUQUIM PATCH 33 (transport audit F1) — BOUND THE PARK ONLY WHEN A
+		// CONNECTION IS STRANDED. The seq-cst handshake above is what makes the
+		// wake-up reliable; this is defence in depth for the one state where a
+		// missed wake is catastrophic and silent — parked with an unassigned
+		// connection in hand, `accept_arm` refusing to re-arm, and no timer of
+		// our own to re-evaluate. In the ordinary idle case (`assigned`) the
+		// park stays unbounded, so a quiet server still costs zero syscalls.
+		err := nbio.tick(nbio.NO_TIMEOUT if assigned else ACCEPT_STALL_RECHECK)
 		if err != nil {
 			log.errorf("dedicated accept loop error: %v", err)
 			server_shutdown(s)
@@ -1247,8 +1354,19 @@ _server_accept_loop :: proc(s: ^Server) {
 			break
 		}
 	}
-	sync.atomic_store_explicit(&s.accept_loop, nil, .Release)
-	nbio.release_thread_event_loop()
+	// URUQUIM PATCH 33 (transport audit F2) — NO FURTHER ASSIGNMENT IS POSSIBLE
+	// FROM HERE. The accept operation is removed, any pending connection is
+	// closed, and `on_accept_dedicated` now refuses late CQEs while `closing` is
+	// set, so nothing on this thread can touch a lane's event loop again. Lanes
+	// block on this flag before destroying their loops.
+	atomic_store(&s.accept_drained, true)
+	// The loop itself is deliberately NOT released here (transport audit F4): a
+	// lane finishing a handler still loads `accept_loop` and may call
+	// `nbio.wake_up` on it, and it can lose the race against a nil store. The
+	// acceptor thread is the `serve` caller, which waits on `threads_closed`
+	// immediately after this returns, so keeping the loop alive until every lane
+	// is gone costs one idle event loop for the duration of the drain and makes
+	// the wake unconditionally safe. `serve` releases it.
 }
 
 @(private)
@@ -1383,7 +1501,9 @@ handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 		if td.handler_active {
 			return false
 		}
-		sync.atomic_store_explicit(&td.handler_active, true, .Release)
+		// URUQUIM PATCH 33 (transport audit F1) — paired with the acceptor's
+		// seq-cst load in `accept_choose_lane`.
+		sync.atomic_store_explicit(&td.handler_active, true, .Seq_Cst)
 		return true
 	} else {
 		if td.handler_active {
@@ -1431,11 +1551,16 @@ handler_lane_leave :: proc(res: ^Response, loc := #caller_location) {
 	assert_has_td(loc)
 	when URUQUIM_DEDICATED_ACCEPT {
 		assert(td.handler_active, "handler lane leave without enter", loc)
-		sync.atomic_store_explicit(&td.handler_active, false, .Release)
+		// URUQUIM PATCH 33 (transport audit F1) — lane half of the Dekker
+		// handshake; see `accept_try_assign_pending`. Both the store that makes
+		// this lane eligible again and the load of the acceptor's parking flag
+		// must be sequentially consistent, or each side can read the other as
+		// stale and the acceptor parks forever with a connection in hand.
+		sync.atomic_store_explicit(&td.handler_active, false, .Seq_Cst)
 		server := res._conn.server
 		accept_loop := sync.atomic_load_explicit(&server.accept_loop, .Acquire)
 		if !atomic_load(&server.closing) &&
-		   sync.atomic_load_explicit(&server.pending_waiting, .Acquire) &&
+		   sync.atomic_load_explicit(&server.pending_waiting, .Seq_Cst) &&
 		   accept_loop != nil {
 			nbio.wake_up(accept_loop)
 		}

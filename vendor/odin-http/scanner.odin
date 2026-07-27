@@ -11,8 +11,54 @@ import "core:net"
 Scan_Callback :: #type proc(user_data: rawptr, token: string, err: bufio.Scanner_Error)
 Split_Proc    :: #type proc(split_data: rawptr, data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: bufio.Scanner_Error, final_token: bool)
 
+// URUQUIM PATCH 34 (HTTP audit F2) — REQUIRE CRLF; REJECT A BARE LF OR CR.
+//
+// This delegated to `bufio.scan_lines`, which terminates a line on a bare `\n`
+// and merely strips an optional trailing `\r`. The request line and every header
+// line are split with it, so the server accepted LF-only line endings and header
+// values containing a lone `\r`.
+//
+// That is a request-smuggling differential, and a classic one: RFC 9112 §2.2
+// permits a recipient to accept a bare LF as a line terminator but a front-end
+// that frames strictly on CRLF — or that forwards the bytes untouched — then
+// disagrees with this backend about where a header, and therefore a request,
+// ends. An attacker who can get `Foo: a\nEvil: y` past the proxy as one header
+// value has it parsed as two headers here. The project's stated posture is to
+// reject rather than normalise (`web/path_policy.odin`), and the strict CL/TE
+// handling in `body.odin` already follows it; line termination was the gap.
+//
+// A `\r` NOT followed by `\n` is also refused, so a lone CR inside a field value
+// cannot be laundered either. The scanner still needs more data (advance 0) when
+// a trailing `\r` might be the first half of a CRLF that has not arrived yet.
 scan_lines :: proc(split_data: rawptr, data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: bufio.Scanner_Error, final_token: bool) {
-	return bufio.scan_lines(data, at_eof)
+	for i in 0 ..< len(data) {
+		switch data[i] {
+		case '\n':
+			// A bare LF: the preceding byte was not a CR, or we would have taken
+			// the CR branch below and consumed the pair there.
+			return 0, nil, .Advanced_Too_Far, false
+		case '\r':
+			if i + 1 >= len(data) {
+				if at_eof {
+					// A trailing CR with nothing after it can never become CRLF.
+					return 0, nil, .Advanced_Too_Far, false
+				}
+				// The LF may still be in flight; ask for more bytes.
+				return 0, nil, nil, false
+			}
+			if data[i + 1] != '\n' {
+				return 0, nil, .Advanced_Too_Far, false
+			}
+			return i + 2, data[:i], nil, false
+		}
+	}
+	if at_eof && len(data) > 0 {
+		// Unterminated final line. The old behaviour returned it as a token;
+		// an unterminated request line or header field is malformed, not a
+		// message, so it is refused for the same reason as a bare LF.
+		return 0, nil, .Advanced_Too_Far, false
+	}
+	return 0, nil, nil, false
 }
 
 scan_num_bytes :: proc(split_data: rawptr, data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: bufio.Scanner_Error, final_token: bool) {

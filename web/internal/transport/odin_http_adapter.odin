@@ -542,9 +542,41 @@ start_upload :: proc(exchange: ^Exchange, content_length: int) {
 	exchange.spool_active = true
 	exchange.spool_last = .Ready
 
+	// URUQUIM (ingest audit F1) — ARM THE ONLY CLEANUP THAT SURVIVES A TEARDOWN.
+	//
+	// Until now a spool was released either by `on_upload_done` (an orderly
+	// error) or by `driver_cleanup` (dispatch ran). Neither reaches a connection
+	// that dies mid-body: `connection_close`/`connection_abort` call
+	// `nbio.remove` on the pending recv, so the chunk callback never fires
+	// again. The deadline sweep does exactly that at `max_request_time`, which
+	// defaults to 30 s — so ANY upload slower than 30 s (1 GiB under ~35 MB/s,
+	// i.e. an ordinary WAN client) retired one admission slot permanently, and
+	// after `max_concurrent` of them every further upload answered 503 until the
+	// process restarted. Shutdown force-close and any scanner error had the same
+	// effect.
+	//
+	// `ingest.cancel` is idempotent (`.Terminal` is a no-op) and correct after
+	// `persist`, so this is a safety net that cannot double-release: whichever
+	// path gets there first wins and the rest are no-ops.
+	conn := exchange.res._conn
+	conn.on_teardown_user = rawptr(exchange)
+	conn.on_teardown = upload_conn_torn_down
+
 	// The spool's own per-upload and process quotas bound the body mid-stream, so
 	// body_stream needs no separate max_length (-1); the window bounds memory.
 	http.body_stream(exchange.req, -1, upload_window(runtime), exchange, on_upload_chunk, on_upload_done)
+}
+
+// upload_conn_torn_down releases a spool whose connection ended before any
+// other cleanup path could run. Idempotent by `ingest.cancel`'s contract.
+@(private)
+upload_conn_torn_down :: proc(user: rawptr) {
+	exchange := (^Exchange)(user)
+	if exchange == nil || !exchange.spool_active {
+		return
+	}
+	exchange.spool_active = false
+	_ = ingest.cancel(&exchange.spool, .Disconnected)
 }
 
 @(private)
@@ -659,6 +691,19 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 	// deferred retry, because everything the dispatch names lives in the
 	// connection's temp arena and cannot outlive a client disconnect (F-002).
 	if !http.handler_lane_enter(res) {
+		// URUQUIM (ingest audit F3) — RELEASE A SPOOLED BODY WE WILL NEVER
+		// DISPATCH. `driver_cleanup` is the usual owner of `upload_cancel`, and
+		// it only runs once `cfg.dispatch` has been called — which this refusal
+		// returns before. Without this, every upload refused for lane contention
+		// left its file on disk and its admission slot and process-byte
+		// reservation held, i.e. capacity bled away under exactly the burst that
+		// caused the contention. The teardown hook armed in `start_upload` would
+		// eventually catch it, but releasing here returns the slot immediately
+		// instead of at connection close.
+		if exchange.spool_active {
+			exchange.spool_active = false
+			_ = ingest.cancel(&exchange.spool, .Cancelled_By_Drain)
+		}
 		// URUQUIM FIX (F-002) — a deferred dispatch can never run safely. The
 		// Exchange and everything it names (`req`/`res` into `conn.loop`, the
 		// inbound views) live in the connection's temp arena, which
@@ -930,6 +975,23 @@ write_response :: proc(res: ^http.Response, out: Outbound) {
 	res.status = http.Status(out.status)
 	for header in out.headers {
 		http.headers_set(&res.headers, header.name, header.value)
+	}
+	// ROUTER AUDIT C4 — announce the length the suppressed body would have had.
+	// Setting the header explicitly is also what makes the backend leave it
+	// alone: its heading writer computes a length only when the response does
+	// not already carry one.
+	if out.suppressed_body_len > 0 {
+		// `headers_set_unsafe` stores the VIEW, and the heading is serialized
+		// after this procedure returns, so the digits must outlive this frame:
+		// they are rendered into the connection arena, which lives until the
+		// request cycle ends. A stack buffer here would dangle.
+		buf: [20]u8
+		rendered := strconv.write_int(buf[:], i64(out.suppressed_body_len), 10)
+		http.headers_set_unsafe(
+			&res.headers,
+			"content-length",
+			strings.clone(rendered, context.temp_allocator),
+		)
 	}
 	http.body_set_bytes(res, out.body)
 }

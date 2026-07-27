@@ -378,6 +378,49 @@ corpus_storage := []Wire_Case{
 			connection_must_close = true,
 			notes = "WP9 D7: the core's 404/405 policy decides, so 405 with Allow — never 501.",
 		},
+
+		// --- HTTP audit F1/F2: framing strictness the corpus did not cover ---
+		//
+		// These four are smuggling DIFFERENTIALS rather than malformed-input
+		// crashes: each is a byte sequence a strict front-end reads one way and
+		// a lenient backend reads another. The corpus already covered CL and TE
+		// disagreement; line termination and chunk-size spelling were the gaps.
+		{
+			name = "bare LF line termination is rejected",
+			bytes = "GET /ping HTTP/1.1\nHost: localhost\nConnection: close\n\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "HTTP audit F2: `bufio.scan_lines` terminated on a bare LF, so a " +
+			"proxy that frames strictly on CRLF and this backend could disagree about " +
+			"where a header — and therefore a request — ends.",
+		},
+		{
+			name = "a lone CR inside a header value is rejected",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\rb\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "HTTP audit F2: a CR not followed by LF cannot be laundered into a " +
+			"field value; it is refused rather than normalised away.",
+		},
+		{
+			name = "chunk size with a leading plus is rejected",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n" +
+			"+2\r\n{}\r\n0\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "HTTP audit F1: RFC 9112 §7.1 chunk-size is 1*HEXDIG. Odin's " +
+			"`strconv.parse_int` accepts a leading `+`, so this parsed as size 2 here " +
+			"while a strict proxy rejects the line — a Transfer-Encoding desync.",
+		},
+		{
+			name = "chunk size with a digit separator is rejected",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n" +
+			"1_0\r\n0123456789abcdef\r\n0\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "HTTP audit F1: `_` is an Odin numeric separator, not a hex digit. " +
+			"`1_0` parsed as 16 here and is malformed to a strict front-end.",
+		},
 }
 
 wire_corpus :: proc() -> []Wire_Case {
