@@ -64,16 +64,47 @@ If you have 20 minutes, read `01-concepts/what-this-is.md`, then
 `04-rules/ownership-and-lifetime.md`. Those two prevent more defects than
 everything else here.
 
-## What this guide does not yet cover
+## What this guide does not yet teach
 
-These sections are planned in `planning/documentation-program.md` and are not
-written:
+Read this list before you conclude a feature does not exist. It does. This
+guide has not reached it yet.
 
-- `02-build-notes/` — a build-along for the server-rendered stack.
-- `03-build-intake/` — a build-along for the worker-shaped, asynchronous stack.
+**Druse features with no page here.** Go to `docs/canonical-patterns.md` and
+`docs/ai-context.md`:
+
+| Subject | Where it is |
+|---|---|
+| Streaming and server-sent events | `web.stream`, `web.stream_send`, `web.stream_live`, `crystals:web/sse` |
+| File uploads | `web.upload`, `web.enable_upload`, `web.form_file` |
+| Static files | `web.static`, `web.Static_Options` |
+| CORS | `web.cors`, `web.Cors_Options` |
+| Security headers | `web.secure_headers` |
+| Client IP behind a proxy | `web.client_ip`, `web.trust_proxies` |
+| Observability and metrics | `web.observe`, `web.Framework_Event`, `crystals:web/metrics` |
+| The full error envelope | `docs/errors.md` |
+| Operations and shutdown | `docs/operations.md` |
+
+The guide names 25 of the 82 core symbols. The other 57 are real, and
+`docs/ai-context.md` is the complete list. If a symbol is not there, it does
+not exist — do not guess a name.
+
+**Crystals packages with no page here.** Go to
+`druse-crystals/docs/crystals.md`:
+
+`rate_limit` and its three backends, `storage_s3`, `storage_filesystem`,
+`web/html`, `web/redirect`, `web/cookie`, `web/rate_limit`, `mail_memory`,
+`auth/session_memory`, the four `*_postgres` backends, `apitest` and
+`preflight`.
+
+That is 17 of 44 packages, and 156 public symbols.
+
+**Sections planned and not written**, per `planning/documentation-program.md`:
+
+- `02-build-notes/` — the server-rendered stack, taught as one build-along.
+- `03-build-intake/` — the asynchronous, worker-shaped stack.
 - `05-recipes/` — one problem per file, for a reader who already knows Druse.
-- `04-rules/` friction map — blocked. It is built from `druse-miniature/FRICTION.md`,
+- `friction-map.md` — blocked. It is built from `druse-miniature/FRICTION.md`,
   which is not reachable from this repository.
 
-Until they exist, `docs/quick-start.md` is the build-along, and
+Until they exist, `docs/quick-start.md` is the build-along and
 `docs/canonical-patterns.md` is the recipe list.
