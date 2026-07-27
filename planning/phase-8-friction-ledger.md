@@ -242,3 +242,15 @@ both facets unprompted.) **All eight findings F8-1..F8-8 are now RESOLVED.**
 | **7. Smallest candidate improvement** | Add the redirect family to the public `web.Status`, in numeric order: **`Moved_Permanently = 301`, `Found = 302`, `See_Other = 303`, `Temporary_Redirect = 307`, `Permanent_Redirect = 308`**. **No new procedure**: `web.set_header(ctx, "Location", …)` + `web.text(ctx, .See_Other, "")` already expresses a redirect with the symbols C2 delivered, so a `web.redirect` responder would be a second public name for an operation the surface already performs (G-01). The whole family lands on one review because 4-of-5 guarantees the same raw-int cast returns for the next application, and because the choice *between* them is a safety decision that deserves names: 301/308 are cached by browsers, sometimes indefinitely; 307/308 preserve the method and body and are therefore the wrong answer to a form post. `304` stays a private `Status(304)` — framework-internal cache negotiation a handler never returns, the same reasoning C1 recorded. `300`, `305` and `306` are not added: no use, and the last two are deprecated. |
 | **8. Public cost / reversibility** | Additive to a frozen public enum — the Phase-1 freeze evidence ritual — with **no ledger growth**: `Status` is one already-counted symbol. No member moves, no signature changes, no behaviour changes: the vendored status table already carries all five codes *with their reason phrases*, so the bytes on the wire are identical before and after. Enum additions do not break a `case` match on the current members. Fully reversible before release. |
 | **9. RED test** | A public-surface test asserting `int(web.Status.See_Other) == 303` and the same for the four siblings, plus a handler that calls `web.set_header(ctx, "Location", "/")` and `web.text(ctx, .See_Other, "")` producing a `303` **with the `Location` header** on the wire — RED today (no such members), GREEN after. It distinguishes *improvement* (a named 303 exists, and a redirect's status prints as itself in a log) from *preference* (nothing about the cast is a matter of taste: it is unchecked, and it renders as `%!(BAD ENUM VALUE=303)`). |
+
+**Disposition:** **RESOLVED by corrective WP C8 (2026-07-27).** `web.Status` now
+carries `Moved_Permanently=301`, `Found=302`, `See_Other=303`,
+`Temporary_Redirect=307` and `Permanent_Redirect=308` as named members. No
+responder was added: `web.set_header(ctx, "Location", …)` + `web.text(ctx,
+.See_Other, "")` is the canonical form, and `redirect` stays a reserved name
+(G-01). 304 remains the private `STATUS_NOT_MODIFIED` cast, now pinned in both
+directions. Pinned by `tests/c8-redirect-statuses` + `build/check_c8_controls.sh`,
+with the full freeze ritual (Amendment 38) and mutation probes 62/63. The
+`web/redirect` Crystal — the workaround that named its own expiry — is retired at
+the Crystals repo's next core re-pin, not before, because that repo pins the core
+by commit.

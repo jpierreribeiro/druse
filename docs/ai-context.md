@@ -733,15 +733,47 @@ a bare integer. The complete set:
 
 ```text
 .OK .Created .Accepted .No_Content
+.Moved_Permanently .Found .See_Other .Temporary_Redirect .Permanent_Redirect
 .Bad_Request .Unauthorized .Forbidden .Not_Found .Method_Not_Allowed
 .Conflict .Payload_Too_Large .Too_Many_Requests
 .Internal_Server_Error .Service_Unavailable
 ```
 
-The last row's `.Conflict` (409), `.Payload_Too_Large` (413), `.Too_Many_Requests`
-(429) and `.Service_Unavailable` (503) were added by corrective WP C1 (friction
-F8-1): operationally-essential codes three independent applications were forced
-to spell as raw-int casts. Prefer the named member over `Status(<int>)`.
+`.Conflict` (409), `.Payload_Too_Large` (413), `.Too_Many_Requests` (429) and
+`.Service_Unavailable` (503) were added by corrective WP C1 (friction F8-1):
+operationally-essential codes three independent applications were forced to spell
+as raw-int casts. The redirect row was added by corrective WP C8 (friction F8-9),
+for the same reason and one more: an unnamed enum value renders as
+`%!(BAD ENUM VALUE=303)` under `%v`, so a cast made every log line about a
+redirect illegible. **Prefer the named member over `Status(<int>)` — always.**
+
+There is no redirect responder, and there will not be one. A redirect is two
+calls, and the second is an ordinary responder:
+
+<!-- fragment: phase1/redirect -->
+```odin
+// POST/Redirect/GET — after a successful POST, so a refresh does not re-submit.
+if !web.set_header(ctx, "Location", "/notes") {
+	web.internal_error(ctx)
+	return
+}
+web.text(ctx, .See_Other, "")
+```
+
+The empty body is deliberate: browsers follow the header, and a body on a redirect
+is read by nobody while still costing the bytes. Choosing the member is a safety
+decision, not a preference:
+
+| Member | Code | Use it when |
+|---|---|---|
+| `.See_Other` | 303 | after a successful POST — the client re-issues as GET, which is what makes refresh safe |
+| `.Found` | 302 | a redirect after a GET. **Wrong after a POST**: the client may repeat the method, the re-submission 303 prevents |
+| `.Moved_Permanently` | 301 | a URL that has genuinely moved for good — browsers CACHE it, sometimes indefinitely |
+| `.Temporary_Redirect` | 307 | the client must repeat the SAME request (method and body) elsewhere, temporarily |
+| `.Permanent_Redirect` | 308 | as 307, permanently — and cached like 301 |
+
+304 is not a member: it is framework-internal cache negotiation (`web.static`), not
+something a handler returns.
 
 `Content-Type` is set for you: `application/json` for JSON and every envelope,
 `text/plain; charset=utf-8` for text, the caller's value for `bytes`, none for
@@ -1033,10 +1065,13 @@ web.serve_with(&app, web.Serve_Config{host = "0.0.0.0", port = 8080})
 ```
 
 Other names reserved for later phases, none of which exist today:
-`web.serve_transport`, `web.body_limit`, `web.redirect`. (`web.bytes` and
-`web.set_header` DO exist now — added by corrective WP C2; `web.conflict` is
-unnecessary since C1 made `.Conflict` a named `Status` member.) Two names will
-NEVER exist: `web.recovery` (ADR-020) and `web.group` (ADR-024).
+`web.serve_transport`, `web.body_limit`. (`web.bytes` and `web.set_header` DO
+exist now — added by corrective WP C2; `web.conflict` is unnecessary since C1
+made `.Conflict` a named `Status` member.) Names that will NEVER exist:
+`web.recovery` (ADR-020), `web.group` (ADR-024), and `web.redirect` — corrective
+WP C8 closed the redirect gap by naming five `Status` members instead, because
+`web.set_header` + `web.text` already put both halves of a redirect on the wire
+(G-01). The name stays reserved so nobody takes it by accident.
 
 Phase boundaries in one line each:
 

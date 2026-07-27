@@ -459,3 +459,16 @@ upload_handler :: proc(ctx: ^web.Context) {
 	}
 	web.text(ctx, .OK, file.filename)
 }
+
+// fragment: phase1/redirect
+// POST/Redirect/GET (C8). A redirect is two calls: the target through
+// `set_header`, the status through an ordinary responder. The empty body is
+// deliberate — browsers follow the header, and a body on a redirect is read by
+// nobody while still costing the bytes.
+save_note :: proc(ctx: ^web.Context) {
+	if !web.set_header(ctx, "Location", "/notes") {
+		web.internal_error(ctx)
+		return
+	}
+	web.text(ctx, .See_Other, "")
+}

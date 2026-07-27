@@ -272,4 +272,13 @@ pins the core at a commit (`COMPATIBILITY.md`), so retirement happens at the nex
 re-pin, not before.
 
 ### Progress (C8)
-- [ ] **C8 F8-9 redirect statuses.** Branch off `main`, PR only.
+- [x] **C8 F8-9 redirect statuses — DONE (2026-07-27).** `web.Status` gains
+  `Moved_Permanently=301`, `Found=302`, `See_Other=303`, `Temporary_Redirect=307`,
+  `Permanent_Redirect=308`; no responder added, `redirect` stays reserved; 304
+  stays the private cast and is now pinned in BOTH directions. Full freeze ritual:
+  signature snapshot, the 19-member freeze control, the new public-api control,
+  `docs/ai-context.md` + `docs/canonical-patterns.md` (whose stale "Phase 3,
+  unavailable" rows for `redirect` AND `bytes` are corrected), Amendment 38,
+  `tests/c8-redirect-statuses` + `check_c8_controls.sh` wired into `check.sh`, and
+  mutation probes 62/63. Landed as SPEC → RED → GREEN, the RED verified by exit
+  status.

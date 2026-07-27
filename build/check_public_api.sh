@@ -631,6 +631,13 @@ echo "public API contract: web/testing bridge exports match the locked minimal s
 # `bytes` and `set_header` were promoted to the public surface by corrective WP C2
 # (frictions F8-2/F8-4), so they are no longer later-phase names. `conflict` stays
 # banned: C1 named `.Conflict` as a Status member, not a `web.conflict` proc.
+#
+# `redirect` stays banned for the same reason, and corrective WP C8 (friction
+# F8-9) is where that was decided rather than assumed. C8 closed the redirect gap
+# by naming five `Status` members — NOT by adding a responder: `set_header(ctx,
+# "Location", …)` and `text(ctx, .See_Other, "")` already put both halves on the
+# wire, so `web.redirect` would be a second public name for an operation the
+# surface performs (G-01), and a ledger-growing one. The name stays reserved.
 for URUQUIM_FUTURE in group \
   serve_with serve_transport app_init \
   redirect conflict recovery body_limit \
@@ -1442,6 +1449,28 @@ fi
 awk '/^Status :: enum int \{/{f=1;next} /^\}/{f=0} f' <<<"$URUQUIM_WEB_PUBLIC_CODE" |
   grep -qE 'Payload_Too_Large += 413' ||
   fail "the public Status.Payload_Too_Large = 413 member is missing (C1/F8-1)"
+
+# 10d-y. The redirect family is PUBLIC (corrective WP C8, friction F8-9): without
+#        it POST/Redirect/GET — the pattern every HTML form needs — could not be
+#        written against the core, and an application was forced to cast
+#        `Status(303)`, which is unchecked AND renders as `%!(BAD ENUM VALUE=303)`
+#        in every log line about a redirect.
+#
+#        304 is the deliberate exception and stays PRIVATE: framework-internal
+#        cache negotiation a handler never returns (the reasoning C1 recorded for
+#        it, unchanged here). The two halves are asserted together so that neither
+#        can drift without the other being noticed.
+URUQUIM_STATUS_MEMBERS="$(awk '/^Status :: enum int \{/{f=1;next} /^\}/{f=0} f' <<<"$URUQUIM_WEB_PUBLIC_CODE")"
+for URUQUIM_REDIRECT in "Moved_Permanently += 301" "Found += 302" "See_Other += 303" \
+  "Temporary_Redirect += 307" "Permanent_Redirect += 308"; do
+  grep -qE "$URUQUIM_REDIRECT" <<<"$URUQUIM_STATUS_MEMBERS" ||
+    fail "the public Status member '${URUQUIM_REDIRECT%% *}' is missing (C8/F8-9)"
+done
+if grep -qE '(^|[^A-Za-z_])(Not_Modified|Multiple_Choices|Use_Proxy) +=' <<<"$URUQUIM_STATUS_MEMBERS"; then
+  fail "a 304/300/305 member was added to the public Status enum; 304 stays the private STATUS_NOT_MODIFIED cast (WP-static/C8)"
+fi
+grep -qE '^STATUS_NOT_MODIFIED :: Status\(304\)$' <<<"$URUQUIM_WEB_CODE" ||
+  fail "the private STATUS_NOT_MODIFIED :: Status(304) value is missing (C8 keeps 304 framework-internal)"
 
 # 10e. The two WP5 error codes are spelled exactly as the ratified wire contract
 #      requires (docs/errors.md). A typo here is a silent compatibility break:

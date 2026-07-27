@@ -293,12 +293,19 @@ uruquim_freeze_expect_decl() { # description exact-line
 uruquim_freeze_expect_decl "Method must stay a closed 6-member u8 enum" \
   'application	type	Method :: enum u8 {UNKNOWN, GET, POST, PUT, PATCH, DELETE}'
 
-# Status is the closed int enum. Corrective WP C1 (friction F8-1, amendment in
-# planning/phase-1-freeze.md) ADDED the operationally-essential codes three
-# independent applications were forced to spell as raw-int casts: 409, 413, 429,
-# 503. The set is again closed and pinned here — additive only, no member moved.
-uruquim_freeze_expect_decl "Status must stay the closed 14-member int enum (C1: +409/413/429/503)" \
-  'application	type	Status :: enum int {OK = 200, Created = 201, Accepted = 202, No_Content = 204, Bad_Request = 400, Unauthorized = 401, Forbidden = 403, Not_Found = 404, Method_Not_Allowed = 405, Conflict = 409, Payload_Too_Large = 413, Too_Many_Requests = 429, Internal_Server_Error = 500, Service_Unavailable = 503}'
+# Status is the closed int enum. Two corrective WPs have widened it, each with an
+# amendment in planning/phase-1-freeze.md and each additive only — no member has
+# ever moved:
+#   C1 (friction F8-1, Amendment 32) added the operationally-essential codes three
+#     independent applications were forced to spell as raw-int casts: 409, 413,
+#     429, 503.
+#   C8 (friction F8-9, Amendment 38) added the redirect family the enum did not
+#     name at all: 301, 302, 303, 307, 308. Without them POST/Redirect/GET could
+#     not be written against the core.
+# The set is again closed and pinned here. 304 is deliberately absent: it stays a
+# private Status(304), framework-internal cache negotiation a handler never returns.
+uruquim_freeze_expect_decl "Status must stay the closed 19-member int enum (C1: +409/413/429/503; C8: +301/302/303/307/308)" \
+  'application	type	Status :: enum int {OK = 200, Created = 201, Accepted = 202, No_Content = 204, Moved_Permanently = 301, Found = 302, See_Other = 303, Temporary_Redirect = 307, Permanent_Redirect = 308, Bad_Request = 400, Unauthorized = 401, Forbidden = 403, Not_Found = 404, Method_Not_Allowed = 405, Conflict = 409, Payload_Too_Large = 413, Too_Many_Requests = 429, Internal_Server_Error = 500, Service_Unavailable = 503}'
 
 uruquim_freeze_expect_decl "Handler must stay the single handler shape" \
   'application	type	Handler :: proc(ctx: ^Context)'
@@ -552,7 +559,7 @@ done
 # Report.
 # ---------------------------------------------------------------------------
 echo "freeze: signatures      -> $URUQUIM_FREEZE_APP_COUNT application + $URUQUIM_FREEZE_TS_COUNT test-support = $URUQUIM_FREEZE_TOTAL, byte-identical to the snapshot"
-echo "freeze: fields/enums    -> Method(u8, 6), Status(int, 14, C1:+409/413/429/503), Handler, Context, Request, Header_View, App, Recorded_Response pinned"
+echo "freeze: fields/enums    -> Method(u8, 6), Status(int, 19, C1:+409/413/429/503, C8:+301/302/303/307/308), Handler, Context, Request, Header_View, App, Recorded_Response pinned"
 echo "freeze: extractors      -> named results pinned, no #optional_ok on any exported procedure"
 echo "freeze: dependencies    -> $(wc -l <"$URUQUIM_FREEZE_ACTUAL_DEP" | tr -d ' ') direct imports match the snapshot; boundaries one-way"
 echo "freeze: evidence matrix -> $URUQUIM_FREEZE_REF_COUNT citations resolved, all 65 symbols present, none NOT_FROZEN"

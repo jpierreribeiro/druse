@@ -722,4 +722,31 @@ mutate_sed "ratified symbol deleted from the package" "$T/web/errors.odin" \
 expect_reject "$T" "ratified symbol deleted from the package" \
   "web/ is missing part of the ratified Phase-1 surface"
 
+# 62. C8 (F8-9): a redirect member removed from the public Status enum. The five
+#     are load-bearing — POST/Redirect/GET is written against `.See_Other`, and
+#     losing the name sends applications back to the `Status(303)` cast that
+#     renders as `%!(BAD ENUM VALUE=303)` in every log line about a redirect.
+T="$(fresh_tree)"; TREES+=("$T")
+mutate_sed "remove the public See_Other member" "$T/web/respond.odin" \
+  '/^\tSee_Other             = 303,$/d'
+expect_reject "$T" "removed public See_Other member" \
+  "the public Status member 'See_Other' is missing"
+
+# 63. C8 declined a redirect RESPONDER on purpose (G-01: `set_header` + `text`
+#     already express it), and the moment the codes became nameable is exactly
+#     when someone will try to add the convenience wrapper. This probe proves the
+#     attempt is rejected.
+#
+#     It is rejected by the LEDGER INVENTORY, not by the reserved-name list —
+#     `redirect` is on that list, but the inventory diff runs first and refuses
+#     any export outside the ratified surface, so the reservation is only ever
+#     reachable for a name someone also added to the ledger. The expectation is
+#     written to the guard that actually fires; a probe that names the wrong
+#     guard passes for the wrong reason and would keep passing if that guard were
+#     deleted.
+T="$(fresh_tree)"; TREES+=("$T")
+printf '\nredirect :: proc(ctx: ^Context, status: Status, location: string) {}\n' >>"$T/web/respond.odin"
+expect_reject "$T" "redirect responder added to the public surface" \
+  "web/ exports symbols outside the ratified Phase-1 surface"
+
 echo "PASS: WP16 mutation checks (5 stray/overlap/deletion states rejected, 4 refactor controls accepted)"

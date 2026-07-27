@@ -24,14 +24,46 @@ import "core:mem"
 // `text(ctx, status, s)` signatures require a status type. Phase 1 named only the
 // statuses its public documentation and default-policy contract used; the
 // corrective WP C1 (friction F8-1) adds the operationally-essential codes that
-// three independent applications were forced to spell as raw-int casts. These are
-// ADDITIVE: no existing member moves, and an enum addition does not break a
-// `case` match on the current members.
+// three independent applications were forced to spell as raw-int casts, and the
+// corrective WP C8 (friction F8-9) adds the redirect family the enum did not name
+// at all. These are ADDITIVE: no existing member moves, and an enum addition does
+// not break a `case` match on the current members.
+//
+// THE REDIRECT FAMILY LANDS WHOLE (C8), and the choice between its members is a
+// safety decision rather than a preference, which is exactly why each one is
+// named here instead of being cast at the call site:
+//
+//   - `See_Other` (303) is the one to use after a successful POST. It tells the
+//     client to re-issue as GET, and that is what makes a refresh safe —
+//     POST/Redirect/GET, the pattern every HTML form needs.
+//   - `Found` (302) is what most code means by "redirect" and is the WRONG default
+//     after a POST: the client may repeat the method, which is the re-submission
+//     303 exists to prevent.
+//   - `Moved_Permanently` (301) and `Permanent_Redirect` (308) are CACHED BY
+//     BROWSERS, sometimes indefinitely. A wrong permanent redirect is close to
+//     unrecoverable for anyone who received it.
+//   - `Temporary_Redirect` (307) and `Permanent_Redirect` (308) PRESERVE the method
+//     and body: they say "repeat the same request elsewhere", not "go look there".
+//
+// 300, 305 and 306 are not named: no application has asked for the first, and the
+// last two are deprecated. 304 stays a private `Status(304)` — framework-internal
+// cache negotiation a handler never returns, the same reasoning C1 recorded.
+//
+// There is deliberately NO `redirect` responder. `set_header(ctx, "Location", …)`
+// (C2) and `text(ctx, .See_Other, "")` already put both halves on the wire, so a
+// responder would be a second public name for an operation the surface performs —
+// the accretion G-01 forbids. `redirect` remains on the later-phase banned list in
+// `build/check_public_api.sh`, and C8 leaves it there.
 Status :: enum int {
 	OK                    = 200,
 	Created               = 201,
 	Accepted              = 202,
 	No_Content            = 204,
+	Moved_Permanently     = 301,
+	Found                 = 302,
+	See_Other             = 303,
+	Temporary_Redirect    = 307,
+	Permanent_Redirect    = 308,
 	Bad_Request           = 400,
 	Unauthorized          = 401,
 	Forbidden             = 403,

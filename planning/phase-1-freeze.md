@@ -2385,3 +2385,72 @@ REQUEST_STATE_MAX` is a `#assert` (compile-time).
 restore the ADR-028 statement). Sixth of the C1..C7 corrective batch. **This is
 the amendment the release-readiness review must ratify as a philosophy change, not
 merely a gap fix — see `planning/adr-028-amendment.md`.**
+
+## Amendment 38 — Corrective WP C8 (friction F8-9): `Status` gains 301/302/303/307/308
+
+**Date: 2026-07-27. Authority: the friction ledger, which is marked LIVE precisely
+so a finding arriving after the C1..C7 batch has somewhere to land
+(`planning/corrective-program-plan.md` §6).**
+**Ledger effect: NONE — `Status` is a single symbol already counted; the ledger
+stays application 80 + test-support 2 = union 82.** This amendment WIDENS one
+frozen enum's signature, additively, exactly as Amendment 32 did.
+
+`Status` gains five members, in numeric order among the existing ones:
+
+```
+Moved_Permanently  = 301
+Found              = 302
+See_Other          = 303
+Temporary_Redirect = 307
+Permanent_Redirect = 308
+```
+
+**WHY.** The enum named **no 3xx at all**, so POST/Redirect/GET — the pattern every
+HTML form needs so that a refresh does not re-submit — could not be written against
+the core. That gap is conspicuous rather than marginal because the entire
+server-rendered stack already ships in Crystals: `web/form` exists so a plain
+`<form>` works, `web/csrf` has a form-field mode precisely because forms cannot set
+headers, `web/html` and `web/template` render the pages. The one status that ties
+the flow together was the one the core could not name.
+
+**The second reason, which F8-1 did not have.** A cast is not merely unchecked and
+undiscoverable; an unnamed enum value renders as `%!(BAD ENUM VALUE=303)` under
+`%v`. Every log line and every test-failure message about a redirect printed
+garbage — in exactly the responses whose only content *is* the status. The C8 suite
+asserts the rendering, so this property is pinned rather than assumed.
+
+**ADDITIVE, no member moved.** Every existing member keeps its value; an enum
+addition does not break a `case` match on the current members. No behaviour
+changes: the vendored status table already carries all five codes *with* their
+reason phrases, so the bytes on the wire are identical before and after — C8 names
+what the transport already emitted.
+
+**THE FAMILY LANDS WHOLE, deliberately.** 4-of-5 would guarantee the raw-int cast
+returns for the next application, which is the friction itself; and the choice
+between the members is a safety decision that deserves names: 301/308 are cached by
+browsers, sometimes indefinitely, and 307/308 preserve the method and body and are
+therefore the wrong answer to a form post. 300, 305 and 306 are NOT added (no use;
+the last two are deprecated). **304 stays a private `Status(304)`** — the
+framework-internal cache negotiation of `web.static`, which a handler never
+returns, the same reasoning Amendment 32 recorded, and now pinned in both
+directions by `check_public_api.sh`.
+
+**NO `web.redirect`, and that is the decision rather than an omission.**
+`set_header(ctx, "Location", …)` (C2) and `text(ctx, .See_Other, "")` already put
+both halves on the wire, so a responder would be a second public name for an
+operation the surface performs — the accretion G-01 forbids, and it would grow the
+ledger. `redirect` therefore stays on the reserved later-phase list in
+`check_public_api.sh`. `docs/canonical-patterns.md` had advertised
+`web.redirect(...)` as "Phase 3, unavailable" since Phase 1; no phase ever owned
+it, and C8 replaces that row with the two-call form that works.
+
+| Symbol | Ledger | WP | Signature evidence | Behaviour evidence | Doc | Notes |
+|---|---|---|---|---|---|---|
+| `Status` (widened) | A | C8 | `build/phase1-public-signatures.txt` (the 19-member row) + `build/check_phase1_freeze.sh` (the pinned declaration) | `tests/c8-redirect-statuses/redirect_statuses_test.odin` (members equal their codes; POST/Redirect/GET reaches the wire WITH its `Location`; the status formats as its own name) | `docs/ai-context.md` (the member set + the two-call redirect) and `docs/canonical-patterns.md` (the canonical form) | +301/302/303/307/308; no ledger growth; 304 stays private; no `redirect` responder; mutation probes 62/63 added |
+
+**Rollback.** Reversible before release (remove the five members; the two-call form
+reverts to a `Status(303)` cast) — but from here the names are a public contract.
+Consequence elsewhere: the `web/redirect` Crystal exists only to hold these five
+casts and its own header states it should be retired when the core grows the
+members. It cannot be deleted the moment C8 merges — the Crystals repo pins the
+core by commit (`COMPATIBILITY.md`), so retirement happens at the next re-pin.

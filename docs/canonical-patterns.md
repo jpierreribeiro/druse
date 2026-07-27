@@ -519,17 +519,32 @@ lifetime above).
 | 204 | `web.no_content(ctx)` |
 | other status + JSON | `web.json(ctx, status, payload)` |
 | plain text | `web.text(ctx, status, s)` |
-| raw bytes — Phase 3, unavailable | `web.bytes(...)` |
-| redirect — Phase 3, unavailable | `web.redirect(...)` |
+| raw bytes | `web.bytes(ctx, status, content_type, data)` (C2) |
+| redirect | `web.set_header(ctx, "Location", target)` then `web.text(ctx, .See_Other, "")` (C8) |
 | 400 | `web.bad_request(ctx, msg)` |
 | 401 | `web.unauthorized(ctx, msg)` |
 | 403 | `web.forbidden(ctx, msg)` |
 | 404 | `web.not_found(ctx, resource)` |
-| 409 — Phase 3, unavailable | `web.conflict(...)` |
+| 409 | `web.json(ctx, .Conflict, payload)` — C1 named the status; there is no dedicated 409 responder |
 | 500 | `web.internal_error(ctx)` |
 
 `web.ok` is exactly `web.json(ctx, .OK, value)` and `web.created` is exactly
 `web.json(ctx, .Created, value)` — tiny shorthands, no extra behavior.
+
+**A redirect is two calls, and there is deliberately no redirect responder.** Corrective
+WP C8 (friction F8-9) named the redirect statuses — `.Moved_Permanently` (301),
+`.Found` (302), `.See_Other` (303), `.Temporary_Redirect` (307),
+`.Permanent_Redirect` (308) — because POST/Redirect/GET could not otherwise be
+written against the core. It did not add a responder: `web.set_header` (C2) already
+puts the `Location` on the wire and `web.text` already puts a status there, so a
+a responder would be a second public name for an operation the surface performs
+(G-01). The name stays reserved in `build/check_public_api.sh`.
+
+Use `.See_Other` after a successful POST — it tells the client to re-issue as GET,
+which is what makes a refresh safe. `.Found` is what most code means by "redirect"
+and is the wrong answer to a form post: the client may repeat the method. `.301`
+and `.308` are cached by browsers, sometimes indefinitely; `.307` and `.308`
+preserve the method and body. Send an empty body: browsers follow the header.
 
 Phase-1 JSON payloads are concrete values:
 
