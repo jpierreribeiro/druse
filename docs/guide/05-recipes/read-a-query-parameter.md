@@ -62,15 +62,12 @@ still a client error, still already answered.
 	}
 ```
 
-Use this when zero is a legitimate value and cannot serve as a sentinel.
+Use this when zero is legitimate and cannot serve as a sentinel.
 
 ## Strings
 
-```odin
-	q, found := web.query(ctx, "q")
-```
-
-`query` never answers for you, and there is no `query_or` for strings.
+`web.query` returns `(value, found)` and never answers for you. There is no
+`query_or` for strings.
 
 **The string is a view** into the request buffer, valid while the handler runs
 and not after. Clone it if it must outlive the request — see

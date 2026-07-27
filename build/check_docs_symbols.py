@@ -15,7 +15,7 @@ def defs(dirs):
     return out
 CACHE={a:defs(d) for a,d in ALIAS.items()}
 # lines that deliberately say a symbol does NOT exist
-NEG=re.compile(r'There is no |no separate |do not exist|does not exist|Proposal|var_port')
+NEG=re.compile(r'there is no |no separate |do not exist|does not exist|proposal|var_port|never use it',re.I)
 bad=[]
 for p in sorted(glob.glob('docs/guide/**/*.md',recursive=True)+['docs/STYLE.md','docs/GLOSSARY.md']):
     for i,line in enumerate(open(p),1):

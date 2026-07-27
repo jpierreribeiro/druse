@@ -78,6 +78,12 @@ For a reader who already knows Druse and wants the answer, not the teaching.
 | [`error-responses.md`](05-recipes/error-responses.md) | Which responder do I call, and which errors do I get for free? |
 | [`read-a-query-parameter.md`](05-recipes/read-a-query-parameter.md) | Four extractors — which one, and what happens when the parameter is missing? |
 | [`who-is-the-user.md`](05-recipes/who-is-the-user.md) | How do I write the `who` helper without corrupting the subject? |
+| [`write-a-middleware.md`](05-recipes/write-a-middleware.md) | How do I run code around a handler, and guard a route? |
+| [`test-a-handler.md`](05-recipes/test-a-handler.md) | How do I test without a socket? |
+| [`stream-a-response.md`](05-recipes/stream-a-response.md) | How do I send a response I cannot buffer whole? |
+| [`accept-a-file-upload.md`](05-recipes/accept-a-file-upload.md) | How do I take a file, in memory or spooled to disk? |
+| [`observe-the-framework.md`](05-recipes/observe-the-framework.md) | What failed, how often, and am I draining? |
+| [`serve-a-browser-app.md`](05-recipes/serve-a-browser-app.md) | CORS, static files, security headers, and the real client IP behind a proxy? |
 
 ### Also here
 
@@ -99,24 +105,17 @@ everything else here.
 Read this list before you conclude a feature does not exist. It does. This
 guide has not reached it yet.
 
-**Druse features with no page here.** Go to `docs/canonical-patterns.md` and
-`docs/ai-context.md`:
+**Every one of the 82 core symbols is taught on a page of this guide**, not
+merely listed here. `build/check_docs_coverage.py` enforces that, and it
+ignores this file so a mention in the map cannot count as coverage.
 
-| Subject | Where it is |
-|---|---|
-| Streaming and server-sent events | `web.stream`, `web.stream_send`, `web.stream_live`, `crystals:web/sse` |
-| File uploads | `web.upload`, `web.enable_upload`, `web.form_file` |
-| Static files | `web.static`, `web.Static_Options` |
-| CORS | `web.cors`, `web.Cors_Options` |
-| Security headers | `web.secure_headers` |
-| Client IP behind a proxy | `web.client_ip`, `web.trust_proxies` |
-| Observability and metrics | `web.observe`, `web.Framework_Event`, `crystals:web/metrics` |
-| The full error envelope | `docs/errors.md` |
-| Operations and shutdown | `docs/operations.md` |
+Named is still not the same as narrated. Streaming, uploads, CORS, static
+files and the proxy surface have a recipe rather than a build-along chapter,
+because no build-along reaches them yet.
 
-The guide names 64 of the 82 core symbols. The other 18 are real, and
-`docs/ai-context.md` is the complete list. If a symbol is not there, it does
-not exist — do not guess a name.
+The reference remains the place to look up a signature. `docs/ai-context.md`
+is the complete list, and if a symbol is not there it does not exist — do not
+guess a name.
 
 **Crystals packages never named here.** Go to
 `druse-crystals/docs/crystals.md`:
