@@ -92,6 +92,19 @@ json :: proc(ctx: ^Context, status: Status, value: $T) {
 	// like a marshal failure — a logged 500 — rather than put on the wire. The
 	// cost is one allocation-free pass over the output, and it is the framework
 	// verifying its own contract, not an optional nicety.
+	// ROUTER AUDIT P3 (NOT TAKEN, AND WHY). This full second pass over every
+	// marshalled body exists to catch one condition — a non-finite float — which
+	// is a property of the TYPE, so in principle it could be answered once per
+	// instantiation and skipped entirely for the float-free DTOs that dominate.
+	// It cannot be written today: the gate needs a compile-time walk over `T`'s
+	// fields, and the pinned toolchain's `base:intrinsics` exposes
+	// `type_struct_field_count` but resolves a field type only BY NAME
+	// (`type_field_type($T, $name: string)`) — there is no field-type-by-index,
+	// so the recursion is not expressible. A runtime type walk is the RTTI cache
+	// the JSON study already measured and REJECTED (round-trip p99 +17.8%), and a
+	// byte-scan pre-filter for `N`/`I` is defeated by ordinary text. Guessing here
+	// would silently disable a check that keeps invalid JSON off the wire, so the
+	// cost stays until the intrinsic exists. Recorded rather than left implicit.
 	if err != nil || !encoding_json.is_valid(data, .JSON) {
 		// The encoder may hand back a partially-filled buffer alongside the
 		// error. It has no owner, so it is released here.
@@ -167,8 +180,19 @@ text :: proc(ctx: ^Context, status: Status, s: string) {
 // It sets NO `Content-Type`: there is no content to describe, and announcing a
 // media type for an empty body would be a claim about nothing. It allocates
 // nothing.
+//
+// ROUTER AUDIT C1 — it DOES carry the framework's trailing headers, and used not
+// to. This was the one responder that passed `nil` instead of going through
+// `response_headers_finish`, so a 204 left without `Access-Control-Allow-Origin`,
+// without `X-Request-Id`, without the secure headers, and silently dropped every
+// pair the handler had recorded with `web.set_header` — contradicting that
+// procedure's documented promise to ride on whatever response is committed.
+//
+// The CORS case is the sharp one: 204 is the canonical success for DELETE, so a
+// browser fetch against a CORS-configured app failed the origin check on exactly
+// the route shape that most often answers 204, while every other status worked.
 no_content :: proc(ctx: ^Context) {
-	response_commit(&ctx.private.response, .No_Content, nil, nil)
+	response_commit(&ctx.private.response, .No_Content, response_headers_finish(ctx, 0), nil)
 }
 
 // set_header records an APPLICATION response header, to ride on whatever response

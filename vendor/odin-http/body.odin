@@ -260,8 +260,10 @@ _body_chunked :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb
 		// Content-Length path already guards with `_is_plain_decimal`; the
 		// chunked path was missed. Reject any non-positive parse the same way a
 		// malformed size line is rejected.
+		// PATCH 33 (HTTP audit F1) — hex digits only, checked BEFORE the parse,
+		// so `+a` and `1_0` are refused here instead of being read as 10 and 16.
 		size, ok := strconv.parse_int(string(size_line), 16)
-		if !ok || size < 0 {
+		if !_is_plain_hex(string(size_line)) || !ok || size < 0 {
 			log.infof("Encountered an invalid chunk size when decoding a chunked body: %q", string(size_line))
 			s.cb(s.user_data, "", .Bad_Read_Count)
 			return
@@ -404,6 +406,31 @@ _is_plain_decimal :: proc(s: string) -> bool {
 		if s[i] < '0' || s[i] > '9' {
 			return false
 		}
+	}
+	return true
+}
+
+// URUQUIM PATCH 34 (HTTP audit F1) — the chunk-size counterpart of
+// `_is_plain_decimal`, and it exists for the same reason on the other framing
+// axis. RFC 9112 §7.1 defines chunk-size as 1*HEXDIG, but both chunked paths
+// passed the line straight to `strconv.parse_int(.., 16)` and only rejected a
+// NEGATIVE result. Odin's numeric parsing accepts a leading `+` and ignores `_`
+// digit separators, so `+a` and `1_0` parsed to valid positive sizes here while
+// an RFC-strict front-end rejects them as malformed. That disagreement about
+// where a chunk ends is a Transfer-Encoding desync — the request-smuggling
+// primitive the Content-Length path was already hardened against. Hex digits
+// only; nothing else, in either case.
+@(private)
+_is_plain_hex :: proc(s: string) -> bool {
+	if len(s) == 0 {
+		return false
+	}
+	for i in 0 ..< len(s) {
+		c := s[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
+			continue
+		}
+		return false
 	}
 	return true
 }

@@ -341,6 +341,26 @@ cors_commit_preflight :: proc(ctx: ^Context) {
 cors_headers_append :: proc(ctx: ^Context, n: int) -> int {
 	count := n
 	if !ctx.private.cors_active {
+		// ROUTER AUDIT C2 — `Vary: Origin` BELONGS ON EVERY RESPONSE OF A
+		// CORS-CONFIGURED APP, not only on the ones that carry an allow-origin.
+		//
+		// The early return used to emit nothing at all here, so a request with no
+		// `Origin` (or a disallowed one) produced a response with no `Vary`. A
+		// shared cache is then entitled to store that bare response under the URL
+		// alone and hand it to a subsequent request from an ALLOWED origin, which
+		// receives no `Access-Control-Allow-Origin` and fails the browser's check
+		// — a cache-poisoning-shaped CORS failure that reproduces only through an
+		// intermediary, which is the hardest kind to diagnose.
+		//
+		// The condition is "this app negotiates CORS at all", not "this response
+		// did": an app that never calls `web.cors` still emits nothing.
+		if ctx.private.cors.set {
+			ctx.private.response_headers[count] = Header_Pair {
+				name  = CORS_VARY,
+				value = CORS_VARY_ORIGIN,
+			}
+			count += 1
+		}
 		return count
 	}
 	cfg := &ctx.private.cors

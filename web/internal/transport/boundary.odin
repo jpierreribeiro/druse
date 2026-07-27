@@ -75,6 +75,17 @@ Outbound :: struct {
 	// and hands the wire to the owner-lane pump instead of writing a body.
 	// The private boundary is free to carry this (ADR-009 Amendment 1).
 	detached: bool,
+	// ROUTER AUDIT C4 — the length the body WOULD have had, for a response whose
+	// body was suppressed before it reached here. Only HEAD sets it (the core's
+	// `response_body_view` blanks the body but keeps status and headers), and
+	// only when that length is non-zero.
+	//
+	// Without it the adapter computed `content-length` from the empty slice it
+	// was handed and answered `content-length: 0` to every HEAD, while RFC 9110
+	// §8.6 requires the value a GET for the same resource would have sent. That
+	// silently breaks the clients whose whole purpose for issuing HEAD is to
+	// learn the size — `curl -I`, download managers, range-probing proxies.
+	suppressed_body_len: int,
 }
 
 // Dispatch_Proc is how the adapter drives the core. The core builds its context
