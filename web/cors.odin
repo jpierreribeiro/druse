@@ -85,6 +85,17 @@ CORS_TRUE :: "true"
 // Deliberately the five the `Method` enum names, and deliberately not `OPTIONS`
 // — a client does not need permission to send the preflight it is already
 // sending.
+//
+// NOT CHANGED BY AUDIT R8, and the difference is in the specifications rather
+// than in this project's taste. R8 made `Allow` name HEAD and OPTIONS because
+// RFC 9110 §10.2.1 defines that field as the methods the resource SUPPORTS, and
+// the server answers both. `Access-Control-Allow-Methods` is a different header
+// with a different rule: Fetch safelists GET, HEAD and POST, so a browser
+// permits a cross-origin HEAD whether or not it appears here. Adding it would
+// change bytes on the wire without changing what any client may do — and the
+// existing OPTIONS reasoning above is the same argument already applied once.
+// Recorded so this reads as a decision rather than as an inconsistency with
+// the sibling header.
 @(private)
 CORS_DEFAULT_METHODS :: "GET, POST, PUT, PATCH, DELETE"
 
