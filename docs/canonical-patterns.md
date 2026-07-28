@@ -667,7 +667,11 @@ mutates your value, which is what makes a connection pool work.
 <!-- pseudocode: reading the state inside a handler -->
 ```odin
 list_users :: proc(ctx: ^web.Context) {
-	state := web.state(ctx, App_State)
+	state, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 
 	users, err := user_repository.list(state.db)
 	if err != nil {
@@ -679,10 +683,19 @@ list_users :: proc(ctx: ^web.Context) {
 }
 ```
 
-`web.state(ctx, T)` asserts that state was registered **and** that `T` is
-exactly the registered type, then returns `^T`. Both are programming errors and
-neither varies with the request, so a failing assert aborts on your first
-request rather than in front of a client (ADR-020: run under a supervisor).
+`web.state(ctx, T)` returns `(^T, bool)`. `ok` is false when state was never
+registered **or** when `T` is not exactly the registered type. Both are
+programming errors and neither varies with the request, so both are logged at
+Error level and neither can be provoked by a client.
+
+**It used to assert, and the change is about blast radius.** Odin has no
+recoverable panic (ADR-020), so the assert aborted the process — and `web.state`
+is called from inside a handler, on a lane that shares a process with every
+other in-flight request. A fault confined to one route stopped the whole server.
+Now the one request answers 500 and the rest keep being served. Check `ok`:
+ignoring it and dereferencing `nil` gives the crash back, without the sentence
+that named the mistake. (Freeze Amendment 39.)
+
 Exact type, not assignable type: there is no subtyping walk, and casting a
 `^Config` to a `^Database` because both are pointers is what the check exists
 to make impossible.

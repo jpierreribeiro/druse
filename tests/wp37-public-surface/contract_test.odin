@@ -68,13 +68,21 @@ Other_State :: struct {
 
 @(private = "file")
 read_name :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, state_ok := web.state(ctx, App_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.text(ctx, .OK, s.name)
 }
 
 @(private = "file")
 bump :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, state_ok := web.state(ctx, App_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	s.calls += 1
 	web.no_content(ctx)
 }
@@ -194,6 +202,37 @@ wp37_a_nil_state_rejects_the_application :: proc(t: ^testing.T) {
 	web.get(&app, "/name", read_name)
 	res := web.test_request(&app, .GET, "/name")
 	testing.expect_value(t, res.status, web.Status.Internal_Server_Error)
+
+	// STRENGTHENED BY AMENDMENT 39, and the reason is worth stating because the
+	// control caught it rather than a human noticing.
+	//
+	// The 500 above no longer distinguishes what it was written to
+	// distinguish. Before `web.state` returned `(^T, bool)`, only a POISONED
+	// application could answer 500 here. Now a healthy application whose state
+	// happens to be nil produces the same 500 by a completely different route:
+	// `web.state` returns `(nil, false)` and `read_name` answers
+	// `internal_error` itself. `build/check_wp37_controls.sh` deletes the nil
+	// rejection in `app_with_state` and this test stayed GREEN — the defect had
+	// become invisible to it.
+	//
+	// THE PROPERTY THAT STILL SEPARATES THEM: poisoning is APPLICATION-wide.
+	// Every route answers 500, including one that never touches state at all.
+	// A healthy-but-nil application serves this route normally.
+	web.get(&app, "/untouched", untouched_by_state)
+	untouched := web.test_request(&app, .GET, "/untouched")
+	testing.expectf(
+		t,
+		untouched.status == web.Status.Internal_Server_Error,
+		"a nil state must POISON the application, so a handler that never calls web.state answers 500 too; got %v. If this is 200, `app_with_state` accepted nil and built a healthy App — the failure moved into the first handler that wanted state, which is the later, client-facing failure the rejection exists to prevent.",
+		untouched.status,
+	)
+}
+
+// Deliberately does NOT call `web.state`. It is the probe for application-wide
+// poisoning: it can only fail if the App itself was rejected.
+@(private = "file")
+untouched_by_state :: proc(ctx: ^web.Context) {
+	web.text(ctx, .OK, "no state needed")
 }
 
 // The state a handler reads is the state the App was built with, even when the
@@ -230,19 +269,28 @@ wp37_middleware_reads_the_same_state :: proc(t: ^testing.T) {
 
 @(private = "file")
 count_in_middleware :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, state_ok := web.state(ctx, App_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	s.calls += 1
 	web.next(ctx)
 }
 
-// The type registered is the type that must be asked for. This is the half a
-// test cannot execute — a wrong type aborts the process by design (ADR-020),
-// and a test that could observe it would mean the assert was not an assert —
-// so what is pinned here is that the DISTINCT type exists and is not
-// accidentally interchangeable at the Odin level: `^Other_State` and
-// `^App_State` are different types, and `web.state(ctx, Other_State)` returns
-// the former. The runtime half is the assert in `web/state.odin`, and the
-// negative control for it is `build/check_wp37_controls.sh`.
+// The type registered is the type that must be asked for.
+//
+// AMENDED (Phase-1 freeze Amendment 39). This comment used to read: "this is
+// the half a test cannot execute — a wrong type aborts the process by design
+// (ADR-020), and a test that could observe it would mean the assert was not an
+// assert". That was accurate while `state` asserted. It is no longer, and the
+// difference is the point of the change: a wrong type now returns
+// `(nil, false)` and the process survives, so the half that could not be
+// executed is executed below, on real traffic, with the server still answering
+// afterwards.
+//
+// What this case still pins is the compile-time half: `^Other_State` and
+// `^App_State` are distinct types and not accidentally interchangeable.
 @(test)
 wp37_the_requested_type_decides_the_result_type :: proc(t: ^testing.T) {
 	other := Other_State{n = 7}
@@ -256,7 +304,90 @@ wp37_the_requested_type_decides_the_result_type :: proc(t: ^testing.T) {
 
 @(private = "file")
 read_other :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, Other_State)
+	s, state_ok := web.state(ctx, Other_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	s.n += 1
 	web.ok(ctx, s.n)
+}
+
+// --- Amendment 39: the two failures are survivable, and now observable ------
+//
+// THESE TESTS COULD NOT BE WRITTEN BEFORE. `web.state` asserted on both
+// failures, and an assert aborts the test runner along with everything else —
+// which is precisely why the wrong-type contract went untested for the whole
+// life of the API and was pinned only by a build-time control.
+//
+// That is the argument for the change stated as evidence rather than as
+// intent: Odin has no recoverable panic (ADR-020), so one handler asking for
+// the wrong type stopped every in-flight request on every lane. It now answers
+// `(nil, false)`, the application turns that into a 500 for the one request,
+// and the server is still serving on the next line — which is what these
+// assert.
+
+@(private = "file")
+wrong_type_handler :: proc(ctx: ^web.Context) {
+	// Registered state is App_State. This asks for Other_State.
+	s, ok := web.state(ctx, Other_State)
+	if !ok {
+		web.text(ctx, .Internal_Server_Error, "refused")
+		return
+	}
+	web.text(ctx, .OK, "should not happen")
+	_ = s
+}
+
+@(private = "file")
+healthy_handler :: proc(ctx: ^web.Context) {
+	web.text(ctx, .OK, "alive")
+}
+
+@(test)
+wp37_a_wrong_type_is_refused_and_the_server_survives :: proc(t: ^testing.T) {
+	value := App_State{name = "registered"}
+	app := web.app_with_state(&value)
+	defer web.destroy(&app)
+	web.get(&app, "/wrong", wrong_type_handler)
+	web.get(&app, "/healthy", healthy_handler)
+
+	// The framework logs this refusal at Error level, which `core:testing`
+	// would otherwise count as a test failure. Silence it for exactly this one
+	// call and restore immediately — NOT with a `defer`, because a deferred
+	// restore leaves the nil logger installed across the assertions below, and
+	// `testing.expect*` reports failures through `context.logger`. That exact
+	// mistake made another suite in this repository unable to fail.
+	saved := context.logger
+	context.logger = {}
+	refused := web.test_request(&app, .GET, "/wrong")
+	context.logger = saved
+
+	testing.expect_value(t, refused.status, web.Status.Internal_Server_Error)
+	testing.expect_value(t, refused.body, "refused")
+
+	// THE HALF THAT MATTERS: the process is alive and the next request is
+	// served normally. Under the old assert this line was unreachable — the
+	// runner was gone.
+	alive := web.test_request(&app, .GET, "/healthy")
+	testing.expect_value(t, alive.status, web.Status.OK)
+	testing.expect_value(t, alive.body, "alive")
+}
+
+@(test)
+wp37_state_on_an_app_without_state_is_refused_and_survivable :: proc(t: ^testing.T) {
+	// `web.app()` registers no state at all — the other failure mode.
+	app := web.app()
+	defer web.destroy(&app)
+	web.get(&app, "/wrong", wrong_type_handler)
+	web.get(&app, "/healthy", healthy_handler)
+
+	saved := context.logger
+	context.logger = {}
+	refused := web.test_request(&app, .GET, "/wrong")
+	context.logger = saved
+
+	testing.expect_value(t, refused.status, web.Status.Internal_Server_Error)
+	alive := web.test_request(&app, .GET, "/healthy")
+	testing.expect_value(t, alive.status, web.Status.OK)
 }

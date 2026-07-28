@@ -45,7 +45,7 @@ application	proc	router :: proc() -> Router
 application	proc	secure_headers :: proc(ctx: ^Context)
 application	proc	serve :: proc(a: ^App, port: int)
 application	proc	set_header :: proc(ctx: ^Context, name: string, value: string) -> bool
-application	proc	state :: proc(ctx: ^Context, $T: typeid) -> ^T
+application	proc	state :: proc(ctx: ^Context, $T: typeid) -> (value: ^T, ok: bool)
 application	proc	static :: proc(a: ^App, prefix: string, dir: string, o: Static_Options = {...})
 application	proc	stats :: proc() -> Server_Stats
 application	proc	stop :: proc(a: ^App)

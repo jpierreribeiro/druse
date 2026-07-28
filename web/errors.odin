@@ -1007,6 +1007,26 @@ FRAMEWORK_MESSAGE_NIL_STATE ::
 	"rejected fail-closed: every request will answer 500 and web.serve will " +
 	"refuse to start."
 
+// The two `web.state` refusals (Phase-1 freeze Amendment 39). They are LOG
+// messages, not fail-closed poisons and not `Framework_Error` members: after
+// the `(^T, bool)` change the framework has not failed when either fires — it
+// answered the question in the return value, and the application owns what
+// happens next. They exist so a caller who ignores `ok` still gets a sentence
+// naming the mistake instead of a bare segfault.
+@(private)
+FRAMEWORK_MESSAGE_STATE_UNREGISTERED ::
+	"uruquim: web.state was called on an application built with web.app() or " +
+	"web.bare(); only web.app_with_state registers state (ADR-004). It returned " +
+	"(nil, false) rather than aborting the process; the handler must check the " +
+	"second result before using the first."
+
+@(private)
+FRAMEWORK_MESSAGE_STATE_TYPE_MISMATCH ::
+	"uruquim: web.state was asked for a type other than the one registered with " +
+	"web.app_with_state; the requested and registered types must match exactly " +
+	"(ADR-004, AMEND-1). It returned (nil, false) rather than aborting the " +
+	"process; the handler must check the second result before using the first."
+
 // WP36 — the two limits members of the fail-closed family.
 //
 // Neither adds a `Framework_Error` member, for the WP30 reason: the enum names

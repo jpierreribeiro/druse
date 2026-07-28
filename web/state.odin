@@ -96,33 +96,71 @@ state_poison_nil :: proc(loc := #caller_location) {
 	logger.procedure(logger.data, .Error, FRAMEWORK_MESSAGE_NIL_STATE, logger.options, loc)
 }
 
-// state returns the application's state as a `^T`.
+// state returns the application's state as a `^T`, and whether it was there.
 //
-// It asserts, before the cast, that state was registered at all and that `T` is
-// EXACTLY the registered type. Both are programmer errors, not runtime
-// conditions: an application either registered its state or did not, and it
-// either asks for the type it registered or asks for a different one. Neither
-// varies with the request, so neither can be discovered by a client — a failing
-// assert aborts on the first request in development, which is the documented
-// fault model (ADR-020: run under a supervisor).
+// FAULT ISOLATION (Phase-1 freeze Amendment 39). This used to return a bare
+// `^T` and ASSERT on both failure modes, which aborted the process. Odin has no
+// recoverable panic (ADR-020), so one handler asking for the wrong type took
+// down every in-flight request on every lane — a whole server stopped by a
+// mistake confined to one route. It now REPORTS and returns `(nil, false)`, so
+// the application decides: answer a 500 for that request and keep serving, or
+// stop deliberately.
+//
+// THE `ok` IS NOT OPTIONAL, deliberately. `#optional_ok` would let every
+// existing call site keep compiling unchanged and silently receive `nil` on the
+// failure path — turning a loud abort into a segfault with no message, which is
+// worse than what it replaces. It is also banned on exported procedures by the
+// freeze gate. A hard two-value return makes every call site acknowledge the
+// question, which is the migration being asked for rather than a change being
+// hidden.
+//
+// IT STILL SAYS SOMETHING. Both failures log at Error level through
+// `context.logger` before returning, on the same private path
+// `state_poison_nil` uses. Without that, a caller who ignores `ok` and
+// dereferences `nil` would get a bare SIGSEGV where they previously got a
+// sentence naming the mistake — trading a clear crash for an unclear one.
+//
+// WHY NO `Framework_Error` MEMBER, and this is the substance of the change
+// rather than an omission. `Framework_Error` means *the framework failed*.
+// After this, it has not: the framework answered the question it was asked, in
+// the return value, and an application that ignores the answer has made an
+// APPLICATION error. Growing a public enum to describe a case the caller now
+// owns would misclassify it, and would spend a frozen ledger slot on it.
 //
 // EXACT TYPE, NOT ASSIGNABLE TYPE. `typeid` equality is the whole check; there
 // is no subtyping walk and no "close enough". Casting a `^Config` to a
 // `^Database` because both are pointers is the defect this exists to make
 // impossible, and a loose comparison would restore it.
 //
-// The returned pointer is the caller's original: writing through it mutates the
-// value `app_with_state` was given, which is the point.
-state :: proc(ctx: ^Context, $T: typeid) -> ^T {
-	assert(
-		ctx.private.state != nil,
-		"uruquim: web.state was called on an application built with web.app() or web.bare(); only web.app_with_state registers state (ADR-004).",
-	)
-	assert(
-		ctx.private.state_type == typeid_of(T),
-		"uruquim: web.state was asked for a type other than the one registered with web.app_with_state; the requested and registered types must match exactly (ADR-004, AMEND-1).",
-	)
-	return (^T)(ctx.private.state)
+// When `ok` is true the returned pointer is the caller's original: writing
+// through it mutates the value `app_with_state` was given, which is the point.
+// When `ok` is false the pointer is `nil` and must not be dereferenced.
+state :: proc(ctx: ^Context, $T: typeid) -> (value: ^T, ok: bool) {
+	if ctx.private.state == nil {
+		state_report(FRAMEWORK_MESSAGE_STATE_UNREGISTERED)
+		return nil, false
+	}
+	if ctx.private.state_type != typeid_of(T) {
+		state_report(FRAMEWORK_MESSAGE_STATE_TYPE_MISMATCH)
+		return nil, false
+	}
+	return (^T)(ctx.private.state), true
+}
+
+// state_report logs one `web.state` refusal at Error level.
+//
+// It is `state_poison_nil`'s mechanism with the message as a parameter: a direct
+// `context.logger` call rather than `core:log`, because `package web` may not
+// import `core:log` (the measured dependency cost recorded on
+// `framework_report`). An application that installs no logger gets no output,
+// which is the same contract every other framework diagnostic has.
+@(private)
+state_report :: proc(message: string, loc := #caller_location) {
+	logger := context.logger
+	if logger.procedure == nil {
+		return
+	}
+	logger.procedure(logger.data, .Error, message, logger.options, loc)
 }
 
 // REQUEST_STATE_MAX bounds the ONE request-scoped value `request_state` stores in

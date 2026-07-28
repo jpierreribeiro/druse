@@ -74,7 +74,11 @@ fmt_int :: proc(n: int) -> string {
 
 @(private)
 start_job :: proc(ctx: ^web.Context) {
-	st := web.state(ctx, App_State)
+	st, state_ok := web.state(ctx, App_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	sync.mutex_lock(&st.job.mu)
 	st.job.progress = 0
 	st.job.done = false
@@ -89,7 +93,11 @@ start_job :: proc(ctx: ^web.Context) {
 // no assumption of replay.
 @(private)
 progress_stream :: proc(ctx: ^web.Context) {
-	st := web.state(ctx, App_State)
+	st, state_ok := web.state(ctx, App_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	s, ok := web.stream(ctx, "text/event-stream")
 	if !ok {
 		web.text(ctx, .OK, "no-stream")
@@ -119,7 +127,11 @@ progress_stream :: proc(ctx: ^web.Context) {
 // GET /result — the processed bytes via bounded response streaming.
 @(private)
 result_stream :: proc(ctx: ^web.Context) {
-	st := web.state(ctx, App_State)
+	st, state_ok := web.state(ctx, App_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	s, ok := web.stream(ctx, "application/octet-stream")
 	if !ok {
 		web.text(ctx, .OK, "no-stream")

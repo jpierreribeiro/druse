@@ -464,7 +464,11 @@ main :: proc() {
 }
 
 show_config :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.ok(ctx, s^)
 }
 ```
@@ -475,9 +479,13 @@ plus that value; a nil pointer rejects the application fail-closed.
 
 - the App stores the **pointer**, so a handler writing through it mutates your
   value. The value must **outlive the App** — put it in `main`, beside it;
-- `web.state(ctx, T)` asserts that state was registered and that `T` is
-  **exactly** the registered type, then returns `^T`. A wrong type aborts: it
-  is a programming error, not a runtime condition (ADR-020);
+- `web.state(ctx, T)` returns `(^T, bool)`. `ok` is false when no state was
+  registered or `T` is not **exactly** the registered type — both programming
+  errors, both logged at Error level, neither varying with the request. **It
+  used to assert, which aborted the process** (ADR-020: no recoverable panic),
+  so one handler asking for the wrong type stopped every in-flight request on
+  every lane. Check `ok`; ignoring it and dereferencing `nil` restores the
+  crash without the message. Freeze Amendment 39;
 - handlers and middleware read it the same way. There is no second name;
 - it is **not** per-request storage, and there is none.
 

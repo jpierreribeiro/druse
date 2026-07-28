@@ -179,82 +179,70 @@ if run_selected "$T" "$NAMES" >/dev/null 2>&1; then
 fi
 echo "CONTROL 1: nil-state rejection deleted -> RED as required"
 
-# --- 2. the typeid assert deleted --------------------------------------------
+# --- 2 and 3. REWRITTEN FOR FREEZE AMENDMENT 39 ------------------------------
+#
+# Controls 2 and 3 used to compile a standalone program, run it as a
+# subprocess, and read its EXIT STATUS, because the contract they pinned could
+# only be observed as a process abort: `web.state` asserted, and an assert takes
+# the test runner with it.
+#
+# `web.state` now returns `(^T, bool)` and does not abort. That did not weaken
+# these controls — it let them stop being subprocess forensics. The behaviour is
+# now observable from an ordinary test on the real dispatch path, so they are
+# expressed the way every other control in this repository is: weaken the guard,
+# require the named test to go RED.
+#
+# THE FINDING FROM THE OLD CONTROL 3 IS PRESERVED, because it is still true and
+# still counter-intuitive. Deleting ONLY the registration check changes nothing
+# observable: an App built by `web.app()` has a ZERO `state_type`, which never
+# equals `typeid_of(T)`, so the type check refuses the unregistered case anyway.
+# Through the public API that check is not independently load-bearing. It exists
+# for its DIAGNOSTIC — "you built this with web.app(), not web.app_with_state"
+# is a far more useful sentence than "the type does not match" — and a message
+# is worth a branch. So control 3 removes the PAIR, exactly as it did before.
+
+# --- 2. the type check deleted -----------------------------------------------
+NAMES="test_wp37_public.wp37_a_wrong_type_is_refused_and_the_server_survives"
 T="$(suite_tree wrong_type)"
-write_probe "$T" wrong_type
-BEFORE="$(probe_exit "$T")"
-test "$BEFORE" -ne 0 ||
-  fail "BROKEN PROBE (2): asking web.state for an unregistered type did NOT abort in the unmutated tree. The typeid assert is not doing anything."
-echo "CONTROL 2 baseline: a wrong-type web.state aborts (exit $BEFORE)"
+OUT="$(run_selected "$T" "$NAMES")" ||
+  { echo "$OUT" >&2; fail "BROKEN PROBE (2): the selected test is not green BEFORE the mutation"; }
+grep -qE 'Finished [1-9][0-9]* tests?' <<<"$OUT" ||
+  { echo "$OUT" >&2; fail "BROKEN PROBE (2): the selection ran no test"; }
 H="$(md5sum "$T/uruquim/web/state.odin" | cut -d' ' -f1)"
 python3 - "$T/uruquim/web/state.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
-old = """	assert(
-		ctx.private.state_type == typeid_of(T),"""
-new = """	assert(
-		true,"""
+old = """	if ctx.private.state_type != typeid_of(T) {"""
+new = """	if false {"""
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "typeid assert deleted" "$T/uruquim/web/state.odin" "$H"
-AFTER="$(probe_exit "$T")"
-test "$AFTER" -eq 0 ||
-  fail "control '2: typeid assert deleted' still aborted (exit $AFTER); the probe is not isolating the assert"
-echo "CONTROL 2: typeid assert deleted -> the wrong-type program STOPPED aborting, as required"
+assert_mutated "type check deleted" "$T/uruquim/web/state.odin" "$H"
+if run_selected "$T" "$NAMES" >/dev/null 2>&1; then
+  fail "control '2: type check deleted' stayed GREEN; a handler asking for a type other than the registered one was handed the registered pointer reinterpreted, and the suite did not notice"
+fi
+echo "CONTROL 2: type check deleted -> the wrong-type test RED as required"
 
-# --- 3. BOTH asserts deleted -------------------------------------------------
-#
-# WHY THIS CONTROL REMOVES TWO THINGS AND NOT ONE, recorded because the first
-# version of it removed one and stayed red. Deleting only the registration
-# assert does NOT stop the abort: an App built by `web.app()` has a ZERO
-# `state_type`, which never equals `typeid_of(T)`, so the typeid assert catches
-# the unregistered case anyway.
-#
-# The honest conclusion, stated rather than papered over: through the PUBLIC
-# API the registration assert is not independently load-bearing. It exists for
-# its DIAGNOSTIC — "you built this with web.app(), not web.app_with_state" is a
-# different and much more useful sentence than "the type does not match" — and
-# a message is worth an assert. What this control proves is that the PAIR is
-# load-bearing, and it proves something sharper than "the program stops
-# refusing": see the note at the assertion below.
+# --- 3. BOTH checks deleted --------------------------------------------------
+NAMES="test_wp37_public.wp37_state_on_an_app_without_state_is_refused_and_survivable"
 T="$(suite_tree no_state)"
-write_probe "$T" no_state
-BEFORE="$(probe_exit "$T")"
-test "$BEFORE" -ne 0 ||
-  fail "BROKEN PROBE (3): web.state on an app() with no state did NOT abort in the unmutated tree."
-echo "CONTROL 3 baseline: web.state without registration aborts (exit $BEFORE)"
+OUT="$(run_selected "$T" "$NAMES")" ||
+  { echo "$OUT" >&2; fail "BROKEN PROBE (3): the selected test is not green BEFORE the mutation"; }
 H="$(md5sum "$T/uruquim/web/state.odin" | cut -d' ' -f1)"
 python3 - "$T/uruquim/web/state.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
-for old in ("""	assert(
-		ctx.private.state != nil,""", """	assert(
-		ctx.private.state_type == typeid_of(T),"""):
+for old in ("""	if ctx.private.state == nil {""", """	if ctx.private.state_type != typeid_of(T) {"""):
     assert old in s, "pattern not found: %r" % old[:40]
-    s = s.replace(old, """	assert(
-		true,""", 1)
+    s = s.replace(old, """	if false {""", 1)
 open(p, 'w').write(s)
 PYEOF
-assert_mutated "both asserts deleted" "$T/uruquim/web/state.odin" "$H"
-AFTER="$(probe_exit "$T")"
-# AND THIS IS THE RESULT WORTH RECORDING, because it is better than the one the
-# control was written expecting. With both asserts gone the program does not
-# quietly succeed — it dies from a SEGMENTATION FAULT (128+SIGSEGV = 139 on
-# this platform) instead of the assert trap (132), because the handler
-# dereferences a nil pointer one line later.
-#
-# So the asserts do not turn a crash into a non-crash. They turn an UNDIAGNOSED
-# memory fault into a DIAGNOSED refusal that names what the programmer did
-# wrong. That is the whole value of them and it is what this control now pins:
-# the exit status must CHANGE, and the mutated status must not be the clean
-# assert trap.
-test "$AFTER" -ne 0 ||
-  fail "control '3: both asserts deleted' made the program SUCCEED (exit 0); it should have dereferenced nil"
-test "$AFTER" -ne "$BEFORE" ||
-  fail "control '3: both asserts deleted' produced the same exit status ($AFTER); the probe is not isolating them"
-echo "CONTROL 3: both asserts deleted -> the diagnosed refusal ($BEFORE) became an undiagnosed fault ($AFTER), as required"
+assert_mutated "both checks deleted" "$T/uruquim/web/state.odin" "$H"
+if run_selected "$T" "$NAMES" >/dev/null 2>&1; then
+  fail "control '3: both checks deleted' stayed GREEN; web.state reported ok on an application that registered no state at all"
+fi
+echo "CONTROL 3: both checks deleted -> the no-state test RED as required"
 
 echo "PASS: all three WP37 mutation controls behaved as required"

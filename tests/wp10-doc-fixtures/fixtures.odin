@@ -394,7 +394,11 @@ Doc_App_State :: struct {
 }
 
 show_config :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, Doc_App_State)
+	s, state_ok := web.state(ctx, Doc_App_State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.ok(ctx, s^)
 }
 

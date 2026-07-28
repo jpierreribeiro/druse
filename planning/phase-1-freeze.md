@@ -2563,3 +2563,78 @@ default and would have passed even if the zero were ignored.
 **Rollback.** Remove the field, the constant, the `Too_Many_Nodes` issue kind
 and the envelope helper; `json_scan_structure` reverts to returning depth alone.
 No other public name or signature changes.
+
+---
+
+## Amendment 39 — Fault isolation: `web.state` returns `(^T, bool)`
+
+**Date: 2026-07-28. Authority: the owner. Ledger effect: none; application
+remains 62 and test-support remains 2. THIS IS A BREAKING CHANGE — the first in
+this document that requires editing existing call sites.**
+
+**What changed.**
+
+	state :: proc(ctx: ^Context, $T: typeid) -> ^T                      (before)
+	state :: proc(ctx: ^Context, $T: typeid) -> (value: ^T, ok: bool)   (after)
+
+Both failure modes — no state registered, and a type other than the registered
+one — used to `assert`. They now log at Error level and return `(nil, false)`.
+
+**Why, and the reasoning is about blast radius rather than taste.** Odin has no
+recoverable panic (ADR-020), so an assert aborts the process. `web.state` is
+called from inside a handler, and handlers run on lanes that share a process
+with every other in-flight request. One handler asking for the wrong type
+therefore stopped **every request on every lane** — a fault confined to one
+route taking down the whole server. The two conditions are genuine programmer
+errors and the old reasoning about that was correct; what it did not weigh is
+that the punishment is collective.
+
+**The `ok` is deliberately NOT `#optional_ok`.** That would let every existing
+call site compile unchanged and silently receive `nil` on the failure path,
+converting a loud abort into a segfault with no message — strictly worse than
+what it replaces. It is also already banned on exported procedures by this
+gate's own extractor rule. A hard two-value return makes each call site
+acknowledge the question, which is the migration being requested rather than a
+change being smuggled in.
+
+**No `Framework_Error` member was added, and that is the substance rather than
+an omission.** `Framework_Error` means *the framework failed*. After this
+change it has not: it answered the question in the return value, and an
+application that ignores the answer has made an application error. Growing a
+frozen public enum to describe a case the caller now owns would misclassify it.
+Both refusals still log — through the same private `context.logger` path
+`state_poison_nil` uses — so a caller who ignores `ok` and dereferences `nil`
+still gets a sentence naming the mistake rather than a bare segfault.
+
+**Negative evidence, and it is the strongest available argument for the
+change.** `tests/wp37-public-surface` carried this comment against the
+wrong-type contract:
+
+> the half a test cannot execute — a wrong type aborts the process by design
+> (ADR-020), and a test that could observe it would mean the assert was not an
+> assert
+
+That was accurate, and it meant the contract went **untested for the entire
+life of the API**, pinned only by a build-time control. It is now executed:
+`wp37_a_wrong_type_is_refused_and_the_server_survives` drives a wrong-type
+handler over the real dispatch path, asserts the 500, and then asserts that the
+NEXT request is served — a line that was unreachable before, because the runner
+was gone. Reverting the type check to an assert kills it with
+`Signal caught: Illegal_Instruction`, which is the control.
+
+The companion case covers the other failure mode (`web.app()`, no state
+registered at all). Both silence `context.logger` for exactly the one refusing
+call and restore it immediately rather than with a `defer` — a deferred restore
+leaves the nil logger installed across the assertions, and `testing.expect*`
+reports through `context.logger`; that exact mistake made another suite in this
+repository unable to report a failure.
+
+**Call sites migrated:** 14 across `examples/07-app-state`,
+`tests/wp99-slice`, `tests/wp37-public-surface`, `tests/wp10-doc-fixtures`,
+`tests/wp91-commit-security` and `tests/support/web_blocking_lab`. The example
+is the one that matters, because it teaches the pattern: it checks `ok` and
+answers `web.internal_error` rather than ignoring it.
+
+**Rollback.** Restore the single-result signature and the two asserts; revert
+the call sites. The two new tests must be deleted with it — they cannot run
+against an asserting implementation, which is the whole point.

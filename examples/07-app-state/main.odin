@@ -6,7 +6,7 @@
 // TYPED inside any handler or middleware.
 //
 //	app := web.app_with_state(&state)     // once, in main
-//	s := web.state(ctx, App_State)        // anywhere, typed
+//	s, ok := web.state(ctx, App_State)    // anywhere, typed; check ok
 //
 // THE CALL SITE HAS NO TYPE ARGUMENTS ON THE HANDLER. That is the whole reason
 // this shape was chosen (ADR-004 option A): the alternative was a parametric
@@ -80,9 +80,23 @@ main :: proc() {
 }
 
 // Reading. `web.state(ctx, App_State)` returns a `^App_State` — the type you
-// named, not a `rawptr` you have to cast and hope about.
+// named, not a `rawptr` you have to cast and hope about — plus an `ok` saying
+// whether it was there.
+//
+// CHECK THE `ok`. It is false only when this application registered no state or
+// you asked for a type other than the one it registered: both are programming
+// mistakes, neither varies with the request, and both are loud in the log. The
+// framework used to ABORT THE PROCESS on them. It no longer does, because Odin
+// has no recoverable panic and one wrong handler was taking down every
+// in-flight request on every lane. Answering 500 for this one request and
+// staying up is the trade; ignoring `ok` and dereferencing `nil` gives back the
+// crash, without the message.
 show_greeting :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.ok(ctx, Greeting{greeting = s.greeting})
 }
 
@@ -92,12 +106,20 @@ show_greeting :: proc(ctx: ^web.Context) {
 // Handlers execute concurrently by default, so the shared counter is atomic.
 // Immutable application state needs no synchronization.
 record_visit :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	_ = sync.atomic_add(&s.visits, 1)
 	web.no_content(ctx)
 }
 
 show_stats :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.ok(ctx, Stats{visits = sync.atomic_load(&s.visits)})
 }
