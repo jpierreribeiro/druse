@@ -79,7 +79,6 @@ bash -n "$URUQUIM_ROOT/build/check_phase7_spec.sh"
 bash -n "$URUQUIM_ROOT/build/check_phase7_freeze.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp87_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp88_controls.sh"
-bash -n "$URUQUIM_ROOT/build/check_wp94_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c01_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_readiness_matrix.sh"
 bash -n "$URUQUIM_ROOT/build/check_c03_controls.sh"
@@ -1136,11 +1135,6 @@ env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp87_co
 # not by luck; the package stays unlinked until WP90.
 echo "--- WP88/WP89 stream registry and cross-lane delivery controls ---"
 env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp88_controls.sh"
-
-# WP93/WP94 — the opt-in spool substrate (WP87 body corpus green unedited)
-# and the streaming multipart parser proven fragmentation-invariant.
-echo "--- WP93/WP94 spool and streaming-multipart controls ---"
-env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp94_controls.sh"
 
 # WP67 — the desired decoder/schema suites are committed RED. The control
 # proves each is red for the pre-registered reason and that the current 500 is

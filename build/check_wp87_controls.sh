@@ -69,8 +69,14 @@ run_green "$URUQUIM_ROOT/tests/wp87-stream-lifecycle" stream-green
 
 # The inbound-body corpus — STAGE ADVANCED BY WP94 (2026-07-23): the spool
 # substrate is implemented, so the body corpus is now required GREEN,
-# unedited — the RED-under-control promise kept. Its case completeness moves
-# to check_wp94_controls.sh, alongside the multipart fragmentation proof.
+# unedited — the RED-under-control promise kept.
+#
+# AUDIT T6/M7: the sentence that used to end this paragraph pointed at
+# check_wp94_controls.sh "alongside the multipart fragmentation proof". Both
+# are gone. The streaming multipart parser they guarded had zero product
+# consumers — the shipped upload path spools raw bytes — and its own finding
+# recorded that wiring it would have been pathological, so it was deleted
+# rather than left as a trap for whoever wired it next.
 run_green "$URUQUIM_ROOT/tests/wp87-body-lifecycle" body-green
 
 # `package web` itself (the public core) still imports NEITHER private

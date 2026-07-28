@@ -118,7 +118,13 @@ echo "test hygiene: no suite silences the logger across its own assertions"
 # (audit T6/T7 — wiring their tests into the gate would enforce dead code), and
 # g76-scale-sockets is a scale lab whose resource profile is not a gate
 # property. Anything else new must be wired in or added here deliberately.
-URUQUIM_ORPHAN_ALLOWED=" wp115-buf-ring wp116-multishot wp117-nbio-multishot wp118-accept-multishot g76-scale-sockets "
+# AUDIT T6 — three of the five entries here are gone, not tolerated.
+# wp115/wp116/wp117 tested the recv-multishot machinery that had zero product
+# consumers; the machinery and the suites were deleted together. wp118 stays
+# ALLOWED and stays in the tree: it proves multishot ACCEPT, which T7 names as
+# the change this project actually indicated, so it is evidence for future work
+# rather than a leftover of abandoned work.
+URUQUIM_ORPHAN_ALLOWED=" wp118-accept-multishot g76-scale-sockets "
 URUQUIM_ORPHANS=""
 for URUQUIM_SUITE_DIR in "$URUQUIM_ROOT"/tests/*/ "$URUQUIM_ROOT"/tests/*/*/; do
   test -d "$URUQUIM_SUITE_DIR" || continue

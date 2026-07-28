@@ -62,7 +62,6 @@ Specifics :: struct #raw_union {
 	// WP117 (Phase 9) — multishot recv over a provided-buffer ring. Linux/io_uring
 	// only; the field exists on every platform's union but is only ever set by the
 	// linux backend.
-	recv_multishot: Recv_Multishot `raw_union_tag:"type=.Recv_Multishot"`,
 	send:     Send      `raw_union_tag:"type=.Send"`,
 	write:    Write     `raw_union_tag:"type=.Write"`,
 	timeout:  Timeout   `raw_union_tag:"type=.Timeout"`,
@@ -83,7 +82,6 @@ Operation_Type :: enum i32 {
 	Dial,
 	Read,
 	Recv,
-	Recv_Multishot, // WP117 (Phase 9) — multishot recv, linux/io_uring only
 	Send,
 	Write,
 	Timeout,
