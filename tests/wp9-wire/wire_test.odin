@@ -156,6 +156,10 @@ wp9_raw_wire_corpus :: proc(t: ^testing.T) {
 		run_wire_case(t, server.port, wire_case)
 	}
 
+	// AUDIT M9 — runs on the corpus's own server, for the reason recorded on the
+	// procedure itself.
+	wp9_shrink_does_not_drop_a_pipelined_request(t, server.port)
+
 	// Across the WHOLE corpus, not one smuggled request may have executed.
 	testing.expectf(
 		t,
@@ -395,14 +399,19 @@ wp9_the_log_filter_cannot_swallow_an_assertion_failure :: proc(t: ^testing.T) {
 // patch guards on `s.end == 0`; this proves the guard is load-bearing by
 // sending exactly the shape that would break without it: a body large enough to
 // trigger the shrink, with a second request already in flight behind it.
-@(test)
-wp9_a_shrink_after_a_large_body_does_not_drop_a_pipelined_request :: proc(t: ^testing.T) {
-	s: Server
-	if !start_server(&s) {
-		testing.fail_now(t, "server must start")
-	}
-	defer stop_server(&s)
-
+// CALLED FROM `wp9_raw_wire_corpus`, NOT AN `@(test)` OF ITS OWN, and that is
+// the correction rather than a style choice.
+//
+// It WAS a separate test. The gate runs this suite with the default four
+// threads (no `-define:ODIN_TEST_THREADS=1`), and this suite keeps ONE server
+// behind a process-global `g_server` on fixed ports — the one-server-per-process
+// rule the transport documents. A second test starting its own server clobbered
+// the corpus's while it was mid-run: green every time on a serial local run,
+// and a four-minute timeout with two tests unfinished in the gate.
+//
+// The gate caught it. Sharing the corpus's server removes the collision without
+// changing this suite's concurrency for everything else.
+wp9_shrink_does_not_drop_a_pipelined_request :: proc(t: ^testing.T, port: int) {
 	// Comfortably over RETAINED_BUF_MAX (256 KiB) so the shrink is reached, and
 	// inside the body cap so the request is served rather than refused.
 	BODY :: 1024 * 1024
@@ -420,7 +429,7 @@ wp9_a_shrink_after_a_large_body_does_not_drop_a_pipelined_request :: proc(t: ^te
 	strings.write_string(&b, "GET /ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
 
 	before := ping_hits
-	endpoint := net.Endpoint{address = net.IP4_Address{127, 0, 0, 1}, port = s.port}
+	endpoint := net.Endpoint{address = net.IP4_Address{127, 0, 0, 1}, port = port}
 	sock, derr := net.dial_tcp(endpoint)
 	testing.expect(t, derr == nil, "must connect")
 	defer net.close(sock)
