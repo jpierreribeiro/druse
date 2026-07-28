@@ -29,8 +29,15 @@ Do not call this more than once.
 body :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb: Body_Callback) {
 	assert(req._body_ok == nil, "you can only call body once per request")
 
+	// URUQUIM PATCH 37 (audit H3) — the shared predicate, not a suffix test.
+	// `headers_validate` has already refused anything this would reject, so the
+	// framing decision here agrees with the admission decision by construction.
 	enc_header, ok := headers_get_unsafe(req.headers, "transfer-encoding")
-	if ok && strings.has_suffix(enc_header, "chunked") {
+	is_chunked := false
+	if ok {
+		is_chunked = transfer_encoding_chunked_final(enc_header)
+	}
+	if is_chunked {
 		_body_chunked(req, max_length, user_data, cb)
 	} else {
 		_body_length(req, max_length, user_data, cb)

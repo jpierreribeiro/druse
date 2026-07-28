@@ -16,6 +16,7 @@
 // held to it without touching this file.
 package wp9_wire
 
+import "base:runtime"
 import "core:log"
 import "core:net"
 import "core:strings"
@@ -172,6 +173,7 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 
 	ping_before := ping_hits
 	echo_before := echo_hits
+	nobody_before := nobody_hits
 	smuggled_before := smuggled_hits
 
 	result := tc.wire_send(port, c.bytes)
@@ -186,7 +188,13 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 	// answered or closed, not left hanging.
 	testing.expectf(t, !result.timed_out, "%s: the adapter hung instead of answering or closing", c.name)
 
-	handler_ran := (ping_hits - ping_before) + (echo_hits - echo_before) > 0
+	// `/nobody` counts too. It was omitted, so the 204 case asserted
+	// `handler_must_run` against a counter its handler never touched and failed
+	// silently for as long as the logger was discarding failures.
+	handler_ran :=
+		(ping_hits - ping_before) +
+		(echo_hits - echo_before) +
+		(nobody_hits - nobody_before) > 0
 	smuggled_ran := smuggled_hits - smuggled_before > 0
 
 	testing.expectf(
@@ -269,7 +277,9 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 // ---------------------------------------------------------------------------
 
 Log_Filter :: struct {
-	inner: log.Logger,
+	inner:            log.Logger,
+	forwarded_errors: int,
+	dropped_errors:   int,
 }
 
 filter_proc :: proc(
@@ -280,8 +290,19 @@ filter_proc :: proc(
 	location := #caller_location,
 ) {
 	filter := (^Log_Filter)(data)
-	if level == .Error {
+	// Swallow the framework's own diagnostics — a rejected request logs them
+	// legitimately — but NEVER a record from THIS suite, because that is how
+	// `testing.expect*` reports a FAILED ASSERTION (core/testing: expectf calls
+	// log.errorf). Filtering on level alone discarded this suite's own failures:
+	// a case demanding status 999 passed, and the H3 framing cases passed with
+	// the fix reverted. Every corpus case was decorative from the commit that
+	// introduced this suite until this line changed.
+	if level == .Error && !strings.contains(location.file_path, "tests/wp9-wire") {
+		filter.dropped_errors += 1
 		return
+	}
+	if level == .Error {
+		filter.forwarded_errors += 1
 	}
 	if filter.inner.procedure != nil {
 		filter.inner.procedure(filter.inner.data, level, text, options, location)
@@ -296,4 +317,38 @@ swallow_framework_log :: proc(filter: ^Log_Filter) -> log.Logger {
 		lowest_level = .Debug,
 		options = context.logger.options,
 	}
+}
+
+// THE CONTROL for the filter itself: it drives `filter_proc` directly with a
+// record from each origin, so a regression is caught by a mechanism the
+// regression cannot disable.
+@(test)
+wp9_the_log_filter_cannot_swallow_an_assertion_failure :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	sink_hits := 0
+	filter.inner = log.Logger {
+		procedure = proc(data: rawptr, level: log.Level, text: string, options: log.Options, location := #caller_location) {
+			(^int)(data)^ += 1
+		},
+		data = rawptr(&sink_hits),
+		lowest_level = .Debug,
+	}
+
+	framework_loc := runtime.Source_Code_Location {
+		file_path = "/repo/web/internal/transport/odin_http_adapter.odin",
+	}
+	filter_proc(&filter, .Error, "backend refused a malformed request", {}, framework_loc)
+	testing.expect_value(t, filter.dropped_errors, 1)
+	testing.expect_value(t, sink_hits, 0)
+
+	suite_loc := runtime.Source_Code_Location {
+		file_path = "/repo/tests/wp9-wire/wire_test.odin",
+	}
+	filter_proc(&filter, .Error, "a wire case failed", {}, suite_loc)
+	testing.expect_value(t, filter.forwarded_errors, 1)
+	testing.expectf(
+		t,
+		sink_hits == 1,
+		"the wire suite's log filter swallowed an assertion failure; every corpus case is then decorative",
+	)
 }

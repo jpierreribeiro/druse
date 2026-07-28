@@ -659,6 +659,41 @@ on_body :: proc(user_data: rawptr, body: http.Body, err: http.Body_Error) {
 
 	rline := req.line.(http.Requestline)
 
+	// AUDIT H3/WP9 — A BODY THAT DID NOT PARSE IS NOT A REQUEST.
+	//
+	// `http.body` reports framing failures through `err`: a Content-Length that
+	// is not a plain decimal (`2, 2`, `-1`, a 20-digit overflow), a non-hex or
+	// negative chunk size, a chunk not terminated by CRLF. This procedure used
+	// to inspect only `.Too_Long` and dispatch on everything else, handing the
+	// handler whatever partial or empty body the failed read left behind.
+	//
+	// Measured on the raw-wire corpus: seven cases whose whole point is "the
+	// handler must not run on an ambiguous request" entered the handler anyway.
+	// They still answered 4xx, but only because the fixture route binds JSON and
+	// the decode failed second — a handler that reads headers, logs, or takes any
+	// side effect before touching the body ran to completion on a request the
+	// parser had already rejected. The corpus could not report this because its
+	// logger discarded every failed assertion (fixed in tests/wp9-wire).
+	//
+	// `.Too_Long` stays a DISPATCHED outcome on purpose: it is a policy refusal
+	// the core turns into a 413 with the framework's error envelope, not a
+	// framing failure. Everything else is refused here, before any application
+	// code observes the request. `_body_ok` is already false on this path, so
+	// `response_must_close` retires the connection rather than leaving it to be
+	// reused against a stream nobody could re-synchronize.
+	// Classified through the backend's own mapping rather than by matching the
+	// scanner's error enum here: that keeps this file from taking a direct
+	// dependency on `core:bufio` (the Phase-1 dependency freeze) and keeps one
+	// owner for the error-to-status question.
+	if err != nil {
+		refusal := http.body_error_status(err)
+		if refusal != http.Status.OK && refusal != http.Status.Payload_Too_Large {
+			res.status = refusal
+			http.respond(res)
+			return
+		}
+	}
+
 	preserved_exchange := exchange.inbound.exchange
 	exchange.inbound = Inbound {
 		exchange   = preserved_exchange,

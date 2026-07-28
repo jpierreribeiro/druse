@@ -272,6 +272,53 @@ corpus_storage := []Wire_Case{
 			connection_must_close = true,
 		},
 
+		// --- H3: the transfer-coding TOKEN, not a suffix --------------------
+		//
+		// All three framing sites used to ask `has_suffix(enc, "chunked")`,
+		// which is true of far more than the chunked coding. Both rejected
+		// cases below returned 201 against this backend before PATCH 37 —
+		// verified by reverting the predicate and re-running this corpus.
+		//
+		// The body is DELIBERATELY a valid `/echo` payload, Content-Type and
+		// all. A malformed body would make these cases pass for the wrong
+		// reason: the request would be refused at content negotiation or at
+		// JSON decode whether or not the framing check works, and the control
+		// would not fail. The first draft of these cases did exactly that.
+		{
+			name = "an unregistered coding ending in 'chunked' is rejected",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n" +
+			"Transfer-Encoding: xchunked\r\nConnection: close\r\n\r\n" +
+			"10\r\n" + `{"name":"grace"}` + "\r\n0\r\n\r\n",
+			outcome = .Rejected,
+			allowed_status = {400},
+			connection_must_close = true,
+			notes = "RFC 9112 6.1: a transfer-coding the server does not understand must not be read as chunked. " +
+			"`xchunked` is not `chunked`, and a hop that agrees disagrees about where the body ends.",
+		},
+		{
+			name = "chunked applied twice is rejected",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n" +
+			"Transfer-Encoding: chunked, chunked\r\nConnection: close\r\n\r\n" +
+			"10\r\n" + `{"name":"grace"}` + "\r\n0\r\n\r\n",
+			outcome = .Rejected,
+			allowed_status = {400},
+			connection_must_close = true,
+			notes = "RFC 9112 6.1: chunked must not be applied more than once. Two Transfer-Encoding " +
+			"headers comma-merge into exactly this value, so this is also the duplicate-header case.",
+		},
+		{
+			name = "the chunked coding is matched case-insensitively",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n" +
+			"Transfer-Encoding: CHUNKED\r\nConnection: close\r\n\r\n" +
+			"10\r\n" + `{"name":"grace"}` + "\r\n0\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {201},
+			handler_must_run = true,
+			connection_must_close = true,
+			notes = "Transfer-coding names are case-insensitive (RFC 9112 6.1). The old suffix test refused " +
+			"this, which was wrong in the other direction; the token compare accepts it.",
+		},
+
 		// --- 18-21: truncation and malformed syntax -------------------------
 		{
 			name = "truncated fixed body is rejected",
