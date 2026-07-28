@@ -29,7 +29,7 @@ a standardized JSON envelope.
 - **Route organisation:** `web.router()` builds a detached `Router` with the
   same verbs and `use`; `web.mount(&app, "/prefix", &r)` attaches it. A
   one-route Router is the route-level guard.
-- **Request headers:** `web.header` (case-insensitive, first occurrence wins)
+- **Request headers:** `web.header` (case-insensitive; a repeated name is joined with `", "` per RFC 9110 §5.3)
   and `web.bearer_token` (strict RFC 6750). Pure lookups — no automatic
   response, nothing logged, values are request-lifetime views.
 - **Observability:** `web.observe` registers one observer that receives a
@@ -900,8 +900,14 @@ bearer_token(ctx)  -> (value, ok)   strict RFC 6750 Authorization parse
 
 Both are PURE lookups: they never commit a response (unlike the extractors —
 an absent header is routinely not an error) and never log. `ok` means
-presence; an empty value is present. Names are case-insensitive; duplicates:
-first occurrence wins. Values are VIEWS valid only for the request — copy to
+presence; an empty value is present. Names are case-insensitive; a name that
+arrived more than once is JOINED in arrival order with `", "` (RFC 9110 §5.3),
+by the transport, before `header` sees it — `X-Dup: a` then `X-Dup: b` reads
+back as `"a, b"`, on a socket and through `web.test_request` alike. (`web.query`
+is the one that takes the first occurrence; headers never did.) A consequence
+worth knowing: a duplicated `Authorization` joins into a value that fails the
+strict bearer grammar, so `bearer_token` refuses it rather than picking one.
+Values are VIEWS valid only for the request — copy to
 persist. The token comes back verbatim: never trimmed, never normalised; a
 sloppy `Authorization` (two spaces, trailing blank, wrong scheme) is rejected,
 not repaired.

@@ -58,14 +58,19 @@ grep -q 'total_malformed == 0' "$URUQUIM_SUITE" ||
 # --- 1b. H-4: every lane 503 carries Retry-After -----------------------------
 grep -q 'total_lane_503_no_retry == 0' "$URUQUIM_SUITE" ||
   fail "the Retry-After assertion is gone. A 503 lane refusal that does not tell the client when to come back invites an immediate retry onto the same contended pool, which collides again. The ramp reliably produces 503s, so the property is checked over real refusals."
-# The ramp must reach SOME named bound, and a run that produced no 503 must SAY
-# so. The old form here demanded `total_lane_503 > 0`, which is not a property
-# of the code but of the scheduler: measured over nine runs the ramp produced no
-# 503 in six, failing the gate on correct code. Both halves are required — the
-# deterministic bound assertion, and the explicit report that keeps a
-# no-503 run from reading as evidence for Retry-After.
-grep -q 'total_refused > 0' "$URUQUIM_SUITE" ||
-  fail "the assertion that the ramp reaches a bound at all is gone; without it every refusal assertion below is vacuous"
+# The ramp must demonstrably overwhelm the server, and a run that produced no
+# 503 must SAY so. Two earlier forms of this both gated on the scheduler rather
+# than on the code:
+#   `total_lane_503 > 0`  — no 503 in six of nine measured runs.
+#   `total_refused > 0`   — a gate run served 36 of 88 and refused NONE; the
+#                           other 52 timed out, because under dedicated accept
+#                           saturation presents as queueing, not refusal. That
+#                           assertion contradicted Campaign C's own thesis.
+# What holds by arithmetic is that 88 clients cannot all be served on a 20-slot
+# budget with 40 ms handlers. Whether the excess is refused or merely made to
+# wait is the scheduling detail that must not gate.
+grep -q "total_served < total_driven" "$URUQUIM_SUITE" ||
+  fail "the assertion that the ramp actually saturates the server is gone; without it every refusal and dwell assertion below can pass on a run that was never under load"
 grep -q 'NOT exercised\|NOT be evidence\|NOT evidence' "$URUQUIM_SUITE" ||
   fail "the suite no longer reports when a run produced no lane 503. Retry-After is then checked over an empty set and the run reads as evidence for a property it never exercised."
 # Campaign C — the dwell counter must be OBSERVABLE and WIRED, replacing the

@@ -406,6 +406,26 @@ Execute an operation.
 
 If the operation is attached to another thread's event loop, it is queued to be executed on that event loop,
 optionally waking that loop up (from a blocking `tick`) with `trigger_wake_up`.
+
+URUQUIM (transport audit T1) — TWO HAZARDS, both load-bearing:
+
+1. `trigger_wake_up = false` BREAKS THE MPSC'S CORRECTNESS RULE for a
+   cross-thread call. The queue tolerates a producer stalled between claiming a
+   slot and storing into it only because every producer wakes the loop after
+   its own store; a consumer that hits the hole stops, and the stalled
+   producer's later wake is what makes it look again. A caller that skips the
+   wake can leave its item — and every item queued behind it — sitting until
+   some unrelated wake happens to arrive. See the invariant comment on
+   `Multi_Producer_Single_Consumer` in mpsc.odin. Safe only for a SAME-THREAD
+   `exec`, where no queue is involved at all. Uruquim never passes it, and
+   `build/check_public_api.sh` keeps it that way.
+
+2. THE ENQUEUE SPINS, so hold no lock across this call. When the target loop's
+   queue is full (128 entries) the loop below yields until it drains, and only
+   the target thread can drain it — at the top of its next tick. If that thread
+   is blocked on a lock this caller holds, neither side can move. This is not
+   hypothetical: it is the deadlock recorded on `stream.try_send`, which is why
+   the slot wake there is invoked outside the slot mutex.
 */
 exec :: proc(op: ^Operation, trigger_wake_up := true) {
 	if op.l == &_tls_event_loop {
