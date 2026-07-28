@@ -1,7 +1,7 @@
 # Documentation program — the teaching guide
 
 A plan an agent can execute. The deliverable is a tree of `.md` files that
-teaches a person to build a real application with Uruquim core + Crystals.
+teaches a person to build a real application with Druse core + Crystals.
 
 This is not the reference. The reference exists and is good. This is the
 missing half: the guide that gets somebody from nothing to a working
@@ -21,7 +21,7 @@ happened. They are the curriculum.
 
 Ledgers:
 
-- `uruquim-miniature/FRICTION.md` — 30 numbered entries, two applications.
+- `druse-miniature/FRICTION.md` — 30 numbered entries, two applications.
 - The "What the application had to do that the library could have" list at the
   bottom of the same file — five items, each a recipe the guide owes the reader.
 
@@ -30,12 +30,64 @@ its slice of that map.
 
 ---
 
-## 2. Current state — measured, not assumed
+## 2. Naming — the product is Druse
+
+The project is renamed. The guide is written against the new name only. **The
+old name does not appear in any file the guide produces.**
+
+| Old | New | What it is |
+|---|---|---|
+| `uruquim` / `uruquim-odin` | `druse` | the core repository |
+| `uruquim-crystals` | `druse-crystals` | the extension repository |
+| `uruquim-miniature` | `druse-miniature` | the ledger repository |
+| `uruquim-board` | `druse-board` | the reference application |
+| collection `uruquim:` | collection `druse:` | the Odin collection of the core |
+| collection `crystals:` | collection `crystals:` | **unchanged** — it never carried the old name |
+
+Two approved prose terms, one meaning each. `GLOSSARY.md` fixes them in W0:
+
+- **Druse** — the core framework. Repository `druse`, collection `druse:`.
+- **Crystals** — the extension library. Repository `druse-crystals`,
+  collection `crystals:`.
+
+`Druse Crystals` is the display name of the repository. Do not use it in body
+text. Do not write `Druse core`, `the Druse framework` or `the Crystals
+library` — the two approved terms already carry those meanings.
+
+### The documentation is renamed first. The source follows.
+
+The rename applies to the documentation now. The source keeps the old name
+until the repositories are renamed, which is a separate change:
+
+| Tree | `.odin` files with `uruquim` | build / CI scripts |
+|---|---|---|
+| `druse` (core) | 202 | 61 |
+| `druse-crystals` | 60 | 9 |
+
+No work package waits for that change. The guide is written in the target
+vocabulary throughout, because the guide is what the new name is for.
+
+One mechanical detail crosses the boundary: the collection flag. The guide
+writes `-collection:druse=...` and `import web "druse:web"`. Against today's
+tree the flag is still `-collection:uruquim=...`. That is **one line, declared
+once**, in `guide/README.md`:
+
+> The collection is named `druse` from the repository rename onward. If your
+> checkout still builds with `-collection:uruquim=`, use that name in the flag
+> and in every `import`. Nothing else on this page changes.
+
+Do not repeat that note in any other file. A caveat repeated in forty files is
+how a rename half-lands. The note is deleted when the source rename lands, and
+§8's gate rule makes its removal detectable.
+
+---
+
+## 3. Current state — measured, not assumed
 
 | Repo | Docs | Lines |
 |---|---|---|
-| `uruquim-odin` (core) | 12 files | 3617 |
-| `crystals` | 9 files | 2276 |
+| `druse` (core) | 12 files | 3617 |
+| `druse-crystals` | 9 files | 2276 |
 
 What already exists and is good — **do not rewrite**:
 
@@ -57,17 +109,18 @@ What is missing or stale — **this is the work**:
 | No build-along for the async half | `jobs`, `mail`, `storage/s3`, `api_key`, `idempotency`, `sse` have no narrative anywhere |
 | `crystals/docs/migrations.md` names `migrate adopt` | that command does not exist; it is `schema adopt` (entry #16) |
 | Vendoring is one flag in a README | a plain clone into `vendor/` produces an embedded repo that does not track (entry #23) |
+| The whole corpus names the product `uruquim` | the product is `druse` (§2) — the existing reference is renamed by the code rename, not by this program |
 
 ---
 
-## 3. Where it lives
+## 4. Where it lives
 
-**Decision: the guide lives in the core repo, at `uruquim-odin/docs/guide/`.**
+**Decision: the guide lives in the core repository, at `druse/docs/guide/`.**
 
-Reasons: it teaches core and Crystals as one product; the core is where a
+Reasons: it teaches Druse and Crystals as one product; the core is where a
 newcomer arrives; and the two biggest gaps (`memory-model`, `cookbook`) are
-already core files. The Crystals repo keeps its reference and links into the
-guide.
+already core files. The Crystals repository keeps its reference and links into
+the guide.
 
 Confirm this before W1. If it is wrong, only the paths change — everything
 below is unaffected.
@@ -75,7 +128,7 @@ below is unaffected.
 ### Tree
 
 ```
-uruquim-odin/docs/
+druse/docs/
   STYLE.md                 # the writing rules (W0)
   GLOSSARY.md              # one term, one meaning (W0)
   guide/
@@ -108,7 +161,7 @@ uruquim-odin/docs/
       post-redirect-get.md
       layout-and-pages.md
       ...
-    FIXES-WANTED.md              # see §7 — the most valuable by-product
+    FIXES-WANTED.md              # see §8 — the most valuable by-product
 ```
 
 Numbered prefixes are load-bearing. For a framework with no precedent, reading
@@ -116,69 +169,83 @@ order is part of the teaching.
 
 ---
 
-## 4. Style — and the verdict on Simplified Technical English
+## 5. Language and style
 
-### What STE is
+### The rule
 
-ASD-STE100 is a controlled English spec from aerospace maintenance
+**Every file is written in English, and follows ASD-STE100.** Both halves are
+decided. Neither is a preference an executing agent may trade away.
+
+English is the rule for the guide, for `STYLE.md`, for `GLOSSARY.md`, and for
+every file the program produces. The author works in Portuguese; the audience
+is international. Portuguese belongs in `planning/`, never under `docs/`.
+
+### What ASD-STE100 is, and what the project takes from it
+
+ASD-STE100 is a controlled English specification from aerospace maintenance
 documentation: roughly 65 writing rules plus an approved dictionary of ~900
 words, each with **one** meaning and one part of speech. Representative rules:
 active voice; one instruction per sentence; procedural sentences ≤20 words,
 descriptive ≤25; paragraphs ≤6 sentences; no gerunds; no synonyms — you write
 `start`, never `initiate` / `commence` / `begin`.
 
-### Verdict: adopt the rules, reject the dictionary, tier by document type
-
-It is a good reference here, for one reason that outweighs the others: **an
-agent writing ~40 files will drift.** Terminology drift is the default outcome
-of generated corpora, and STE's one-term-one-meaning discipline is the direct
-antidote. That the repo's own audience is international, and that its author
-works in Portuguese while the docs are English, makes the case stronger.
-
-Where it does not fit, honestly:
+The project takes the **rules** and supplies its own dictionary. Two facts make
+that the only workable reading, and neither weakens the rule:
 
 - **The dictionary has no software vocabulary.** No `allocator`, `arena`,
-  `cursor`, `borrow`, `idempotency`. STE handles this through Technical Names
-  and Technical Verbs that a project defines for itself — so this is not a
-  blocker, but it does mean you cannot adopt it off the shelf. You inherit the
-  *mechanism* and supply your own approved terms. That is `GLOSSARY.md`.
-- **The no-gerund rule and the word caps fight explanation.** The concepts
-  chapters must persuade a reader that refusing an ORM is right. STE was
-  designed to strip exactly the connective prose that argument needs, and its
-  own scope statement targets procedural and descriptive maintenance text, not
-  rationale.
-- **The spec is a paid ASD document.** You cannot link contributors to it. You
-  must restate the subset you adopt in your own words, in `STYLE.md`.
+  `cursor`, `borrow`, `idempotency`. The specification handles this through
+  Technical Names and Technical Verbs that a project approves for itself. You
+  inherit the *mechanism* and supply the terms. That is `GLOSSARY.md`, and it
+  is what makes the standard usable here rather than a blocker.
+- **The specification is a paid ASD document.** You cannot link a contributor
+  to it. `STYLE.md` restates the adopted subset in the project's own words, and
+  `STYLE.md` — not the specification — is what the linter enforces and what a
+  reviewer cites.
 
-So: **tier the discipline by document type.**
+The reason the standard earns its place, above the others: **an agent writing
+~40 files will drift.** Terminology drift is the default outcome of generated
+corpora. One-term-one-meaning is the direct antidote.
+
+### How strictly it applies, by document type
+
+Controlled vocabulary, active voice and one meaning per term apply everywhere,
+with no exception. The sentence-length caps and the one-action-per-sentence
+rule relax in one place only.
 
 | Document type | Discipline |
 |---|---|
 | `04-rules/`, `05-recipes/`, operations, every trap statement | Full: ≤20-word sentences, imperative, one action per sentence, approved terms only, no synonyms |
-| `02-build-*`, `03-build-*` | Medium: active voice, ≤25 words, approved terms; connective prose allowed |
-| `01-concepts/` | Light: approved terms and active voice only. Argument is the point |
+| `02-build-*`, `03-build-*` | Medium: active voice, ≤25 words, approved terms, no synonyms; connective prose allowed |
+| `01-concepts/` | Relaxed caps only: approved terms, active voice and no synonyms still hold. Argument is the point |
+
+The single concession is `01-concepts/`. Those chapters must persuade a reader
+that refusing an ORM is right, and the standard's own scope statement targets
+procedural and descriptive maintenance text, not rationale. The concession is
+recorded here so it can be withdrawn by decision rather than by drift. It buys
+back sentence length and gerunds. It buys back nothing about vocabulary.
 
 ### The practical stack
 
-STE alone leaves out everything specific to software. Pair it:
+The standard alone leaves out everything specific to software. Pair it:
 
-1. **STE's philosophy** — controlled vocabulary, one meaning per term, short
+1. **ASD-STE100's rules** — controlled vocabulary, one meaning per term, short
    imperative sentences. Restated in `STYLE.md`.
 2. **Google developer documentation style guide** — free, software-specific,
-   and it covers what STE has no opinion on: code samples, CLI formatting, API
-   naming, placeholder conventions.
+   and it covers what the standard has no opinion on: code samples, CLI
+   formatting, API naming, placeholder conventions.
 3. **Vale** — the free prose linter that enforces both mechanically. Existing
    packages for Google and write-good, plus a custom `Vocab` file generated
-   from `GLOSSARY.md`. Without a checker, any style guide decays within weeks.
-   This is the difference between a style guide and a style aspiration.
+   from `GLOSSARY.md`, and a rule that fails on the old product name. Without a
+   checker, any style guide decays within weeks. This is the difference between
+   a style guide and a style aspiration.
 
 ---
 
-## 5. Source material the agent must read before writing
+## 6. Source material the agent must read before writing
 
 In this order. The agent may not write a line before finishing this list.
 
-1. `uruquim-miniature/FRICTION.md` — both tables, all 30 entries, plus the two
+1. `druse-miniature/FRICTION.md` — both tables, all 30 entries, plus the two
    summary lists at the end.
 2. `core/docs/quick-start.md` — the tone to match.
 3. `core/docs/ai-context.md` and `crystals/docs/ai-context.md` — the mental
@@ -186,12 +253,15 @@ In this order. The agent may not write a line before finishing this list.
 4. `crystals/docs/phase-6-freeze.md`, `phase-7.5-composition-freeze.md`,
    `adrs.md` — decisions already made and refused, with reasons. This is what
    keeps the guide from reopening settled questions.
-5. `crystals/examples/notes/` and `uruquim-miniature/cmd/` — working code. The
+5. `crystals/examples/notes/` and `druse-miniature/cmd/` — working code. The
    build-alongs narrate these, they do not invent new programs.
+
+Every one of these still names the product `uruquim` until the code rename
+lands. Read them for content. Write the new name (§2).
 
 ---
 
-## 6. Work packages
+## 7. Work packages
 
 Each is one agent session. Each has an acceptance check that another agent can
 run without the author present.
@@ -202,7 +272,8 @@ run without the author present.
 - `GLOSSARY.md`: every term with more than one spelling in the current corpus
   gets one approved form. Start from the known collisions — `Valid` /
   `Accepted` / `Ok` / `None` for success (#4, #15), and `subject` used for
-  three different borrowed views (#30).
+  three different borrowed views (#30). The product terms of §2 are the first
+  two entries, and the old name is entered as forbidden, not as a synonym.
 - `friction-map.md`: a table of all 30 entries → the file that will prevent it.
   Entries closed by an upstream API change teach nothing about the API as it
   now stands, and are marked `FIXED`: #3 (layout slots), #8 (`web/redirect`),
@@ -260,7 +331,7 @@ that no document currently shows), `bytes-and-encoding.md` (#19, #24, #29),
   `who` helper.
 - Assigned entries: **#1, #5, #6, #7, #19, #20, #21**.
 - **Accept:** the code in the chapters is extracted from a program that the
-  gate builds (§7). Not typed into markdown.
+  gate builds (§8). Not typed into markdown.
 
 ### W5 — `03-build-intake/`
 
@@ -292,21 +363,21 @@ here already knows the framework and wants an answer.
   `content` were the problem) is a message-quality defect with nothing to teach:
   route it to `FIXES-WANTED.md`, not to a chapter.
 - **Accept:** every command in every document was executed by the agent before
-  it was written. Every internal link resolves.
+  it was written. Every internal link resolves. No file names the old product.
 
 ### W8 — Mechanical enforcement
 
-See §7.
+See §8.
 
 ### W9 — Acceptance test
 
-See §8.
+See §9.
 
 ---
 
-## 7. Mechanical guarantees
+## 8. Mechanical guarantees
 
-Three, and they are what separates this from a documentation effort that rots
+Four, and they are what separates this from a documentation effort that rots
 in a quarter.
 
 **Snippets are extracted, never typed.** Mark regions in real Odin source:
@@ -323,12 +394,17 @@ Documentation that cannot drift from the code is the whole point — the repo ha
 already been bitten twice by docs that named commands which do not exist.
 
 **Prose is linted.** Vale, with the Google package plus a `Vocab` generated
-from `GLOSSARY.md`, and per-directory severity implementing the tiering in §4.
+from `GLOSSARY.md`, and per-directory severity implementing the tiering in §5.
 
 **Links are checked.** A dead internal link in a framework guide is worse than
 no guide, because the reader has no other source to fall back on.
 
-All three run in the same gate as the code.
+**The old name fails the gate.** One rule, error severity, over the whole
+`docs/` tree: the string `uruquim`, in any case, is a build failure. A rename
+that half-lands is worse than either name, and prose is where a rename rots
+first.
+
+All four run in the same gate as the code.
 
 ### FIXES-WANTED.md — the by-product that matters most
 
@@ -338,6 +414,8 @@ rename, the base64 padding stripped by hand in three places (#29) is one
 helper, and `var_u16` (#13) is ten lines. After the guide ships, each becomes a
 permanent commitment. **Every trap you document is a trap you have decided to
 keep forever.**
+
+The same window is why §2 renames the collection now rather than later.
 
 So the rule for the agent is: **when you are about to write a warning, stop and
 ask whether it can be an API change, a type, or a gate check instead.** If it
@@ -350,7 +428,7 @@ not stop the bug; a named safe path plus a guard did.
 
 ---
 
-## 8. Acceptance test — reuse the method that produced the ledger
+## 9. Acceptance test — reuse the method that produced the ledger
 
 The ledgers were produced by building a real application and recording every
 stumble. **Run the same procedure against the guide instead of against the
@@ -367,11 +445,13 @@ it.
 
 ---
 
-## 9. Rules for the executing agent
+## 10. Rules for the executing agent
 
 - **Never invent API.** Grep the source for every symbol before writing it. The
   ledger's first four entries are all guessed names that were wrong.
 - **Never write a command you have not run.**
+- **Write `druse`, never `uruquim` (§2).** The one exception is the collection
+  note in `guide/README.md`. Do not add a second one.
 - **Do not rewrite `canonical-patterns.md`, `ai-context.md`, or
   `crystals.md`.** Harvest and link. Duplicated reference is guaranteed to
   diverge.
