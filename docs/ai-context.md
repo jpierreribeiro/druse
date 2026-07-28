@@ -525,18 +525,22 @@ unknown path                     -> 404 {"error":{"code":"not_found",...}}
 path exists under another method -> 405 + Allow, {"error":{"code":"method_not_allowed",...}}
 ```
 
-`Allow` lists only the methods registered for that path, always in the order
-`GET, POST, PUT, PATCH, DELETE`, comma-and-space separated, with no duplicates.
+`Allow` lists every method the path is served under, always in the frozen order
+`GET, [HEAD,] POST, PUT, PATCH, DELETE, OPTIONS`, comma-and-space separated,
+with no duplicates, independent of registration order.
 
-**It does NOT list `HEAD` or `OPTIONS`, and the server answers both anyway.**
-Measured on a route registered only for GET: `HEAD` returns 200 with an empty
-body and `OPTIONS` returns 204 carrying `Allow: GET`. So the resource supports
-three methods and the header names one. RFC 9110 §10.2.1 defines `Allow` as the
-methods *supported* by the resource, so this is a deliberate deviation, not an
-oversight — the five-verb order is frozen (WP32b) and
-`tests/c08-router-corpus` rejects an `Allow` that includes HEAD or OPTIONS.
-Written down here because a client that reads `Allow` to decide whether it may
-send `HEAD` will get the wrong answer, and nothing else in the docs said so.
+**`HEAD` and `OPTIONS` ARE listed, because the server answers both** (audit R8).
+A route registered only for GET emits `Allow: GET, HEAD, OPTIONS`. `HEAD` is
+conditional on GET — it is mapped to GET before matching, so a path without GET
+has no HEAD — and `OPTIONS` is unconditional wherever an `Allow` is emitted.
+Neither is a `Method` member: `Method` names what an application can REGISTER,
+and the framework emits these two as tokens.
+
+This REVERSES the earlier deviation recorded here, which said the two were
+served but never named. The original rejection conflated two things: an
+alphabetical ordering (still rejected — it would make the header depend on
+nothing anyone decided) and the listing itself (restored — RFC 9110 §10.2.1
+defines `Allow` as the methods the resource *supports*, and clients act on it).
 
 ### Route identity
 

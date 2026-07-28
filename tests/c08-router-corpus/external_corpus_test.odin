@@ -405,22 +405,34 @@ c08_method_collection_answers_405_with_a_frozen_order_allow :: proc(t: ^testing.
 			allow = strings.trim_space(line[len("Allow:"):])
 		}
 	}
-	// The ORDER is frozen (WP32b): a set rendered in map order would make this
-	// header non-deterministic, and a non-deterministic header is one no client
-	// or cache can rely on.
-	// The frozen order is `GET, POST, PUT, PATCH, DELETE` — REGISTRATION-
-	// INDEPENDENT and not alphabetical (docs/canonical-patterns.md). A set
-	// rendered in map order would make this header non-deterministic, and a
-	// non-deterministic header is one no client or cache can rely on.
+	// The ORDER is frozen: registration-independent and not alphabetical, so
+	// two applications registering the same methods in different sequences
+	// produce byte-identical headers. A set rendered in map order would make
+	// this header non-deterministic, and a non-deterministic header is one no
+	// client or cache can rely on.
 	//
-	// This assertion was written wrong the first time — as an alphabetical list
-	// including HEAD and OPTIONS — and the corpus caught it. That is worth
-	// leaving a note about: a comparative study's real risk is importing the
-	// OTHER system's expectations, and this is one that slipped in.
+	// AMENDED BY AUDIT R8, and the amendment is a correction to this comment as
+	// much as to the assertion. The note here used to read: "this assertion was
+	// written wrong the first time — as an alphabetical list including HEAD and
+	// OPTIONS — and the corpus caught it", filed as a lesson about importing
+	// another system's expectations.
+	//
+	// TWO THINGS WERE CONFLATED IN THAT REJECTION. The alphabetical ordering
+	// was genuinely wrong and stays rejected. Listing HEAD and OPTIONS was
+	// RIGHT, and was thrown out with it. Measured on a socket against a
+	// GET-only route: HEAD answers 200 and OPTIONS answers 204, while `Allow`
+	// said `GET`. RFC 9110 §10.2.1 defines the field as the set of methods the
+	// resource supports, so the header was describing what an application had
+	// typed rather than what the server does.
+	//
+	// The framework's two automatic verbs are now named: HEAD directly after
+	// GET (it IS the GET route — `implicit_from_token` maps it before matching,
+	// so a path without GET has no HEAD), and OPTIONS last and unconditional
+	// (`options_answer` answers any path that gets this far).
 	testing.expectf(
 		t,
-		allow == "GET, POST, DELETE",
-		"Allow must be the frozen canonical order GET, POST, PUT, PATCH, DELETE (filtered to the registered methods), got %q",
+		allow == "GET, HEAD, POST, DELETE, OPTIONS",
+		"Allow must be the frozen order GET, [HEAD], POST, PUT, PATCH, DELETE, OPTIONS — the registered methods plus the two the framework serves itself (audit R8) — got %q",
 		allow,
 	)
 }

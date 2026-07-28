@@ -282,17 +282,31 @@ unknown path                     → 404
 path registered on another method → 405 + Allow
 ```
 
-`Allow` names only the methods registered for that path, always in the order
-`GET, POST, PUT, PATCH, DELETE`, comma-and-space separated, never duplicated.
+`Allow` names every method the path is served under, always in the frozen order
+`GET, [HEAD,] POST, PUT, PATCH, DELETE, OPTIONS`, comma-and-space separated,
+never duplicated. The order is registration-independent, so two applications
+registering the same methods in different sequences emit byte-identical headers.
 
-**`HEAD` and `OPTIONS` are served but never listed.** On a route registered only
-for GET, `HEAD` answers 200 with an empty body and `OPTIONS` answers 204 with
-`Allow: GET` — three methods supported, one advertised. RFC 9110 §10.2.1 says
-`Allow` is the set of methods the resource *supports*, so this is a known
-deviation held in place on purpose: the five-verb order is frozen (WP32b) and
-the router corpus refuses an `Allow` containing HEAD or OPTIONS, after an
-earlier attempt to add them was rejected as importing another router's
-conventions. Do not read `Allow` as a capability probe for those two methods.
+**`HEAD` and `OPTIONS` are listed because they are served** (audit R8). A route
+registered only for GET emits `Allow: GET, HEAD, OPTIONS`, which is what that
+resource actually answers — measured: `HEAD` returns 200 with an empty body,
+`OPTIONS` returns 204. `HEAD` appears only when GET is registered, because HEAD
+*is* the GET route (it is mapped to GET before matching, so a path without GET
+has no HEAD); `OPTIONS` is unconditional wherever an `Allow` is emitted at all.
+
+Neither is a `Method` member, and neither will be: `Method` names the verbs an
+application can REGISTER, and adding two it cannot register would put
+unconstructible states in a public enum to serve a string. They are emitted as
+tokens by the framework.
+
+**This reverses an earlier decision, and the reversal is narrower than it
+looks.** The first attempt to list them was rejected — correctly — as an
+ALPHABETICAL list, which would have made the header depend on nothing anyone
+had decided. Alphabetical ordering stays rejected. Listing the two methods was
+thrown out with it, and that part was wrong: RFC 9110 §10.2.1 defines `Allow` as
+the set of methods the resource supports, and a cache, a CORS preflight or a
+monitor choosing HEAD over GET reads it and acts on it.
+
 Phase 1 exposes no way to read response headers, so it is verified internally.
 Both bodies are empty until WP6 renders the error envelope.
 
