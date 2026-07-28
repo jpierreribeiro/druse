@@ -22,9 +22,24 @@ grep -qE '^set_header :: proc\(ctx: \^Context, name: string, value: string\) -> 
 grep -qE '^bytes :: proc\(ctx: \^Context, status: Status, content_type: string, data: \[\]u8\)' "$URUQUIM_RESP" ||
   fail "web.bytes is missing its ratified signature"
 
-# 2. The injection guard exists (CR/LF/NUL rejected) and reserved names are refused.
-grep -qE "b == '\\\\r' \|\| b == '\\\\n' \|\| b == 0" "$URUQUIM_RESP" ||
-  fail "the header control-byte (CR/LF/NUL) injection guard is missing"
+# 2. The injection guard exists and reserved names are refused.
+#
+# AMENDED BY AUDIT H1. This used to pin the literal `b == '\\r' || b == '\\n' || b == 0`,
+# which was the guard at the time — and pinning those exact bytes made this
+# check fail when the rule was WIDENED to every byte RFC 9110 §5.5 excludes
+# from a field value. A control that goes red because its guard got STRONGER is
+# pointing at the wrong thing: what C2 ratified is that a control byte in a
+# header value is refused, not which three bytes counted in 2026.
+#
+# It now pins the property, in both directions — the exclusion AND the HTAB
+# exemption, so a rule rewritten to sweep up legal OWS is caught here too. The
+# behavioural evidence is `c2_set_header_refuses_every_control_byte`, which was
+# run with the widened check reverted and named each surviving byte; a grep
+# cannot do that job and this one no longer pretends to.
+grep -qE "if b < 0x20 \|\| b == 0x7f \{" "$URUQUIM_RESP" ||
+  fail "the header control-byte injection guard is missing (RFC 9110 5.5: field content is SP / HTAB / VCHAR / obs-text)"
+grep -qE "if b == '\\\\t' \{" "$URUQUIM_RESP" ||
+  fail "the header control-byte guard no longer admits HTAB, which is legal OWS inside a field value"
 grep -q 'header_name_is_reserved' "$URUQUIM_RESP" ||
   fail "the reserved-header-name guard is missing"
 
