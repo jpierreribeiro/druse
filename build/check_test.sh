@@ -50,4 +50,46 @@ if URUQUIM_ODIN_BIN="/bin/echo" \
   fail "build/check.sh accepted a divergent compiler"
 fi
 
+# ---------------------------------------------------------------------------
+# A TEST SUITE MUST BE ABLE TO FAIL.
+#
+# `testing.expect`, `expectf` and `expect_value` report a failure by calling
+# `log.errorf` through `context.logger` (core/testing/testing.odin). A suite
+# that installs a logger which discards those records is green no matter what
+# it asserts. TWO suites shipped that way and both were found only by asking
+# the question directly:
+#
+#   tests/wp9-wire            dropped every `.Error` record. A case demanding
+#                             status 999 passed. Decorative since the commit
+#                             that created it.
+#   tests/wp67-.../internal   set `context.logger = {}` with a DEFERRED restore,
+#                             so the nil logger covered all three assertions.
+#
+# Two shapes, one rule: silencing the logger is legitimate ONLY around the call
+# whose diagnostic is expected, and it must be restored before anything is
+# asserted. A deferred restore always spans the assertions, so it is banned
+# outright — the narrow form is just as easy to write.
+URUQUIM_DEFERRED_SILENCE="$(grep -rn 'defer context\.logger = ' \
+  "$URUQUIM_ROOT/tests" --include='*.odin' || true)"
+if test -n "$URUQUIM_DEFERRED_SILENCE"; then
+  echo "$URUQUIM_DEFERRED_SILENCE" >&2
+  fail "$(cat <<'EOF'
+a test defers its context.logger restore. That keeps the substituted logger
+installed for the REST OF THE TEST, including every assertion after it, and
+`testing.expect*` reports failures THROUGH that logger — so the suite cannot
+fail. Restore it immediately after the call whose diagnostic is being
+suppressed, not at proc exit.
+EOF
+)"
+fi
+
+# The unconditional form of the same defect: a filter that drops every Error
+# record rather than only the framework's own.
+URUQUIM_BLIND_FILTER="$(grep -rn -A 2 'if level == .Error {' \
+  "$URUQUIM_ROOT/tests" --include='*.odin' | grep -c 'return' || true)"
+if test "$URUQUIM_BLIND_FILTER" -gt 0; then
+  fail "a test logger filter drops EVERY .Error record. That includes core:testing's own assertion failures, so the suite is green whatever it asserts (this is what tests/wp9-wire did). Filter by origin or by message marker, never by level alone."
+fi
+
+echo "test hygiene: no suite silences the logger across its own assertions"
 echo "PASS: WP0 toolchain and repository baseline"

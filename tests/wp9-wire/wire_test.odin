@@ -282,6 +282,21 @@ Log_Filter :: struct {
 	dropped_errors:   int,
 }
 
+// A record the FRAMEWORK or the vendored backend logged about a request. Those
+// are the only ones this suite may discard: a rejected request legitimately
+// produces them, and `odin test` counts any Error record as a failure.
+//
+// Anything else — notably `core:testing`'s own `log.errorf` from an assertion —
+// is forwarded. Matching on the framework's source tree rather than on the
+// suite's own keeps that true when the suite is compiled from somewhere else.
+@(private)
+from_framework :: proc(file_path: string) -> bool {
+	return(
+		strings.contains(file_path, "/web/") ||
+		strings.contains(file_path, "/vendor/") \
+	)
+}
+
 filter_proc :: proc(
 	data: rawptr,
 	level: log.Level,
@@ -297,7 +312,19 @@ filter_proc :: proc(
 	// a case demanding status 999 passed, and the H3 framing cases passed with
 	// the fix reverted. Every corpus case was decorative from the commit that
 	// introduced this suite until this line changed.
-	if level == .Error && !strings.contains(location.file_path, "tests/wp9-wire") {
+	// FAIL OPEN. Swallow only what is positively identified as the framework's
+	// or the backend's own diagnostic; forward everything else, including
+	// anything unrecognized. The asymmetry is deliberate: forwarding a
+	// framework record costs a spurious, loud, easily-fixed failure, while
+	// swallowing an assertion costs a suite that is green and worthless — which
+	// is exactly what happened here.
+	//
+	// Identify by ORIGIN rather than by the suite's own path. An earlier
+	// revision of this fix asked whether the record came from "tests/wp9-wire",
+	// which silently reverted to swallowing assertions the moment the suite was
+	// built from a copy under a different directory — a meta-audit that runs
+	// suites out of a scratch tree caught exactly that.
+	if level == .Error && from_framework(location.file_path) {
 		filter.dropped_errors += 1
 		return
 	}
@@ -335,14 +362,14 @@ wp9_the_log_filter_cannot_swallow_an_assertion_failure :: proc(t: ^testing.T) {
 	}
 
 	framework_loc := runtime.Source_Code_Location {
-		file_path = "/repo/web/internal/transport/odin_http_adapter.odin",
+		file_path = "/home/user/uruquim/web/internal/transport/odin_http_adapter.odin",
 	}
 	filter_proc(&filter, .Error, "backend refused a malformed request", {}, framework_loc)
 	testing.expect_value(t, filter.dropped_errors, 1)
 	testing.expect_value(t, sink_hits, 0)
 
 	suite_loc := runtime.Source_Code_Location {
-		file_path = "/repo/tests/wp9-wire/wire_test.odin",
+		file_path = "/somewhere/else/entirely/wire_test.odin",
 	}
 	filter_proc(&filter, .Error, "a wire case failed", {}, suite_loc)
 	testing.expect_value(t, filter.forwarded_errors, 1)
