@@ -126,6 +126,84 @@ recv_until :: proc(sock: net.TCP_Socket, b: ^strings.Builder, marker: string, ti
 	}
 }
 
+// AUDIT M5 — A COMMITTED RESPONSE IS NOT A STREAM.
+//
+// `web.stream` guarded `stream_detached` and a nil exchange, and nothing else.
+// Its own comment claimed the single-commit guard covered the rest — and it
+// does, in ONE direction: a responder AFTER a stream is refused. A stream after
+// a responder was not, and `stream_begin` detaches the connection before
+// anybody notices.
+//
+// MEASURED before the guard existed:
+//
+//	text(.OK) then stream()          -> 200, chunked, buffered body GONE
+//	text(.Bad_Request) then stream() -> 400, chunked, refusal body GONE,
+//	                                    the stream's chunks sent UNDER THE 400
+//
+// The second is why this is a defect and not a curiosity: status from one
+// response, body from another, silently. Framing was never corrupt — one status
+// line, chunked only, no `Content-Length` beside it — which was worth
+// establishing, because a reply carrying both is the ambiguity WP9 D2 refuses
+// on the request side.
+@(private)
+m5_committed_then_stream :: proc(ctx: ^web.Context) {
+	web.text(ctx, .Bad_Request, "REFUSED-BY-HANDLER")
+	if s, ok := web.stream(ctx); ok {
+		// Must be unreachable. If it runs, the refusal above is about to be
+		// replaced on the wire by whatever this sends.
+		web.stream_send(s, transmute([]u8)string("STREAM-WON"))
+		web.stream_close(s)
+	}
+}
+
+@(test)
+wp96_a_stream_is_refused_after_a_response_is_committed :: proc(t: ^testing.T) {
+	srv: Server
+	srv.port = 51965
+	srv.app = web.app()
+	web.get(&srv.app, "/committed", m5_committed_then_stream)
+	web.get(&srv.app, "/plain", buffered_handler)
+	srv.thread = thread.create_and_start_with_poly_data(&srv, serve_thread)
+	defer stop(&srv)
+	ready := false
+	for _ in 0 ..< 300 {
+		if st, _ := get(srv.port, "/plain"); st == 200 {
+			ready = true
+			break
+		}
+		time.sleep(2 * time.Millisecond)
+	}
+	testing.expect(t, ready, "server must start")
+
+	status, raw := get(srv.port, "/committed")
+
+	testing.expectf(
+		t,
+		status == 400,
+		"the committed refusal must survive; got %d. A 200 here means the stream replaced it.",
+		status,
+	)
+	testing.expect(
+		t,
+		strings.contains(raw, "REFUSED-BY-HANDLER"),
+		"the refusal BODY must reach the client, not be abandoned when the stream detached the connection",
+	)
+	testing.expect(
+		t,
+		!strings.contains(raw, "STREAM-WON"),
+		"web.stream must have returned ok=false, so nothing was streamed under the committed status",
+	)
+	// The framing must belong to ONE response. Both headers together is the
+	// CL+TE ambiguity this project refuses on the request side; it never
+	// happened here, and this keeps it that way.
+	lower := strings.to_lower(raw, context.temp_allocator)
+	testing.expect(
+		t,
+		!(strings.contains(lower, "content-length:") && strings.contains(lower, "transfer-encoding: chunked")),
+		"a reply must not carry both Content-Length and Transfer-Encoding: chunked",
+	)
+}
+
 // AUDIT H5 — AN IDLE STREAM MUST OUTLIVE THE ARRIVAL DEADLINE.
 //
 // This test exists because the line it guards was found to be UNCOVERED.
