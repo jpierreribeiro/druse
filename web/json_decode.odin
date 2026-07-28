@@ -14,6 +14,29 @@ import "core:reflect"
 import "core:strconv"
 import "core:strings"
 
+// AUDIT J6 — DUPLICATE-KEY REJECTION IS DELEGATED, DELIBERATELY, AND GUARDED
+// BY A TEST RATHER THAN BY A SECOND IMPLEMENTATION.
+//
+// The finding asks for the behaviour to be OWNED here instead of delegated to a
+// nightly toolchain pin. It is not, and the reason is the paragraph below this
+// one: this module deliberately does not implement a second JSON grammar.
+// Detecting duplicate keys means walking object keys with unquoting applied,
+// which is a second parser by another name — and two grammars that can disagree
+// about the same body is the defect this file exists to avoid.
+//
+// WHAT REPLACES OWNERSHIP is a pin plus a test. The compiler commit is pinned
+// and `build/check.sh` refuses to run against any other, so the stdlib cannot
+// change underneath this without a deliberate act; and the contract test in
+// `tests/wp67-json-boundary/decoder` fails the moment it does.
+//
+// THAT TEST WAS HALF DECORATIVE UNTIL THIS AUDIT. It claimed to check both the
+// plain and the `\u`-escaped spelling — the escaped one being the interesting
+// case, since those keys collide only after unquoting — and its two request
+// bodies were BYTE-FOR-BYTE IDENTICAL. The escaped claim was never sent. It now
+// is, both cases go red when their duplication is removed, and a third case
+// pins that the refusal comes from duplication rather than from `\u` in a key
+// being refused outright.
+//
 // The parser is already the syntax authority and reports every malformed,
 // duplicate-key and trailing-token case the preceding `json.is_valid` pass
 // reported. Its disposable tree lives in `temporary`, and `context.allocator`
