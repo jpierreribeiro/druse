@@ -70,6 +70,19 @@ ok_handler :: proc(ctx: ^web.Context) {
 	web.text(ctx, .OK, "ok")
 }
 
+// AUDIT H5. `max_request_time` documents itself as bounding ARRIVAL and not
+// application time: "IT DOES NOT BOUND A HANDLER ... The clock starts when a
+// request begins arriving and stops when it has arrived." This handler is the
+// instrument for that clause — the request has fully arrived before it runs, so
+// every nanosecond here is the application's own.
+SLOW_HANDLER_SLEEP :: 900 * time.Millisecond
+
+@(private)
+slow_handler :: proc(ctx: ^web.Context) {
+	time.sleep(SLOW_HANDLER_SLEEP)
+	web.text(ctx, .OK, "slow-but-served")
+}
+
 @(private)
 server_thread :: proc(s: ^Server) {
 	web.serve(&s.app, s.port)
@@ -83,6 +96,7 @@ start :: proc(s: ^Server, port: int, limits: web.Limits) -> bool {
 	web.get(&s.app, "/big", big_handler)
 	web.get(&s.app, "/stall", stall_handler)
 	web.get(&s.app, "/ok", ok_handler)
+	web.get(&s.app, "/slow", slow_handler)
 	web.limits(&s.app, limits)
 	s.thread = thread.create_and_start_with_poly_data(s, server_thread)
 	for _ in 0 ..< 300 {
@@ -301,6 +315,116 @@ open_keepalive :: proc(port: int) -> (net.TCP_Socket, bool) {
 			return {}, false
 		}
 	}
+}
+
+// AUDIT H5 — THE ARRIVAL DEADLINE MUST NOT BOUND A HANDLER.
+//
+// The finding this pins was investigated and REFUTED, and the test exists
+// because of HOW it was refuted rather than despite it. `conn.request_started`
+// really is never cleared when a request finishes arriving — it is stamped in
+// `conn_handle_req` and cleared in `clean_request_loop`, which runs after the
+// RESPONSE — and the sweep's read branch fires exactly on
+// `request_started != 0 && send_started == 0`, which is the window a handler
+// occupies. On paper the deadline bounds handlers, contradicting the contract
+// `web/limits.odin` publishes.
+//
+// It does not, for a reason that is nowhere written down: the sweep is a
+// `timeout_poly` on the lane's own event loop, and a handler runs SYNCHRONOUSLY
+// on that same lane. While the handler is executing, the loop is not ticking,
+// so the sweep cannot run to close the connection. The detached-stream case —
+// the one place the handler returns the lane while the request cycle continues
+// — is closed deliberately: `stream_prepare` clears `request_started` itself.
+//
+// So the contract holds by an ARCHITECTURAL COINCIDENCE. Anything that lets a
+// handler yield its lane back to the loop mid-request — an async handler, a
+// second sweeper, a handler pool that returns before responding — silently
+// turns `max_request_time` into a handler timeout and starts closing
+// connections under slow pages, logged as "request read deadline exceeded",
+// which is a diagnosis pointing at the client for the application's latency.
+//
+// This test pins the published CONTRACT rather than the mechanism, so whoever
+// makes that change hears about it from a red test instead of from production.
+@(test)
+wp90_the_arrival_deadline_does_not_bound_a_handler :: proc(t: ^testing.T) {
+	s: Server
+	limits := web.DEFAULT_LIMITS
+	// A third of the handler's sleep, so a deadline that DID govern handler time
+	// would have fired twice over before the response was ready.
+	limits.max_request_time = i64(300 * time.Millisecond)
+	limits.max_idle_time = 0
+	testing.expect(t, start(&s, 51917, limits), "server must start")
+	defer stop(&s)
+
+	// One write: the request has entirely arrived before the handler begins.
+	began := time.now()
+	status, total := tiny_get(51917, "/slow")
+	elapsed := time.since(began)
+
+	testing.expectf(
+		t,
+		status == 200,
+		"a handler slower than max_request_time must still be served; got status=%d after %v. web/limits.odin: \"IT DOES NOT BOUND A HANDLER ... the clock starts when a request begins arriving and stops when it has arrived\".",
+		status,
+		elapsed,
+	)
+	testing.expect(t, total > 0, "and its body must reach the client")
+	// The handler really did outlive the deadline — otherwise this test would
+	// pass on a build where the sleep never happened, which is the failure mode
+	// a timing assertion exists to exclude.
+	testing.expectf(
+		t,
+		elapsed >= SLOW_HANDLER_SLEEP,
+		"the exchange took %v, less than the handler's own %v sleep: the slow path was not exercised and this test proved nothing",
+		elapsed,
+		SLOW_HANDLER_SLEEP,
+	)
+}
+
+// The other half. A test that only proved "slow handlers are served" would pass
+// just as well on a server with no arrival deadline at all, so the same
+// configuration must still cut off a slow ARRIVAL. Without this, a future
+// change could satisfy the test above by disarming slowloris protection.
+@(test)
+wp90_the_same_deadline_still_cuts_a_slow_arrival :: proc(t: ^testing.T) {
+	s: Server
+	limits := web.DEFAULT_LIMITS
+	limits.max_request_time = i64(300 * time.Millisecond)
+	limits.max_idle_time = 0
+	testing.expect(t, start(&s, 51918, limits), "server must start")
+	defer stop(&s)
+
+	sock, ok := dial(51918)
+	testing.expect(t, ok, "must connect")
+	defer net.close(sock)
+	net.set_option(sock, .Receive_Timeout, 5 * time.Second)
+
+	head := "POST /ok HTTP/1.1\r\nHost: localhost\r\nContent-Length: 10\r\nConnection: close\r\n\r\n"
+	_, send_err := net.send_tcp(sock, transmute([]u8)string(head))
+	testing.expect(t, send_err == nil, "the head must be accepted")
+
+	// Ten body bytes spread over ~600ms, twice the deadline. An IDLE timer would
+	// be reset by every one of them; an arrival deadline is not, and that
+	// distinction is the whole reason this field exists rather than an idle one.
+	cut := false
+	for i in 0 ..< 10 {
+		time.sleep(60 * time.Millisecond)
+		one := [1]u8{'x'}
+		if _, err := net.send_tcp(sock, one[:]); err != nil {
+			cut = true
+			break
+		}
+		_ = i
+	}
+	if !cut {
+		buffer: [256]u8
+		n, err := net.recv_tcp(sock, buffer[:])
+		cut = n == 0 || (err != nil && err != net.TCP_Recv_Error.Timeout)
+	}
+	testing.expect(
+		t,
+		cut,
+		"a body trickled over twice max_request_time must be cut off; if this passes only when the handler test does, the arrival deadline has been disarmed rather than scoped",
+	)
 }
 
 @(test)

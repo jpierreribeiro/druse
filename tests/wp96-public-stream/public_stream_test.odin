@@ -126,6 +126,115 @@ recv_until :: proc(sock: net.TCP_Socket, b: ^strings.Builder, marker: string, ti
 	}
 }
 
+// AUDIT H5 — AN IDLE STREAM MUST OUTLIVE THE ARRIVAL DEADLINE.
+//
+// This test exists because the line it guards was found to be UNCOVERED.
+// `stream_prepare` clears `conn.request_started` when a stream takes over the
+// connection; that clear was deleted and every stream suite in the project
+// stayed green. A guard nothing can notice the removal of is not a guard.
+//
+// WHAT IT GUARDS. The sweep's arrival branch fires on
+// `request_started != 0 && send_started == 0`. For a buffered request the
+// handler holds the lane, so the sweep cannot run mid-request. A detached
+// stream is the one shape that gives the lane back while the request cycle is
+// still open — and `send_started` returns to zero the moment each send
+// completes (`on_response_sent`). So a stream sitting between events has both
+// conditions true, and without the clear the connection is closed at
+// `max_request_time` and logged as "request read deadline exceeded".
+//
+// That is server-sent events, precisely: a subscriber that connects and waits.
+// The failure would look like a client bug — a connection dropped a few seconds
+// in, blamed on a slow request that had finished arriving long before.
+//
+// The stream's OWN protection is unaffected and stays where it belongs: WP92's
+// `write_deadline_override` bounds every chunk send, so a slow CONSUMER is
+// still cut off. What must not bound it is the deadline for bytes that already
+// arrived.
+Idle_Shared :: struct {
+	tok:    web.Stream,
+	opened: sync.Sema,
+	ok:     bool,
+}
+
+g_idle: ^Idle_Shared
+
+@(private)
+idle_stream_handler :: proc(ctx: ^web.Context) {
+	s, ok := web.stream(ctx)
+	g_idle.tok = s
+	g_idle.ok = ok
+	sync.sema_post(&g_idle.opened)
+	// Returns without sending anything. The subscriber is now waiting.
+}
+
+@(test)
+wp96_an_idle_stream_outlives_the_arrival_deadline :: proc(t: ^testing.T) {
+	DEADLINE :: 300 * time.Millisecond
+	// Long enough that the sweep (250 ms granularity) gets several passes at the
+	// connection while it sits idle. A shorter wait could pass by luck.
+	IDLE_WAIT :: 1200 * time.Millisecond
+
+	shared: Idle_Shared
+	g_idle = &shared
+
+	srv: Server
+	srv.port = 51963
+	srv.app = web.app()
+	limits := web.DEFAULT_LIMITS
+	limits.max_request_time = i64(DEADLINE)
+	limits.max_idle_time = 0
+	web.limits(&srv.app, limits)
+	web.get(&srv.app, "/events", idle_stream_handler)
+	web.get(&srv.app, "/plain", buffered_handler)
+	srv.thread = thread.create_and_start_with_poly_data(&srv, serve_thread)
+	defer stop(&srv)
+	ready := false
+	for _ in 0 ..< 300 {
+		if st, _ := get(srv.port, "/plain"); st == 200 {
+			ready = true
+			break
+		}
+		time.sleep(2 * time.Millisecond)
+	}
+	testing.expect(t, ready, "server must start")
+
+	sock, ok := dial(srv.port)
+	testing.expect(t, ok)
+	defer net.close(sock)
+	_, _ = net.send_tcp(sock, transmute([]u8)string("GET /events HTTP/1.1\r\nHost: x\r\n\r\n"))
+	testing.expect(t, sync.sema_wait_with_timeout(&shared.opened, 3 * time.Second), "the handler must run")
+	testing.expect(t, shared.ok, "web.stream must open on a real connection")
+
+	wire: strings.Builder
+	strings.builder_init(&wire, context.temp_allocator)
+	testing.expect(t, recv_until(sock, &wire, "\r\n\r\n", 3 * time.Second), "the head must commit")
+
+	// The subscriber waits, well past the arrival deadline, with nothing sent in
+	// either direction. This is the whole test.
+	time.sleep(IDLE_WAIT)
+
+	// If the connection survived, an event sent now reaches the client.
+	sent := web.stream_send(shared.tok, transmute([]u8)string("late-event\n"))
+	testing.expectf(
+		t,
+		sent != .Closed,
+		"the stream was closed while idle for %v under a %v arrival deadline; stream_send reported %v. `stream_prepare` must clear `conn.request_started` — an idle subscriber is not a slow request.",
+		IDLE_WAIT,
+		DEADLINE,
+		sent,
+	)
+
+	got := recv_until(sock, &wire, "late-event", 3 * time.Second)
+	testing.expectf(
+		t,
+		got,
+		"the event sent after %v idle never reached the client: the connection was closed by the arrival deadline",
+		IDLE_WAIT,
+	)
+
+	web.stream_close(shared.tok)
+}
+
 @(test)
 wp96_a_handler_streams_from_a_worker_and_close_terminates :: proc(t: ^testing.T) {
 	shared: Shared
