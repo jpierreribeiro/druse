@@ -307,6 +307,37 @@ cors_resolve :: proc(ctx: ^Context) {
 	// A preflight is an OPTIONS carrying `Access-Control-Request-Method`. The
 	// header is what distinguishes it from an ordinary OPTIONS, which WP32a
 	// already answers with the route's `Allow`.
+	//
+	// AUDIT R7 — THE PREFLIGHT DELIBERATELY DOES NOT CONSULT THE ROUTE TABLE,
+	// and this note exists because the opposite reads like an obvious fix.
+	//
+	// The finding is factually right: a preflight to a path that does not exist
+	// is answered 204 advertising the configured method list, so the response
+	// names methods that resource may not support. Consulting the router would
+	// make that accurate. It would also be a REGRESSION, and the measurement is
+	// what shows it — four preflights against a server with only `GET /known`
+	// registered:
+	//
+	//	existing path, supported method     204, 183 bytes
+	//	existing path, unsupported method   204, 183 bytes
+	//	nonexistent path                    204, 183 bytes
+	//	nonexistent path, odd method        204, 183 bytes
+	//
+	// Byte-for-byte identical. A cross-origin page cannot read a preflight's
+	// status, but it can tell "preflight passed, my request went out" from
+	// "preflight failed" — so a preflight that answered differently for a path
+	// that exists would be a PATH ENUMERATION ORACLE for any origin on the
+	// allow-list. Uniformity is the property protecting against that, and it is
+	// exactly what route-awareness would destroy.
+	//
+	// AND IT WOULD BUY NOTHING, because the preflight is not the authorization
+	// boundary. Measured on the same server: the real `DELETE /known` the
+	// preflight "permitted" is answered **405**, and the real `GET /nope` is
+	// answered **404**. The router refuses them whatever the preflight said.
+	//
+	// The configured method list is also the APPLICATION's statement, not a
+	// guess: `Cors_Options.methods` is what it chose to advertise. Replacing it
+	// with the route's actual set would override an explicit configuration.
 	if ctx.private.implicit == .Options {
 		if _, asks := cors_arrived_header(ctx, CORS_REQUEST_METHOD_HEADER); asks {
 			ctx.private.cors_preflight = true

@@ -340,6 +340,17 @@ web.cors(&app, web.Cors_Options{
 })
 ```
 
+**The preflight does not consult the route table, on purpose** (audit R7). A
+preflight to a path that does not exist is answered `204` with the configured
+method list, exactly like one to a path that does — measured byte-for-byte
+identical, 183 bytes in both cases. That uniformity is the point: a preflight
+that answered differently for a real path would let any allow-listed origin
+ENUMERATE your paths, since a page can tell a passed preflight from a failed
+one. The preflight is not the authorization boundary — the real `DELETE` it
+"permitted" is still answered `405`, and the real request to a missing path
+still `404`. `Cors_Options.methods` is what your application chose to
+advertise, and nothing overrides it.
+
 ### Limits
 
 ```text
