@@ -2169,6 +2169,47 @@ hands to whatever it already runs, the smallest thing that discharges the WP50
 removable with the WP90 adapter code (vendored patch 28), but the names are a
 public contract from the Closure freeze onward.
 
+## Amendment 33 — Campaign C: `Server_Stats` field replacement
+
+**Date: 2026-07-27. Authority: the verification-campaign owner decision recorded
+in `planning/decisoes-do-dono.md` (Campaign C, Option 4). Ledger effect: one
+frozen struct field replaced in place — `lane_collisions: int` removed,
+`handler_dwell_ns: i64` added. Symbol count unchanged (75 application + 2
+test-support = 77).**
+
+**WHY.** Dedicated accept (WP119) made handlers run synchronously on the lane
+thread, so `handler_lane_enter` cannot return false and the 503-on-collision
+path is unreachable. `lane_collisions` was structurally zero while the lane
+pool saturated with silent socket-buffer queueing, and `tests/c05-saturation`
+was red on `main` because it asserted the dead contract. `handler_dwell_ns`
+(total nanoseconds inside dispatched handlers, as a running total) is the
+observable replacement; the operator differences it for utilization and mean
+dwell, and c05 pins that it moves with real work — its control (accumulator
+stubbed to zero) goes red.
+
+**COMPATIBILITY.** This is a breaking change to a frozen struct: code that
+read `lane_collisions` no longer compiles. Accepted under the ADR-029
+delegation because the removed field could only ever report zero — no
+workable consumer depends on it — and because the replacement answers the
+question operators were told `lane_collisions` answered.
+
+**TIMESTAMP COST (post-implementation, 2026-07-27, shared KVM, 4 vCPU):** two
+`time.now()` + `time.since` calls plus the seq-cst `atomic_add` measure **~600 ns
+per dispatch** in a 5M-iteration tight loop on this host — far above the ~40–50 ns
+vDSO estimate in the Campaign C body. That is an artifact of this machine (a
+shared-tenancy VM with a coarse clock, where `clock_gettime` is not the ~20 ns
+vDSO fast path); on the c5.2xlarge campaign host (bare-metal Nitro) the same
+bracket should cost tens of nanoseconds. The c05 suite passes with the cost in
+place (2.0 s wall for 92 dispatches — under 2% on the worst-case host). **The
+delta is recorded here rather than filed under noise, per the campaign
+instruction.** If this brackets as hot on bare metal, the fallback is reusing
+the deadline sweep's per-lane clock (one timestamp per sweep, amortized)
+instead of per-request reads — noted, not implemented.
+
+| Symbol | Ledger | Campaign | Signature evidence | Behaviour evidence | Doc | Notes |
+|---|---|---|---|---|---|---|
+| `Server_Stats` (field) | A | C | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c05-saturation` (dwell tracked under ramp; control red) | `docs/operations.md` | `lane_collisions` removed; `handler_dwell_ns` added; struct remains 9 integer fields, no string |
+
 ## Amendment 32 — Corrective WP C1 (friction F8-1): `Status` gains 409/413/429/503
 
 **Date: 2026-07-24. Authority: the Corrective Program (`planning/corrective-program-plan.md`),

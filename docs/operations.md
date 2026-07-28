@@ -276,9 +276,24 @@ web.use(&app, web.logger)
 web.use(&app, web.request_id)
 ```
 
-* **`refused_connections()` is your saturation signal.** It rising means you are
-  at `max_connections`. Zero means either nothing was refused or no server is
-  running — those are deliberately not distinguished.
+* **Lane utilization is your saturation signal — `web.stats().handler_dwell_ns`.**
+  A synchronous Handler holds its lane and cannot be preempted, and under
+  dedicated accept a request arriving at a busy lane queues silently on that
+  lane's socket — no 503, no counter, only latency. The old `lane_collisions`
+  counter was retired for exactly that reason (it could only ever read zero).
+  `handler_dwell_ns` is the total nanoseconds lanes spent inside handlers, a
+  running total you difference over an interval:
+
+  ```
+  utilization = Δhandler_dwell_ns / (lanes × Δwall_nanoseconds)
+  mean_dwell  = Δhandler_dwell_ns / Δresponses_sent
+  ```
+
+  Utilization approaching 1 means the lane pool binds first; mean dwell says
+  whether to raise `max_handlers` or shorten the handler. Do not read a flat
+  latency graph as headroom — queueing on a busy lane is invisible there.
+  Capacity is `lanes ÷ mean handler dwell` (C-05 measured the Handler lane
+  binds first).
 * **`observe`** receives a typed event for every framework-detected failure.
   It cannot change the response; it is for exporting to metrics or alerting.
 * **Key every metric on `web.route(ctx)`, never on `ctx.request.path`.** The
@@ -458,15 +473,17 @@ the topology those limitations make mandatory:
 * **Enable `max_write_time` and `max_idle_time`**, sized to your slowest
   legitimate client. They ship OFF because a framework-chosen number would reset
   real clients on upgrade; OFF is not a recommendation. Matrix row 5.
-* **Size `max_handlers` above your expected concurrency, and treat 503 as
-  backpressure.** C-05 measured that the Handler lane is the **first** resource
-  to bind — a synchronous handler holds its lane for its whole duration, and
-  refusals come from **collision on the lane pool, not from the pool being
-  full**: a 503 can arrive with most lanes idle, because there is no queue and no
-  work-stealing between lanes. Capacity is roughly `lanes ÷ handler-dwell`. So a
-  503 is normal load-shedding, it carries `Retry-After: 1`, and the knob for it
-  is `max_handlers` — **not** `max_connections`, which only decides how many
-  clients get to wait. Matrix row 4.
+* **Size `max_handlers` above your expected concurrency, and treat utilization as
+  the sizing signal.** C-05 measured that the Handler lane is the **first**
+  resource to bind — a synchronous handler holds its lane for its whole
+  duration. Under dedicated accept, contention does not answer 503 itself: a
+  request contending for a busy lane queues silently on that lane's socket.
+  Saturation therefore appears as **rising lane utilization**, which you read
+  from `web.stats().handler_dwell_ns`: utilization approaching 1 means the lane
+  pool binds first; the acceptor still answers 503 + `Retry-After: 1` only when
+  **every** lane is blocked. Capacity is roughly `lanes ÷ mean handler dwell`.
+  The knob is `max_handlers` — **not** `max_connections`, which only decides
+  how many clients get to wait. Matrix row 4.
 * **Tune the accept backlog** (`somaxconn`) — it is the kernel's, and the only
   place a connection can queue. Matrix row 11.
 * **One server per process**, and install your own `SIGTERM`/`SIGINT` handler

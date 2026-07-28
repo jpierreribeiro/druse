@@ -385,7 +385,6 @@ c03_a_deadline_expiring_with_the_drain_does_not_double_close :: proc(t: ^testing
 		server.thread = nil
 		web.destroy(&server.app)
 	}
-	g_server = nil
 	for i in 0 ..< STALLED {
 		if live[i] {
 			net.close(socks[i])
@@ -428,12 +427,12 @@ c03_a_stop_after_a_failed_bind_returns :: proc(t: ^testing.T) {
 
 	server: Server
 	server.port = port
-	g_server = &server
 	server.app = web.app()
 	web.limits(&server.app, base_limits())
 	web.get(&server.app, "/ping", ping_handler)
-	server.thread = thread.create_and_start(serve_thread)
-	sync.wait(&server.ready)
+	server.thread = thread.create_and_start_with_poly_data(&server, serve_thread)
+	started := sync.sema_wait_with_timeout(&server.ready, 10 * time.Second)
+	testing.expect(t, started, "the failed-bind server thread must post ready")
 	time.sleep(200 * time.Millisecond)
 
 	returned := stop_server(&server)

@@ -342,16 +342,20 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	after := one_request(server.port)
 	fmt.printf("[c05] after the ramp: %v\n", after)
 
-	// item 2 — the lane-collision counter must be VISIBLE, not just felt as a
-	// 503. Read it on the server BEFORE stop. Every lane 503 a client saw was
-	// counted on the server first, so the server total is at least the
-	// client-observed total; a decorative counter (never incremented) would read
-	// zero while the clients saw hundreds of 503s.
+	// Campaign C — `lane_collisions` is RETIRED: under dedicated accept the
+	// ramp's 503s come only from the acceptor's own saturation refusal, and a
+	// request contending for a busy lane queues silently on the lane's socket
+	// instead of being refused. The observable saturation signal is now dwell:
+	// total nanoseconds lanes spent inside handlers. After the ramp, that
+	// total must cover every request we DROVE (served OR refused), with a
+	// floor way below one dwell per request, because it counts only time
+	// inside the dispatch bracket (queue time excluded).
 	stats := web.stats()
 	fmt.printf(
-		"[c05] web.stats().lane_collisions=%d (clients observed %d lane 503s)\n",
-		stats.lane_collisions,
+		"[c05] web.stats().handler_dwell_ns=%d (clients observed %d lane 503s; handler dwell %v)\n",
+		stats.handler_dwell_ns,
 		total_lane_503,
+		WORK_DWELL,
 	)
 
 	returned := false
@@ -407,16 +411,23 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		"%d lane 503s arrived without a Retry-After header; a refusal that does not say when to retry invites an immediate re-collision (H-4)",
 		total_lane_503_no_retry,
 	)
-	// item 2 — the counter is WIRED, not decorative: the server counted at least
-	// every lane 503 a client observed. Equality is the common case; the server
-	// count can only exceed it (a collision whose 503 lost a connect race still
-	// incremented). A zero here beside hundreds of client 503s is the bug this
-	// assertion exists to catch.
+	// Campaign C — the dwell counter is WIRED, not decorative. `lane_collisions`
+	// read zero next to hundreds of client 503s; a dwell total that stays near
+	// zero while every SERVED request ran a 40 ms handler is the same defect in
+	// a new shape. (The 503s themselves charge no dwell — the acceptor refuses
+	// before dispatch — so the bound counts served work only, with a loose
+	// WORK_DWELL/4 floor to keep scheduler slack out of the assertion.)
+	served_all := 0
+	for clients in LEVELS {
+		served_all += clients
+	}
+	min_dwell_ns := i64(WORK_DWELL / 4)
 	testing.expectf(
 		t,
-		int(stats.lane_collisions) >= total_lane_503,
-		"web.stats().lane_collisions=%d is below the %d lane 503s clients observed; the saturation counter is not wired to the refusal site",
-		stats.lane_collisions,
-		total_lane_503,
+		stats.handler_dwell_ns >= i64(served_all) * min_dwell_ns,
+		"web.stats().handler_dwell_ns=%d is far below the %d served dispatches at %v dwell each; the dwell accumulator is not wired to the dispatch bracket",
+		stats.handler_dwell_ns,
+		served_all,
+		WORK_DWELL,
 	)
 }

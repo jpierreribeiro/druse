@@ -176,21 +176,21 @@ parameter.** Key your metrics on `web.route(ctx)`, never on
 `web.stats()` returns a `Server_Stats` — nine running totals for the send and
 saturation sides, which `refused_connections` did not cover: `responses_sent`,
 `response_bytes` (on the wire), `send_errors`, `write_deadline_aborts`,
-`lane_collisions`, and the three detached-stream counters `stream_refused_full`,
+`handler_dwell_ns`, and the three detached-stream counters `stream_refused_full`,
 `stream_refused_budget`, `stream_aborted_slow` (previously reachable from no
 public API, so a slow-consumer abort was counted and then unseeable). Every
 field is an integer, so redaction holds by construction. Zero when no server
 runs, like `refused_connections`.
 
-**`lane_collisions` is the framework's first saturation signal** (item 2). A
-synchronous Handler holds its lane and cannot be preempted, so a request whose
-lane is already running one is refused with `503 + Retry-After: 1` — and because
-lanes do not share work, that 503 can arrive with OTHER lanes idle. It shows up
-in neither latency nor `refused_connections` (which counts connection
-admission). Capacity is `max_handlers ÷ handler-dwell` (C-05 measured the
-Handler lane binds first). A rising `lane_collisions` says: raise
-`max_handlers`, shorten the handler, or move blocking work (DB, upstream HTTP)
-off the lane — do not read a flat latency graph as headroom.
+**`handler_dwell_ns` is the framework's first saturation signal** (Campaign C).
+It replaced `lane_collisions`, which dedicated accept made structurally dead —
+handlers run synchronously on the lane thread, so the 503-on-collision path
+is unreachable and the old counter could only ever read zero while the lane
+pool saturated with silent queueing. `handler_dwell_ns` is a running total of
+time inside dispatched handlers: difference it over an interval for
+utilization (Δdwell / (lanes × Δwall)) and for mean dwell against
+`responses_sent`. A rising utilization says: raise `max_handlers`, shorten the
+handler, or move blocking work (DB, upstream HTTP) off the lane.
 
 ### Security headers
 

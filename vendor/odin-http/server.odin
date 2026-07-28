@@ -221,16 +221,20 @@ Server :: struct {
 	response_bytes:       i64, // bytes handed to the socket for those responses
 	send_errors:          int, // buffered-response sends that completed with an error
 	write_deadline_aborts:int, // connections aborted by the sweep's write-deadline branch
-	// URUQUIM PATCH 31 (item 2 — lane-collision observability) — BRIDGE. How many
-	// requests were refused with 503 because their lane was already running a
-	// synchronous Handler (`handler_lane_enter` returned false). This is the ONLY
-	// visible signal of the framework's first saturation point: C-05 measured that
-	// the Handler lane binds first (capacity is `lanes ÷ dwell`), and a 503 on
-	// collision can arrive with OTHER lanes idle, so it is invisible in latency and
-	// in `refused_total` (which counts connection admission, a different resource).
-	// Written by the adapter at the collision site, read without a request in hand —
-	// same atomic discipline as the counters above. Deletable with the backend.
-	lane_collisions:      int,
+	// URUQUIM PATCH 35 (Campaign C) — BRIDGE. Total nanoseconds lanes spent
+	// inside dispatched handlers, as a running total for the life of the server
+	// (WP50's counter shape: a scraper differences it). This replaces
+	// `lane_collisions`, which is dead under dedicated accept — handlers run
+	// synchronously on the lane, so `handler_lane_enter` cannot return false
+	// and the 503-on-collision path is unreachable, leaving the documented
+	// saturation signal structurally zero while real saturation presents as
+	// silent head-of-line queueing. The operator derives
+	// utilization = Δhandler_dwell_ns / (lanes × Δwall_ns) and
+	// mean dwell   = Δhandler_dwell_ns / Δresponses_sent.
+	// Written by the lane that runs the dispatch, read without a request in
+	// hand — same atomic discipline as the counters above. Deletable with the
+	// vendored backend when `core:net/http` lands.
+	handler_dwell_ns:     i64,
 	// Once the server starts closing/shutdown this is set to true, all threads will check it
 	// and start their thread local shutdown procedure.
 	//
@@ -1200,7 +1204,10 @@ accept_refuse_handler_saturation :: proc(s: ^Server) {
 	}
 	net.close(sock)
 	_ = sync.atomic_add(&s.active_connections, -1)
-	_ = sync.atomic_add(&s.lane_collisions, 1)
+	// Campaign C: no lane_collisions increment here — this acceptor-side
+	// saturation 503 is a different resource from the dead lane-collision
+	// path; if its count is worth publishing it belongs under its own name
+	// (`refused_saturation_total`), not the retired one.
 }
 
 @(private)
