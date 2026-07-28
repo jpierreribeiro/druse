@@ -262,6 +262,49 @@ The policy REJECTS rather than transforms: a dot segment, an interior empty
 segment, a percent-encoded slash or a percent-encoded NUL is answered `400`
 before route matching. Everything else passes through byte-exact.
 
+**`web.path` therefore hands you the RAW segment, and that has one sharp
+consequence worth spelling out** (audit R9). Measured on a route
+`GET /users/:name`:
+
+```text
+/users/a%20b     -> web.path(ctx, "name") == "a%20b"     (not "a b")
+/users/%61dmin   -> web.path(ctx, "name") == "%61dmin"   (not "admin")
+/users/a%2Fb     -> 400, rejected before matching
+/users/a%00b     -> 400, rejected before matching
+```
+
+The second line is the one to read twice. **If you compare a captured parameter
+against a literal to make an authorization decision, `%61dmin` is not `admin`
+and your check passes it through.** That yields nothing on its own — the raw
+value will not match an `admin` row either — but it is a real bypass the moment
+anything downstream decodes: a proxied upstream, a client library that builds a
+URL from it, a log pipeline that normalises.
+
+The framework will not decode this for you, and that is the same decision as
+the rest of the policy: decoding is normalisation, and every normalisation rule
+is a way for this server and a proxy in front of it to disagree about what a
+path means. What it does instead is reject the two encodings that change a
+path's STRUCTURE — `%2F` and `%00` — so the ambiguity that could reroute a
+request is already closed.
+
+**If a captured parameter feeds an authorization decision, refuse the encoded
+form rather than trying to canonicalise it:**
+
+<!-- pseudocode: an authorization check on a captured parameter -->
+```odin
+name := web.path(ctx, "name")
+if strings.contains(name, "%") {
+	web.bad_request(ctx, "encoded path parameters are not accepted here")
+	return
+}
+if name == "admin" {
+	web.forbidden(ctx, "reserved name")
+	return
+}
+```
+
+One comparison, no decoder, and no second opinion about what the bytes mean.
+
 **Registration conflicts are diagnosed (WP30).** Registering two routes for the
 same method and the same path shape rejects the application fail-closed: every
 request answers 500 and `web.serve` refuses to start, with a diagnostic naming

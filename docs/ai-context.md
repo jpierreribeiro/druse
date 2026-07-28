@@ -529,6 +529,13 @@ Pattern rules:
   percent-encoding is neither decoded nor rewritten. WP31b adds REJECTION, not
   transformation: a dot segment, an interior empty segment, a percent-encoded
   slash or a percent-encoded NUL is answered `400` before matching.
+- **`web.path` returns the RAW segment** (audit R9): `/users/a%20b` gives
+  `"a%20b"`, and `/users/%61dmin` gives `"%61dmin"`. **A naive authorization
+  compare is bypassable** — `%61dmin != "admin"` — which yields nothing alone
+  but is a real bypass once anything downstream decodes. Reject `%` in a
+  parameter that feeds an authorization decision rather than canonicalising it.
+  `%2F` and `%00`, the two that change a path's structure, are already refused
+  with `400`.
 
 Registration conflicts ARE diagnosed (WP30). Two routes registered for the same
 method and the same path shape reject the application fail-closed — every
