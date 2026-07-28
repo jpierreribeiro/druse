@@ -17,7 +17,33 @@ import "core:thread"
 import "core:time"
 import web "uruquim:web"
 
-BIG_BYTES :: 8 * 1024 * 1024 // far beyond any kernel buffer pair
+// The body a HEALTHY reader drains end to end. It only has to be big enough to
+// take more than one write; it is deliberately NOT the stall size, because a
+// fast reader has to swallow the whole thing inside its receive timeout.
+BIG_BYTES :: 8 * 1024 * 1024
+
+// THE STALL BODY MUST EXCEED THE KERNEL BUFFER PAIR, AND 8 MiB DID NOT.
+//
+// The write-deadline case works by stalling a reader so the server's send
+// cannot finish. If the whole body fits in the sender's send buffer plus the
+// receiver's receive buffer, the send COMPLETES, nothing is ever stalled, and
+// the deadline correctly has nothing to abort — the test then fails while the
+// framework behaves exactly as specified.
+//
+// The stall case used BIG_BYTES, commented "far beyond any kernel buffer pair".
+// It is not. Measured on a host with `net.ipv4.tcp_rmem` max 32 MiB and
+// `net.core.wmem_max` 4 MiB, the pair absorbed ~8.3 MiB: an 8 MiB body
+// completed with `write_deadline_aborts` still 0, while 16 MiB aborted as
+// intended. That is also why this case looked like an environment-dependent
+// flake — red for the July audit, green for the session after it, red again
+// here. It never flaked. It is a threshold sitting ~4% under a host-dependent
+// quantity, so it is deterministically red or green PER HOST.
+//
+// 64 MiB clears the worst case those sysctls allow (32 + 4 MiB) with room to
+// spare. It is a SEPARATE constant from BIG_BYTES because making the healthy
+// reader drain 64 MiB inside its own receive timeout made THAT case flaky —
+// the two tests want opposite things from the size.
+STALL_BYTES :: 64 * 1024 * 1024
 
 Server :: struct {
 	app:    web.App,
@@ -30,6 +56,12 @@ big_handler :: proc(ctx: ^web.Context) {
 	// Content is irrelevant to a deadline test; zeroed bytes keep the handler
 	// cheap so a loaded machine cannot turn allocation time into a flake.
 	body := make([]u8, BIG_BYTES, context.temp_allocator)
+	web.text(ctx, .OK, string(body))
+}
+
+@(private)
+stall_handler :: proc(ctx: ^web.Context) {
+	body := make([]u8, STALL_BYTES, context.temp_allocator)
 	web.text(ctx, .OK, string(body))
 }
 
@@ -49,6 +81,7 @@ start :: proc(s: ^Server, port: int, limits: web.Limits) -> bool {
 	s.port = port
 	s.app = web.app()
 	web.get(&s.app, "/big", big_handler)
+	web.get(&s.app, "/stall", stall_handler)
 	web.get(&s.app, "/ok", ok_handler)
 	web.limits(&s.app, limits)
 	s.thread = thread.create_and_start_with_poly_data(s, server_thread)
@@ -128,9 +161,11 @@ stalled_read :: proc(
 	if !ok {return false, 0, 0}
 	defer net.close(sock)
 	// A tiny receive buffer makes the kernel's flow control stall the server's
-	// send almost immediately for an 8 MiB body.
+	// send almost immediately. It is NOT sufficient on its own: the sender's own
+	// send buffer still absorbs megabytes, which is why STALL_BYTES has to clear
+	// the PAIR.
 	net.set_option(sock, .Receive_Buffer_Size, 1024)
-	request := "GET /big HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+	request := "GET /stall HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
 	if _, err := net.send_tcp(sock, transmute([]u8)string(request)); err != nil {
 		return false, 0, 0
 	}
@@ -151,7 +186,11 @@ stalled_read :: proc(
 		m, err := net.recv_tcp(sock, buffer[:])
 		if m > 0 {
 			total += m
-			if total >= BIG_BYTES {
+			// STALL_BYTES, not BIG_BYTES: this reader is draining the stall
+			// route. Comparing against the smaller constant would report "full
+			// body, never terminated" after 8 MiB of a 64 MiB response — the
+			// exact wrong reading, and a green-to-red flip for the wrong reason.
+			if total >= STALL_BYTES {
 				return false, time.since(began), total // full body: never terminated
 			}
 			continue
@@ -179,9 +218,32 @@ wp90_a_stalled_write_is_aborted_at_the_deadline :: proc(t: ^testing.T) {
 	defer stop(&s)
 
 	// Stall past deadline (300ms) + sweep granularity (250ms) + margin.
+	aborts_before := web.stats().write_deadline_aborts
 	terminated, acted_in, total := stalled_read(51910, 900 * time.Millisecond, 3 * time.Second)
+	aborts_after := web.stats().write_deadline_aborts
+
+	// THE DIRECT EVIDENCE, asserted first because it is the one that names the
+	// mechanism. The client-side observations below say the connection ended
+	// early; only this says the WRITE DEADLINE ended it, rather than a reset,
+	// a drain, or the body simply running out. When this suite failed for
+	// buffer-sizing reasons the counter read 0, which is what identified the
+	// cause — the byte-count assertions alone could not tell "the deadline did
+	// not fire" from "the deadline fired late".
+	testing.expectf(
+		t,
+		aborts_after > aborts_before,
+		"web.stats().write_deadline_aborts did not move (%d -> %d): the stalled send was never aborted by the deadline. If the client received the whole body, STALL_BYTES no longer exceeds this host's socket buffer pair and the send never stalled at all.",
+		aborts_before,
+		aborts_after,
+	)
 	testing.expect(t, terminated, "a stalled response must be terminated by the write deadline, observably")
-	testing.expect(t, total < BIG_BYTES, "the aborted response must not have delivered the full body")
+	testing.expectf(
+		t,
+		total < STALL_BYTES,
+		"the aborted response delivered the FULL body (%d of %d bytes): the send completed, so nothing was stalled for the deadline to abort",
+		total,
+		STALL_BYTES,
+	)
 	testing.expect(t, acted_in < 2 * time.Second, "the abort must be visible promptly after the stall, not after megabytes drain")
 }
 
