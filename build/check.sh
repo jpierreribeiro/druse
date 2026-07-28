@@ -1455,6 +1455,18 @@ env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp9_mut
 # "Index 0 is out of range 0..<0" and Illegal_Instruction, which under ADR-020
 # is the whole process. Serial: it asserts on a shared transport type and needs
 # no ports.
+# M8 — orphaned spool files are swept at boot, and nothing else in the
+# directory is. A crash leaves partials behind and nothing removed them, so
+# they accumulated across restarts until a disk filled. The suite's second half
+# is the line the sweep must not cross: files the application put in the
+# directory are not the framework's to delete. Serial: it owns a fixed port.
+echo "--- M8 boot sweep of orphaned spool files (odin test) ---"
+timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+  "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/m8-spool-sweep" \
+  "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$URUQUIM_BIN_TMP/m8-spool-sweep" ||
+  fail "the M8 boot-sweep contract did not pass within the timeout"
+
 echo "--- M6 allocation-failure degradation on the response path (odin test) ---"
 timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
   "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/m6-allocation-failure" \

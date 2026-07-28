@@ -24,6 +24,20 @@ import transport "uruquim:web/internal/transport"
 // §4.2 registered defaults (1 GiB per upload, 8 GiB per process, 64 KiB memory
 // prefix, and handler-lanes − 1 concurrent spools).
 Upload_Config :: struct {
+	// The directory spools are written into. **It is owned by exactly ONE
+	// server instance** (audit M8), and that is a contract rather than a
+	// preference: `enable_upload` SWEEPS leftover `uruquim-spool-` files out of
+	// it at boot, because a crash or a `kill -9` leaves partials behind and
+	// nothing else ever removes them — they accumulate across restarts until a
+	// disk fills.
+	//
+	// Two instances sharing one directory therefore delete each other's live
+	// spools on startup. There is no portable way to tell a live spool from an
+	// abandoned one: an mtime threshold races a slow upload, and file locks are
+	// not in the pinned core. Give each instance its own directory.
+	//
+	// Only the framework's own `uruquim-spool-` prefix is swept; anything else
+	// in the directory is left alone.
 	dir:               string,
 	per_upload_quota:  i64,
 	process_quota:     i64,
