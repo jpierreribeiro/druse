@@ -94,11 +94,18 @@ admission_init :: proc(a: ^Admission, cfg: Spool_Config) -> bool {
 	a.process_bytes = 0
 	a.seq = 0
 	a.initialized = true
-	sweep_orphans(a.cfg.dir)
 	return true
 }
 
 // sweep_orphans removes leftover spool files at boot (audit M8).
+//
+// EXPORTED, AND CALLED FROM THE SERVER START RATHER THAN FROM `admission_init`.
+// It lived in `admission_init` first, and the gate caught why that is wrong:
+// `admission_init` is a library primitive, and several `Admission` values can
+// exist in one process against one directory — the WP87 suite does exactly
+// that, four tests in parallel — so a sweep there deletes another Admission's
+// LIVE spool. Taking ownership of a directory is a property of a SERVER
+// starting, which happens once per process; initialising a struct is not.
 //
 // Nothing cleaned them. A spool is unlinked at request teardown, so the steady
 // state is empty — but a crash, a kill -9 or an OOM leaves the partial behind,
@@ -120,7 +127,6 @@ admission_init :: proc(a: ^Admission, cfg: Spool_Config) -> bool {
 // Failures are ignored on purpose. A directory that cannot be read at boot is
 // reported by the first spool that tries to open a file in it, with a better
 // message than a sweep could give.
-@(private)
 sweep_orphans :: proc(dir: string) {
 	entries, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
 	if err != nil {

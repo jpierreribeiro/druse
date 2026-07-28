@@ -229,6 +229,13 @@ serve :: proc(cfg: Config) -> Serve_Error {
 	// requires a designated directory (no silent /tmp), so a bad config fails the
 	// listen rather than silently disabling uploads.
 	if cfg.upload_enabled {
+		// AUDIT M8 — the boot sweep, HERE and not in `admission_init`. This is
+		// the moment one server takes ownership of the spool directory, once
+		// per process. `admission_init` is a library primitive and several
+		// `Admission` values can share a directory in one process (the WP87
+		// suite runs four such tests in parallel), where a sweep would delete
+		// a live spool belonging to another.
+		ingest.sweep_orphans(cfg.upload_dir)
 		if !ingest.admission_init(
 			&runtime.admission,
 			ingest.Spool_Config {
