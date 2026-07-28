@@ -216,6 +216,62 @@ Limits :: struct {
 	// current adapter implements one synchronous Handler lane per unit; a future
 	// adapter may use another mechanism but must preserve the same bound.
 	max_handlers:     int,
+
+	// AUDIT J3/J4 — the largest number of JSON values and object keys a request
+	// body may contain. Zero means no limit.
+	//
+	// THE MEASURED HOLE THIS CLOSES, and it is one hole with two faces. Both
+	// numbers below are from bodies INSIDE the 4 MiB `max_body`, on this
+	// project's own toolchain and host:
+	//
+	//	`[{},{},…]`, 1,398,101 empty objects, decoded into a 288-byte DTO:
+	//	  RSS peak +588 MB for one request — 147x the body. Sampled at 1 ms
+	//	  during the request, because the arena resets at request end and a
+	//	  before/after delta reports 52 MB, understating the peak 11-fold.
+	//
+	//	one object of 322,000 distinct keys: 1.70 s, 1.99 s, 2.08 s across
+	//	  three runs. Handlers are synchronous on their lane, so that is a
+	//	  lane held for two seconds by one client, with `max_handlers`
+	//	  defaulting to the core count.
+	//
+	// `max_body` is doing its job in both cases — the body really is 4 MiB. It
+	// is simply the wrong dimension: what the cost scales with is the number of
+	// STRUCTURES, and no byte cap can express that. Neither shape is malformed,
+	// so nothing else on the request path has grounds to refuse it.
+	//
+	// WHY NODE COUNT AND NOT DEPTH OR KEY COUNT. Nesting depth is already
+	// bounded (`JSON_NEST_DEPTH_MAX`, against stack exhaustion) and is a
+	// different failure. A key-count cap was the backlog's proposal, and the
+	// measurement is what ruled it out: the J3 shape has 1.4M values and ZERO
+	// keys, so a key cap would not see it at all. Counting values and keys
+	// together is the one quantity both measured costs are linear in — memory at
+	// ~150 bytes per value for the preflight tree, CPU at ~6 us per key.
+	//
+	// COUNTED EXACTLY, in the allocation-free pre-scan that already walks the
+	// body for depth, so this costs no additional pass and refuses BEFORE the
+	// parser allocates anything. The count is derived from structural
+	// punctuation outside strings:
+	//
+	//	values = commas + non-empty containers + 1
+	//	keys   = colons
+	//
+	// which is exact rather than an estimate: every value except the root is a
+	// child of exactly one container, and a container with n children carries
+	// n-1 commas. Empty containers are detected and excluded, which matters
+	// because the J3 shape is 1.4M of them and treating them as non-empty would
+	// double-count the very body this bounds.
+	//
+	// A BREACH IS A 413. The status is about size and the body is oversized —
+	// along a dimension the client can act on, which is why the envelope reports
+	// the effective node limit as a number rather than saying "too complex".
+	//
+	// THE DEFAULT IS ON, unlike the deadline fields, and that asymmetry is
+	// deliberate. Those default off because a framework-chosen duration would
+	// break real slow clients. This one has no such tension: 100,000 nodes is
+	// two to three orders of magnitude above ordinary API traffic while cutting
+	// the measured worst cases to ~15 MB and ~0.3 s. An application doing bulk
+	// imports raises it on purpose, having decided what its lanes can afford.
+	max_json_nodes:   int,
 }
 
 // DEFAULT_LIMITS is what every application gets without asking.
@@ -248,6 +304,11 @@ DEFAULT_LIMITS :: Limits {
 	reserved_conns   = RESERVED_CONNECTION_LIMIT,
 	max_drain_time   = DRAIN_TIME_LIMIT,
 	max_handlers     = 0,
+	// J3/J4: default ON, and the reasoning for the asymmetry with the fields
+	// above is on the field itself. The measured worst cases are 588 MB and
+	// 2.08 s for a single in-limit request; this bounds both without coming
+	// near ordinary traffic.
+	max_json_nodes   = JSON_NODE_LIMIT,
 }
 
 // The public setting is bounded even when explicit. The automatic policy is
@@ -313,6 +374,24 @@ CONNECTION_LIMIT :: 1024
 
 @(private)
 RESERVED_CONNECTION_LIMIT :: 16
+
+// JSON_NODE_LIMIT is the default ceiling on JSON values plus object keys in a
+// request body (audit J3/J4).
+//
+// 100,000 is chosen from the two measurements, not from taste. The preflight
+// tree costs ~150 bytes per value (211 MB measured for 1,398,101 values) and a
+// key costs ~6 us (1.70-2.08 s measured for 322,000). At this ceiling the worst
+// case a single request can reach is therefore roughly:
+//
+//	memory  100,000 x 150 B  ~= 15 MB, against 588 MB measured unbounded
+//	CPU     100,000 x 6 us   ~= 0.3 s, against 2.08 s measured unbounded
+//
+// The upper bound on ordinary traffic is what makes it safe to default ON: a
+// REST payload is tens of values, a page of results a few thousand. Something
+// has to be deliberately bulk-importing to see this number, and that
+// application raises it having decided what its lanes can afford.
+@(private)
+JSON_NODE_LIMIT :: 100_000
 
 
 
@@ -401,6 +480,15 @@ limits :: proc(a: ^App, l: Limits) {
 	// C-04 — the response-size budget follows the same convention: zero means
 	// no limit (a meaningful choice), negative is a mistake.
 	if l.max_response_bytes < 0 {
+		limits_poison(a, FRAMEWORK_MESSAGE_LIMITS_INVALID)
+		return
+	}
+	// J3/J4 — same convention again: zero means no limit, negative is a mistake.
+	// There is no minimum above zero, deliberately. A very small positive value
+	// refuses almost every body, which is a strange configuration but a
+	// COHERENT one — the same latitude `max_response_bytes` gets. What is
+	// refused is the incoherent value.
+	if l.max_json_nodes < 0 {
 		limits_poison(a, FRAMEWORK_MESSAGE_LIMITS_INVALID)
 		return
 	}

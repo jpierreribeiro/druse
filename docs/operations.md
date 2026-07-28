@@ -119,6 +119,22 @@ web.limits(&app, budget)
 | `max_connections` | 1024 | the connection is **closed at accept**, not queued |
 | `reserved_conns` | 16 | slots held back from admission so a shutdown always has room |
 | `max_handlers` | `0` = auto | synchronous Handler capacity; auto resolves from CPU count, bounded to 4..32 |
+| `max_json_nodes` | 100,000 | `413` with code `body_too_complex`, before the JSON parser allocates — the structural cost bound (audit J3/J4) |
+
+**`max_json_nodes` bounds STRUCTURE, which `max_body` cannot see.** Two
+well-formed bodies, both inside the 4 MiB body cap, measured on a 4 vCPU host:
+a 4 MiB array of 1,398,101 empty objects decoded into a 288-byte DTO peaked at
+**588 MB of RSS**; a 4 MiB object of 322,000 keys held one Handler lane for
+**1.6-2.1 s**. Neither is malformed, so nothing else had grounds to refuse them,
+and the body really is 4 MiB in both cases — bytes are simply not what the
+decode costs scale with.
+
+The budget counts JSON values plus object keys, so an N-key object costs
+`2N + 1` and an N-element array of scalars costs `N + 1`. At the default the
+same two bodies cost **20 MB** and **50 ms**. Ordinary API traffic is two to
+three orders of magnitude below the ceiling — a 25,000-key body is still served
+— so raise it only if you knowingly accept bulk documents, and raise it having
+decided what `max_handlers` lanes of that size cost you. `0` disables it.
 
 **`max_request_time` is a REQUEST deadline, not an idle timeout.** An idle timer
 is reset by every byte, so a client trickling one byte per second resets it

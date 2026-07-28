@@ -345,10 +345,11 @@ web.cors(&app, web.Cors_Options{
 ```text
 Limits{max_body, max_request_line, max_headers, max_request_time,
        max_write_time, max_response_bytes, max_idle_time,
-       max_connections, reserved_conns, max_drain_time, max_handlers}
+       max_connections, reserved_conns, max_drain_time, max_handlers,
+       max_json_nodes}
 DEFAULT_LIMITS   4 MiB, 8000, 8000, 30 s (ns), 0 write (ns), 0 response bytes,
                  0 idle (ns), 1024 conns, 16 reserved, 10 s drain (ns),
-                 0 = auto Handlers (4..32)
+                 0 = auto Handlers (4..32), 100_000 JSON nodes
 limits(&app, l)                    set it; before the first request
 ```
 
@@ -409,6 +410,15 @@ fail-closed rather than run on a guess.
   bounded automatic policy (CPU count clamped to 4..32), `1` is explicit
   single-Handler compatibility, and 256 is the largest accepted explicit
   value. Full saturation stops Handler progress; it does not preempt user code.
+- **`max_json_nodes` bounds JSON STRUCTURE, which `max_body` cannot express.**
+  It counts JSON values plus object keys, so an N-key object costs `2N + 1`.
+  Default 100,000; `0` disables. A breach is a `413` with code
+  `body_too_complex` — deliberately not `body_too_large` (a client that retries
+  by shrinking bytes has misread it) and not `invalid_json` (the body is
+  well-formed). Measured, both bodies inside the 4 MiB cap: an array of
+  1,398,101 empty objects peaked at **588 MB RSS**, and a 322,000-key object
+  held one lane for **1.6-2.1 s**; at the default those become **20 MB** and
+  **50 ms**. Audit J3/J4, Phase-1 freeze Amendment 38.
 - Handlers may run concurrently. Mutable application state and observer/logger
   sinks are application-owned and must synchronize themselves.
 

@@ -81,3 +81,38 @@ question is **settled and negative** on the pinned toolchain, for a structural
 reason worth keeping written down: the seed is an address that moves on resize.
 What should replace it is the measured entry above — a per-key CPU cost that
 `max_body` does not bound.
+
+---
+
+## Addendum, same day: the bound, and where the boundary actually fell
+
+Closed by the same field as J3, `Limits.max_json_nodes` (Phase-1 freeze
+Amendment 38), because the two findings are one quantity seen twice. A
+key-count cap — the backlog's proposal for J4 specifically — was rejected on
+J3's evidence: that body has 1.4M values and **zero keys**, so a key cap would
+not have seen it at all.
+
+Same probe, same host. `keys` here counts object keys; the node budget sees
+`2N + 1` for an N-key object, so the 100,000 default admits just under 50,000
+keys:
+
+| keys | nodes | unbounded (control) | with the default |
+|---|---|---|---|
+| 10,000 | 20,001 | 28.7 ms, 200 | **32.4 ms, 200** |
+| 25,000 | 50,001 | 97.6 ms, 200 | **99.3 ms, 200** |
+| 50,000 | 100,001 | 267.6 ms, 200 | **8.8 ms, 413** |
+| 100,000 | 200,001 | 500.0 ms, 200 | **19.3 ms, 413** |
+| 322,000 | 644,001 | 1.57 s, 200 | **50.4 ms, 413** |
+
+**The worst case falls from 1.57 s of Handler-lane time to 50 ms**, and the
+refusal cost is the single scan pass — it grows with body bytes, not with
+structures, which is why the 4 MiB refusal is 50 ms rather than 8.8 ms.
+
+**The boundary landed where it was documented, not where it was hoped.** 25,000
+keys is 50,001 nodes and is served; 50,000 keys is 100,001 nodes and is refused
+by one. That the transition is exactly one node wide is the evidence that the
+count is exact rather than approximate — an estimate would have blurred it.
+
+**Legitimate traffic is untouched, measured rather than assumed.** The 10,000-
+and 25,000-key rows are within noise of the control (32.4 vs 28.7 ms, 99.3 vs
+97.6 ms). The scan is not free, but it is not detectable at these sizes either.

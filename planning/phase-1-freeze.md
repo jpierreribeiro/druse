@@ -2474,3 +2474,92 @@ REQUEST_STATE_MAX` is a `#assert` (compile-time).
 restore the ADR-028 statement). Sixth of the C1..C7 corrective batch. **This is
 the amendment the release-readiness review must ratify as a philosophy change, not
 merely a gap fix — see `planning/adr-028-amendment.md`.**
+
+---
+
+## Amendment 38 — Audit J3/J4: `Limits.max_json_nodes`, no ledger growth
+
+**Date: 2026-07-28. Authority: the owner, on the measurements below. Ledger
+effect: none; application remains 62 and test-support remains 2.**
+
+**Why this exists, in numbers.** Two bodies, both well-formed, both inside
+`max_body`, both measured on this project's toolchain and host:
+
+| body | shape | unbounded cost |
+|---|---|---|
+| 4 MiB | `[{},{},…]`, 1,398,101 empty objects, into a 288-byte DTO | **RSS peak +587.9 MB** |
+| 4 MiB | one object, 322,000 distinct keys | **1.57–2.08 s of one Handler lane** |
+
+The memory figure is a 1 ms high-water sample. A before/after delta reports
++52 MB, because the request arena resets at request end — it understates the
+peak elevenfold, and the first version of that probe would have refuted J3 on
+that artifact.
+
+`max_body` is doing its job in both cases: the body really is 4 MiB. It is the
+wrong dimension. Nothing else on the request path had grounds to refuse either
+body, because neither is malformed.
+
+**Shape and compile evidence.** Existing `Limits` gains `max_json_nodes: int`;
+`DEFAULT_LIMITS.max_json_nodes` is `JSON_NODE_LIMIT` (100,000). The exact field
+and constant shapes are compiler-derived in
+`build/phase1-public-signatures.txt`. No new public name exists — additive to a
+struct whose own doc comment records that "adding a field later is cheap. That
+asymmetry is the entire argument for the size of this struct."
+
+**Why one field and not two.** The backlog carried J3 and J4 as separate items
+and proposed a key-count cap for J4. The measurement ruled that out: the J3
+shape has 1.4M values and **zero keys**, so a key cap would not see it at all.
+Counting values and object keys together is the one quantity both costs are
+linear in — ~150 bytes per value of preflight tree, ~6 µs per key of CPU.
+Nesting depth is a third axis and stays where it was (`JSON_NEST_DEPTH_MAX`,
+against stack exhaustion), because it is a different failure.
+
+**Why the default is ON**, unlike `max_write_time`, `max_idle_time` and
+`max_response_bytes`. Those default off because a framework-chosen duration or
+size would break applications shipping today. This one has no such tension:
+100,000 nodes is two to three orders of magnitude above ordinary API traffic.
+The boundary was measured, not asserted — 25,000 keys (50,001 nodes) is served
+in 99 ms; 50,000 keys (100,001 nodes) is refused.
+
+**Behaviour and negative evidence.** Counting is a named, allocation-free
+procedure, `json_scan_structure`, folded into the depth pre-scan that already
+walked the body — no additional pass — and it refuses **before** the parser
+allocates, since building the tree is the cost being bounded. The count is
+exact:
+
+	values = commas + non-empty containers + 1
+	keys   = colons
+
+Counting containers rather than *non-empty* containers double-counts every
+`{}`, and the J3 body is 1.4 million of them, so that error would land squarely
+on the shape this bounds. `tests/wp67-json-boundary/internal` owns the
+arithmetic directly, with the empty-container cases chosen for exactly that
+trap; both mutations were run and both go red — disarming the cap, and dropping
+the non-empty test (which reports `[{},{}]` as 5 nodes instead of 3).
+
+**Measured after the change, same probes, same host:**
+
+| | unbounded | with the default | |
+|---|---|---|---|
+| J3 `[]Big` RSS peak rise | +587.9 MB | **+19.9 MB** | 29× |
+| J4 322,000 keys | 1.57 s | **50 ms** | 31× |
+
+The unbounded column is the control run and reproduces the original figures to
+within 0.1 MB, which is what licenses reading the other column as an effect
+rather than as drift.
+
+**A breach is a 413** with code `body_too_complex`, not `body_too_large` and not
+`invalid_json`. The client's JSON is correct, so reporting a syntax error would
+send it hunting for a fault that is not there; and a client that retries by
+shrinking bytes has misread a refusal about structure — it could shrink 4 MiB to
+400 KiB while keeping all 322,000 keys. The envelope reports the effective node
+limit as a number, like `max_body`'s.
+
+**Zero means no limit**, following `max_response_bytes`. The test asserts the
+pair: the same 120,001-node body is refused under the default and decoded with
+the field at zero. A first draft used a 15,001-node body, which is *under* the
+default and would have passed even if the zero were ignored.
+
+**Rollback.** Remove the field, the constant, the `Too_Many_Nodes` issue kind
+and the envelope helper; `json_scan_structure` reverts to returning depth alone.
+No other public name or signature changes.

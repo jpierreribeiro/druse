@@ -398,6 +398,15 @@ body :: proc(ctx: ^Context, dst: ^$T) -> bool {
 	case .Unknown_Field:
 		error_unknown_body_field(ctx, json_path_string(&issue.path))
 		return false
+	case .Too_Many_Nodes:
+		// AUDIT J3/J4 — a well-formed body with more structures than the lane can
+		// afford. NOT `Invalid_Json`: the client's JSON is correct and telling it
+		// otherwise would send it hunting for a syntax error that is not there.
+		// It is the same class of refusal as `max_body`, one dimension over, so
+		// it takes the same status and the same shape of envelope — the effective
+		// limit as a number the client can act on.
+		error_commit_body_too_many_nodes(ctx, ctx.private.limits.max_json_nodes)
+		return false
 	case .Unsupported_Destination, .Internal:
 		framework_report(T, .Body_Decode_Failed)
 		error_commit_static(ctx, .Internal_Server_Error, ERROR_BODY_INTERNAL)

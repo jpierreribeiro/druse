@@ -98,6 +98,11 @@ Json_Decode_Issue_Kind :: enum {
 	Unknown_Field,
 	Unsupported_Destination,
 	Internal,
+	// AUDIT J3/J4 — more JSON values and object keys than `max_json_nodes`
+	// admits. Distinct from `Invalid_Json`: the body is well-formed and the
+	// refusal is a resource decision, so it must not be reported as a syntax
+	// error the client could fix by correcting its JSON.
+	Too_Many_Nodes,
 }
 
 @(private)
@@ -737,6 +742,99 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 // arena, then compares that tree with the destination RTTI. The arena is
 // destroyed before the real typed decode, so the caller never owns the
 // preflight tree and every failure path has one obvious cleanup point.
+// json_scan_structure walks a request body once, without allocating, and
+// reports how many JSON nodes it contains and how deeply it nests.
+//
+// TWO ANSWERS FROM ONE PASS because they guard two different failures. Depth
+// guards the stack: the pinned `core:encoding/json` validator and parser are
+// both recursive-descent and neither bounds its own recursion, so a body under
+// `max_body` that is nothing but `[` overflows a worker thread's stack and
+// aborts the process. Node count guards memory and lane time (audit J3/J4): a
+// 4 MiB body of `[{},{},…]` peaked at 588 MB of RSS, and a 4 MiB body of
+// 322,000 object keys held a Handler lane for 2.08 s. Both are well-formed and
+// inside every limit the framework had.
+//
+// THE COUNT IS EXACT, and the arithmetic is worth stating because the obvious
+// version is wrong on precisely the shape that matters:
+//
+//	every value except the root is the child of exactly one container;
+//	a container holding n children carries n-1 commas;
+//	so  values = commas + non-empty containers + 1.
+//
+// Counting containers rather than NON-EMPTY containers double-counts every
+// `{}` — and the J3 shape is 1.4 million of them, so that error would land
+// exactly on the body this exists to bound. A container is empty when its
+// closer arrives with nothing but whitespace since its opener.
+//
+// Object KEYS are added on (one per `:`). They are not JSON values, so they do
+// not belong in the identity above, but each is a string the tree allocates and
+// hashes — and they are the entire cost J4 measured, on a body whose value
+// count is otherwise unremarkable.
+//
+// String contents are skipped with escape tracking, so punctuation inside a
+// JSON string is never miscounted — a body of `{"a":"{{{{,,,,"}` counts as the
+// two nodes it is.
+//
+// It is called on EVERY JSON body, so it does no work per byte beyond a switch.
+@(private)
+json_scan_structure :: proc(raw: []u8) -> (nodes: int, max_depth: int) {
+	depth := 0
+	in_string := false
+	escaped := false
+	commas := 0
+	colons := 0
+	non_empty_containers := 0
+	// True while nothing but whitespace has been seen since the innermost
+	// container opened, which is what makes that container empty.
+	fresh_container := false
+
+	for b in raw {
+		if in_string {
+			if escaped {
+				escaped = false
+			} else if b == '\\' {
+				escaped = true
+			} else if b == '"' {
+				in_string = false
+			}
+			continue
+		}
+		switch b {
+		case '"':
+			in_string = true
+			fresh_container = false
+		case '[', '{':
+			depth += 1
+			if depth > max_depth {
+				max_depth = depth
+			}
+			fresh_container = true
+		case ']', '}':
+			depth -= 1
+			if !fresh_container {
+				non_empty_containers += 1
+			}
+			// The container that just closed is content of its parent, so the
+			// parent is not fresh whatever it looked like before.
+			fresh_container = false
+		case ',':
+			commas += 1
+			fresh_container = false
+		case ':':
+			colons += 1
+			fresh_container = false
+		case ' ', '\t', '\r', '\n':
+		// Whitespace leaves `{   }` empty.
+		case:
+			// A scalar byte: a digit, `-`, or a letter of true/false/null. Its
+			// container has content.
+			fresh_container = false
+		}
+	}
+
+	return commas + non_empty_containers + 1 + colons, max_depth
+}
+
 @(private)
 body_json_preflight :: proc(
 	raw: []u8,
@@ -752,36 +850,27 @@ body_json_preflight :: proc(
 	// pre-scan is a single allocation-free pass that counts bracket/brace depth
 	// while skipping string contents, so a `[` inside a JSON string is never
 	// miscounted. A body deeper than the ceiling is a malformed request.
+	//
+	// AUDIT J3/J4 — the same pass also counts STRUCTURES, and the body is
+	// refused below if it carries more than the lane can afford. See
+	// `json_scan_structure` for the arithmetic and `max_json_nodes` for the
+	// measurements that set the ceiling.
+	node_count, max_depth := json_scan_structure(raw)
+	if max_depth > JSON_NEST_DEPTH_MAX {
+		return Json_Decode_Issue{kind = .Invalid_Json}
+	}
+
+	// Refused BEFORE the parser, which is the whole point: doing this after the
+	// tree exists would bound nothing, since building the tree is the cost.
 	{
-		depth := 0
-		max_depth := 0
-		in_string := false
-		escaped := false
-		for b in raw {
-			if in_string {
-				if escaped {
-					escaped = false
-				} else if b == '\\' {
-					escaped = true
-				} else if b == '"' {
-					in_string = false
-				}
-				continue
-			}
-			switch b {
-			case '"':
-				in_string = true
-			case '[', '{':
-				depth += 1
-				if depth > max_depth {
-					max_depth = depth
-				}
-			case ']', '}':
-				depth -= 1
-			}
-		}
-		if max_depth > JSON_NEST_DEPTH_MAX {
-			return Json_Decode_Issue{kind = .Invalid_Json}
+		node_cap := ctx.private.limits.max_json_nodes
+		// A zero here is a Context the framework built without a budget, not an
+		// application choice — `web.limits` refuses a negative and an
+		// application that wants no limit sets zero deliberately. The read path
+		// follows `max_body`'s precedent and treats it as "no limit" rather than
+		// substituting a default the caller never asked for.
+		if node_cap > 0 && node_count > node_cap {
+			return Json_Decode_Issue{kind = .Too_Many_Nodes}
 		}
 	}
 

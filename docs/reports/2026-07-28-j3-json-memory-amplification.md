@@ -75,3 +75,36 @@ the peak scales with is element count times destination size, neither of which
 `/tmp/…/j3probe` in the session scratch, or rebuild it: two routes differing
 only in bound type, a 4 MiB `[{},…]` body, and a 1 ms RSS sampler thread. The
 sampler is the part that matters.
+
+---
+
+## Addendum, same day: the bound, and what it actually costs
+
+The finding above is closed by `Limits.max_json_nodes` (Phase-1 freeze
+Amendment 38), defaulting to 100,000 JSON values plus object keys. Counting is
+folded into the depth pre-scan that already walked the body, so it adds no pass,
+and the refusal happens **before** the parser allocates — which is the only
+place it can help, since building the tree is the cost.
+
+Same probe, same host, same 4 MiB body of 1,398,101 empty objects:
+
+| bound type | unbounded (control) | with the default |
+|---|---|---|
+| `[]Small` | +210.9 MB, 200 | **+12.2 MB, 413** |
+| `[]Big` | +587.9 MB, 200 | **+19.9 MB, 413** |
+
+**The control column is the reason to believe the other one.** It is this
+probe re-run with `max_json_nodes = 0`, and it reproduces the original
+measurement to within 0.1 MB (+587.9 against +588). A 29× drop measured against
+an instrument that had drifted would be worth nothing; measured against an
+instrument that still reports the old number on the old configuration, it is an
+effect.
+
+Wall-clock for the whole probe fell from 5.88 s to 1.00 s in the same pair,
+which is the J4 half of the same mechanism showing up here.
+
+**What this does not claim.** The bound is per REQUEST. Concurrency still
+multiplies it: 100,000 nodes is ~15 MB of preflight tree, so `max_handlers`
+lanes each decoding a maximal body is still `max_handlers × ~15 MB`, and the
+aggregate remains a cgroup's job — the same division of labour C-04 records for
+`max_response_bytes`.
