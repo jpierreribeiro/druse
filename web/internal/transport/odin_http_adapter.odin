@@ -637,12 +637,17 @@ dispatch_upload :: proc(exchange: ^Exchange) {
 	req := exchange.req
 	rline := req.line.(http.Requestline)
 	preserved_exchange := exchange.inbound.exchange
+	neutral, headers_ok := neutral_headers(req, context.temp_allocator)
+	if !headers_ok {
+		refuse_exhausted(exchange.res)
+		return
+	}
 	exchange.inbound = Inbound {
 		exchange = preserved_exchange,
 		method   = rline.method_raw,
 		path     = req.url.path,
 		query    = req.url.query,
-		headers  = neutral_headers(req, context.temp_allocator),
+		headers  = neutral,
 		peer     = render_peer(req.client.address, context.temp_allocator),
 		upload   = rawptr(&exchange.spool),
 	}
@@ -695,6 +700,11 @@ on_body :: proc(user_data: rawptr, body: http.Body, err: http.Body_Error) {
 	}
 
 	preserved_exchange := exchange.inbound.exchange
+	neutral, headers_ok := neutral_headers(req, context.temp_allocator)
+	if !headers_ok {
+		refuse_exhausted(res)
+		return
+	}
 	exchange.inbound = Inbound {
 		exchange   = preserved_exchange,
 		// WP9 D7 — the ORIGINAL token. A valid but non-Phase-1 method
@@ -704,7 +714,7 @@ on_body :: proc(user_data: rawptr, body: http.Body, err: http.Body_Error) {
 		method     = rline.method_raw,
 		path       = req.url.path,
 		query      = req.url.query,
-		headers    = neutral_headers(req, context.temp_allocator),
+		headers    = neutral,
 		// WP48: the peer, from the accepted connection rather than from any
 		// header. Rendered into the request's own temp allocator, so it lives
 		// exactly as long as every other request-scoped view.
@@ -1023,18 +1033,45 @@ stream_teardown_error :: proc(link: ^Stream_Link) {
 // neutral_headers copies the backend request headers into neutral pairs. The
 // copies live in `allocator` (the connection arena), valid for the exchange.
 @(private)
-neutral_headers :: proc(req: ^http.Request, allocator: mem.Allocator) -> []Header {
+// AUDIT M6 — the `make` is checked, and a failure is SIGNALLED rather than
+// degraded.
+//
+// `copy_response` can fall back to a bare 500 because it is on the response
+// path and the answer is already lost. This is on the REQUEST path, and the
+// same trick would be worse than the crash it replaces: returning `nil` hands
+// the application a request with NO HEADERS AT ALL. That mostly fails closed —
+// no `Authorization` means deny, no `Origin` means same-origin — but "mostly"
+// is not a property to ship, and the handler would have no way to tell a
+// header-less request from a header-stripped one.
+//
+// So it reports, and the caller refuses the request with a 500 before any
+// application code observes it. An unanswerable request is answered, not
+// half-answered.
+neutral_headers :: proc(req: ^http.Request, allocator: mem.Allocator) -> (headers: []Header, ok: bool) {
 	count := len(req.headers._kv)
 	if count == 0 {
-		return nil
+		return nil, true
 	}
-	out := make([]Header, count, allocator)
+	out, merr := make([]Header, count, allocator)
+	if merr != nil {
+		return nil, false
+	}
 	i := 0
 	for k, v in req.headers._kv {
 		out[i] = Header{name = k, value = v}
 		i += 1
 	}
-	return out
+	return out, true
+}
+
+// refuse_exhausted answers a request the adapter could not even represent
+// (audit M6). It allocates nothing: the status is set on the backend response
+// and `respond` writes it.
+@(private)
+refuse_exhausted :: proc(res: ^http.Response) {
+	http.headers_set_close(&res.headers)
+	res.status = http.Status.Internal_Server_Error
+	http.respond(res)
 }
 
 // write_response writes the neutral `Outbound` to the backend response. Status
@@ -1069,16 +1106,49 @@ write_response :: proc(res: ^http.Response, out: Outbound) {
 // The core copies its committed response into these before its own teardown, so
 // the adapter owns the bytes it sends. Kept next to the adapter because it is
 // the adapter's ownership contract, exercised by the boundary tests.
+// AUDIT M6 — AN ALLOCATION FAILURE HERE MUST NOT KILL THE PROCESS.
+//
+// Every `make`/`clone` below was unchecked, and Odin's `make` returns a NIL
+// slice on failure rather than raising: the loop then indexed it. PROVOKED with
+// an allocator rigged to fail on its first call, before this was written:
+//
+//	odin_http_adapter.odin(1078:11) Index 0 is out of range 0..<0
+//	Signal caught: Illegal_Instruction
+//
+// ADR-020 has no recoverable panic, so that is the whole process — every
+// in-flight request on every lane — lost to one failed `make`, ON THE RESPONSE
+// PATH, after the handler had already produced an answer.
+//
+// IT IS NOT A THEORETICAL PRESSURE. Two measurements in this same audit make it
+// reachable: J3 peaked at 588 MB of RSS for one in-limit request, and M9
+// measured GB-scale retention across idle keep-alive connections.
+//
+// THE DEGRADATION ALLOCATES NOTHING, which is the only thing that can be true
+// on this path: a 500 with no headers and no body, from fields already owned by
+// the caller. A client gets a bare 500 instead of a dropped connection, and the
+// other lanes keep serving. Partial work is abandoned rather than published —
+// half a header list is a response nobody wrote.
 copy_response :: proc(out: ^Outbound, status: int, headers: []Header, body: []u8, allocator: mem.Allocator) {
 	out.status = status
 
 	if len(headers) > 0 {
-		copied := make([]Header, len(headers), allocator)
+		copied, merr := make([]Header, len(headers), allocator)
+		if merr != nil {
+			copy_response_exhausted(out)
+			return
+		}
 		for header, i in headers {
-			copied[i] = Header {
-				name  = strings.clone(header.name, allocator),
-				value = strings.clone(header.value, allocator),
+			name, nerr := strings.clone(header.name, allocator)
+			if nerr != nil {
+				copy_response_exhausted(out)
+				return
 			}
+			value, verr := strings.clone(header.value, allocator)
+			if verr != nil {
+				copy_response_exhausted(out)
+				return
+			}
+			copied[i] = Header{name = name, value = value}
 		}
 		out.headers = copied
 	} else {
@@ -1086,10 +1156,29 @@ copy_response :: proc(out: ^Outbound, status: int, headers: []Header, body: []u8
 	}
 
 	if len(body) > 0 {
-		out.body = slice.clone(body, allocator)
+		cloned, berr := slice.clone(body, allocator)
+		if berr != nil {
+			copy_response_exhausted(out)
+			return
+		}
+		out.body = cloned
 	} else {
 		out.body = nil
 	}
+}
+
+// copy_response_exhausted is the allocation-free fallback (audit M6).
+//
+// `suppressed_body_len` is cleared too: it is the length the adapter announces
+// for a body it will not send, and announcing the abandoned response's length
+// beside an empty 500 would be a `Content-Length` that disagrees with the
+// bytes — the framing defect this project refuses everywhere else.
+@(private)
+copy_response_exhausted :: proc(out: ^Outbound) {
+	out.status = 500
+	out.headers = nil
+	out.body = nil
+	out.suppressed_body_len = 0
 }
 
 // stream_registry_current exposes the running server's stream registry, the

@@ -1449,6 +1449,19 @@ env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp9_mut
 # stopped controlling.
 #
 # COST, measured: 261 s for all seventeen, the slowest being wp41 at 48 s.
+# M6 — allocation failure on the response path is a degraded 500, not a dead
+# process. The suite drives `copy_response` through an allocator rigged to fail
+# at each of its allocations in turn; before the fix, budget 0 produced
+# "Index 0 is out of range 0..<0" and Illegal_Instruction, which under ADR-020
+# is the whole process. Serial: it asserts on a shared transport type and needs
+# no ports.
+echo "--- M6 allocation-failure degradation on the response path (odin test) ---"
+timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+  "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/m6-allocation-failure" \
+  "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$URUQUIM_BIN_TMP/m6-allocation-failure" ||
+  fail "the M6 allocation-failure contract did not pass within the timeout"
+
 echo "--- mutation-control scripts (executed, not merely parsed) ---"
 for uruquim_control in c7 wp16 wp17 wp18 wp19 wp20 wp21 wp22 wp23 wp24 wp25 \
                        wp30 wp36 wp37 wp38 wp39 wp41; do
