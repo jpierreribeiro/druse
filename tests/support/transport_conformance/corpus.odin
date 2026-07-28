@@ -329,7 +329,18 @@ corpus_storage := []Wire_Case{
 		},
 		{
 			name = "whitespace before the header colon is rejected",
-			bytes = "GET /ping HTTP/1.1\r\nHost : localhost\r\nConnection: close\r\n\r\n",
+			// THE SPACED HEADER IS NOT `Host`, AND THAT IS THE WHOLE CASE.
+			//
+			// This sent "Host : localhost". With the space-before-colon rule
+			// removed, the name parses as "Host " — which no longer matches
+			// "host", so the request is refused for having NO HOST HEADER, a
+			// different rule entirely. The case passed with the guard and
+			// without it: measured, removing the rule left this at 400 while
+			// `X-Spaced : 1` went from 400 to 200 with the handler running.
+			// A test whose name is broader than its evidence (finding S2, the
+			// same shape as wp63's multipart case).
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\n" +
+			"X-Spaced : 1\r\nConnection: close\r\n\r\n",
 			outcome = .Rejected,
 			allowed_status = {400},
 			connection_must_close = true,

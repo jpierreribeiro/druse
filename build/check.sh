@@ -47,6 +47,7 @@ bash -n "$URUQUIM_ROOT/build/check.sh"
 bash -n "$URUQUIM_ROOT/build/check_test.sh"
 bash -n "$URUQUIM_ROOT/build/check_public_api.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp3_mutations.sh"
+bash -n "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
 bash -n "$URUQUIM_ROOT/build/check_g11_teardown.sh"
 bash -n "$URUQUIM_ROOT/build/check_examples.sh"
 bash -n "$URUQUIM_ROOT/build/check_docs.sh"
@@ -1411,6 +1412,12 @@ for URUQUIM_UNGATED in \
     fail "tests/$URUQUIM_UNGATED failed; it is cited as evidence for a merged fix or a frozen symbol"
 done
 echo "PASS: the previously ungated evidence suites run in the gate"
+
+# The raw-wire corpus is only worth its runtime if its cases DETECT the defects
+# they are named after. It could not report a failure at all until this
+# session's logger fix, so that had never been established for any of them.
+echo "--- WP9 raw-wire corpus: mutation controls (the cases must detect) ---"
+env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
 
 # The gate leaves NO artifact in the working tree.
 echo "--- WP69 blocking boundary: process-isolated liveness evidence ---"
