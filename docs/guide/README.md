@@ -52,6 +52,7 @@ The page you want when you arrive with a question.
 | [Forms and redirects](03-subjects/forms-and-redirects.md) | Reading a form post, and why the answer is always a 303 |
 | [Cookies](03-subjects/cookies.md) | Reading, setting, and the one constructor for a session cookie |
 | [Limits and shutdown](03-subjects/limits-and-shutdown.md) | What bounds the server, what is off by default, how it stops |
+| [Project layout](03-subjects/project-layout.md) | How to arrange files once a service outgrows one screen — an indication, not a rule |
 | [Static files](05-recipes/serve-a-browser-app.md) | Serving a directory, CORS, security headers, real client IP |
 | [Testing](05-recipes/test-a-handler.md) | Running a request through real routing, without a socket |
 
@@ -73,6 +74,7 @@ gate fails if a page drifts from its source.
 | [Route groups](06-cookbook/route-groups.md) | A group as a value, and the one-route guard |
 | [Authentication](06-cookbook/authentication.md) | A bearer gate and a typed lookup, both application code |
 | [CORS, static and uploads](06-cookbook/cors-static-and-uploads.md) | What a browser-facing service needs, in one program |
+| [A layered service](06-cookbook/clean-layers.md) | A URL shortener with one file per layer, and dependencies pointing one way |
 
 ## Recipes — by task
 

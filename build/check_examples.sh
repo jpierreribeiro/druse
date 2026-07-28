@@ -43,7 +43,8 @@ URUQUIM_EXPECTED_EXAMPLES="01-hello-world
 07-app-state
 08-table-stakes
 09-graceful-shutdown
-10-config-and-health"
+10-config-and-health
+11-clean-layers"
 
 test -d "$URUQUIM_EXAMPLES" || fail "examples/ does not exist"
 
