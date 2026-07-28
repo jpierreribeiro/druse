@@ -260,8 +260,25 @@ The readers and `web.body` share ONE single-use capability (ADR-012): whichever
 runs first takes it.
 
 **An upload larger than `max_body` (4 MiB default) is refused with 413 before
-your handler runs**, and no setting makes a 2 GB upload work — the body is held
-whole. Terminate large uploads at a proxy or object store and pass a reference.
+your handler runs**, and no setting makes a 2 GB upload work in memory — the
+body is held whole. Terminate large uploads at a proxy or object store and pass
+a reference.
+
+**With `enable_upload` it is SPOOLED to disk instead of refused, and then
+`form_field`/`form_file` stop answering** (audit M7). The spool holds the body
+exactly as it arrived, framing included. Measured with `max_body` at 4096, the
+same multipart form sent twice:
+
+```text
+within the cap   upload=no   form_field("caption")="hello"   form_file("photo")=100 bytes
+over the cap     upload=yes  form_field=UNAVAILABLE          form_file=UNAVAILABLE
+                 first bytes on disk: --B\r\nContent-Disposition: form-data; ...
+```
+
+So a photo upload that crosses the cap gives you a path whose first bytes are a
+boundary marker, not a JPEG — and the accessors you were using return
+`ok=false`, which is also what "no such field" looks like. Parse the spooled
+file with a parser you choose, or keep multipart uploads under `max_body`.
 
 A malformed form yields nothing rather than a partial parse, because a missing
 field that looks like a blank one is a bug nobody attributes to the parser.

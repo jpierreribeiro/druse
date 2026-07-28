@@ -70,6 +70,28 @@ Upload :: struct {
 // not spooled: it was within `max_body` (use `web.body`/`web.form_file`), the
 // App did not `enable_upload`, or the request ran on the in-memory test
 // transport.
+//
+// AUDIT M7 — WHAT IS IN THE FILE, WHEN THE BODY WAS A MULTIPART FORM. The
+// spool holds the request body EXACTLY AS IT ARRIVED. For a
+// `multipart/form-data` request that means the framing too, not the file the
+// user picked. Measured, with `max_body` at 4096 and the same form sent twice:
+//
+//	within the cap   upload=no   form_field("caption")="hello"  form_file("photo")=100 bytes
+//	over the cap     upload=yes  form_field=UNAVAILABLE         form_file=UNAVAILABLE
+//	                 and the file's first bytes are:
+//	                 `--B\r\nContent-Disposition: form-data; name="caption"\r\n\r\nhello`
+//
+// So an application that uploads a photo and crosses `max_body` receives a
+// path whose first bytes are a boundary marker rather than a JPEG, and the two
+// accessors it was using stop answering — silently, because `ok=false` is also
+// what "no such field" looks like.
+//
+// THIS IS NOT AN OVERSIGHT WAITING FOR A STREAMING PARSER. One exists in
+// `web/internal/ingest/multipart.odin` and is deliberately NOT wired: it
+// appends to a carry buffer byte-by-byte and runs a substring search per byte,
+// so wiring it would trade a documented limitation for a quadratic one. Parse
+// the spooled file with a parser you choose, or keep multipart uploads under
+// `max_body` and use `form_file`.
 upload :: proc(ctx: ^Context) -> (up: Upload, ok: bool) {
 	sp := ctx.private.upload
 	if sp == nil {
