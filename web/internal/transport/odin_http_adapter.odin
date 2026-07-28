@@ -734,19 +734,24 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 	}
 
 	// URUQUIM PATCH 35 (Campaign C) — bracket the synchronous dispatch so its
-	// wall time feeds the observable saturation signal. `lane_collisions` is
-	// retired: under dedicated accept a contended request queues silently on
-	// the lane's socket instead of reaching the 503 above, so `lane_collisions`
-	// was structurally zero while the lane pool was the first resource to bind.
-	// Wall-clock dwell is the measurable proxy for that queueing; the operator
-	// differences the running total.
-	dispatch_started := time.now()
+	// elapsed time feeds the observable saturation signal. `lane_collisions` is
+	// retired: it named a lane-collision refusal that dedicated accept made
+	// unreachable, and in practice only ever counted the ACCEPTOR's saturation
+	// refusals under a misleading name. Handler dwell is the measurable proxy
+	// for the queueing that replaced it; the operator differences the total.
+	//
+	// MONOTONIC, not wall clock. `time.now()` is CLOCK_REALTIME and `time.since`
+	// returns a SIGNED difference, so an NTP step backward during a dispatch
+	// would add a negative value to a counter operators read as monotonically
+	// increasing — a differenced sample could go backwards. `time.tick_now` is
+	// CLOCK_MONOTONIC_RAW, which is what measuring an elapsed interval wants.
+	dispatch_started := time.tick_now()
 	out: Outbound
 	cfg := exchange.runtime.config
 	cfg.dispatch(cfg.user, exchange.inbound, &out, context.temp_allocator)
 	_ = sync.atomic_add(
 		&res._conn.server.handler_dwell_ns,
-		i64(time.since(dispatch_started)),
+		i64(time.tick_since(dispatch_started)),
 	)
 	http.handler_lane_leave(res)
 
@@ -795,9 +800,16 @@ stream_open :: proc(exchange_handle: rawptr) -> (stream.Token, bool) {
 	link^ = Stream_Link {
 		runtime = runtime,
 		conn    = conn,
-		loop    = nbio.current_thread_event_loop(),
 		tok     = tok,
 	}
+	// M2 — PUBLISH THE OWNER LANE LAST, AND ATOMICALLY. `stream_pump_arm` runs
+	// on any producer thread and reads this field on a slot that a previous
+	// stream may just have retired. A plain write here could be read torn,
+	// handing the arm a garbage loop pointer. The seq-cst store also releases
+	// the plain writes above: a reader that observes this loop observes a fully
+	// built link. Slots are reused, so a stale-but-untorn read is still
+	// possible — `stream_pump` rejects that case on arrival.
+	sync.atomic_store(&link.loop, nbio.current_thread_event_loop())
 	// Re-register the wake with its user pointer now that the link exists.
 	// Safe: no producer can hold the token before stream_open returns it.
 	stream.rebind_wake(&runtime.streams, tok, stream_pump_arm, rawptr(link))
@@ -833,14 +845,29 @@ stream_pump_arm :: proc(user: rawptr) {
 	if link == nil {
 		return
 	}
+	// Read the owner lane atomically: `stream_open` publishes it with a matching
+	// atomic store, so this can never observe a torn pointer.
+	loop := sync.atomic_load(&link.loop)
+	if loop == nil {
+		return
+	}
 	if _, armed := sync.atomic_compare_exchange_strong(&link.pump_armed, false, true); armed {
-		nbio.next_tick_poly(link, stream_pump, link.loop)
+		nbio.next_tick_poly(link, stream_pump, loop)
 	}
 }
 
 @(private)
 stream_pump :: proc(_: ^nbio.Operation, link: ^Stream_Link) {
 	sync.atomic_store(&link.pump_armed, false)
+	// M2 — SINGLE-WRITER GUARD. A wake captured before this slot was retired can
+	// land here after `stream_open` rebound the slot to a DIFFERENT lane. Driving
+	// the link from here would then put two lanes on one socket, which is exactly
+	// the invariant the adapter assumes away. The link names its current owner;
+	// if that is not this thread, the wake is stale and the real owner will pump
+	// itself. Cheap: a TLS read and a compare.
+	if sync.atomic_load(&link.loop) != nbio.current_thread_event_loop() {
+		return
+	}
 	stream_pump_run(link)
 }
 

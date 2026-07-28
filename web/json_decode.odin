@@ -152,22 +152,6 @@ json_path_restore :: proc(path: ^Json_Field_Path, old: int) {
 	path.len = old
 }
 
-@(private)
-json_field_name :: proc(field: reflect.Struct_Field) -> string {
-	tag := reflect.struct_tag_get(field.tag, "json")
-	name := tag
-	for i in 0 ..< len(tag) {
-		if tag[i] == ',' {
-			name = tag[:i]
-			break
-		}
-	}
-	if name == "" {
-		return field.name
-	}
-	return name
-}
-
 // json_struct_field finds the same ordinary and flattened-using fields as the
 // stdlib decoder, with the SAME precedence as `json_struct_target`: explicit
 // json tags first, then ordinary field names, then flattened `using _`
@@ -479,6 +463,16 @@ json_struct_known_check :: proc(
 	// walk shape-checked every declaration in order, so a key shadowed by a
 	// higher-precedence field elsewhere (J1: a later tag; J2: an outer field
 	// over a flattened child) was double-validated against the wrong type.
+	//
+	// Keys come from a MAP, so iteration order is not the wire order and not the
+	// declaration order. Returning the first failure found would let map layout
+	// decide which of several invalid fields the client is told about: the same
+	// body with its keys transposed would name a different field. Select the
+	// LEXICOGRAPHICALLY SMALLEST failing key instead — the same rule the unknown
+	// -key scan in `json_shape_check` already applies, so both halves of the
+	// refusal path are stable for the same reason.
+	best_key := ""
+	best_issue := Json_Decode_Issue{}
 	for key, child in object {
 		winner, found := json_struct_field(info, key)
 		if !found {
@@ -487,9 +481,18 @@ json_struct_known_check :: proc(
 		old := json_path_push(path, key)
 		issue := json_shape_check(child, winner, path)
 		json_path_restore(path, old)
-		if issue.kind != .None {
-			return issue
+		if issue.kind == .None {
+			continue
 		}
+		// `Json_Decode_Issue` carries the path BY VALUE, so the winner stays
+		// valid as the scan continues.
+		if best_key == "" || key < best_key {
+			best_key = key
+			best_issue = issue
+		}
+	}
+	if best_key != "" {
+		return best_issue
 	}
 	return {}
 }
@@ -685,8 +688,10 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 				return json_issue_at(.Unsupported_Destination, path)
 			}
 
-			// Validate declared fields in declaration order, so two invalid
-			// values cannot make the selected error depend on map iteration.
+			// Validate every PRESENT key against the field the decoder would
+			// write, selecting the lexicographically smallest failing key, so
+			// two invalid values cannot make the selected error depend on map
+			// iteration order.
 			if issue := json_struct_known_check(v, info, path); issue.kind != .None {
 				return issue
 			}

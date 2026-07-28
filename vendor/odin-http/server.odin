@@ -224,11 +224,13 @@ Server :: struct {
 	// URUQUIM PATCH 35 (Campaign C) — BRIDGE. Total nanoseconds lanes spent
 	// inside dispatched handlers, as a running total for the life of the server
 	// (WP50's counter shape: a scraper differences it). This replaces
-	// `lane_collisions`, which is dead under dedicated accept — handlers run
-	// synchronously on the lane, so `handler_lane_enter` cannot return false
-	// and the 503-on-collision path is unreachable, leaving the documented
-	// saturation signal structurally zero while real saturation presents as
-	// silent head-of-line queueing. The operator derives
+	// `lane_collisions`, whose NAMED source is dead under dedicated accept —
+	// handlers run synchronously on the lane, so `handler_lane_enter` cannot
+	// return false and the 503-on-collision path is unreachable. The counter
+	// still moved, because the acceptor's saturation refusal below also
+	// incremented it, so it reported a different resource under the documented
+	// saturation signal's name while real lane saturation presents as silent
+	// head-of-line queueing. The operator derives
 	// utilization = Δhandler_dwell_ns / (lanes × Δwall_ns) and
 	// mean dwell   = Δhandler_dwell_ns / Δresponses_sent.
 	// Written by the lane that runs the dispatch, read without a request in

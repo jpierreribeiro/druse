@@ -183,10 +183,11 @@ field is an integer, so redaction holds by construction. Zero when no server
 runs, like `refused_connections`.
 
 **`handler_dwell_ns` is the framework's first saturation signal** (Campaign C).
-It replaced `lane_collisions`, which dedicated accept made structurally dead —
-handlers run synchronously on the lane thread, so the 503-on-collision path
-is unreachable and the old counter could only ever read zero while the lane
-pool saturated with silent queueing. `handler_dwell_ns` is a running total of
+It replaced `lane_collisions`, which dedicated accept made misleading rather
+than dead — handlers run synchronously on the lane thread, so the
+503-on-collision path is unreachable, and the only increments the counter still
+received came from the acceptor's saturation refusals while real lane saturation
+presented as silent queueing. `handler_dwell_ns` is a running total of
 time inside dispatched handlers: difference it over an interval for
 utilization (Δdwell / (lanes × Δwall)) and for mean dwell against
 `responses_sent`. A rising utilization says: raise `max_handlers`, shorten the

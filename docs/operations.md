@@ -280,7 +280,9 @@ web.use(&app, web.request_id)
   A synchronous Handler holds its lane and cannot be preempted, and under
   dedicated accept a request arriving at a busy lane queues silently on that
   lane's socket — no 503, no counter, only latency. The old `lane_collisions`
-  counter was retired for exactly that reason (it could only ever read zero).
+  counter was retired for exactly that reason: it never observed the lane
+  saturation its name promised, and the number it did report came from the
+  acceptor's own refusals — a different resource under a misleading label.
   `handler_dwell_ns` is the total nanoseconds lanes spent inside handlers, a
   running total you difference over an interval:
 

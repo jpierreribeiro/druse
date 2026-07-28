@@ -2179,32 +2179,80 @@ test-support = 77).**
 
 **WHY.** Dedicated accept (WP119) made handlers run synchronously on the lane
 thread, so `handler_lane_enter` cannot return false and the 503-on-collision
-path is unreachable. `lane_collisions` was structurally zero while the lane
-pool saturated with silent socket-buffer queueing, and `tests/c05-saturation`
-was red on `main` because it asserted the dead contract. `handler_dwell_ns`
-(total nanoseconds inside dispatched handlers, as a running total) is the
-observable replacement; the operator differences it for utilization and mean
-dwell, and c05 pins that it moves with real work — its control (accumulator
-stubbed to zero) goes red.
+path in `dispatch_exchange` is unreachable. `handler_dwell_ns` (total
+nanoseconds inside dispatched handlers, as a running total) is the observable
+replacement; the operator differences it for utilization and mean dwell, and
+c05 pins that it moves with real work — its control (accumulator stubbed to
+zero) goes red.
+
+**CORRECTION (2026-07-28) — THE ORIGINAL JUSTIFICATION WAS WRONG, THE DECISION
+STANDS.** This amendment first claimed `lane_collisions` "was structurally zero"
+and that `tests/c05-saturation` "was red on `main` because it asserted the dead
+contract". Both were re-tested on pristine `44bdcda` and are false. The counter
+had TWO increment sites, and only the adapter one (`odin_http_adapter.odin`, the
+lane-collision refusal) was unreachable; the ACCEPTOR's saturation refusal
+(`vendor/odin-http/server.odin`, `accept_refuse_handler_saturation`) also
+incremented it. Five pristine runs on a 4-vCPU host recorded
+`lane_collisions` = 0, 2, 2, 0, 39 — tracking the client-observed 503s **1:1
+every time** — and the old assertion `lane_collisions >= total_lane_503` held in
+all five. c05 was red on `main` for the same scheduling-dependent reason it was
+red after the swap: the unconditional `total_lane_503 > 0` assertion, since
+fixed. So `lane_collisions` was never dead; it was MISNAMED, counting acceptor
+saturation refusals under a lane-collision name. The replacement is still the
+right call — a misnamed refusal count is not a saturation signal, and dwell is —
+but the record must not claim a dead counter that measurement contradicts. If
+the acceptor-refusal count is wanted, it returns under its own name
+(`refused_saturation_total`), per the Campaign C plan.
 
 **COMPATIBILITY.** This is a breaking change to a frozen struct: code that
 read `lane_collisions` no longer compiles. Accepted under the ADR-029
-delegation because the removed field could only ever report zero — no
-workable consumer depends on it — and because the replacement answers the
-question operators were told `lane_collisions` answered.
+delegation because the removed field reported acceptor saturation refusals
+under a name that promised lane collisions — a consumer reading it for the
+documented meaning was already being misled — and because the replacement
+answers the question operators were told `lane_collisions` answered.
 
-**TIMESTAMP COST (post-implementation, 2026-07-27, shared KVM, 4 vCPU):** two
-`time.now()` + `time.since` calls plus the seq-cst `atomic_add` measure **~600 ns
-per dispatch** in a 5M-iteration tight loop on this host — far above the ~40–50 ns
-vDSO estimate in the Campaign C body. That is an artifact of this machine (a
-shared-tenancy VM with a coarse clock, where `clock_gettime` is not the ~20 ns
-vDSO fast path); on the c5.2xlarge campaign host (bare-metal Nitro) the same
-bracket should cost tens of nanoseconds. The c05 suite passes with the cost in
-place (2.0 s wall for 92 dispatches — under 2% on the worst-case host). **The
-delta is recorded here rather than filed under noise, per the campaign
-instruction.** If this brackets as hot on bare metal, the fallback is reusing
-the deadline sweep's per-lane clock (one timestamp per sweep, amortized)
-instead of per-request reads — noted, not implemented.
+**TIMESTAMP COST — RE-MEASURED 2026-07-28. The earlier ~600 ns recording and its
+explanation are both withdrawn.** The bracket is two clock reads plus one
+seq-cst add. Measured on a 4-vCPU KVM host whose clocksource is `tsc`
+(2M iterations each, `-o:speed`, loop overhead subtracted):
+
+| Path | ns/call |
+|---|---|
+| glibc `clock_gettime` (**vDSO**) | 20.2 |
+| raw `syscall(SYS_clock_gettime)` in C | 119.2 |
+| Odin `time.now()` | 114.8 |
+| `sync.atomic_add` alone | 6.4 |
+| **full bracket (2 reads + add)** | **238.0** |
+
+The mechanism is NOT a coarse clock and NOT shared tenancy. `core:time` calls
+`core:sys/linux.clock_gettime`, which issues `syscall(SYS_clock_gettime, ...)`
+directly — **Odin's stdlib never consults the vDSO**. Odin's 114.8 ns matches
+the raw-syscall control (119.2), not the vDSO path (20.2), on a host where the
+vDSO fast path is fully available. The Campaign C body's ~40–50 ns estimate was
+arithmetically right for the mechanism it assumed (2 × 20.2) — that mechanism is
+simply not the one in use. **Bare metal will therefore NOT bring this to tens of
+nanoseconds**; the syscall boundary is host-independent in order of magnitude,
+and the only route to vDSO cost is a clock path `core:time` does not provide.
+
+At 250k req/s this is ~60 ms of CPU per second, about 6% of one core.
+
+The previously cited reassurance — "the c05 suite passes with the cost in place
+(2.0 s wall for 92 dispatches — under 2%)" — is also withdrawn: c05's handlers
+dwell 40 ms, so 238 ns is 0.0006% of each, and that measurement **cannot detect
+the bracket at all**. It was not evidence. The routing-benchmark before/after
+delta the Campaign C plan required has still not been run; that obligation is
+open, not discharged.
+
+Fallback if a routing profile shows the bracket hot: derive timestamps from the
+deadline sweep's per-lane clock (one read per sweep, amortized) instead of
+per-request reads — noted, not implemented.
+
+**CLOCK SOURCE (2026-07-28).** The bracket now uses `time.tick_now` /
+`time.tick_since` (CLOCK_MONOTONIC_RAW), not `time.now` / `time.since`
+(CLOCK_REALTIME). `time.since` returns a SIGNED difference, so an NTP step
+backward during a dispatch added a negative value to a total operators read as
+monotonically increasing — a differenced sample could go negative. Pinned by
+`build/check_c05_controls.sh`.
 
 | Symbol | Ledger | Campaign | Signature evidence | Behaviour evidence | Doc | Notes |
 |---|---|---|---|---|---|---|

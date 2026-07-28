@@ -55,9 +55,11 @@ refused_connections :: proc() -> int {
 // counters that were maintained in the registry and reachable from no public
 // API, so a slow-consumer abort was counted and then unseeable. Campaign C adds
 // `handler_dwell_ns`: the framework's FIRST saturation point (C-05: lanes ÷
-// dwell). The predecessor, `lane_collisions`, was structurally dead under
-// dedicated accept (WP119) — handled by replacing the failed counter, not by
-// reviving it.
+// dwell). The predecessor, `lane_collisions`, was MISNAMED rather than dead: its
+// lane-collision increment was unreachable under dedicated accept (WP119), but
+// the acceptor's saturation refusal also incremented it, so the number moved
+// while meaning something other than its name. Handled by replacing the failed
+// counter, not by reviving it.
 //
 // WHY A STRUCT OF INTEGERS AND NOT A METRICS API. The same reason as
 // `refused_connections`: a framework that exports a metrics abstraction has
@@ -82,8 +84,9 @@ Server_Stats :: struct {
 	// Handler saturation (Campaign C). The FIRST resource to bind (C-05: capacity
 	// is lanes / dwell). Under dedicated accept, a request that arrives at a
 	// busy lane queues on that lane's socket — no 503, no counter, only latency
-	// — so the old `lane_collisions` counter was structurally zero at the exact
-	// moment the server was saturated. `handler_dwell_ns` is the observable
+	// — so the old `lane_collisions` counter never saw the saturation its name
+	// described; what it did count was the acceptor's own refusals, which is a
+	// different resource under the wrong label. `handler_dwell_ns` is the observable
 	// replacement: total nanoseconds lanes spent inside handlers, as a running
 	// total. Differenced over an interval it gives utilization
 	// (Δdwell / (lanes × Δwall)) and mean handler dwell (Δdwell / Δresponses) —
