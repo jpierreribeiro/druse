@@ -47,18 +47,30 @@ main :: proc() {
 }
 
 show_greeting :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.ok(ctx, Greeting{greeting = s.greeting})
 }
 
 record_visit :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	_ = sync.atomic_add(&s.visits, 1)
 	web.no_content(ctx)
 }
 
 show_stats :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.ok(ctx, Stats{visits = sync.atomic_load(&s.visits)})
 }
 ```
