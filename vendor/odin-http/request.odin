@@ -121,6 +121,32 @@ transfer_encoding_chunked_final :: proc(enc: string) -> bool {
 	return count == 1 && last_is_chunked
 }
 
+// URUQUIM PATCH 39 (audit H2) — ASCII case-insensitive equality, used to compare
+// an absolute-form request-target's authority against the Host field.
+//
+// ASCII rather than `strings.equal_fold`: a host is `reg-name` / IP-literal
+// (RFC 3986 §3.2.2), so Unicode simple-folding has nothing to contribute here
+// and would introduce cases where two byte-different authorities compare equal —
+// exactly the ambiguity this comparison exists to detect.
+ascii_equal_fold :: proc(a: string, b: string) -> bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i in 0 ..< len(a) {
+		ca, cb := a[i], b[i]
+		if 'A' <= ca && ca <= 'Z' {
+			ca += 32
+		}
+		if 'A' <= cb && cb <= 'Z' {
+			cb += 32
+		}
+		if ca != cb {
+			return false
+		}
+	}
+	return true
+}
+
 // Validates the headers, use `headers_validate_for_server` if these are request headers
 // that should be validated from the server side.
 headers_validate :: proc(headers: ^Headers) -> bool {

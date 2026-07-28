@@ -1725,6 +1725,62 @@ conn_handle_req :: proc(c: ^Connection, allocator := context.temp_allocator) {
 			return
 		}
 
+		// URUQUIM PATCH 39 (audit H2) — an absolute-form target whose authority
+		// disagrees with the Host field is REFUSED.
+		//
+		// RFC 9112 §3.2.2: "When an origin server receives a request with an
+		// absolute-form of request-target, the origin server MUST ignore the
+		// received Host header field (if any) and instead use the host
+		// information of the request-target." §3.2 obliges a client sending
+		// absolute-form to send a Host field carrying that same authority, so
+		// agreement is what a conforming client produces and disagreement is not
+		// an accident.
+		//
+		// WHAT WAS MEASURED, on a socket, before this patch:
+		//
+		//   GET http://evil.example/report HTTP/1.1
+		//   Host: good.example
+		//     -> 200, and `web.header(ctx, "host")` returned "good.example"
+		//
+		// Two authorities in one request, never reconciled, and the application
+		// was handed the half the RFC says to ignore. An application that tenants,
+		// signs URLs, or builds absolute redirects from `Host` is then reading a
+		// different request than a front proxy routing or caching on the target's
+		// authority — one request, two identities, which is cache poisoning and
+		// tenant confusion by the same mechanism.
+		//
+		// REFUSED, NOT REPAIRED, and that is deliberate: this is the CL+TE
+		// disposition (patch WP9 D2) applied to authority instead of framing.
+		// Overwriting the Host field with the target's authority would satisfy
+		// the letter of the MUST while leaving the two hops disagreeing about
+		// which request this was, silently. When the two AGREE, "ignore the Host
+		// field and use the target's" and "use the Host field" are the same
+		// answer, so the MUST is satisfied by construction on every request that
+		// survives.
+		//
+		// `url.host` is empty for origin-form (`/path` starts with the separator),
+		// so ordinary traffic never reaches the comparison. `OPTIONS *` is exempt
+		// BY NAME: `url_parse` finds no `/` in `*` and files the whole target as
+		// the host, so a rule keyed only on "host is non-empty" would answer 400
+		// to the legal server-capabilities ping — the corpus carries a case for it.
+		if rline := &l.req.line.(Requestline); l.req.url.host != "" {
+			is_options_star := rline.method == .Options && rline.target.(string) == "*"
+			if !is_options_star {
+				host_field, has_host := headers_get_unsafe(l.req.headers, "host")
+				if has_host && !ascii_equal_fold(host_field, l.req.url.host) {
+					log.warnf(
+						"request-target authority %q disagrees with the Host field %q",
+						l.req.url.host,
+						host_field,
+					)
+					headers_set_close(&l.res.headers)
+					l.res.status = .Bad_Request
+					respond(&l.res)
+					return
+				}
+			}
+		}
+
 		l.req.headers.readonly = true
 
 		l.conn.scanner.max_token_size = bufio.DEFAULT_MAX_SCAN_TOKEN_SIZE

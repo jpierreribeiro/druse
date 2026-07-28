@@ -519,6 +519,44 @@ corpus_storage := []Wire_Case{
 			"controls. `sanitize_key` escapes only LF, so such a name was lowercased and " +
 			"stored as-is.",
 		},
+		// --- audit H2: absolute-form authority vs the Host field ------------
+		//
+		// RFC 9112 §3.2.2 makes the target's authority authoritative and the Host
+		// field ignorable. Measured before vendor patch 39: a target naming
+		// `evil.example` with `Host: good.example` was served 200, and the
+		// application was handed "good.example" — the half the RFC discards.
+		{
+			name = "absolute-form whose authority AGREES with Host is served",
+			bytes = "GET http://localhost/ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {200},
+			handler_must_run = true,
+			connection_must_close = true,
+			notes = "audit H2: the accepting half. Without it the rejection case below " +
+			"would pass just as well against a server that refused absolute-form outright, " +
+			"which is not what was fixed.",
+		},
+		{
+			name = "absolute-form whose authority DISAGREES with Host is rejected",
+			bytes = "GET http://evil.example/ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H2: one request carrying two identities. A front proxy routing " +
+			"or caching on the target's authority and an application tenanting on Host are " +
+			"then serving different requests — refused rather than repaired, the same " +
+			"disposition as CL+TE.",
+		},
+		{
+			name = "OPTIONS * is still answered, not read as an authority",
+			bytes = "OPTIONS * HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {200},
+			connection_must_close = true,
+			notes = "audit H2's TRAP, and the reason this case exists: `url_parse` finds no " +
+			"`/` in `*` and files the whole target as the host, so an authority check keyed " +
+			"only on \"host is non-empty\" answers 400 to the legal server-capabilities " +
+			"ping. No handler runs — the backend answers it directly.",
+		},
 		{
 			name = "a horizontal tab inside a header value is still accepted",
 			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\tb\r\nConnection: close\r\n\r\n",

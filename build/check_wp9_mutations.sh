@@ -145,4 +145,18 @@ must_go_red "field-line control check narrowed to the splitting bytes (H1)" \
 			return true
 		}"
 
-echo "PASS: WP9 raw-wire corpus mutation controls (6 guards, each detected)"
+# Audit H2, and BOTH halves of it. The second mutation is the one worth having:
+# it removes the `OPTIONS *` exemption rather than the check, so the corpus is
+# held to the exemption being load-bearing and not merely present. A rule that
+# refuses the legal server-capabilities ping would otherwise ship green.
+must_go_red "absolute-form authority no longer reconciled with Host (H2)" \
+  "vendor/odin-http/server.odin" \
+  'if has_host && !ascii_equal_fold(host_field, l.req.url.host) {' \
+  'if false && has_host && !ascii_equal_fold(host_field, l.req.url.host) {'
+
+must_go_red "OPTIONS * exemption removed from the authority check (H2)" \
+  "vendor/odin-http/server.odin" \
+  'is_options_star := rline.method == .Options && rline.target.(string) == "*"' \
+  'is_options_star := false && rline.method == .Options && rline.target.(string) == "*"'
+
+echo "PASS: WP9 raw-wire corpus mutation controls (8 guards, each detected)"
