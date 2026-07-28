@@ -1,0 +1,68 @@
+# Hello World
+
+The smallest complete server. `examples/01-hello-world`, compiled by the build
+check.
+
+## Server
+
+<!-- druse:begin examples/01-hello-world/main.odin -->
+```odin
+package main
+
+import web "druse:web"
+
+main :: proc() {
+	// `app()` creates the application with the Phase-1 defaults: a standardized
+	// 404 for an unknown path, and a 405 with an `Allow` header when the path
+	// exists under a different method.
+	app := web.app()
+
+	// `destroy` releases everything the application owns. Call it exactly once,
+	// on the value `app()` returned — `defer` is the canonical way.
+	defer web.destroy(&app)
+
+	// Register one route. The handler runs when a GET arrives at /ping.
+	web.get(&app, "/ping", ping)
+
+	// `serve` binds the port and blocks while the server runs.
+	// Everything after this line runs only after the server stops.
+	web.serve(&app, 8080)
+}
+
+ping :: proc(ctx: ^web.Context) {
+	// `text` sends a plain-text body with the status you choose.
+	// It sets `Content-Type: text/plain; charset=utf-8` for you.
+	web.text(ctx, .OK, "pong")
+}
+```
+<!-- druse:end -->
+
+## Run
+
+```text
+odin run examples/01-hello-world -collection:druse=.
+```
+
+## Client
+
+```text
+curl http://localhost:8080/ping
+```
+
+```text
+pong
+```
+
+`Ctrl+C` stops it.
+
+## What to notice
+
+`web.app()` creates it, `defer web.destroy(&app)` releases it once, `web.get`
+registers a route, and `web.serve` **blocks** while serving.
+
+You already have `404` for an unknown path and `405` with an `Allow` header for
+a known path under the wrong method. You wrote neither.
+
+## Next
+
+[`crud.md`](crud.md) — the same program grown into six routes.
