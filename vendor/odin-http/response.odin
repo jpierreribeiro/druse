@@ -341,14 +341,29 @@ response_send_got_body :: proc(r: ^Response, will_close: bool) {
 	// URUQUIM PATCH 19 (WP90 / ADR-039) — the write-deadline clock starts when
 	// the completed response is handed to the event loop, and the operation
 	// handle is retained so a deadline abort (or any close) can cancel it.
-	// URUQUIM PATCH 32 (performance candidate) — the timestamp is observable
-	// only when a buffered-write deadline is enabled. Avoid a clock syscall per
-	// response on the default-off path.
-	if conn.server.opts.response_write_timeout > 0 {
-		conn.send_started = time.now()
-	} else {
-		conn.send_started = {}
-	}
+	// URUQUIM PATCH 32 (performance candidate), WITHDRAWN BY PATCH 40 (audit M4).
+	//
+	// Patch 32 stamped this only when a buffered-write deadline was configured,
+	// to save a clock syscall per response on the default-off path. The saving
+	// was real; what it did not account for is that `send_started` is not only
+	// the write deadline's clock — it is also how `server_deadline_sweep` tells
+	// a connection that is SENDING from one that is still RECEIVING.
+	//
+	// MEASURED CONSEQUENCE. With the write deadline off, a stalled buffered
+	// send is indistinguishable from a slow-arriving request, so the ARRIVAL
+	// branch fires on it: a client that stopped reading a 64 MiB body was cut
+	// off at `max_request_time` and logged as "request read deadline exceeded"
+	// — about a request that had finished arriving long before. It was also
+	// closed GRACEFULLY, which ADR-039 argues at length is the wrong ending for
+	// a slow reader, because a graceful close flushes kernel buffers to that
+	// same slow reader first.
+	//
+	// So the protection was real, accidental, mislabelled, and terminated the
+	// wrong way. Stamping unconditionally makes `send_started == 0` mean
+	// exactly "not sending", which is what every branch below already assumes.
+	// One clock read per response is the price of the sweep being able to tell
+	// the two states apart.
+	conn.send_started = time.now()
 	conn.pending_send = nbio.send_poly(conn.socket, {buf}, conn, on_response_sent)
 }
 

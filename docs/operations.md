@@ -114,12 +114,27 @@ web.limits(&app, budget)
 | `max_request_line` | 8000 | the backend refuses the request |
 | `max_headers` | 8000 | the backend refuses the request |
 | `max_request_time` | 30 s | **the connection is closed** — this is the slowloris defence |
-| `max_write_time` | `0` = off | **the connection is reset (RST)** — a graceful close would flush kernel buffers to the slow reader first and hide the deadline; the reset is the observable, honest end (WP90 / ADR-039) |
+| `max_write_time` | `0` = off — but see below | **the connection is reset (RST)** — a graceful close would flush kernel buffers to the slow reader first and hide the deadline; the reset is the observable, honest end (WP90 / ADR-039) |
 | `max_idle_time` | `0` = off | the idle keep-alive connection is **closed gracefully**; the clock stops the moment the next request's bytes arrive |
 | `max_connections` | 1024 | the connection is **closed at accept**, not queued |
 | `reserved_conns` | 16 | slots held back from admission so a shutdown always has room |
 | `max_handlers` | `0` = auto | synchronous Handler capacity; auto resolves from CPU count, bounded to 4..32 |
 | `max_json_nodes` | 100,000 | `413` with code `body_too_complex`, before the JSON parser allocates — the structural cost bound (audit J3/J4) |
+
+**`max_write_time` at `0` does not mean sends are unbounded.** One of the two
+deadlines always covers a response send: with no write deadline configured,
+`max_request_time` bounds it instead, and the connection is **aborted** and
+counted in `web.stats().write_deadline_aborts`. This is deliberate (audit M4) —
+leaving a send unbounded is worse than bounding it with the only number you
+gave us. Before M4 the same thing happened by accident and was logged as
+`request read deadline exceeded`, about a request that had finished arriving
+long before; measured on a 64 MiB body against a client that stopped reading.
+
+Set `max_write_time` explicitly when your sends and your request arrivals
+deserve different budgets — a large download to a slow link is a legitimate
+long send, and it is bounded by `max_request_time` until you say otherwise. If
+both are `0`, sends really are unbounded and a stalled reader parks a
+connection slot until it goes away.
 
 **`max_json_nodes` bounds STRUCTURE, which `max_body` cannot see.** Two
 well-formed bodies, both inside the 4 MiB body cap, measured on a 4 vCPU host:

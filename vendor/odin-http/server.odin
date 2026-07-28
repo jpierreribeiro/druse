@@ -1902,6 +1902,41 @@ server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 				connection_abort(conn)
 				continue
 			}
+			// URUQUIM PATCH 40 (audit M4) — WHEN NO WRITE DEADLINE IS SET, THE
+			// ARRIVAL DEADLINE COVERS THE SEND, deliberately and under its own
+			// name.
+			//
+			// This branch is not new behaviour; it is the behaviour that was
+			// already happening by accident. Before patch 40, `send_started`
+			// was left at zero whenever the write deadline was off, so a
+			// stalled send fell through to the arrival branch below and was
+			// closed as a slow REQUEST. Measured: a client that stopped
+			// reading a 64 MiB body was cut at `max_request_time` and told the
+			// request had been too slow to arrive.
+			//
+			// Now that `send_started` is always stamped, that no longer
+			// happens on its own — and simply letting it stop would REMOVE a
+			// protection applications have been relying on without knowing.
+			// Leaving a send unbounded is worse than bounding it with the only
+			// number the operator gave us, so one of the two deadlines always
+			// covers the send. What changes is that it now says so, counts as
+			// a write abort, and ABORTS rather than closing gracefully — a
+			// graceful close would flush the pending bytes to the very reader
+			// that stopped reading (ADR-039).
+			//
+			// An operator who wants a different bound for sends sets
+			// `max_write_time`; this branch then never fires, because the one
+			// above owns the connection.
+			if effective_write == 0 && read_t > 0 && conn.send_started != (time.Time{}) &&
+			   time.diff(conn.send_started, now) > read_t {
+				log.infof(
+					"uruquim: response send exceeded max_request_time with no max_write_time set; aborting connection %i",
+					conn.socket,
+				)
+				_ = sync.atomic_add(&s.write_deadline_aborts, 1)
+				connection_abort(conn)
+				continue
+			}
 			if read_t > 0 && conn.request_started != (time.Time{}) &&
 			   conn.send_started == (time.Time{}) &&
 			   time.diff(conn.request_started, now) > read_t {

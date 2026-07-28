@@ -344,6 +344,60 @@ open_keepalive :: proc(port: int) -> (net.TCP_Socket, bool) {
 //
 // This test pins the published CONTRACT rather than the mechanism, so whoever
 // makes that change hears about it from a red test instead of from production.
+// AUDIT M4 — A STALLED SEND IS ABORTED AND NAMED, NOT CLOSED AND MISLABELLED.
+//
+// `max_write_time` defaults OFF while a detached stream gets 30 s
+// unconditionally, so the backlog read this as "buffered responses have no
+// write deadline". Measured, that was true and the conclusion was not: a client
+// that stopped reading a 64 MiB body WAS cut off — by the ARRIVAL deadline,
+// because `send_started` was only stamped when the write deadline was on, so a
+// stalled send was indistinguishable from a slow-arriving request.
+//
+// The protection was therefore real, accidental, mislabelled ("request read
+// deadline exceeded", about a request that had finished arriving), and ended
+// the wrong way: a graceful close flushes kernel buffers to the very reader
+// that stopped reading, which is the thing ADR-039 exists to avoid.
+//
+// Vendor patch 40 stamps `send_started` always and gives the case its own
+// branch. Same protection, same trigger, correct name, counted as a write
+// abort, and a reset instead of a close.
+//
+// WHAT THIS TEST PINS is the counter, because the counter is what an operator
+// sees. A silently closed connection and an aborted one look identical from the
+// client side here; `write_deadline_aborts` is the difference between "we cut a
+// slow reader off" and "we think a request arrived slowly".
+@(test)
+wp90_a_stalled_send_without_a_write_deadline_is_a_write_abort :: proc(t: ^testing.T) {
+	s: Server
+	limits := web.DEFAULT_LIMITS
+	// The shipped shape: no write deadline. Only the arrival clock is set, and
+	// it is shortened so the answer arrives inside a test.
+	limits.max_write_time = 0
+	limits.max_request_time = i64(400 * time.Millisecond)
+	limits.max_idle_time = 0
+	testing.expect(t, start(&s, 51919, limits), "server must start")
+	defer stop(&s)
+
+	before := web.stats().write_deadline_aborts
+	_, _, total := stalled_read(51919, 2500 * time.Millisecond, 4 * time.Second)
+	after := web.stats().write_deadline_aborts
+
+	testing.expectf(
+		t,
+		total < STALL_BYTES,
+		"a client that stopped reading must not receive the whole %d-byte body; got %d",
+		STALL_BYTES,
+		total,
+	)
+	testing.expectf(
+		t,
+		after > before,
+		"the stalled send must be counted as a WRITE abort (%d -> %d). If this is unchanged while the body was still truncated, the connection was cut by the ARRIVAL deadline instead — the same outcome under the wrong name, which is exactly what audit M4 found.",
+		before,
+		after,
+	)
+}
+
 @(test)
 wp90_the_arrival_deadline_does_not_bound_a_handler :: proc(t: ^testing.T) {
 	s: Server
