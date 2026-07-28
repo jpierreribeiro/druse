@@ -3,11 +3,9 @@
 **Assumes:** [`../01-concepts/shape-of-an-application.md`](../01-concepts/shape-of-an-application.md).
 
 This chapter teaches one idea: **who owns these bytes, and how long do they
-stay valid?** Every other page assumes it.
-
-This is the largest single source of recorded defects. Seven of the thirty
-friction-ledger entries are this one class, in seven different packages. Learn
-the class once. Do not wait to meet each instance.
+stay valid?** Every other page assumes it. It is the largest single source of
+recorded defects — seven of the thirty friction-ledger entries are this one
+class, in seven different packages. Learn the class once.
 
 ## The one idea
 
@@ -30,7 +28,6 @@ answered as though it had succeeded.
 ## The rule
 
 **Never return a view from a procedure that owns the thing it points into.**
-
 That sentence covers every shape below.
 
 ## Shape 1 — a view into a record
@@ -106,10 +103,8 @@ This is the signature people guess wrong:
 begin :: proc(pool: ^Pool, opts := Tx_Options{}, name := "tx", ...) -> (Tx, Error)
 ```
 
-`begin` takes `^Pool`. It does not take a `^Conn`. Do not acquire a connection
-and pass it: the transaction acquires its own and owns it for its whole life.
-
-Pair `begin` with `rollback_if_open`, deferred:
+`begin` takes `^Pool`, not a `^Conn`. Do not acquire a connection and pass it:
+the transaction acquires its own. Pair it with `rollback_if_open`, deferred:
 
 ```odin
 	tx, e := pg.begin(&s.pool)

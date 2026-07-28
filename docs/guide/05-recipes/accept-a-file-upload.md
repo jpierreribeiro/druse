@@ -73,9 +73,8 @@ when the request ends.
 	}
 ```
 
-`upload_persist` **transfers ownership**. The file survives teardown, and it is
-yours to delete. Without it, copy the bytes before you return — the spool file
-is gone after that.
+`upload_persist` **transfers ownership**: the file survives teardown and is
+yours to delete. Without it, copy the bytes before you return.
 
 Check the return value: a failed persist leaves the file the framework's, and
 it will vanish.

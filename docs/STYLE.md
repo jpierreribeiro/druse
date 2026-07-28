@@ -73,6 +73,14 @@ nothing about vocabulary.
 Show the whole thing that compiles. A sample with `...` in the middle teaches a
 reader to guess.
 
+**A cookbook page never contains typed code.** It carries extraction markers,
+and `build/gen_cookbook.py` inlines the program from a real example the build
+check compiles. `build/check_docs.sh` fails when a page has drifted from its
+source. Documentation that cannot drift from the code is the whole point.
+
+A recipe may show the calls that matter rather than a whole program. A cookbook
+page may not.
+
 Never write a symbol you have not found in the source. Search for it first. The
 most expensive documentation defect this project has recorded is a command that
 does not exist.
@@ -93,9 +101,10 @@ files.
 
 Every page starts with one line that states what it assumes you have read.
 
-Size limits: a concepts page is 150 lines. A build-along chapter is 250 lines.
-A rules page is 200 lines. A subject page is 120 lines. A recipe is 80 lines.
-A guide nobody finishes teaches nothing.
+Size limits: a concepts page is 150 lines, a build-along chapter 250, a rules
+page 200, a subject page 120, a recipe 80, a cookbook page 400 — most of which
+is the program. `build/check_docs.sh` enforces every one. A guide nobody
+finishes teaches nothing.
 
 A subject page is the one a reader arrives at with a question — `routing.md`,
 `request.md`, `response.md`. Name it for the question, not for the packages it

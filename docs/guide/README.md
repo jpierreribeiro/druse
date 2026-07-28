@@ -50,9 +50,25 @@ The page you want when you arrive with a question.
 | [Static files](05-recipes/serve-a-browser-app.md) | Serving a directory, CORS, security headers, real client IP |
 | [Testing](05-recipes/test-a-handler.md) | Running a request through real routing, without a socket |
 
+## Cookbook — complete programs
+
+A whole program you can copy, run and curl. Every line is extracted from an
+example the build check compiles — `build/gen_cookbook.py` inlines it, and the
+gate fails if a page drifts from its source.
+
+| Page | |
+|---|---|
+| [Hello World](06-cookbook/hello-world.md) | The smallest complete server |
+| [CRUD](06-cookbook/crud.md) | Six routes: list, read, create, replace, update, delete |
+| [Custom middleware](06-cookbook/custom-middleware.md) | Running code around a handler, and a guard that short-circuits |
+| [Application state](06-cookbook/app-state.md) | One typed value, created once, read anywhere |
+| [Graceful shutdown](06-cookbook/graceful-shutdown.md) | A signal handler, drain, and the readiness probe |
+| [Config and health](06-cookbook/config-and-health.md) | Environment configuration, liveness and readiness |
+
 ## Recipes — by task
 
-One problem, one answer.
+One problem, one answer. These show the calls that matter, not a whole program
+— for a program to copy, use the cookbook above.
 
 | Page | |
 |---|---|
