@@ -1362,11 +1362,55 @@ rm -rf "$URUQUIM_ROOT/tests/wp61-public-surface/fixture"
 # not a test result. The bound is generous — the suite's own phases take about
 # four seconds — so a timeout means genuinely stuck, never slow.
 echo "--- WP58/59 drain deadline: stop returns with connections held open (odin test) ---"
+# ONE SERVER PER PROCESS, so this suite runs SEQUENTIALLY — the same rule
+# tests/c03-fault-campaign carries, and for the same reason. `web.stop` sets its
+# App's drain bit and then calls `transport.request_stop()`, which acts on the
+# process-global server WITHOUT consulting the App it was handed. This package
+# holds two tests, and `wp65_is_draining_is_false_until_stop` calls `stop` twice
+# on a serverless App; under the parallel runner those calls shut down the
+# server `wp58_drain_anatomy` is measuring, and its eight keep-alive dials find
+# nothing ("expected held to be 8, got 0"). Measured on a 4-vCPU host: 3 failures
+# in 15 runs with the default runner, 0 in 15 with THREADS=1.
 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
   timeout 120 \
   "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/wp58-drain" \
-  "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_BIN_TMP/wp58-drain" \
+  "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$URUQUIM_BIN_TMP/wp58-drain" \
   || fail "the drain suite failed or timed out; a timeout means the drain is stuck, which is the defect it exists to catch"
+
+# ---------------------------------------------------------------------------
+# Suites that were in the tree but in no gate script.
+#
+# A test nobody runs is not coverage, and these were being CITED as coverage:
+# `tests/wp7_5-c2-upload` is the behaviour evidence recorded in
+# planning/phase-1-freeze.md for three frozen public symbols (`Upload`,
+# `Upload_Config`, `enable_upload`); `tests/multipart-content` is the case the
+# July audit identified as the one that actually catches the multipart defect
+# (the similarly-named wp63 case does not, finding S2);
+# `tests/h2-graceful-acquire` is the evidence in the closure record that a
+# server which cannot acquire its event loop fails gracefully instead of
+# aborting. All eleven orphans were run and pass; the six with a citation are
+# wired in here. The four multishot suites and g76-scale-sockets are left out
+# deliberately and listed in build/check_test.sh, which now fails on any NEW
+# orphan.
+#
+# THREADS=1 for the ones that drive a server: one server per process.
+echo "--- Previously ungated suites: multipart, HEAD framing, ingest, upload ---"
+for URUQUIM_UNGATED in \
+  multipart-content \
+  head-content-length \
+  ingest-leak \
+  h2-graceful-acquire \
+  wp7_5-c1-inbound-stream \
+  wp7_5-c2-upload; do
+  env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+    timeout 180 \
+    "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/$URUQUIM_UNGATED" \
+    "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+    -out:"$URUQUIM_BIN_TMP/$URUQUIM_UNGATED" ||
+    fail "tests/$URUQUIM_UNGATED failed; it is cited as evidence for a merged fix or a frozen symbol"
+done
+echo "PASS: the previously ungated evidence suites run in the gate"
 
 # The gate leaves NO artifact in the working tree.
 echo "--- WP69 blocking boundary: process-isolated liveness evidence ---"
