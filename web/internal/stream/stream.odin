@@ -309,13 +309,19 @@ try_send :: proc(r: ^Registry, tok: Token, data: []u8) -> Send_Result {
 	// (which clears ownership at retire) cannot race the read.
 	slot_wake := s.wake
 	slot_user := s.wake_user
-	sync.mutex_unlock(&s.mu)
-	// 5. wake the owner (outside the lock).
+	// M2: invoke the wake INSIDE the slot lock. The old code captured the wake
+	// under the lock and invoked outside, which left a window where a producer
+	// could be preempted and a concurrent `stream_open` could overwrite the
+	// `Stream_Link` non-atomically, causing `stream_pump_arm` to read a torn
+	// `link.loop`. `stream_pump_arm` does not acquire the slot lock (it CASes
+	// `pump_armed` and schedules an async tick), so invoking it here cannot
+	// deadlock.
 	if slot_wake != nil {
 		slot_wake(slot_user)
 	} else if r.wake != nil {
 		r.wake(r.wake_user)
 	}
+	sync.mutex_unlock(&s.mu)
 	// 6. a closed typed result.
 	return .Sent
 }

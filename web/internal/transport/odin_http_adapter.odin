@@ -373,7 +373,7 @@ _server_stats :: proc() -> Server_Stats {
 		response_bytes        = sync.atomic_load(&server.response_bytes),
 		send_errors           = sync.atomic_load(&server.send_errors),
 		write_deadline_aborts = sync.atomic_load(&server.write_deadline_aborts),
-		lane_collisions       = sync.atomic_load(&server.lane_collisions),
+		handler_dwell_ns      = sync.atomic_load(&server.handler_dwell_ns),
 	}
 	if g_server.streams != nil {
 		c := stream.counters(g_server.streams)
@@ -729,20 +729,25 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 		// own backoff on top.
 		http.headers_set(&res.headers, "Retry-After", "1")
 		res.status = http.Status.Service_Unavailable
-		// PATCH 31 (item 2) — count the collision so it is visible in web.stats().
-		// This is the framework's first saturation point (C-05: lanes ÷ dwell), and
-		// a 503 here can arrive with other lanes idle — invisible otherwise.
-		sync.atomic_add(&res._conn.server.lane_collisions, 1)
 		http.respond(res)
 		return
 	}
 
-	// The core builds its context, dispatches, copies the response into the
-	// connection allocator, and tears down its request-local state — all before
-	// returning (WP8 D2/D4).
+	// URUQUIM PATCH 35 (Campaign C) — bracket the synchronous dispatch so its
+	// wall time feeds the observable saturation signal. `lane_collisions` is
+	// retired: under dedicated accept a contended request queues silently on
+	// the lane's socket instead of reaching the 503 above, so `lane_collisions`
+	// was structurally zero while the lane pool was the first resource to bind.
+	// Wall-clock dwell is the measurable proxy for that queueing; the operator
+	// differences the running total.
+	dispatch_started := time.now()
 	out: Outbound
 	cfg := exchange.runtime.config
 	cfg.dispatch(cfg.user, exchange.inbound, &out, context.temp_allocator)
+	_ = sync.atomic_add(
+		&res._conn.server.handler_dwell_ns,
+		i64(time.since(dispatch_started)),
+	)
 	http.handler_lane_leave(res)
 
 	// WP90b — a dispatch that opened a detached stream committed to a
@@ -886,7 +891,10 @@ stream_pump_run :: proc(link: ^Stream_Link) {
 	// the last queued event rather than discarding it.
 	_, close_requested, live := stream.owner_state(reg, link.tok.slot)
 	if !live || close_requested || stream.draining(reg) {
-		link.terminated = true
+		// M1: do NOT set terminated here. The terminator send is in flight; if the
+		// connection is aborted before the completion runs, the completion never
+		// fires and the slot would leak. Setting terminated now would make
+		// `stream_conn_torn_down` early-return and never release the slot.
 		conn.send_started = time.now()
 		conn.pending_send = nbio.send_poly(conn.socket, {STREAM_TERMINATOR}, link, on_stream_terminator_sent)
 	}

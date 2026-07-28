@@ -169,15 +169,45 @@ json_field_name :: proc(field: reflect.Struct_Field) -> string {
 }
 
 // json_struct_field finds the same ordinary and flattened-using fields as the
-// stdlib decoder. The first match wins, matching declaration order.
+// stdlib decoder, with the SAME precedence as `json_struct_target`: explicit
+// json tags first, then ordinary field names, then flattened `using _`
+// children. This keeps shape validation and tree decode in agreement — J1.
 @(private)
 json_struct_field :: proc(info: ^reflect.Type_Info, key: string) -> (field_type: ^reflect.Type_Info, found: bool) {
-	for field in reflect.struct_fields_zipped(info.id) {
-		if json_field_name(field) == key {
+	fields := reflect.struct_fields_zipped(info.id)
+	// Pass 1: explicit json tags.
+	for field in fields {
+		tag, explicit := reflect.struct_tag_lookup(field.tag, "json")
+		if !explicit {
+			continue
+		}
+		name := tag
+		for i in 0 ..< len(tag) {
+			if tag[i] == ',' {
+				name = tag[:i]
+				break
+			}
+		}
+		if name == key {
 			return field.type, true
 		}
 	}
-	for field in reflect.struct_fields_zipped(info.id) {
+	// Pass 2: ordinary field names (no tag, or empty tag).
+	for field in fields {
+		tag := reflect.struct_tag_get(field.tag, "json")
+		name := tag
+		for i in 0 ..< len(tag) {
+			if tag[i] == ',' {
+				name = tag[:i]
+				break
+			}
+		}
+		if name == "" && field.name == key {
+			return field.type, true
+		}
+	}
+	// Pass 3: flattened `using _` children.
+	for field in fields {
 		if field.is_using && field.name == "_" {
 			base := reflect.type_info_base(field.type)
 			if _, ok := base.variant.(reflect.Type_Info_Struct); ok {
@@ -443,25 +473,22 @@ json_struct_known_check :: proc(
 	info: ^reflect.Type_Info,
 	path: ^Json_Field_Path,
 ) -> Json_Decode_Issue {
-	for field in reflect.struct_fields_zipped(info.id) {
-		if field.is_using && field.name == "_" {
-			base := reflect.type_info_base(field.type)
-			if _, ok := base.variant.(reflect.Type_Info_Struct); ok {
-				if issue := json_struct_known_check(object, base, path); issue.kind != .None {
-					return issue
-				}
-			}
-			continue
+	// Validate each present key against the field the DECODER will write —
+	// resolved through `json_struct_field`, which shares `json_struct_target`'s
+	// precedence (explicit tag, then name, then flattened `using _`). The old
+	// walk shape-checked every declaration in order, so a key shadowed by a
+	// higher-precedence field elsewhere (J1: a later tag; J2: an outer field
+	// over a flattened child) was double-validated against the wrong type.
+	for key, child in object {
+		winner, found := json_struct_field(info, key)
+		if !found {
+			continue // the caller's unknown scan reports this key
 		}
-
-		name := json_field_name(field)
-		if child, present := object[name]; present {
-			old := json_path_push(path, name)
-			issue := json_shape_check(child, field.type, path)
-			json_path_restore(path, old)
-			if issue.kind != .None {
-				return issue
-			}
+		old := json_path_push(path, key)
+		issue := json_shape_check(child, winner, path)
+		json_path_restore(path, old)
+		if issue.kind != .None {
+			return issue
 		}
 	}
 	return {}

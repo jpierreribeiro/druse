@@ -104,6 +104,17 @@ Essas decisões seguem a regra de sempre: aprovam **escopo e gates**, não nomes
 públicos. `http_client` e `metrics` ainda passam por spec, RED-under-control,
 gates e freeze próprios no repositório Crystals antes de qualquer promessa.
 
+## Decisões do dono (2026-07-27) — Campaign C
+
+| Decisão | O que ficou decidido, em uma linha |
+|---|---|
+| **Campaign C: Opção 4 + limpeza da Opção 3** | `lane_collisions` está morto sob dedicated-accept e é REMOVIDO de `Server_Stats`; entra `handler_dwell_ns: i64` (total de nanossegundos dentro dos handlers, running total). A utilização é derivada pelo operador (Δdwell / (lanes × Δwall)); `web.stats()` continua uma struct de inteiros. `tests/c05-saturation` foi reescrito para o novo contrato e está verde, com controle (acumulador zerado → vermelho). Registro: `planning/phase-1-freeze.md` Amendment 33. |
+
+Justificativa registrada: o contador removido só podia relatar zero — nenhum
+consumidor viável dependia dele — e deixá-lo ao lado de um contador vivo daria
+aos operadores um número que por construção não se move (R-14: um caminho
+canônico, não dois).
+
 ## Fila de decisões abertas
 
 - **ADR-030 — concorrência.** Reaberta apenas para o workload de liveness da

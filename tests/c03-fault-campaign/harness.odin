@@ -65,14 +65,11 @@ Server :: struct {
 	done:   sync.Sema,
 }
 
-g_server: ^Server
-
 ping_handler :: proc(ctx: ^web.Context) {
 	web.text(ctx, .OK, "pong")
 }
 
-serve_thread :: proc() {
-	s := g_server
+serve_thread :: proc(s: ^Server) {
 	sync.post(&s.ready)
 	web.serve(&s.app, s.port)
 	sync.post(&s.done)
@@ -87,7 +84,6 @@ base_limits :: proc() -> web.Limits {
 }
 
 start_server :: proc(s: ^Server, limits: web.Limits) -> bool {
-	g_server = s
 	for candidate in CANDIDATE_PORTS {
 		s.app = web.app()
 		web.limits(&s.app, limits)
@@ -95,8 +91,14 @@ start_server :: proc(s: ^Server, limits: web.Limits) -> bool {
 		web.get(&s.app, "/slow", slow_handler)
 		web.get(&s.app, "/big", big_handler)
 		s.port = candidate
-		s.thread = thread.create_and_start(serve_thread)
-		sync.wait(&s.ready)
+		s.thread = thread.create_and_start_with_poly_data(s, serve_thread)
+		// Bound the wait: a hung startup must fail loudly, not hang the runner.
+		if !sync.sema_wait_with_timeout(&s.ready, 10 * time.Second) {
+			thread.join(s.thread)
+			thread.destroy(s.thread)
+			s.thread = nil
+			continue
+		}
 		if wait_until_accepting(candidate) {
 			return true
 		}
@@ -127,7 +129,6 @@ wait_until_accepting :: proc(port: int) -> bool {
 // into a second crash.
 stop_server :: proc(s: ^Server) -> bool {
 	if s.thread == nil {
-		g_server = nil
 		return true
 	}
 	web.stop(&s.app)
@@ -138,7 +139,6 @@ stop_server :: proc(s: ^Server) -> bool {
 		s.thread = nil
 		web.destroy(&s.app)
 	}
-	g_server = nil
 	return returned
 }
 

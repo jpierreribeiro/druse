@@ -60,11 +60,16 @@ grep -q 'total_lane_503_no_retry == 0' "$URUQUIM_SUITE" ||
   fail "the Retry-After assertion is gone. A 503 lane refusal that does not tell the client when to come back invites an immediate retry onto the same contended pool, which collides again. The ramp reliably produces 503s, so the property is checked over real refusals."
 grep -q 'total_lane_503 > 0' "$URUQUIM_SUITE" ||
   fail "the assertion that the ramp actually produces a lane 503 is gone; without it the Retry-After check is vacuous"
-# item 2 — the lane-collision counter must be OBSERVABLE, not just felt as a 503.
-grep -q 'stats.lane_collisions) >= total_lane_503' "$URUQUIM_SUITE" ||
-  fail "the assertion that web.stats().lane_collisions covers the client-observed lane 503s is gone. A saturation counter that reads zero while clients see hundreds of 503s is decorative; this ties the counter to the refusal site (item 2)."
-grep -q 'atomic_add(&res._conn.server.lane_collisions' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
-  fail "the lane-collision counter is no longer incremented at the 503 refusal site in dispatch_exchange; web.stats().lane_collisions would then be decorative (item 2)."
+# Campaign C — the dwell counter must be OBSERVABLE and WIRED, replacing the
+# retired lane_collisions. Asserted in two places: the suite compares
+# handler_dwell_ns against served dispatches, and the accumulator lives at the
+# dispatch bracket.
+grep -q 'stats.handler_dwell_ns >= i64(served_all)' "$URUQUIM_SUITE" ||
+  fail "the dwell-vs-served assertion is gone. A saturation signal that stays flat while clients wait out hundreds of handler dwells is as decorative as lane_collisions was; this ties handler_dwell_ns to real work."
+grep -q 'res._conn.server.handler_dwell_ns' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+  fail "the dwell accumulator is no longer fed at the dispatch bracket in dispatch_exchange; web.stats().handler_dwell_ns would then stay zero (Campaign C)."
+grep -q 'i64(time.since(dispatch_started))' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+  fail "the dispatch bracket no longer measures elapsed wall time; without it, handler_dwell_ns counts nothing (Campaign C)."
 grep -q 'Retry-After' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
   fail "the lane-refusal 503 no longer sets Retry-After (H-4). The refusal path at dispatch_exchange must add the header before respond()."
 

@@ -613,3 +613,95 @@ audit_duplicate_object_keys_are_refused :: proc(t: ^testing.T) {
 		escaped.body,
 	)
 }
+
+// --- JSON audit backlog: J1/J2 field-precedence agreement --------------------
+//
+// The shape check and the fused decoder used two different precedence rules
+// (`json_struct_field` walked plain declaration order; `json_struct_target`
+// walks explicit tags first). For a payload key that matches differently under
+// each rule, validation and decode disagreed about the destination field, so
+// the fast path and the stdlib fallback could classify the same request
+// differently. These schemas pin the agreement: the value that passes the
+// shape check must be the value the decoder writes.
+
+// The divergence needs one field matching by NAME and a LATER field matching
+// by explicit TAG: the tag pass wins for decode, the declaration-order walk
+// won for the old shape check.
+J1_Input :: struct {
+	y: string,
+	x: int `json:"y"`,
+}
+
+bind_j1 :: proc(ctx: ^web.Context) {
+	dst: J1_Input
+	if !web.body(ctx, &dst) {
+		return
+	}
+	web.ok(ctx, dst)
+}
+
+@(test)
+audit_j1_tag_shadow_shape_check_and_decode_agree :: proc(t: ^testing.T) {
+	// Key "y" matches field `x` by explicit tag (decode winner) while field
+	// `y` matches by name and is declared FIRST. Before the fix, the shape
+	// check walked declaration order and validated against `y: string`:
+	// `{"y":5}` was wrongly refused and `{"y":"hello"}` passed the check only
+	// to miss the fused decode on type.
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/j1", bind_j1)
+
+	// An integer arrives at the tagged `x: int` field: must be ACCEPTED and
+	// written there, not refused because `y: string` shadowed it in the check.
+	num := web.test_request(&a, .POST, "/j1", `{"y":5}`)
+	testing.expectf(t, num.status == web.Status.OK,
+		"tagged int field accepts an integer, got %v (%s)", num.status, num.body)
+
+	// A string against the same key fails the tagged int check: must be
+	// REFUSED as invalid_field, identically on the fused path and fallback.
+	str := web.test_request(&a, .POST, "/j1", `{"y":"hello"}`)
+	testing.expectf(t, str.status == web.Status.Bad_Request,
+		"a string for the tagged int field is refused, got %v (%s)", str.status, str.body)
+	testing.expect(t, strings.contains(str.body, "invalid_field"), "refusal is invalid_field")
+}
+
+J2_Child :: struct {
+	inner: string `json:"id"`,
+}
+
+J2_Input :: struct {
+	using _:   J2_Child,
+	outer:     int `json:"id"`,
+}
+
+bind_j2 :: proc(ctx: ^web.Context) {
+	dst: J2_Input
+	if !web.body(ctx, &dst) {
+		return
+	}
+	web.ok(ctx, dst)
+}
+
+@(test)
+audit_j2_flattened_shadow_validates_the_decode_winner_only :: proc(t: ^testing.T) {
+	// Key "id" lives in both the flattened child (string) and the outer struct
+	// (int). The old `json_struct_known_check` recursed into the child AND
+	// checked the outer field, so `{"id":5}` was refused against the child's
+	// `id: string` even though the decoder's winner is the outer `id: int`.
+	// The winner's type alone must decide.
+	filter: Log_Filter
+	context.logger = filtered_logger(&filter)
+	a := web.app()
+	defer web.destroy(&a)
+	web.post(&a, "/j2", bind_j2)
+
+	num := web.test_request(&a, .POST, "/j2", `{"id":5}`)
+	testing.expectf(t, num.status == web.Status.OK,
+		"the outer int field wins and accepts an integer, got %v (%s)", num.status, num.body)
+
+	str := web.test_request(&a, .POST, "/j2", `{"id":"x"}`)
+	testing.expectf(t, str.status == web.Status.Bad_Request,
+		"a string for the winning int field is refused, got %v (%s)", str.status, str.body)
+}
