@@ -131,4 +131,18 @@ must_go_red "transfer-coding matched by suffix instead of token (H3)" \
   'return count == 1 && last_is_chunked' \
   'return strings.has_suffix(enc, "chunked")'
 
-echo "PASS: WP9 raw-wire corpus mutation controls (5 guards, each detected)"
+# Audit H1. The narrowed form is the interesting mutation, not deletion: it is
+# what the code ACTUALLY said before patch 38 was written for the egress sink
+# (CR/LF/NUL only, on the reasoning that those are the splitting bytes). If the
+# corpus only noticed the check being deleted entirely, it would not be holding
+# the rule this patch is named after.
+must_go_red "field-line control check narrowed to the splitting bytes (H1)" \
+  "vendor/odin-http/http.odin" \
+  "		if b < 0x20 || b == 0x7f {
+			return true
+		}" \
+  "		if b == 0 && false {
+			return true
+		}"
+
+echo "PASS: WP9 raw-wire corpus mutation controls (6 guards, each detected)"

@@ -479,6 +479,57 @@ corpus_storage := []Wire_Case{
 			notes = "HTTP audit F1: `_` is an Odin numeric separator, not a hex digit. " +
 			"`1_0` parsed as 16 here and is malformed to a strict front-end.",
 		},
+
+		// --- audit H1: control bytes in a field line ------------------------
+		//
+		// The lone-CR case above is the neighbour of these three, and the gap it
+		// left is the point: CR was refused because CR is the splitting byte,
+		// while every other byte RFC 9110 §5.5 excludes from a field value was
+		// stored verbatim and answered 200. All three of these were MEASURED at
+		// 200 before vendor patch 38.
+		//
+		// `/ping` on purpose, not `/echo`: `/echo` answers 400 for a body that
+		// is not JSON whether or not the field line was refused, so a case
+		// drafted against it would pass with the fix reverted. That mistake was
+		// made once in this corpus already (audit H3).
+		{
+			name = "a NUL inside a header value is rejected",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\x00b\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H1: RFC 9110 §5.5 makes rejecting or replacing a NUL in a " +
+			"field value a MUST — \"invalid and dangerous, due to the varying ways that " +
+			"implementations might parse and interpret those characters\".",
+		},
+		{
+			name = "a C0 control inside a header value is rejected",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\x01b\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H1: field-value is `*( SP / HTAB / VCHAR / obs-text )`, so 0x01 " +
+			"is not field content at all. This one was not merely stored — an application " +
+			"echoing the value put the 0x01 back on the wire byte-for-byte.",
+		},
+		{
+			name = "a control byte inside a header NAME is rejected",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-\x01Test: v\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H1: a field name is a `token` (RFC 9110 §5.6.2), which excludes " +
+			"controls. `sanitize_key` escapes only LF, so such a name was lowercased and " +
+			"stored as-is.",
+		},
+		{
+			name = "a horizontal tab inside a header value is still accepted",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\tb\r\nConnection: close\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {200},
+			handler_must_run = true,
+			connection_must_close = true,
+			notes = "audit H1's boundary, and the reason it is here: HTAB is legal OWS " +
+			"inside a field value. A control-byte rule that swept it up would refuse " +
+			"conforming traffic, and nothing else in this corpus would have noticed.",
+		},
 }
 
 wire_corpus :: proc() -> []Wire_Case {

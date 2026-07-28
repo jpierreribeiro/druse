@@ -166,8 +166,54 @@ method_parse :: proc(m: string) -> (method: Method, ok: bool) #no_bounds_check {
 	return nil, false
 }
 
+// URUQUIM PATCH 38 (audit H1) — a field line carrying a control byte is
+// refused, not stored.
+//
+// RFC 9110 §5.5 defines a field value as `*( SP / HTAB / VCHAR / obs-text )`:
+// bytes 0x00–0x08, 0x0A–0x1F and 0x7F are not field content at all. The same
+// clause is explicit about the sharp end of the set — "field values containing
+// CR, LF, or NUL characters are invalid and dangerous, due to the varying ways
+// that implementations might parse and interpret those characters" — and makes
+// rejecting or replacing them a MUST.
+//
+// WHAT WAS MEASURED. Before this patch, `X-Test: a<0x00>b` and `X-Test: a<0x01>b`
+// were both answered 200 and stored verbatim, and an application that echoed the
+// value into a response header put the 0x01 back on the wire byte-for-byte. CR
+// and LF cannot arrive here — the scanner splits field lines on CRLF, so the
+// bytes this actually admits are NUL, the rest of C0, and DEL.
+//
+// WHY REFUSE RATHER THAN STRIP. Stripping produces a value neither end asked
+// for, and leaves this server's idea of the header different from the idea held
+// by whatever sits in front of it — the same two-ends-disagree shape as the
+// CL+TE and obs-fold patches. Refusing is one answer both ends can see.
+//
+// The check covers the whole line, name and value alike: a control byte in a
+// field NAME is not a `token` either (RFC 9110 §5.6.2), and `sanitize_key`
+// escapes only LF, so such a name would otherwise be stored as-is. HTAB is
+// admitted because it is legal OWS inside a value; the obs-fold rule below
+// still refuses a line that BEGINS with one.
+@(private)
+header_line_has_control :: proc(line: string) -> bool {
+	for b in transmute([]byte)line {
+		if b == '\t' {
+			continue
+		}
+		if b < 0x20 || b == 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
 // Parses the header and adds it to the headers if valid. The given string is copied.
 header_parse :: proc(headers: ^Headers, line: string, allocator := context.temp_allocator) -> (key: string, ok: bool) {
+	// URUQUIM PATCH 38 (audit H1) — refuse control bytes before anything is
+	// lowercased, cloned or merged. `ok = false` is answered 400 by the server
+	// loop (server.odin, `on_header_line`), which is the refusal RFC 9110 §5.5
+	// requires.
+	if header_line_has_control(line) {
+		return
+	}
 	// URUQUIM PATCH 18 (F14) — reject obsolete line folding, both forms. RFC
 	// 7230 obs-fold is CRLF followed by a space OR a horizontal tab; the
 	// original check caught only the space. A tab-prefixed continuation line
