@@ -27,10 +27,15 @@ This note appears once, here. No other page repeats it.
 
 ## Start here
 
-**[Quickstart](00-quickstart.md)** — a running server in five minutes. You type
-it; you do not read about it.
-**[Installation](03-subjects/installation.md)** — the two flags, and vendoring
-that survives a fresh clone.
+1. **[Odin in ten minutes](00-odin-in-ten-minutes.md)** — the eight language
+   constructs this guide uses. Skip it if you know Odin.
+2. **[Quickstart](00-quickstart.md)** — a running server in five minutes. You
+   type it; you do not read about it.
+3. **[Installation](03-subjects/installation.md)** — the two flags, and
+   vendoring that survives a fresh clone.
+
+You do not need to know Odin to start. You need about eight things, and page 1
+is all of them.
 
 ## Guide — by subject
 
@@ -64,6 +69,10 @@ gate fails if a page drifts from its source.
 | [Application state](06-cookbook/app-state.md) | One typed value, created once, read anywhere |
 | [Graceful shutdown](06-cookbook/graceful-shutdown.md) | A signal handler, drain, and the readiness probe |
 | [Config and health](06-cookbook/config-and-health.md) | Environment configuration, liveness and readiness |
+| [Path and query parameters](06-cookbook/path-and-query-params.md) | Static beating parametric, and why `?limit=abc` is a 400 |
+| [Route groups](06-cookbook/route-groups.md) | A group as a value, and the one-route guard |
+| [Authentication](06-cookbook/authentication.md) | A bearer gate and a typed lookup, both application code |
+| [CORS, static and uploads](06-cookbook/cors-static-and-uploads.md) | What a browser-facing service needs, in one program |
 
 ## Recipes — by task
 
