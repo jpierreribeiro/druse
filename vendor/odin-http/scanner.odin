@@ -152,10 +152,56 @@ scanner_destroy :: proc(s: ^Scanner) {
 	delete(s.buf)
 }
 
+// URUQUIM PATCH 41 (audit M9) — the read buffer is RETURNED between requests
+// once it has grown past what ordinary traffic needs.
+//
+// `remove_range` moves `len` and never touches the backing allocation, and the
+// buffer grows by DOUBLING to hold a request body (`_body_length` sets
+// `max_token_size = ilen`). So one large POST left that keep-alive connection
+// holding a body-sized buffer for as long as the client kept the socket open,
+// and `max_idle_time` defaults to 0, so nothing reaped it.
+//
+// MEASURED, 16 keep-alive connections left idle after ONE POST each:
+//
+//	64-byte bodies    +0.01 MB per connection
+//	1 MiB bodies      +2.02 MB per connection
+//	3 MiB bodies      +6.49 MB per connection
+//
+// Linear at roughly 2.1x the body — the retained buffer plus the doubling
+// ladder below it, which the allocator keeps resident. At the shipped defaults
+// that is `max_connections` 1024 x 2.1 x `max_body` 4 MiB, about 8.6 GB, which
+// is not a budget a cgroup absorbs; it is one it gets killed by.
+//
+// THE THRESHOLD IS THE POINT. Shrinking unconditionally would reallocate on
+// every request of every connection. `RETAINED_BUF_MAX` is well above the
+// request line and header ceilings (8000 each) and above any realistic
+// pipelined burst, so ordinary traffic never reaches it and never pays. Only a
+// connection that has just carried a large BODY does — and it pays one
+// allocation on its next large body, in exchange for not holding megabytes
+// idle.
+//
+// Sized in `len(s.buf)` rather than `cap`, because that is the field the
+// growth path doubles and the field `remove_range` leaves standing.
+RETAINED_BUF_MAX :: 256 * 1024
+
 scanner_reset :: proc(s: ^Scanner) {
 	remove_range(&s.buf, 0, s.start)
 	s.end   -= s.start
 	s.start  = 0
+
+	// URUQUIM PATCH 41 (audit M9). Only when nothing is pending: `s.end` is the
+	// live prefix a pipelined follow-up request may already occupy, and
+	// discarding it would drop a request that has arrived.
+	if len(s.buf) > RETAINED_BUF_MAX && s.end == 0 {
+		// The allocator is captured and restored: `s.buf = nil` zeroes the
+		// whole dynamic-array header, and the connection's buffer allocator is
+		// NOT `context.allocator` (`scanner_init` takes it as a parameter).
+		// Losing it would silently move the next growth onto a different heap.
+		buf_allocator := s.buf.allocator
+		delete(s.buf)
+		s.buf = nil
+		s.buf.allocator = buf_allocator
+	}
 
 	s.split                        = scan_lines
 	s.split_data                   = nil

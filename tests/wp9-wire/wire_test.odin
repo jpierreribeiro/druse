@@ -379,3 +379,80 @@ wp9_the_log_filter_cannot_swallow_an_assertion_failure :: proc(t: ^testing.T) {
 		"the wire suite's log filter swallowed an assertion failure; every corpus case is then decorative",
 	)
 }
+
+// AUDIT M9 — THE BUFFER SHRINK MUST NOT EAT A PIPELINED REQUEST.
+//
+// Vendor patch 41 returns the connection's read buffer between requests once it
+// has grown past `RETAINED_BUF_MAX`, because one large POST otherwise left that
+// keep-alive connection holding a body-sized buffer for as long as the client
+// kept the socket open. Measured over 16 idle connections: +0.01 MB each for
+// 64-byte bodies, +6.49 MB each for 3 MiB bodies — about 2.1x the body, linear.
+//
+// THE RISK THE SHRINK CREATES is this test. `s.end` is the live prefix of
+// already-arrived bytes, which on a pipelined connection is the NEXT request.
+// Discarding the buffer while that is present would drop a request the client
+// has already sent and will never resend — a silent hang, not an error. The
+// patch guards on `s.end == 0`; this proves the guard is load-bearing by
+// sending exactly the shape that would break without it: a body large enough to
+// trigger the shrink, with a second request already in flight behind it.
+@(test)
+wp9_a_shrink_after_a_large_body_does_not_drop_a_pipelined_request :: proc(t: ^testing.T) {
+	s: Server
+	if !start_server(&s) {
+		testing.fail_now(t, "server must start")
+	}
+	defer stop_server(&s)
+
+	// Comfortably over RETAINED_BUF_MAX (256 KiB) so the shrink is reached, and
+	// inside the body cap so the request is served rather than refused.
+	BODY :: 1024 * 1024
+	body := make([]u8, BODY, context.temp_allocator)
+	for i in 0 ..< BODY {body[i] = 'x'}
+
+	b: strings.Builder
+	strings.builder_init(&b, context.temp_allocator)
+	strings.write_string(&b, "POST /ping HTTP/1.1\r\nHost: localhost\r\nContent-Length: ")
+	strings.write_int(&b, BODY)
+	strings.write_string(&b, "\r\n\r\n")
+	strings.write_bytes(&b, body)
+	// THE SECOND REQUEST, in the same write. It is sitting in the connection's
+	// buffer while the first one is still being handled.
+	strings.write_string(&b, "GET /ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+
+	before := ping_hits
+	endpoint := net.Endpoint{address = net.IP4_Address{127, 0, 0, 1}, port = s.port}
+	sock, derr := net.dial_tcp(endpoint)
+	testing.expect(t, derr == nil, "must connect")
+	defer net.close(sock)
+	net.set_option(sock, .Receive_Timeout, 10 * time.Second)
+
+	payload := transmute([]u8)strings.to_string(b)
+	sent := 0
+	for sent < len(payload) {
+		n, serr := net.send_tcp(sock, payload[sent:])
+		if serr != nil || n <= 0 {break}
+		sent += n
+	}
+	testing.expect_value(t, sent, len(payload))
+
+	reply: strings.Builder
+	strings.builder_init(&reply, context.temp_allocator)
+	chunk: [8192]u8
+	for {
+		n, rerr := net.recv_tcp(sock, chunk[:])
+		if n > 0 {strings.write_bytes(&reply, chunk[:n])}
+		if n <= 0 || rerr != nil {break}
+	}
+
+	testing.expectf(
+		t,
+		ping_hits - before == 2,
+		"BOTH requests must be served: the large POST and the pipelined GET behind it. Handler ran %d time(s). One means the buffer was discarded while the second request was already in it — the client sent bytes the server threw away, and will wait forever for a reply it will never get.",
+		ping_hits - before,
+	)
+	testing.expect(
+		t,
+		strings.count(strings.to_string(reply), "HTTP/1.1 200") == 2,
+		"and both must be answered on the wire",
+	)
+}
