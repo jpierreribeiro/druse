@@ -107,9 +107,18 @@ wp19_header_empty_value_is_present :: proc(t: ^testing.T) {
 }
 
 @(test)
-wp19_header_duplicates_first_occurrence_wins :: proc(t: ^testing.T) {
-	// The WP5 D4 query rule, restated for headers: one rule, one mental model,
-	// and joining would allocate.
+wp19_header_scan_takes_the_first_matching_pair :: proc(t: ^testing.T) {
+	// THE SCAN RULE, not the duplicate-header contract — the two were conflated
+	// and this test carried the wrong name.
+	//
+	// On the wire a repeated name never reaches the core as two pairs: the
+	// transport's `header_parse` joins repeats with `", "` (RFC 9110 §5.3), and
+	// `web.test_request` now does the same, so `X-Dup: a` + `X-Dup: b` arrives
+	// as the single value `"a, b"`. What THIS pins is the core's behaviour when
+	// it is nevertheless handed several pairs of one name: it takes the first
+	// match and never concatenates. That is a defensive property of the scan —
+	// deterministic, allocation-free — and it stays worth pinning precisely
+	// because no transport is supposed to produce this input.
 	pairs := [3]Header_Pair {
 		{name = "X-Dup", value = "first"},
 		{name = "x-dup", value = "second"},

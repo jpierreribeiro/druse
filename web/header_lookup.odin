@@ -32,9 +32,20 @@ package web
 //
 // Names are case-insensitive with ASCII folding, per RFC 9110 — `X-Api-Key`,
 // `x-api-key` and `X-API-KEY` are one header; non-ASCII bytes compare
-// byte-exact. When the same name arrived more than once, the FIRST occurrence
-// wins, matching the query rule (WP5 D4): one rule, one mental model, and
-// joining would allocate.
+// byte-exact.
+//
+// WHEN THE SAME NAME ARRIVED MORE THAN ONCE, THE VALUES ARE JOINED, in arrival
+// order, separated by `", "` — RFC 9110 §5.3's permitted combination, performed
+// once at parse time by the transport (`header_parse`). `X-Dup: alpha` followed
+// by `X-Dup: beta` reads back as `"alpha, beta"`, and there is exactly one
+// entry per name to look up.
+//
+// This comment previously said the FIRST occurrence wins, "matching the query
+// rule (WP5 D4) ... and joining would allocate". Both halves were false: the
+// join happens in the transport before `header` is ever called, and it
+// allocates (`strings.concatenate`). `web.query` DOES take first-occurrence —
+// that rule is real, it just was never this one. Pinned by
+// `tests/wp19-header-lookup`.
 //
 // An empty value is PRESENT: `("", true)`. `ok` reports presence, not
 // validity.
@@ -69,8 +80,11 @@ header :: proc(ctx: ^Context, name: string) -> (value: string, ok: bool) {
 // the caller decides what that means (typically a 401 from an auth
 // middleware — see docs/canonical-patterns.md).
 //
-// When `Authorization` arrived more than once, the first occurrence is the
-// one parsed, per the `header` rule above.
+// When `Authorization` arrived more than once, the values are joined per the
+// `header` rule above, so what this parses is `"<first>, <second>"` — which
+// fails the strict grammar below (the token would contain a comma and a
+// space). A duplicated `Authorization` is therefore refused, not silently
+// resolved to one of the two.
 bearer_token :: proc(ctx: ^Context) -> (value: string, ok: bool) {
 	raw, found := header(ctx, "Authorization")
 	if !found {

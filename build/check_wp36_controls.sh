@@ -144,11 +144,13 @@ python3 - "$T/uruquim/web/limits.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
-old = """	if a.private.dispatched {
+# REPOINTED (audit): the field read became the `app_has_dispatched` accessor,
+# and this pattern has not matched since.
+old = """	if app_has_dispatched(a) {
 		limits_poison(a, FRAMEWORK_MESSAGE_LIMITS_AFTER_DISPATCH)
 		return
 	}"""
-new = """	_ = a.private.dispatched"""
+new = """	_ = app_has_dispatched(a)"""
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF

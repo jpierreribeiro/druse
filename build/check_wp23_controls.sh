@@ -204,8 +204,7 @@ old = """	if ctx.private.request_id_set {
 			value = ctx.private.request_id_value,
 		}
 		count += 1
-	}
-	return ctx.private.response_headers[:count]"""
+	}"""
 new = """	if ctx.private.request_id_set {
 		for i := count; i > 0; i -= 1 {
 			ctx.private.response_headers[i] = ctx.private.response_headers[i - 1]
@@ -215,8 +214,7 @@ new = """	if ctx.private.request_id_set {
 			value = ctx.private.request_id_value,
 		}
 		count += 1
-	}
-	return ctx.private.response_headers[:count]"""
+	}"""
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
@@ -232,8 +230,9 @@ python3 - "$T/request_id.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
-old = """	request_id_counter += 1
-	counter := request_id_counter"""
+# REPOINTED (audit): the counter became an atomic add for concurrent lanes,
+# and this pattern has not matched since — the uniqueness guard was unguarded.
+old = """	counter := sync.atomic_add(&request_id_counter, 1) + 1"""
 new = """	counter := u64(1)"""
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))

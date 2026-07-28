@@ -138,11 +138,13 @@ python3 - "$T/observer.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
-old = """observe :: proc(a: ^App, observer: proc(event: Framework_Event)) {
-	a.private.observer = observer
+# REPOINTED (audit): `observe` gained the late-configuration guard after this
+# mutation was written, so the pattern stopped matching and this control was
+# inert. The mutation itself is unchanged in INTENT — a second `observe` call
+# silently ignored — only in the text it edits.
+old = """	a.private.observer = observer
 }"""
-new = """observe :: proc(a: ^App, observer: proc(event: Framework_Event)) {
-	if a.private.observer == nil {
+new = """	if a.private.observer == nil {
 		a.private.observer = observer
 	}
 }"""
@@ -172,7 +174,10 @@ cp "$URUQUIM_ROOT"/build/check_public_api.sh "$T/build/"
 cp "$URUQUIM_ROOT"/build/check.sh "$T/build/"
 cp "$URUQUIM_ROOT"/web/*.odin "$T/web/"
 cp "$URUQUIM_ROOT"/web/testing/*.odin "$T/web/testing/"
-cp "$URUQUIM_ROOT"/web/internal/transport/*.odin "$T/web/internal/transport/"
+# REPOINTED (audit): ALL of web/internal, not just transport. `ingest` and
+# `stream` arrived later and the transport imports them, so this tree stopped
+# compiling and the control reported a BROKEN PROBE rather than a result.
+cp -r "$URUQUIM_ROOT"/web/internal/. "$T/web/internal/"
 cp -r "$URUQUIM_ROOT"/vendor/odin-http "$T/vendor/odin-http"
 cp -r "$URUQUIM_ROOT"/tests/. "$T/tests/"
 

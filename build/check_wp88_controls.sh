@@ -97,7 +97,21 @@ if grep -nE '"uruquim:(web|vendor)' "$URUQUIM_ROOT/web/internal/stream"/*.odin; 
   fail "the stream package imports web or the backend; it must stay executor-agnostic"
 fi
 
+# M2 — the wake must never be invoked under the slot lock. `nbio.exec` spins
+# waiting for a full cross-thread queue, and the owner lane can only drain that
+# queue by first returning from a pump that is blocked on this same mutex, so a
+# wake under the lock is a two-thread deadlock with no diagnostic. Both the
+# assertion and the unlock ordering it protects are pinned here.
+grep -q 'wp88_the_slot_wake_runs_outside_the_slot_lock' \
+  "$URUQUIM_ROOT/tests/wp88-stream-registry/registry_test.odin" ||
+  fail "the M2 control is gone: nothing now detects the slot wake being invoked under s.mu, which deadlocks the owner lane against a full nbio queue"
+if ! grep -Pzoq 'slot_user := s\.wake_user\s*\n\s*sync\.mutex_unlock\(&s\.mu\)' \
+  "$URUQUIM_ROOT/web/internal/stream/stream.odin"; then
+  fail "try_send no longer releases s.mu before invoking the slot wake (M2). A wake that reaches a full cross-thread nbio queue spins under this lock while the owner lane blocks on it — deadlock."
+fi
+
 echo "wp88: the WP87 stream corpus is green unedited, all 12 cases present"
+echo "wp88: the slot wake is invoked outside s.mu, on both try_send and close (M2)"
 echo "wp88: ring wraparound, process budget, wake hook and 2000-event concurrency hold"
 echo "wp88: removing the generation check makes the corpus fail (G7-3 control)"
 echo "wp88: stream package wired only through the transport boundary; imports neither web nor backend"

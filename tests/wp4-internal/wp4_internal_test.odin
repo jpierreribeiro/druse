@@ -356,7 +356,7 @@ wp4_405_also_applies_to_a_parametric_path :: proc(t: ^testing.T) {
 	wp4_run(&a, &ctx, .POST, "/users/42")
 
 	testing.expect_value(t, ctx.private.response.status, Status.Method_Not_Allowed)
-	testing.expect_value(t, ctx.private.response.headers[0].value, "GET")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, HEAD, OPTIONS")
 }
 
 // ---------------------------------------------------------------------------
@@ -383,7 +383,7 @@ wp4_allow_is_the_first_header_with_the_exact_name :: proc(t: ^testing.T) {
 
 	// The name is exactly `Allow` — not `allow`, not `ALLOW` — and it is FIRST.
 	testing.expect_value(t, ctx.private.response.headers[0].name, "Allow")
-	testing.expect_value(t, ctx.private.response.headers[0].value, "GET")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, HEAD, OPTIONS")
 	testing.expect_value(t, ctx.private.response.headers[1].name, "Content-Type")
 }
 
@@ -410,7 +410,7 @@ wp4_allow_uses_the_canonical_method_order :: proc(t: ^testing.T) {
 	testing.expect_value(
 		t,
 		ctx.private.response.headers[0].value,
-		"GET, POST, PUT, PATCH, DELETE",
+		"GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS",
 	)
 }
 
@@ -425,7 +425,7 @@ wp4_allow_lists_only_registered_methods :: proc(t: ^testing.T) {
 	ctx: Context
 	wp4_run(&a, &ctx, .GET, "/two")
 
-	testing.expect_value(t, ctx.private.response.headers[0].value, "POST, PATCH")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "POST, PATCH, OPTIONS")
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +459,7 @@ wp4_allow_has_no_duplicates :: proc(t: ^testing.T) {
 	wp4_run(&a, &ctx, .PUT, "/dup")
 
 	testing.expect_value(t, len(ctx.private.response.headers), 2)
-	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, POST")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, HEAD, POST, OPTIONS")
 }
 
 @(test)
@@ -475,7 +475,7 @@ wp4_allow_does_not_duplicate_across_static_and_param_routes :: proc(t: ^testing.
 	ctx: Context
 	wp4_run(&a, &ctx, .DELETE, "/users/me")
 
-	testing.expect_value(t, ctx.private.response.headers[0].value, "GET")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, HEAD, OPTIONS")
 }
 
 // ---------------------------------------------------------------------------
@@ -528,7 +528,7 @@ wp4_unknown_method_is_never_registrable :: proc(t: ^testing.T) {
 
 	ctx: Context
 	wp4_run(&a, &ctx, .UNKNOWN, "/x")
-	testing.expect_value(t, ctx.private.response.headers[0].value, "GET")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, HEAD, OPTIONS")
 }
 
 // ---------------------------------------------------------------------------
@@ -796,7 +796,7 @@ wp4_dispatch_allocates_nothing :: proc(t: ^testing.T) {
 	ctx3: Context
 	wp4_run(&a, &ctx3, .PUT, "/users/42")
 
-	testing.expect_value(t, ctx3.private.response.headers[0].value, "GET, POST")
+	testing.expect_value(t, ctx3.private.response.headers[0].value, "GET, HEAD, POST, OPTIONS")
 	testing.expect_value(t, len(track.allocation_map), after_registration)
 }
 
@@ -975,7 +975,7 @@ wp4_uninterpretable_patterns_do_not_disturb_valid_ones :: proc(t: ^testing.T) {
 	ctx3: Context
 	wp4_run(&a, &ctx3, .POST, "/users/42")
 	testing.expect_value(t, ctx3.private.response.status, Status.Method_Not_Allowed)
-	testing.expect_value(t, ctx3.private.response.headers[0].value, "GET")
+	testing.expect_value(t, ctx3.private.response.headers[0].value, "GET, HEAD, OPTIONS")
 }
 
 @(test)

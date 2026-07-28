@@ -14,6 +14,47 @@ symbol by symbol with the evidence behind each, is in
 and Phase 3 is under way; ledger growth in either is recorded as a numbered
 freeze amendment, never as a snapshot refresh.
 
+### Changed
+
+- **`Allow` now names `HEAD` and `OPTIONS`** (audit R8). A route registered only
+  for GET emitted `Allow: GET` while — measured on a socket — `HEAD` answered
+  200 and `OPTIONS` answered 204. RFC 9110 §10.2.1 defines the field as the
+  methods the resource *supports*, so the header described what an application
+  had typed rather than what the server does, and a cache, a CORS preflight or a
+  monitor choosing HEAD over GET was told a working method was unavailable. Such
+  a route now emits `Allow: GET, HEAD, OPTIONS`. `HEAD` appears only where GET is
+  registered (HEAD *is* the GET route); `OPTIONS` is unconditional. The frozen
+  order becomes `GET, [HEAD,] POST, PUT, PATCH, DELETE, OPTIONS`, still
+  registration-independent. **This reverses a recorded decision, and narrowly:**
+  the original rejection bundled an alphabetical ordering — still rejected —
+  with the listing itself, which was right. No public signature changed;
+  `Method` remains the five registrable verbs, and the two are emitted as
+  tokens rather than becoming enum members an application could never construct.
+
+- **`Limits.max_json_nodes` bounds JSON structural cost** (audit J3/J4), default
+  100,000 values plus object keys, `0` disables. Two well-formed bodies inside
+  the 4 MiB `max_body` were measured at **588 MB of RSS** (1,398,101 empty
+  objects into a 288-byte DTO) and **1.6–2.1 s of one Handler lane** (322,000
+  object keys). `max_body` bounds bytes, and bytes are not what the decode costs
+  scale with. At the default those same bodies cost **20 MB** and **50 ms**;
+  10,000- and 25,000-key bodies are still served, within noise of unbounded. A
+  breach is `413` with code `body_too_complex` — not `body_too_large`, since a
+  client retrying by shrinking bytes has misread it. Recorded as Phase-1 freeze
+  Amendment 38 and row 14 of the C-02 readiness matrix.
+
+- **Control bytes are refused in a header field line** (audit H1), in both
+  directions: a request carrying one is answered 400, and `web.set_header`
+  refuses a value containing one. Previously `X-Test: a\x01b` was answered 200
+  and an application echoing the value put the byte back on the wire. RFC 9110
+  §5.5 defines field content as `SP / HTAB / VCHAR / obs-text`. HTAB and
+  obs-text remain legal.
+
+- **An absolute-form request target whose authority disagrees with `Host` is
+  refused** (audit H2). `GET http://evil.example/x` with `Host: good.example`
+  was answered 200 and the application read `good.example` — the half RFC 9112
+  §3.2.2 says to ignore. Refused rather than repaired, matching the CL+TE
+  disposition. `OPTIONS *` is exempt.
+
 ### Documented
 
 - **Phase 3 is frozen** (WP38): **+6 symbols**, application ledger **44 → 50**

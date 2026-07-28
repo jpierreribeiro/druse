@@ -2179,32 +2179,80 @@ test-support = 77).**
 
 **WHY.** Dedicated accept (WP119) made handlers run synchronously on the lane
 thread, so `handler_lane_enter` cannot return false and the 503-on-collision
-path is unreachable. `lane_collisions` was structurally zero while the lane
-pool saturated with silent socket-buffer queueing, and `tests/c05-saturation`
-was red on `main` because it asserted the dead contract. `handler_dwell_ns`
-(total nanoseconds inside dispatched handlers, as a running total) is the
-observable replacement; the operator differences it for utilization and mean
-dwell, and c05 pins that it moves with real work — its control (accumulator
-stubbed to zero) goes red.
+path in `dispatch_exchange` is unreachable. `handler_dwell_ns` (total
+nanoseconds inside dispatched handlers, as a running total) is the observable
+replacement; the operator differences it for utilization and mean dwell, and
+c05 pins that it moves with real work — its control (accumulator stubbed to
+zero) goes red.
+
+**CORRECTION (2026-07-28) — THE ORIGINAL JUSTIFICATION WAS WRONG, THE DECISION
+STANDS.** This amendment first claimed `lane_collisions` "was structurally zero"
+and that `tests/c05-saturation` "was red on `main` because it asserted the dead
+contract". Both were re-tested on pristine `44bdcda` and are false. The counter
+had TWO increment sites, and only the adapter one (`odin_http_adapter.odin`, the
+lane-collision refusal) was unreachable; the ACCEPTOR's saturation refusal
+(`vendor/odin-http/server.odin`, `accept_refuse_handler_saturation`) also
+incremented it. Five pristine runs on a 4-vCPU host recorded
+`lane_collisions` = 0, 2, 2, 0, 39 — tracking the client-observed 503s **1:1
+every time** — and the old assertion `lane_collisions >= total_lane_503` held in
+all five. c05 was red on `main` for the same scheduling-dependent reason it was
+red after the swap: the unconditional `total_lane_503 > 0` assertion, since
+fixed. So `lane_collisions` was never dead; it was MISNAMED, counting acceptor
+saturation refusals under a lane-collision name. The replacement is still the
+right call — a misnamed refusal count is not a saturation signal, and dwell is —
+but the record must not claim a dead counter that measurement contradicts. If
+the acceptor-refusal count is wanted, it returns under its own name
+(`refused_saturation_total`), per the Campaign C plan.
 
 **COMPATIBILITY.** This is a breaking change to a frozen struct: code that
 read `lane_collisions` no longer compiles. Accepted under the ADR-029
-delegation because the removed field could only ever report zero — no
-workable consumer depends on it — and because the replacement answers the
-question operators were told `lane_collisions` answered.
+delegation because the removed field reported acceptor saturation refusals
+under a name that promised lane collisions — a consumer reading it for the
+documented meaning was already being misled — and because the replacement
+answers the question operators were told `lane_collisions` answered.
 
-**TIMESTAMP COST (post-implementation, 2026-07-27, shared KVM, 4 vCPU):** two
-`time.now()` + `time.since` calls plus the seq-cst `atomic_add` measure **~600 ns
-per dispatch** in a 5M-iteration tight loop on this host — far above the ~40–50 ns
-vDSO estimate in the Campaign C body. That is an artifact of this machine (a
-shared-tenancy VM with a coarse clock, where `clock_gettime` is not the ~20 ns
-vDSO fast path); on the c5.2xlarge campaign host (bare-metal Nitro) the same
-bracket should cost tens of nanoseconds. The c05 suite passes with the cost in
-place (2.0 s wall for 92 dispatches — under 2% on the worst-case host). **The
-delta is recorded here rather than filed under noise, per the campaign
-instruction.** If this brackets as hot on bare metal, the fallback is reusing
-the deadline sweep's per-lane clock (one timestamp per sweep, amortized)
-instead of per-request reads — noted, not implemented.
+**TIMESTAMP COST — RE-MEASURED 2026-07-28. The earlier ~600 ns recording and its
+explanation are both withdrawn.** The bracket is two clock reads plus one
+seq-cst add. Measured on a 4-vCPU KVM host whose clocksource is `tsc`
+(2M iterations each, `-o:speed`, loop overhead subtracted):
+
+| Path | ns/call |
+|---|---|
+| glibc `clock_gettime` (**vDSO**) | 20.2 |
+| raw `syscall(SYS_clock_gettime)` in C | 119.2 |
+| Odin `time.now()` | 114.8 |
+| `sync.atomic_add` alone | 6.4 |
+| **full bracket (2 reads + add)** | **238.0** |
+
+The mechanism is NOT a coarse clock and NOT shared tenancy. `core:time` calls
+`core:sys/linux.clock_gettime`, which issues `syscall(SYS_clock_gettime, ...)`
+directly — **Odin's stdlib never consults the vDSO**. Odin's 114.8 ns matches
+the raw-syscall control (119.2), not the vDSO path (20.2), on a host where the
+vDSO fast path is fully available. The Campaign C body's ~40–50 ns estimate was
+arithmetically right for the mechanism it assumed (2 × 20.2) — that mechanism is
+simply not the one in use. **Bare metal will therefore NOT bring this to tens of
+nanoseconds**; the syscall boundary is host-independent in order of magnitude,
+and the only route to vDSO cost is a clock path `core:time` does not provide.
+
+At 250k req/s this is ~60 ms of CPU per second, about 6% of one core.
+
+The previously cited reassurance — "the c05 suite passes with the cost in place
+(2.0 s wall for 92 dispatches — under 2%)" — is also withdrawn: c05's handlers
+dwell 40 ms, so 238 ns is 0.0006% of each, and that measurement **cannot detect
+the bracket at all**. It was not evidence. The routing-benchmark before/after
+delta the Campaign C plan required has still not been run; that obligation is
+open, not discharged.
+
+Fallback if a routing profile shows the bracket hot: derive timestamps from the
+deadline sweep's per-lane clock (one read per sweep, amortized) instead of
+per-request reads — noted, not implemented.
+
+**CLOCK SOURCE (2026-07-28).** The bracket now uses `time.tick_now` /
+`time.tick_since` (CLOCK_MONOTONIC_RAW), not `time.now` / `time.since`
+(CLOCK_REALTIME). `time.since` returns a SIGNED difference, so an NTP step
+backward during a dispatch added a negative value to a total operators read as
+monotonically increasing — a differenced sample could go negative. Pinned by
+`build/check_c05_controls.sh`.
 
 | Symbol | Ledger | Campaign | Signature evidence | Behaviour evidence | Doc | Notes |
 |---|---|---|---|---|---|---|
@@ -2426,3 +2474,167 @@ REQUEST_STATE_MAX` is a `#assert` (compile-time).
 restore the ADR-028 statement). Sixth of the C1..C7 corrective batch. **This is
 the amendment the release-readiness review must ratify as a philosophy change, not
 merely a gap fix — see `planning/adr-028-amendment.md`.**
+
+---
+
+## Amendment 38 — Audit J3/J4: `Limits.max_json_nodes`, no ledger growth
+
+**Date: 2026-07-28. Authority: the owner, on the measurements below. Ledger
+effect: none; application remains 62 and test-support remains 2.**
+
+**Why this exists, in numbers.** Two bodies, both well-formed, both inside
+`max_body`, both measured on this project's toolchain and host:
+
+| body | shape | unbounded cost |
+|---|---|---|
+| 4 MiB | `[{},{},…]`, 1,398,101 empty objects, into a 288-byte DTO | **RSS peak +587.9 MB** |
+| 4 MiB | one object, 322,000 distinct keys | **1.57–2.08 s of one Handler lane** |
+
+The memory figure is a 1 ms high-water sample. A before/after delta reports
++52 MB, because the request arena resets at request end — it understates the
+peak elevenfold, and the first version of that probe would have refuted J3 on
+that artifact.
+
+`max_body` is doing its job in both cases: the body really is 4 MiB. It is the
+wrong dimension. Nothing else on the request path had grounds to refuse either
+body, because neither is malformed.
+
+**Shape and compile evidence.** Existing `Limits` gains `max_json_nodes: int`;
+`DEFAULT_LIMITS.max_json_nodes` is `JSON_NODE_LIMIT` (100,000). The exact field
+and constant shapes are compiler-derived in
+`build/phase1-public-signatures.txt`. No new public name exists — additive to a
+struct whose own doc comment records that "adding a field later is cheap. That
+asymmetry is the entire argument for the size of this struct."
+
+**Why one field and not two.** The backlog carried J3 and J4 as separate items
+and proposed a key-count cap for J4. The measurement ruled that out: the J3
+shape has 1.4M values and **zero keys**, so a key cap would not see it at all.
+Counting values and object keys together is the one quantity both costs are
+linear in — ~150 bytes per value of preflight tree, ~6 µs per key of CPU.
+Nesting depth is a third axis and stays where it was (`JSON_NEST_DEPTH_MAX`,
+against stack exhaustion), because it is a different failure.
+
+**Why the default is ON**, unlike `max_write_time`, `max_idle_time` and
+`max_response_bytes`. Those default off because a framework-chosen duration or
+size would break applications shipping today. This one has no such tension:
+100,000 nodes is two to three orders of magnitude above ordinary API traffic.
+The boundary was measured, not asserted — 25,000 keys (50,001 nodes) is served
+in 99 ms; 50,000 keys (100,001 nodes) is refused.
+
+**Behaviour and negative evidence.** Counting is a named, allocation-free
+procedure, `json_scan_structure`, folded into the depth pre-scan that already
+walked the body — no additional pass — and it refuses **before** the parser
+allocates, since building the tree is the cost being bounded. The count is
+exact:
+
+	values = commas + non-empty containers + 1
+	keys   = colons
+
+Counting containers rather than *non-empty* containers double-counts every
+`{}`, and the J3 body is 1.4 million of them, so that error would land squarely
+on the shape this bounds. `tests/wp67-json-boundary/internal` owns the
+arithmetic directly, with the empty-container cases chosen for exactly that
+trap; both mutations were run and both go red — disarming the cap, and dropping
+the non-empty test (which reports `[{},{}]` as 5 nodes instead of 3).
+
+**Measured after the change, same probes, same host:**
+
+| | unbounded | with the default | |
+|---|---|---|---|
+| J3 `[]Big` RSS peak rise | +587.9 MB | **+19.9 MB** | 29× |
+| J4 322,000 keys | 1.57 s | **50 ms** | 31× |
+
+The unbounded column is the control run and reproduces the original figures to
+within 0.1 MB, which is what licenses reading the other column as an effect
+rather than as drift.
+
+**A breach is a 413** with code `body_too_complex`, not `body_too_large` and not
+`invalid_json`. The client's JSON is correct, so reporting a syntax error would
+send it hunting for a fault that is not there; and a client that retries by
+shrinking bytes has misread a refusal about structure — it could shrink 4 MiB to
+400 KiB while keeping all 322,000 keys. The envelope reports the effective node
+limit as a number, like `max_body`'s.
+
+**Zero means no limit**, following `max_response_bytes`. The test asserts the
+pair: the same 120,001-node body is refused under the default and decoded with
+the field at zero. A first draft used a 15,001-node body, which is *under* the
+default and would have passed even if the zero were ignored.
+
+**Rollback.** Remove the field, the constant, the `Too_Many_Nodes` issue kind
+and the envelope helper; `json_scan_structure` reverts to returning depth alone.
+No other public name or signature changes.
+
+---
+
+## Amendment 39 — Fault isolation: `web.state` returns `(^T, bool)`
+
+**Date: 2026-07-28. Authority: the owner. Ledger effect: none; application
+remains 62 and test-support remains 2. THIS IS A BREAKING CHANGE — the first in
+this document that requires editing existing call sites.**
+
+**What changed.**
+
+	state :: proc(ctx: ^Context, $T: typeid) -> ^T                      (before)
+	state :: proc(ctx: ^Context, $T: typeid) -> (value: ^T, ok: bool)   (after)
+
+Both failure modes — no state registered, and a type other than the registered
+one — used to `assert`. They now log at Error level and return `(nil, false)`.
+
+**Why, and the reasoning is about blast radius rather than taste.** Odin has no
+recoverable panic (ADR-020), so an assert aborts the process. `web.state` is
+called from inside a handler, and handlers run on lanes that share a process
+with every other in-flight request. One handler asking for the wrong type
+therefore stopped **every request on every lane** — a fault confined to one
+route taking down the whole server. The two conditions are genuine programmer
+errors and the old reasoning about that was correct; what it did not weigh is
+that the punishment is collective.
+
+**The `ok` is deliberately NOT `#optional_ok`.** That would let every existing
+call site compile unchanged and silently receive `nil` on the failure path,
+converting a loud abort into a segfault with no message — strictly worse than
+what it replaces. It is also already banned on exported procedures by this
+gate's own extractor rule. A hard two-value return makes each call site
+acknowledge the question, which is the migration being requested rather than a
+change being smuggled in.
+
+**No `Framework_Error` member was added, and that is the substance rather than
+an omission.** `Framework_Error` means *the framework failed*. After this
+change it has not: it answered the question in the return value, and an
+application that ignores the answer has made an application error. Growing a
+frozen public enum to describe a case the caller now owns would misclassify it.
+Both refusals still log — through the same private `context.logger` path
+`state_poison_nil` uses — so a caller who ignores `ok` and dereferences `nil`
+still gets a sentence naming the mistake rather than a bare segfault.
+
+**Negative evidence, and it is the strongest available argument for the
+change.** `tests/wp37-public-surface` carried this comment against the
+wrong-type contract:
+
+> the half a test cannot execute — a wrong type aborts the process by design
+> (ADR-020), and a test that could observe it would mean the assert was not an
+> assert
+
+That was accurate, and it meant the contract went **untested for the entire
+life of the API**, pinned only by a build-time control. It is now executed:
+`wp37_a_wrong_type_is_refused_and_the_server_survives` drives a wrong-type
+handler over the real dispatch path, asserts the 500, and then asserts that the
+NEXT request is served — a line that was unreachable before, because the runner
+was gone. Reverting the type check to an assert kills it with
+`Signal caught: Illegal_Instruction`, which is the control.
+
+The companion case covers the other failure mode (`web.app()`, no state
+registered at all). Both silence `context.logger` for exactly the one refusing
+call and restore it immediately rather than with a `defer` — a deferred restore
+leaves the nil logger installed across the assertions, and `testing.expect*`
+reports through `context.logger`; that exact mistake made another suite in this
+repository unable to report a failure.
+
+**Call sites migrated:** 14 across `examples/07-app-state`,
+`tests/wp99-slice`, `tests/wp37-public-surface`, `tests/wp10-doc-fixtures`,
+`tests/wp91-commit-security` and `tests/support/web_blocking_lab`. The example
+is the one that matters, because it teaches the pattern: it checks `ok` and
+answers `web.internal_error` rather than ignoring it.
+
+**Rollback.** Restore the single-result signature and the two asserts; revert
+the call sites. The two new tests must be deleted with it — they cannot run
+against an asserting implementation, which is the whole point.

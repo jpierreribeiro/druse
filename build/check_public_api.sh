@@ -1592,5 +1592,52 @@ done
 echo "public API contract: WP9 harness is test-only; both factories run the shared matrix"
 echo "public API contract: the adapter keeps HEAD and Expect under core control; the wire corpus covers all five vendor patches"
 
+# ---------------------------------------------------------------------------
+# ADR-047 — the core installs NO crash signal handler, and no fault hook
+#
+# ACCEPTED 2026-07-25. A library that claims SIGSEGV/SIGABRT is process-wide
+# state: it collides with the supervisor's core-dump capture, an APM agent's
+# crash reporter and the operator's debugger, and an async-signal handler that
+# gets safety wrong turns a clean crash into a hang or a corrupted core. What
+# ships instead is `ops/deploy/uruquim.service` (Restart=on-failure) plus the
+# `coredumpctl` workflow in docs/operations.md, which names the faulting handler
+# on the stack with its full call chain — strictly more than a breadcrumb.
+#
+# This is gated because it is the decision a well-meaning change reverses by
+# accident: "a bounds trap kills the process with no diagnostics" invites
+# exactly the handler ADR-047 refused. The ADR names its own reversal path — a
+# new ADR carrying an async-signal-safety proof — so a future author who really
+# wants this has a door, and it is not this grep.
+#
+# Comments are stripped first: an ADR reference that names the construct in
+# order to forbid it must not be reported as the construct.
+# ---------------------------------------------------------------------------
+URUQUIM_FAULT_CODE="$(sed -E 's://.*$::' $(find "$URUQUIM_ROOT/web" -name '*.odin'))"
+if grep -qE '\b(sigaction|libc\.signal|signal\.signal)\b' <<<"$URUQUIM_FAULT_CODE"; then
+  fail "web/ installs a signal handler. ADR-047 decided the core installs none: it fights the operator's crash tooling and the supervisor + coredump own a fault. Reversing it needs its own ADR with an async-signal-safety proof, not a grep change."
+fi
+if grep -qE 'assertion_failure_proc[[:space:]]*=' <<<"$URUQUIM_FAULT_CODE"; then
+  fail "web/ overrides context.assertion_failure_proc. Besides ADR-047's minimal-core rule, this cannot do what motivates it: bounds failures go through a \"contextless\" trap in the pinned runtime (base/runtime/error_checks.odin) and never consult the context, so the hook would catch explicit asserts only while reading as general fault isolation."
+fi
+# The vendored backend ships `server_shutdown_on_interrupt` (a SIGINT handler).
+# It is unreferenced in this tree and must stay that way: `web.stop` is the
+# shutdown entry point, and it is already documented as signal-handler-safe.
+if grep -rn 'server_shutdown_on_interrupt' "$URUQUIM_ROOT/web" --include='*.odin' >/dev/null 2>&1; then
+  fail "web/ calls the vendored server_shutdown_on_interrupt, installing a process-wide SIGINT handler from a library (ADR-047). Applications install their own and call web.stop, which is safe from a signal handler by design."
+fi
+
+# T1 — nothing may pass `trigger_wake_up = false` to a cross-thread `nbio.exec`.
+# The MPSC tolerates a producer stalled between claiming a slot and storing into
+# it only because every producer wakes the loop afterwards; skipping the wake can
+# strand that item and everything queued behind it until an unrelated wake
+# arrives. Uruquim never passes the parameter at all, which is the simplest way
+# to be right; this keeps it so.
+if grep -rnE 'exec\([^)]*trigger_wake_up[[:space:]]*(:?=)[[:space:]]*false' \
+  "$URUQUIM_ROOT/web" "$URUQUIM_ROOT/vendor/odin-http" --include='*.odin' >/dev/null 2>&1; then
+  fail "a caller passes trigger_wake_up=false to nbio.exec. For a cross-thread exec that breaks the MPSC wake invariant (vendor/nbio/mpsc.odin): the item can sit undelivered behind a stalled producer until an unrelated wake arrives (transport audit T1)."
+fi
+
+echo "public API contract: no signal handler and no assertion hook in the core (ADR-047)"
+echo "public API contract: no cross-thread exec skips the MPSC wake (T1)"
 echo "public API contract: WP7 arena is private; the 4 MiB cap gates the parser; strict JSON; 413 is the public Status.Payload_Too_Large member (C1)"
 echo "PASS: Phase-1 public API anti-accretion contract (WP1 + WP2 + WP3 + WP4 + WP5 + WP6 + WP7)"

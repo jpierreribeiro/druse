@@ -14,6 +14,7 @@
 package web
 // uruquim:file test-support
 
+import "core:strings"
 import transport "uruquim:web/internal/transport"
 import testing "uruquim:web/testing"
 
@@ -135,11 +136,39 @@ test_request :: proc(
 
 	inbound_headers: []transport.Header
 	if len(headers) > 0 {
-		inbound_headers = make([]transport.Header, len(headers), context.temp_allocator)
-		for line, i in headers {
+		// A REPEATED NAME IS JOINED, not kept twice — because that is what the
+		// socket does. The backend's `header_parse` combines repeats into ONE
+		// entry with `", "` (RFC 9110 §5.3) before the core sees them, so a
+		// wire request with `X-Dup: alpha` then `X-Dup: beta` reaches `header`
+		// as the single value `"alpha, beta"`.
+		//
+		// This facade used to hand the core one pair per line. `header` returns
+		// the first match, so the in-memory driver answered `"alpha"` where the
+		// socket answered `"alpha, beta"` — the two drivers disagreed on a
+		// documented contract, and `wp19_public_duplicates_first_occurrence_wins`
+		// pinned the in-memory answer, which made the divergence look ratified.
+		// The parity this procedure claims (R-10) has to include this case.
+		merged := make([dynamic]transport.Header, 0, len(headers), context.temp_allocator)
+		for line in headers {
 			name, value := test_header_split(line)
-			inbound_headers[i] = transport.Header{name = name, value = value}
+			found := false
+			for &pair in merged {
+				// Case-insensitive, like the backend's lowercasing key rule and
+				// like `header`'s own ASCII folding.
+				if ascii_fold_equal(pair.name, name) {
+					pair.value = strings.concatenate(
+						{pair.value, ", ", value},
+						context.temp_allocator,
+					)
+					found = true
+					break
+				}
+			}
+			if !found {
+				append(&merged, transport.Header{name = name, value = value})
+			}
 		}
+		inbound_headers = merged[:]
 	}
 
 	// 2-3. WP9 — the SHARED driver pipeline: neutral inbound -> Context ->

@@ -206,8 +206,11 @@ no_content :: proc(ctx: ^Context) {
 //
 //   - the response is already committed (the header list is finished and being
 //     read — a header set now could never appear);
-//   - the name is empty, or the name or value contains a control byte (CR, LF or
-//     NUL) — the header-injection vector, rejected unconditionally;
+//   - the name is not a valid field-name token, or the value contains a control
+//     byte — any byte outside RFC 9110 §5.5's `SP / HTAB / VCHAR / obs-text`.
+//     CR and LF are the header-injection vector; the rest of C0 and DEL are
+//     refused because a field value containing them is malformed and the next
+//     hop is left to guess (audit H1);
 //   - the name is framework- or transport-owned (`Content-Type`, `Content-Length`,
 //     `Transfer-Encoding`, `Connection`, `X-Request-Id`), which the framework sets
 //     itself — use `web.bytes`/`web.json`/`web.text` to choose a content type;
@@ -231,7 +234,7 @@ set_header :: proc(ctx: ^Context, name: string, value: string) -> bool {
 	if !header_name_is_token(name) {
 		return false
 	}
-	// The VALUE may contain most bytes, but never CR/LF/NUL (the splitting vector).
+	// The VALUE may carry SP, HTAB, VCHAR and obs-text — never a control byte.
 	if header_field_has_control(value) {
 		return false
 	}
@@ -311,12 +314,31 @@ bytes :: proc(ctx: ^Context, status: Status, content_type: string, data: []u8) {
 	)
 }
 
-// header_field_has_control reports whether a header value carries a byte that must
-// never reach the wire unescaped: CR or LF (header/response splitting) or NUL.
+// header_field_has_control reports whether a header value carries a byte that
+// must never reach the wire: any byte outside RFC 9110 §5.5's
+// `*( SP / HTAB / VCHAR / obs-text )`, which is bytes 0x00–0x08, 0x0A–0x1F and
+// 0x7F. HTAB is legal OWS inside a value and is admitted; obs-text (0x80–0xFF)
+// is legal field content and is admitted.
+//
+// AUDIT H1 — this used to name only CR, LF and NUL, on the reasoning that those
+// are the splitting bytes. The rest of C0 is not a splitting vector, and the
+// egress escape (`write_escaped_newlines`, vendor patch 17) does close CR and
+// LF at the socket. What was measured is that a 0x01 in an application header
+// value reached the wire byte-for-byte: this server was emitting a field value
+// its own spec calls malformed, leaving the next hop to guess. The bytes an
+// application can put here do not have to come from a request header — a query
+// parameter, a path capture or a database column reaches this sink too, so the
+// ingress refusal (vendor patch 38) does not make this check redundant.
+//
+// It rejects rather than escapes, because `set_header` and `bytes` already
+// answer `false` for a refused header and the caller hears about the mistake.
 @(private)
 header_field_has_control :: proc(s: string) -> bool {
 	for b in transmute([]byte)s {
-		if b == '\r' || b == '\n' || b == 0 {
+		if b == '\t' {
+			continue
+		}
+		if b < 0x20 || b == 0x7f {
 			return true
 		}
 	}

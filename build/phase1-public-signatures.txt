@@ -1,4 +1,4 @@
-application	const	DEFAULT_LIMITS :: Limits{max_body = BODY_LIMIT, max_request_line = REQUEST_LINE_LIMIT, max_headers = HEADER_BLOCK_LIMIT, max_request_time = REQUEST_TIME_LIMIT, max_write_time = 0, max_response_bytes = 0, max_idle_time = 0, max_connections = CONNECTION_LIMIT, reserved_conns = RESERVED_CONNECTION_LIMIT, max_drain_time = DRAIN_TIME_LIMIT, max_handlers = 0}
+application	const	DEFAULT_LIMITS :: Limits{max_body = BODY_LIMIT, max_request_line = REQUEST_LINE_LIMIT, max_headers = HEADER_BLOCK_LIMIT, max_request_time = REQUEST_TIME_LIMIT, max_write_time = 0, max_response_bytes = 0, max_idle_time = 0, max_connections = CONNECTION_LIMIT, reserved_conns = RESERVED_CONNECTION_LIMIT, max_drain_time = DRAIN_TIME_LIMIT, max_handlers = 0, max_json_nodes = JSON_NODE_LIMIT}
 application	proc	app :: proc() -> App
 application	proc	app_with_state :: proc(state: ^$T) -> App
 application	proc	bad_request :: proc(ctx: ^Context, message: string)
@@ -45,7 +45,7 @@ application	proc	router :: proc() -> Router
 application	proc	secure_headers :: proc(ctx: ^Context)
 application	proc	serve :: proc(a: ^App, port: int)
 application	proc	set_header :: proc(ctx: ^Context, name: string, value: string) -> bool
-application	proc	state :: proc(ctx: ^Context, $T: typeid) -> ^T
+application	proc	state :: proc(ctx: ^Context, $T: typeid) -> (value: ^T, ok: bool)
 application	proc	static :: proc(a: ^App, prefix: string, dir: string, o: Static_Options = {...})
 application	proc	stats :: proc() -> Server_Stats
 application	proc	stop :: proc(a: ^App)
@@ -66,7 +66,7 @@ application	type	Framework_Error :: enum {None, Response_Marshal_Failed, Body_De
 application	type	Framework_Event :: struct {kind: Framework_Error, method: Method, route: string, status: Status, payload_type: typeid}
 application	type	Handler :: proc(ctx: ^Context)
 application	type	Header_View :: struct {private: Header_View_Internal}
-application	type	Limits :: struct {max_body: int, max_request_line: int, max_headers: int, max_request_time: i64, max_write_time: i64, max_response_bytes: int, max_idle_time: i64, max_connections: int, reserved_conns: int, max_drain_time: i64, max_handlers: int}
+application	type	Limits :: struct {max_body: int, max_request_line: int, max_headers: int, max_request_time: i64, max_write_time: i64, max_response_bytes: int, max_idle_time: i64, max_connections: int, reserved_conns: int, max_drain_time: i64, max_handlers: int, max_json_nodes: int}
 application	type	Method :: enum u8 {UNKNOWN, GET, POST, PUT, PATCH, DELETE}
 application	type	Request :: struct {method: Method, path: string, query: string, headers: Header_View, body: []u8}
 application	type	Router :: struct {using app: App}

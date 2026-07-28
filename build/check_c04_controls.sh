@@ -68,7 +68,12 @@ EOF
 
 # --- 3. The decision and its sizing rule are on record -----------------------
 URUQUIM_FLAT="$(tr '\n' ' ' <"$URUQUIM_DOC" | tr -s ' ')"
-grep -qi 'max_connections . (largest response' <<<"$URUQUIM_FLAT" ||
+# The separator between the two factors is a multibyte `×`. `.` matches one
+# CHARACTER in a UTF-8 locale but one BYTE under LC_ALL=C/POSIX, where it
+# cannot span the two bytes of U+00D7 and this check fails on a document that
+# is perfectly correct. Match the bytes between the factors explicitly instead,
+# so the gate says the same thing in every locale.
+grep -qiE 'max_connections .{1,3} \(largest response' <<<"$URUQUIM_FLAT" ||
   fail "the sizing rule is gone from the C-04 record. A delegation to a cgroup is acceptable ONLY while the operator is told what to size it to; without the rule this is an unbounded resource with a shrug."
 grep -qi 'max_response_bytes' <<<"$URUQUIM_FLAT" ||
   fail "the recommended limit's specification is gone; the decision to delegate was made ON CONDITION that the alternative is specified and handed forward"

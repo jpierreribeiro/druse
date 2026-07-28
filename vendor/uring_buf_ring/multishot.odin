@@ -11,25 +11,6 @@ package uring_buf_ring
 
 import "core:sys/linux"
 
-// prep_recv_multishot fills `sqe` as a multishot recv against buffer group
-// `bgid`. `addr`/`len` are left zero: with BUFFER_SELECT + RECV_MULTISHOT the
-// kernel chooses a buffer from the group per completion, so the SQE names no
-// buffer of its own. The op stays armed (posting more CQEs) until it errors, the
-// ring is exhausted (ENOBUFS), or it is cancelled; re-arm when a completion
-// arrives WITHOUT IORING_CQE_F_MORE.
-prep_recv_multishot :: proc "contextless" (sqe: ^linux.IO_Uring_SQE, fd: linux.Fd, bgid: u16, user_data: u64) {
-	sqe.opcode = .RECV
-	sqe.fd = fd
-	sqe.addr = 0
-	sqe.len = 0
-	sqe.msg_flags = {}
-	sqe.flags = {.BUFFER_SELECT}
-	sqe.buf_group = bgid
-	// IORING_RECV_MULTISHOT lives in the ioprio union (bit 1), not msg_flags.
-	sqe.sq_send_recv_flags = {.RECV_MULTISHOT}
-	sqe.user_data = user_data
-}
-
 // prep_accept_multishot fills `sqe` as a multishot accept on listen socket `fd`.
 // One SQE stays armed and posts a CQE per incoming connection (the new fd in
 // `cqe.res`, F_MORE set while armed) — no per-connection accept re-arm, and the
@@ -43,4 +24,19 @@ prep_accept_multishot :: proc "contextless" (sqe: ^linux.IO_Uring_SQE, fd: linux
 	sqe.off = 0  // no addr_len out
 	sqe.sq_accept_flags = {.MULTISHOT}
 	sqe.user_data = user_data
+}
+
+// AUDIT T6 — MOVED HERE FROM `buf_ring.odin`, WHICH WAS DELETED.
+//
+// It is a pure CQE-flag predicate with nothing to do with the provided-buffer
+// ring it used to live beside, and it is what an accept-multishot consumer
+// needs to know whether the SQE is still armed. Keeping it costs two lines;
+// losing it would have taken `tests/wp118-accept-multishot` with it, and that
+// suite is the evidence for T7 — the multishot change this project actually
+// indicated — rather than part of the recv machinery T6 condemned.
+// has_more reports whether the parent (multishot) SQE will generate more CQEs
+// (IORING_CQE_F_MORE). When false, a multishot op has terminated and must be
+// re-armed.
+has_more :: proc "contextless" (cqe_flags: linux.IO_Uring_CQE_Flags) -> bool {
+	return .MORE in cqe_flags
 }

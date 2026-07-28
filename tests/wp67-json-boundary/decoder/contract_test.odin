@@ -604,13 +604,31 @@ audit_duplicate_object_keys_are_refused :: proc(t: ^testing.T) {
 		plain.body,
 	)
 
-	escaped := web.test_request(&a, .POST, "/input", `{"name":"a","name":"b"}`)
+	// FIXED (audit J6). This line was a byte-for-byte COPY of the plain case
+	// above, so the escaped spelling the comment describes was never sent and
+	// the second half of this test proved nothing. `\u006e` is `n`, so the two
+	// keys below are the same key only after unquoting — which is precisely the
+	// property being claimed.
+	escaped := web.test_request(&a, .POST, "/input", `{"\u006eame":"a","name":"b"}`)
 	testing.expectf(
 		t,
 		escaped.status == web.Status.Bad_Request,
 		"an escape-spelled duplicate key is refused, got %v (%s)",
 		escaped.status,
 		escaped.body,
+	)
+	// THE CONTROL FOR THE CONTROL. The 400 above must come from DUPLICATION,
+	// not from the `\u` escape itself being refused for some unrelated reason —
+	// in which case the case would pass while proving nothing about duplicate
+	// keys. The same escaped spelling with a DISTINCT second key must be
+	// accepted.
+	distinct_keys := web.test_request(&a, .POST, "/input", `{"\u006eame":"a"}`)
+	testing.expectf(
+		t,
+		distinct_keys.status != web.Status.Bad_Request,
+		"an escaped key that is NOT duplicated must be accepted, got %v (%s). If this is 400, the case above passed because `\\u` in a key is refused outright, and says nothing about duplicates. (The success status here is the handler's own — 204 — so the assertion is on the REFUSAL, not on a particular success code.)",
+		distinct_keys.status,
+		distinct_keys.body,
 	)
 }
 

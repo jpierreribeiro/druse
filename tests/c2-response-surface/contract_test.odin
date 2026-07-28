@@ -21,6 +21,20 @@ has_header :: proc(res: web.Recorded_Response, line: string) -> bool {
 	return false
 }
 
+// has_header_name asks only whether a header with this NAME was emitted, whatever
+// its value. `has_header` cannot answer that: a refused header must not appear at
+// all, and matching on the full line would pass if the value were merely altered.
+@(private = "file")
+has_header_name :: proc(res: web.Recorded_Response, name: string) -> bool {
+	prefix := strings.concatenate({name, ":"}, context.temp_allocator)
+	for h in res.headers {
+		if len(h) >= len(prefix) && strings.equal_fold(h[:len(prefix)], prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // --- F8-2: set_header ------------------------------------------------------
 
 @(private = "file")
@@ -76,6 +90,68 @@ c2_set_header_refuses_reserved_and_injection :: proc(t: ^testing.T) {
 	testing.expect(t, has_header(res, "X-Ok: 1"), "the valid header was accepted")
 	testing.expect(t, !has_header(res, "Content-Type: text/evil"), "the reserved-name override was refused")
 	testing.expect(t, !has_header(res, "X-Bad: a"), "the CR/LF-injected header was refused")
+}
+
+// --- audit H1: the rest of the control range -------------------------------
+//
+// The case above covers CR/LF, the splitting bytes. It passed for the whole
+// life of `set_header` while every other byte RFC 9110 §5.5 excludes from a
+// field value went straight through to the socket — measured on a loopback
+// socket: an application echoing a request header put a raw 0x01 back on the
+// wire byte-for-byte.
+//
+// This sink is reached WITHOUT a request header. A query parameter, a path
+// capture or a database column all arrive here, so the ingress refusal (vendor
+// patch 38) does not cover it and this test is not a duplicate of the corpus
+// cases in `tests/wp9-wire`.
+@(private = "file")
+control_handler :: proc(ctx: ^web.Context) {
+	// Not from a header — the value an application composes itself.
+	soh := web.set_header(ctx, "X-Soh", "a\x01b") // C0
+	vt := web.set_header(ctx, "X-Vt", "a\x0bb") // vertical tab
+	esc := web.set_header(ctx, "X-Esc", "a\x1bb") // ESC — the terminal-injection one
+	del := web.set_header(ctx, "X-Del", "a\x7fb") // DEL
+	nul := web.set_header(ctx, "X-Nul", "a\x00b") // NUL, refused before H1 too
+
+	// The BOUNDARY, and the half of this test that can actually go red the other
+	// way: HTAB is legal OWS and obs-text is legal field content. A rule written
+	// as "reject anything not alphanumeric" would pass every assertion above and
+	// fail these two.
+	tab := web.set_header(ctx, "X-Tab", "a\tb")
+	obs := web.set_header(ctx, "X-Obs", "a\xc3\xa9b") // é, UTF-8 — obs-text
+
+	if soh || vt || esc || del || nul {
+		web.text(ctx, .Internal_Server_Error, "a control byte was accepted")
+		return
+	}
+	if !tab || !obs {
+		web.text(ctx, .Internal_Server_Error, "legal field content was refused")
+		return
+	}
+	web.text(ctx, .OK, "ok")
+}
+
+@(test)
+c2_set_header_refuses_every_control_byte :: proc(t: ^testing.T) {
+	a := web.app()
+	defer web.destroy(&a)
+	web.get(&a, "/c", control_handler)
+
+	res := web.test_request(&a, .GET, "/c")
+	// The handler answers 500 if it disagreed with the contract, so the status is
+	// itself an assertion — but assert on the wire too, because a header that was
+	// "refused" and still emitted is exactly the failure being guarded against.
+	testing.expect_value(t, res.status, web.Status.OK)
+	for name in ([?]string{"X-Soh", "X-Vt", "X-Esc", "X-Del", "X-Nul"}) {
+		testing.expectf(
+			t,
+			!has_header_name(res, name),
+			"%s carried a control byte and must not appear on the response",
+			name,
+		)
+	}
+	testing.expect(t, has_header(res, "X-Tab: a\tb"), "HTAB is legal OWS inside a field value")
+	testing.expect(t, has_header(res, "X-Obs: a\xc3\xa9b"), "obs-text is legal field content")
 }
 
 // --- F8-4: bytes -----------------------------------------------------------

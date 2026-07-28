@@ -361,7 +361,6 @@ _exec :: proc(op: ^Operation) {
 	case .Read:          read_exec(op)
 	case .Write:         write_exec(op)
 	case .Recv:          recv_exec(op)
-	case .Recv_Multishot: recv_multishot_exec(op)
 	case .Send:          send_exec(op)
 	case .Poll:          poll_exec(op)
 	case .Close:         close_exec(op)
@@ -533,24 +532,6 @@ handle_completed :: proc(op: ^Operation, res: i32, cqe_flags: linux.IO_Uring_CQE
 		maybe_callback(op)
 		bufs_delete(&op.recv._impl.bufs, op.recv.bufs, op.l.allocator)
 		cleanup(op)
-		return
-	case .Recv_Multishot:
-		// A removed multishot op: suppress the callback and, since the kernel will
-		// deliver no further CQE for it (remove cancels the multishot), recycle.
-		if op._impl.removal != nil {
-			if op._impl.removal != (^Operation)(REMOVED) {
-				op._impl.removal._remove.target = nil
-			}
-			cleanup(op)
-			return
-		}
-		recycle := recv_multishot_callback(op, res, cqe_flags)
-		op.cb(op)
-		if recycle {
-			cleanup(op)
-		}
-		// When !recycle the op stays armed in the kernel: do NOT cleanup, the same
-		// Operation fires again on the next arrival.
 		return
 	case .Open:
 		open_callback(op, res)
@@ -1498,86 +1479,3 @@ ns_to_time_spec :: proc(nsec: i64) -> linux.Time_Spec {
 // the dispatch switch it plugs into. The public API is in multishot.odin.
 // ============================================================================
 
-// _Recv_Multishot carries no linux-private state: the result lives in the public
-// Recv_Multishot (buffer_id/received/more/err), refreshed per CQE.
-@(private="package")
-_Recv_Multishot :: struct {}
-
-// recv_multishot_exec submits the armed multishot recv SQE: BUFFER_SELECT +
-// RECV_MULTISHOT against buf_group `bgid`. The kernel picks a buffer from the
-// caller's ring per arrival and keeps the op armed (F_MORE) until it errors, the
-// ring empties, or the peer closes. addr/len stay zero — the kernel names the
-// buffer, not the SQE.
-recv_multishot_exec :: proc(op: ^Operation) {
-	sock: linux.Fd
-	switch socket in op.recv_multishot.socket {
-	case TCP_Socket:
-		sock = linux.Fd(socket)
-	case UDP_Socket:
-		sock = linux.Fd(socket)
-	}
-
-	sqe, ok := uring.get_sqe(&op.l.ring)
-	if ok {
-		sqe.opcode = .RECV
-		sqe.fd = sock
-		sqe.addr = 0
-		sqe.len = 0
-		sqe.msg_flags = {.NOSIGNAL}
-		sqe.flags = {.BUFFER_SELECT}
-		sqe.buf_group = op.recv_multishot.bgid
-		sqe.sq_send_recv_flags = {.RECV_MULTISHOT}
-		sqe.user_data = u64(uintptr(op))
-	}
-	enqueue(op, sqe, ok)
-}
-
-// recv_multishot_callback refreshes the public result from one CQE and returns
-// whether the op should be RECYCLED. F_MORE set → the op stays armed in the
-// kernel (do NOT recycle; the same Operation fires again). No F_MORE → terminated.
-recv_multishot_callback :: proc(op: ^Operation, res: i32, flags: linux.IO_Uring_CQE_Flags) -> (recycle: bool) {
-	m := &op.recv_multishot
-	m.more = .MORE in flags
-
-	if res < 0 {
-		m.received = 0
-		m.buffer_id = 0
-		m.err = _recv_multishot_error(linux.Errno(-res))
-		m.more = false
-		return true
-	}
-
-	m.err = nil
-	m.received = int(res)
-	if .BUFFER in flags {
-		m.buffer_id = u16(transmute(u32)flags >> 16)
-	} else {
-		m.buffer_id = 0
-	}
-
-	if res == 0 { // peer close
-		m.more = false
-		return true
-	}
-	return !m.more
-}
-
-_recv_multishot_error :: proc(errno: linux.Errno) -> Recv_Error {
-	#partial switch errno {
-	case .ECONNRESET, .EPIPE, .ENOTCONN:
-		return TCP_Recv_Error.Connection_Closed
-	case .ENOBUFS:
-		return TCP_Recv_Error.Insufficient_Resources
-	case .ECANCELED:
-		return TCP_Recv_Error.Timeout
-	case:
-		return TCP_Recv_Error.Unknown
-	}
-}
-
-@(private="package")
-_ring_fd :: proc(l: ^Event_Loop = nil) -> int {
-	loop := l
-	if loop == nil { loop = &_tls_event_loop }
-	return int(loop.ring.fd)
-}

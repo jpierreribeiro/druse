@@ -114,11 +114,42 @@ web.limits(&app, budget)
 | `max_request_line` | 8000 | the backend refuses the request |
 | `max_headers` | 8000 | the backend refuses the request |
 | `max_request_time` | 30 s | **the connection is closed** — this is the slowloris defence |
-| `max_write_time` | `0` = off | **the connection is reset (RST)** — a graceful close would flush kernel buffers to the slow reader first and hide the deadline; the reset is the observable, honest end (WP90 / ADR-039) |
+| `max_write_time` | `0` = off — but see below | **the connection is reset (RST)** — a graceful close would flush kernel buffers to the slow reader first and hide the deadline; the reset is the observable, honest end (WP90 / ADR-039) |
 | `max_idle_time` | `0` = off | the idle keep-alive connection is **closed gracefully**; the clock stops the moment the next request's bytes arrive |
 | `max_connections` | 1024 | the connection is **closed at accept**, not queued |
 | `reserved_conns` | 16 | slots held back from admission so a shutdown always has room |
 | `max_handlers` | `0` = auto | synchronous Handler capacity; auto resolves from CPU count, bounded to 4..32 |
+| `max_json_nodes` | 100,000 | `413` with code `body_too_complex`, before the JSON parser allocates — the structural cost bound (audit J3/J4) |
+
+**`max_write_time` at `0` does not mean sends are unbounded.** One of the two
+deadlines always covers a response send: with no write deadline configured,
+`max_request_time` bounds it instead, and the connection is **aborted** and
+counted in `web.stats().write_deadline_aborts`. This is deliberate (audit M4) —
+leaving a send unbounded is worse than bounding it with the only number you
+gave us. Before M4 the same thing happened by accident and was logged as
+`request read deadline exceeded`, about a request that had finished arriving
+long before; measured on a 64 MiB body against a client that stopped reading.
+
+Set `max_write_time` explicitly when your sends and your request arrivals
+deserve different budgets — a large download to a slow link is a legitimate
+long send, and it is bounded by `max_request_time` until you say otherwise. If
+both are `0`, sends really are unbounded and a stalled reader parks a
+connection slot until it goes away.
+
+**`max_json_nodes` bounds STRUCTURE, which `max_body` cannot see.** Two
+well-formed bodies, both inside the 4 MiB body cap, measured on a 4 vCPU host:
+a 4 MiB array of 1,398,101 empty objects decoded into a 288-byte DTO peaked at
+**588 MB of RSS**; a 4 MiB object of 322,000 keys held one Handler lane for
+**1.6-2.1 s**. Neither is malformed, so nothing else had grounds to refuse them,
+and the body really is 4 MiB in both cases — bytes are simply not what the
+decode costs scale with.
+
+The budget counts JSON values plus object keys, so an N-key object costs
+`2N + 1` and an N-element array of scalars costs `N + 1`. At the default the
+same two bodies cost **20 MB** and **50 ms**. Ordinary API traffic is two to
+three orders of magnitude below the ceiling — a 25,000-key body is still served
+— so raise it only if you knowingly accept bulk documents, and raise it having
+decided what `max_handlers` lanes of that size cost you. `0` disables it.
 
 **`max_request_time` is a REQUEST deadline, not an idle timeout.** An idle timer
 is reset by every byte, so a client trickling one byte per second resets it
@@ -280,7 +311,9 @@ web.use(&app, web.request_id)
   A synchronous Handler holds its lane and cannot be preempted, and under
   dedicated accept a request arriving at a busy lane queues silently on that
   lane's socket — no 503, no counter, only latency. The old `lane_collisions`
-  counter was retired for exactly that reason (it could only ever read zero).
+  counter was retired for exactly that reason: it never observed the lane
+  saturation its name promised, and the number it did report came from the
+  acceptor's own refusals — a different resource under a misleading label.
   `handler_dwell_ns` is the total nanoseconds lanes spent inside handlers, a
   running total you difference over an interval:
 

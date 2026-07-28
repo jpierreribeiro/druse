@@ -5,6 +5,28 @@ import "base:runtime"
 
 import "core:sync"
 
+// THE WAKE INVARIANT (URUQUIM, transport audit T1) — this queue is only
+// correct because of a rule that lives entirely outside it.
+//
+// `mpsc_enqueue` claims a slot with `atomic_add(&head)` and stores into it as
+// a SECOND step. `mpsc_dequeue` reads `buffer[tail]` and STOPS on nil. So a
+// producer preempted between its claim and its store leaves a hole at `tail`,
+// and every item behind that hole is invisible to the consumer — not lost, but
+// not delivered either, until something makes the consumer look again.
+//
+//     producer A: head=5 claimed .......... (preempted, buffer[5] still nil)
+//     producer B: head=6 claimed, stored    (buffer[6] = op)
+//     consumer:   tail=5 -> nil -> stops    (B's op is stranded behind A)
+//
+// What rescues B's item is that A, once it resumes and stores, performs its OWN
+// eventfd wake — and that wake re-runs the drain, which now finds both. The
+// queue therefore depends on: EVERY PRODUCER WAKES THE LOOP AFTER ITS STORE
+// COMPLETES. Nothing in this file enforces that; `exec` in nbio.odin is where
+// it is honoured, and `exec`'s `trigger_wake_up := false` is the one way to
+// break it (see the warning there).
+//
+// The consumer is single by construction (the owning event-loop thread), so
+// `tail` needs no atomics.
 Multi_Producer_Single_Consumer :: struct {
 	count:  int,
 	head:   int,

@@ -207,7 +207,12 @@ scenarios_storage := []Scenario{
 			request = {method = "POST", path = "/ping"},
 			expect_status = 405,
 			expect_code = "method_not_allowed",
-			expect_headers = {{"allow", "GET"}},
+			// AUDIT R8: `/ping` is registered under GET alone, and the server
+			// also answers HEAD and OPTIONS on it — so `Allow` names all three.
+			// This case runs on BOTH transports from one table, which is the
+			// property the matrix exists for: the in-memory transport and the
+			// socket must agree byte for byte about this header.
+			expect_headers = {{"allow", "GET, HEAD, OPTIONS"}},
 		},
 
 		// --- query ---------------------------------------------------------

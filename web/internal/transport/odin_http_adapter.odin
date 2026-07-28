@@ -229,6 +229,13 @@ serve :: proc(cfg: Config) -> Serve_Error {
 	// requires a designated directory (no silent /tmp), so a bad config fails the
 	// listen rather than silently disabling uploads.
 	if cfg.upload_enabled {
+		// AUDIT M8 — the boot sweep, HERE and not in `admission_init`. This is
+		// the moment one server takes ownership of the spool directory, once
+		// per process. `admission_init` is a library primitive and several
+		// `Admission` values can share a directory in one process (the WP87
+		// suite runs four such tests in parallel), where a sweep would delete
+		// a live spool belonging to another.
+		ingest.sweep_orphans(cfg.upload_dir)
 		if !ingest.admission_init(
 			&runtime.admission,
 			ingest.Spool_Config {
@@ -637,12 +644,17 @@ dispatch_upload :: proc(exchange: ^Exchange) {
 	req := exchange.req
 	rline := req.line.(http.Requestline)
 	preserved_exchange := exchange.inbound.exchange
+	neutral, headers_ok := neutral_headers(req, context.temp_allocator)
+	if !headers_ok {
+		refuse_exhausted(exchange.res)
+		return
+	}
 	exchange.inbound = Inbound {
 		exchange = preserved_exchange,
 		method   = rline.method_raw,
 		path     = req.url.path,
 		query    = req.url.query,
-		headers  = neutral_headers(req, context.temp_allocator),
+		headers  = neutral,
 		peer     = render_peer(req.client.address, context.temp_allocator),
 		upload   = rawptr(&exchange.spool),
 	}
@@ -659,7 +671,47 @@ on_body :: proc(user_data: rawptr, body: http.Body, err: http.Body_Error) {
 
 	rline := req.line.(http.Requestline)
 
+	// AUDIT H3/WP9 — A BODY THAT DID NOT PARSE IS NOT A REQUEST.
+	//
+	// `http.body` reports framing failures through `err`: a Content-Length that
+	// is not a plain decimal (`2, 2`, `-1`, a 20-digit overflow), a non-hex or
+	// negative chunk size, a chunk not terminated by CRLF. This procedure used
+	// to inspect only `.Too_Long` and dispatch on everything else, handing the
+	// handler whatever partial or empty body the failed read left behind.
+	//
+	// Measured on the raw-wire corpus: seven cases whose whole point is "the
+	// handler must not run on an ambiguous request" entered the handler anyway.
+	// They still answered 4xx, but only because the fixture route binds JSON and
+	// the decode failed second — a handler that reads headers, logs, or takes any
+	// side effect before touching the body ran to completion on a request the
+	// parser had already rejected. The corpus could not report this because its
+	// logger discarded every failed assertion (fixed in tests/wp9-wire).
+	//
+	// `.Too_Long` stays a DISPATCHED outcome on purpose: it is a policy refusal
+	// the core turns into a 413 with the framework's error envelope, not a
+	// framing failure. Everything else is refused here, before any application
+	// code observes the request. `_body_ok` is already false on this path, so
+	// `response_must_close` retires the connection rather than leaving it to be
+	// reused against a stream nobody could re-synchronize.
+	// Classified through the backend's own mapping rather than by matching the
+	// scanner's error enum here: that keeps this file from taking a direct
+	// dependency on `core:bufio` (the Phase-1 dependency freeze) and keeps one
+	// owner for the error-to-status question.
+	if err != nil {
+		refusal := http.body_error_status(err)
+		if refusal != http.Status.OK && refusal != http.Status.Payload_Too_Large {
+			res.status = refusal
+			http.respond(res)
+			return
+		}
+	}
+
 	preserved_exchange := exchange.inbound.exchange
+	neutral, headers_ok := neutral_headers(req, context.temp_allocator)
+	if !headers_ok {
+		refuse_exhausted(res)
+		return
+	}
 	exchange.inbound = Inbound {
 		exchange   = preserved_exchange,
 		// WP9 D7 — the ORIGINAL token. A valid but non-Phase-1 method
@@ -669,7 +721,7 @@ on_body :: proc(user_data: rawptr, body: http.Body, err: http.Body_Error) {
 		method     = rline.method_raw,
 		path       = req.url.path,
 		query      = req.url.query,
-		headers    = neutral_headers(req, context.temp_allocator),
+		headers    = neutral,
 		// WP48: the peer, from the accepted connection rather than from any
 		// header. Rendered into the request's own temp allocator, so it lives
 		// exactly as long as every other request-scoped view.
@@ -734,19 +786,24 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 	}
 
 	// URUQUIM PATCH 35 (Campaign C) — bracket the synchronous dispatch so its
-	// wall time feeds the observable saturation signal. `lane_collisions` is
-	// retired: under dedicated accept a contended request queues silently on
-	// the lane's socket instead of reaching the 503 above, so `lane_collisions`
-	// was structurally zero while the lane pool was the first resource to bind.
-	// Wall-clock dwell is the measurable proxy for that queueing; the operator
-	// differences the running total.
-	dispatch_started := time.now()
+	// elapsed time feeds the observable saturation signal. `lane_collisions` is
+	// retired: it named a lane-collision refusal that dedicated accept made
+	// unreachable, and in practice only ever counted the ACCEPTOR's saturation
+	// refusals under a misleading name. Handler dwell is the measurable proxy
+	// for the queueing that replaced it; the operator differences the total.
+	//
+	// MONOTONIC, not wall clock. `time.now()` is CLOCK_REALTIME and `time.since`
+	// returns a SIGNED difference, so an NTP step backward during a dispatch
+	// would add a negative value to a counter operators read as monotonically
+	// increasing — a differenced sample could go backwards. `time.tick_now` is
+	// CLOCK_MONOTONIC_RAW, which is what measuring an elapsed interval wants.
+	dispatch_started := time.tick_now()
 	out: Outbound
 	cfg := exchange.runtime.config
 	cfg.dispatch(cfg.user, exchange.inbound, &out, context.temp_allocator)
 	_ = sync.atomic_add(
 		&res._conn.server.handler_dwell_ns,
-		i64(time.since(dispatch_started)),
+		i64(time.tick_since(dispatch_started)),
 	)
 	http.handler_lane_leave(res)
 
@@ -795,9 +852,16 @@ stream_open :: proc(exchange_handle: rawptr) -> (stream.Token, bool) {
 	link^ = Stream_Link {
 		runtime = runtime,
 		conn    = conn,
-		loop    = nbio.current_thread_event_loop(),
 		tok     = tok,
 	}
+	// M2 — PUBLISH THE OWNER LANE LAST, AND ATOMICALLY. `stream_pump_arm` runs
+	// on any producer thread and reads this field on a slot that a previous
+	// stream may just have retired. A plain write here could be read torn,
+	// handing the arm a garbage loop pointer. The seq-cst store also releases
+	// the plain writes above: a reader that observes this loop observes a fully
+	// built link. Slots are reused, so a stale-but-untorn read is still
+	// possible — `stream_pump` rejects that case on arrival.
+	sync.atomic_store(&link.loop, nbio.current_thread_event_loop())
 	// Re-register the wake with its user pointer now that the link exists.
 	// Safe: no producer can hold the token before stream_open returns it.
 	stream.rebind_wake(&runtime.streams, tok, stream_pump_arm, rawptr(link))
@@ -833,14 +897,29 @@ stream_pump_arm :: proc(user: rawptr) {
 	if link == nil {
 		return
 	}
+	// Read the owner lane atomically: `stream_open` publishes it with a matching
+	// atomic store, so this can never observe a torn pointer.
+	loop := sync.atomic_load(&link.loop)
+	if loop == nil {
+		return
+	}
 	if _, armed := sync.atomic_compare_exchange_strong(&link.pump_armed, false, true); armed {
-		nbio.next_tick_poly(link, stream_pump, link.loop)
+		nbio.next_tick_poly(link, stream_pump, loop)
 	}
 }
 
 @(private)
 stream_pump :: proc(_: ^nbio.Operation, link: ^Stream_Link) {
 	sync.atomic_store(&link.pump_armed, false)
+	// M2 — SINGLE-WRITER GUARD. A wake captured before this slot was retired can
+	// land here after `stream_open` rebound the slot to a DIFFERENT lane. Driving
+	// the link from here would then put two lanes on one socket, which is exactly
+	// the invariant the adapter assumes away. The link names its current owner;
+	// if that is not this thread, the wake is stale and the real owner will pump
+	// itself. Cheap: a TLS read and a compare.
+	if sync.atomic_load(&link.loop) != nbio.current_thread_event_loop() {
+		return
+	}
 	stream_pump_run(link)
 }
 
@@ -961,18 +1040,45 @@ stream_teardown_error :: proc(link: ^Stream_Link) {
 // neutral_headers copies the backend request headers into neutral pairs. The
 // copies live in `allocator` (the connection arena), valid for the exchange.
 @(private)
-neutral_headers :: proc(req: ^http.Request, allocator: mem.Allocator) -> []Header {
+// AUDIT M6 — the `make` is checked, and a failure is SIGNALLED rather than
+// degraded.
+//
+// `copy_response` can fall back to a bare 500 because it is on the response
+// path and the answer is already lost. This is on the REQUEST path, and the
+// same trick would be worse than the crash it replaces: returning `nil` hands
+// the application a request with NO HEADERS AT ALL. That mostly fails closed —
+// no `Authorization` means deny, no `Origin` means same-origin — but "mostly"
+// is not a property to ship, and the handler would have no way to tell a
+// header-less request from a header-stripped one.
+//
+// So it reports, and the caller refuses the request with a 500 before any
+// application code observes it. An unanswerable request is answered, not
+// half-answered.
+neutral_headers :: proc(req: ^http.Request, allocator: mem.Allocator) -> (headers: []Header, ok: bool) {
 	count := len(req.headers._kv)
 	if count == 0 {
-		return nil
+		return nil, true
 	}
-	out := make([]Header, count, allocator)
+	out, merr := make([]Header, count, allocator)
+	if merr != nil {
+		return nil, false
+	}
 	i := 0
 	for k, v in req.headers._kv {
 		out[i] = Header{name = k, value = v}
 		i += 1
 	}
-	return out
+	return out, true
+}
+
+// refuse_exhausted answers a request the adapter could not even represent
+// (audit M6). It allocates nothing: the status is set on the backend response
+// and `respond` writes it.
+@(private)
+refuse_exhausted :: proc(res: ^http.Response) {
+	http.headers_set_close(&res.headers)
+	res.status = http.Status.Internal_Server_Error
+	http.respond(res)
 }
 
 // write_response writes the neutral `Outbound` to the backend response. Status
@@ -1007,16 +1113,49 @@ write_response :: proc(res: ^http.Response, out: Outbound) {
 // The core copies its committed response into these before its own teardown, so
 // the adapter owns the bytes it sends. Kept next to the adapter because it is
 // the adapter's ownership contract, exercised by the boundary tests.
+// AUDIT M6 — AN ALLOCATION FAILURE HERE MUST NOT KILL THE PROCESS.
+//
+// Every `make`/`clone` below was unchecked, and Odin's `make` returns a NIL
+// slice on failure rather than raising: the loop then indexed it. PROVOKED with
+// an allocator rigged to fail on its first call, before this was written:
+//
+//	odin_http_adapter.odin(1078:11) Index 0 is out of range 0..<0
+//	Signal caught: Illegal_Instruction
+//
+// ADR-020 has no recoverable panic, so that is the whole process — every
+// in-flight request on every lane — lost to one failed `make`, ON THE RESPONSE
+// PATH, after the handler had already produced an answer.
+//
+// IT IS NOT A THEORETICAL PRESSURE. Two measurements in this same audit make it
+// reachable: J3 peaked at 588 MB of RSS for one in-limit request, and M9
+// measured GB-scale retention across idle keep-alive connections.
+//
+// THE DEGRADATION ALLOCATES NOTHING, which is the only thing that can be true
+// on this path: a 500 with no headers and no body, from fields already owned by
+// the caller. A client gets a bare 500 instead of a dropped connection, and the
+// other lanes keep serving. Partial work is abandoned rather than published —
+// half a header list is a response nobody wrote.
 copy_response :: proc(out: ^Outbound, status: int, headers: []Header, body: []u8, allocator: mem.Allocator) {
 	out.status = status
 
 	if len(headers) > 0 {
-		copied := make([]Header, len(headers), allocator)
+		copied, merr := make([]Header, len(headers), allocator)
+		if merr != nil {
+			copy_response_exhausted(out)
+			return
+		}
 		for header, i in headers {
-			copied[i] = Header {
-				name  = strings.clone(header.name, allocator),
-				value = strings.clone(header.value, allocator),
+			name, nerr := strings.clone(header.name, allocator)
+			if nerr != nil {
+				copy_response_exhausted(out)
+				return
 			}
+			value, verr := strings.clone(header.value, allocator)
+			if verr != nil {
+				copy_response_exhausted(out)
+				return
+			}
+			copied[i] = Header{name = name, value = value}
 		}
 		out.headers = copied
 	} else {
@@ -1024,10 +1163,29 @@ copy_response :: proc(out: ^Outbound, status: int, headers: []Header, body: []u8
 	}
 
 	if len(body) > 0 {
-		out.body = slice.clone(body, allocator)
+		cloned, berr := slice.clone(body, allocator)
+		if berr != nil {
+			copy_response_exhausted(out)
+			return
+		}
+		out.body = cloned
 	} else {
 		out.body = nil
 	}
+}
+
+// copy_response_exhausted is the allocation-free fallback (audit M6).
+//
+// `suppressed_body_len` is cleared too: it is the length the adapter announces
+// for a body it will not send, and announcing the abandoned response's length
+// beside an empty 500 would be a `Content-Length` that disagrees with the
+// bytes — the framing defect this project refuses everywhere else.
+@(private)
+copy_response_exhausted :: proc(out: ^Outbound) {
+	out.status = 500
+	out.headers = nil
+	out.body = nil
+	out.suppressed_body_len = 0
 }
 
 // stream_registry_current exposes the running server's stream registry, the

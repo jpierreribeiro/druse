@@ -272,6 +272,53 @@ corpus_storage := []Wire_Case{
 			connection_must_close = true,
 		},
 
+		// --- H3: the transfer-coding TOKEN, not a suffix --------------------
+		//
+		// All three framing sites used to ask `has_suffix(enc, "chunked")`,
+		// which is true of far more than the chunked coding. Both rejected
+		// cases below returned 201 against this backend before PATCH 37 —
+		// verified by reverting the predicate and re-running this corpus.
+		//
+		// The body is DELIBERATELY a valid `/echo` payload, Content-Type and
+		// all. A malformed body would make these cases pass for the wrong
+		// reason: the request would be refused at content negotiation or at
+		// JSON decode whether or not the framing check works, and the control
+		// would not fail. The first draft of these cases did exactly that.
+		{
+			name = "an unregistered coding ending in 'chunked' is rejected",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n" +
+			"Transfer-Encoding: xchunked\r\nConnection: close\r\n\r\n" +
+			"10\r\n" + `{"name":"grace"}` + "\r\n0\r\n\r\n",
+			outcome = .Rejected,
+			allowed_status = {400},
+			connection_must_close = true,
+			notes = "RFC 9112 6.1: a transfer-coding the server does not understand must not be read as chunked. " +
+			"`xchunked` is not `chunked`, and a hop that agrees disagrees about where the body ends.",
+		},
+		{
+			name = "chunked applied twice is rejected",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n" +
+			"Transfer-Encoding: chunked, chunked\r\nConnection: close\r\n\r\n" +
+			"10\r\n" + `{"name":"grace"}` + "\r\n0\r\n\r\n",
+			outcome = .Rejected,
+			allowed_status = {400},
+			connection_must_close = true,
+			notes = "RFC 9112 6.1: chunked must not be applied more than once. Two Transfer-Encoding " +
+			"headers comma-merge into exactly this value, so this is also the duplicate-header case.",
+		},
+		{
+			name = "the chunked coding is matched case-insensitively",
+			bytes = "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n" +
+			"Transfer-Encoding: CHUNKED\r\nConnection: close\r\n\r\n" +
+			"10\r\n" + `{"name":"grace"}` + "\r\n0\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {201},
+			handler_must_run = true,
+			connection_must_close = true,
+			notes = "Transfer-coding names are case-insensitive (RFC 9112 6.1). The old suffix test refused " +
+			"this, which was wrong in the other direction; the token compare accepts it.",
+		},
+
 		// --- 18-21: truncation and malformed syntax -------------------------
 		{
 			name = "truncated fixed body is rejected",
@@ -282,7 +329,18 @@ corpus_storage := []Wire_Case{
 		},
 		{
 			name = "whitespace before the header colon is rejected",
-			bytes = "GET /ping HTTP/1.1\r\nHost : localhost\r\nConnection: close\r\n\r\n",
+			// THE SPACED HEADER IS NOT `Host`, AND THAT IS THE WHOLE CASE.
+			//
+			// This sent "Host : localhost". With the space-before-colon rule
+			// removed, the name parses as "Host " — which no longer matches
+			// "host", so the request is refused for having NO HOST HEADER, a
+			// different rule entirely. The case passed with the guard and
+			// without it: measured, removing the rule left this at 400 while
+			// `X-Spaced : 1` went from 400 to 200 with the handler running.
+			// A test whose name is broader than its evidence (finding S2, the
+			// same shape as wp63's multipart case).
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\n" +
+			"X-Spaced : 1\r\nConnection: close\r\n\r\n",
 			outcome = .Rejected,
 			allowed_status = {400},
 			connection_must_close = true,
@@ -420,6 +478,95 @@ corpus_storage := []Wire_Case{
 			connection_must_close = true,
 			notes = "HTTP audit F1: `_` is an Odin numeric separator, not a hex digit. " +
 			"`1_0` parsed as 16 here and is malformed to a strict front-end.",
+		},
+
+		// --- audit H1: control bytes in a field line ------------------------
+		//
+		// The lone-CR case above is the neighbour of these three, and the gap it
+		// left is the point: CR was refused because CR is the splitting byte,
+		// while every other byte RFC 9110 §5.5 excludes from a field value was
+		// stored verbatim and answered 200. All three of these were MEASURED at
+		// 200 before vendor patch 38.
+		//
+		// `/ping` on purpose, not `/echo`: `/echo` answers 400 for a body that
+		// is not JSON whether or not the field line was refused, so a case
+		// drafted against it would pass with the fix reverted. That mistake was
+		// made once in this corpus already (audit H3).
+		{
+			name = "a NUL inside a header value is rejected",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\x00b\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H1: RFC 9110 §5.5 makes rejecting or replacing a NUL in a " +
+			"field value a MUST — \"invalid and dangerous, due to the varying ways that " +
+			"implementations might parse and interpret those characters\".",
+		},
+		{
+			name = "a C0 control inside a header value is rejected",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\x01b\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H1: field-value is `*( SP / HTAB / VCHAR / obs-text )`, so 0x01 " +
+			"is not field content at all. This one was not merely stored — an application " +
+			"echoing the value put the 0x01 back on the wire byte-for-byte.",
+		},
+		{
+			name = "a control byte inside a header NAME is rejected",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-\x01Test: v\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H1: a field name is a `token` (RFC 9110 §5.6.2), which excludes " +
+			"controls. `sanitize_key` escapes only LF, so such a name was lowercased and " +
+			"stored as-is.",
+		},
+		// --- audit H2: absolute-form authority vs the Host field ------------
+		//
+		// RFC 9112 §3.2.2 makes the target's authority authoritative and the Host
+		// field ignorable. Measured before vendor patch 39: a target naming
+		// `evil.example` with `Host: good.example` was served 200, and the
+		// application was handed "good.example" — the half the RFC discards.
+		{
+			name = "absolute-form whose authority AGREES with Host is served",
+			bytes = "GET http://localhost/ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {200},
+			handler_must_run = true,
+			connection_must_close = true,
+			notes = "audit H2: the accepting half. Without it the rejection case below " +
+			"would pass just as well against a server that refused absolute-form outright, " +
+			"which is not what was fixed.",
+		},
+		{
+			name = "absolute-form whose authority DISAGREES with Host is rejected",
+			bytes = "GET http://evil.example/ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected,
+			connection_must_close = true,
+			notes = "audit H2: one request carrying two identities. A front proxy routing " +
+			"or caching on the target's authority and an application tenanting on Host are " +
+			"then serving different requests — refused rather than repaired, the same " +
+			"disposition as CL+TE.",
+		},
+		{
+			name = "OPTIONS * is still answered, not read as an authority",
+			bytes = "OPTIONS * HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {200},
+			connection_must_close = true,
+			notes = "audit H2's TRAP, and the reason this case exists: `url_parse` finds no " +
+			"`/` in `*` and files the whole target as the host, so an authority check keyed " +
+			"only on \"host is non-empty\" answers 400 to the legal server-capabilities " +
+			"ping. No handler runs — the backend answers it directly.",
+		},
+		{
+			name = "a horizontal tab inside a header value is still accepted",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Test: a\tb\r\nConnection: close\r\n\r\n",
+			outcome = .Ok,
+			allowed_status = {200},
+			handler_must_run = true,
+			connection_must_close = true,
+			notes = "audit H1's boundary, and the reason it is here: HTAB is legal OWS " +
+			"inside a field value. A control-byte rule that swept it up would refuse " +
+			"conforming traffic, and nothing else in this corpus would have noticed.",
 		},
 }
 

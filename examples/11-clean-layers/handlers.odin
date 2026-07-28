@@ -9,7 +9,11 @@ package main
 import web "uruquim:web"
 
 create_handler :: proc(ctx: ^web.Context) {
-	st := web.state(ctx, App_State)
+	st, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 
 	input: Create_Link
 	if !web.body(ctx, &input) {
@@ -32,7 +36,11 @@ create_handler :: proc(ctx: ^web.Context) {
 }
 
 read_handler :: proc(ctx: ^web.Context) {
-	st := web.state(ctx, App_State)
+	st, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	slug := web.path(ctx, "slug")
 
 	l, result := read_link(&st.store, slug)
@@ -44,7 +52,11 @@ read_handler :: proc(ctx: ^web.Context) {
 }
 
 visit_handler :: proc(ctx: ^web.Context) {
-	st := web.state(ctx, App_State)
+	st, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	slug := web.path(ctx, "slug")
 
 	l, result := visit_link(&st.store, slug)

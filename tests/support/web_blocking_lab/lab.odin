@@ -38,7 +38,11 @@ Call :: struct {
 
 @(private)
 handler :: proc(ctx: ^web.Context) {
-	state := web.state(ctx, State)
+	state, state_ok := web.state(ctx, State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	if ctx.request.path == "/block" {
 		sync.sema_post(&state.entered)
 		sync.sema_wait(&state.release)
@@ -58,7 +62,11 @@ handler :: proc(ctx: ^web.Context) {
 
 @(private)
 count_middleware :: proc(ctx: ^web.Context) {
-	state := web.state(ctx, State)
+	state, state_ok := web.state(ctx, State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	_ = sync.atomic_add(&state.middleware_hits, 1)
 	web.next(ctx)
 }

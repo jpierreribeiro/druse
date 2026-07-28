@@ -576,6 +576,44 @@ error_commit_body_too_large :: proc(ctx: ^Context, limit: int) {
 	)
 }
 
+// error_commit_body_too_many_nodes commits the 413 envelope for audit J3/J4:
+// a body that is well-formed and inside `max_body`, but carries more JSON
+// values and object keys than `max_json_nodes` admits.
+//
+// It mirrors `error_commit_body_too_large` deliberately — same status, same
+// dynamic-limit construction, same borrowed buffer, no `core:fmt` (WP6's 37 KiB
+// rule). The two refusals differ only in the dimension they measure, and a
+// client that can act on one can act on the other.
+//
+// The code is `body_too_complex` rather than `body_too_large`: a client that
+// retries by shrinking its BYTES has misread a refusal about STRUCTURE, and
+// could shrink a 4 MiB body to 400 KiB while keeping every one of its 322,000
+// keys. The message names the node count so the retry is informed.
+@(private)
+error_commit_body_too_many_nodes :: proc(ctx: ^Context, limit: int) {
+	if ctx.private.response.committed {
+		return
+	}
+
+	effective := limit
+	if effective <= 0 {
+		effective = JSON_NODE_LIMIT
+	}
+
+	buffer := ctx.private.error_buffer[:]
+	n := 0
+	n += copy(buffer[n:], `{"error":{"code":"body_too_complex","message":"Request body exceeds the limit of `)
+	n = error_write_decimal(buffer, n, effective)
+	n += copy(buffer[n:], ` JSON values and keys"}}`)
+
+	response_commit(
+		&ctx.private.response,
+		.Payload_Too_Large,
+		response_json_headers(ctx),
+		buffer[:n],
+	)
+}
+
 // error_write_decimal writes a non-negative int as ASCII decimal into `buffer`
 // at offset `n`, returning the new offset. Allocation-free, no `core:fmt`.
 @(private)
@@ -968,6 +1006,26 @@ FRAMEWORK_MESSAGE_NIL_STATE ::
 	"Create the state value first and pass its address. This application is " +
 	"rejected fail-closed: every request will answer 500 and web.serve will " +
 	"refuse to start."
+
+// The two `web.state` refusals (Phase-1 freeze Amendment 39). They are LOG
+// messages, not fail-closed poisons and not `Framework_Error` members: after
+// the `(^T, bool)` change the framework has not failed when either fires — it
+// answered the question in the return value, and the application owns what
+// happens next. They exist so a caller who ignores `ok` still gets a sentence
+// naming the mistake instead of a bare segfault.
+@(private)
+FRAMEWORK_MESSAGE_STATE_UNREGISTERED ::
+	"uruquim: web.state was called on an application built with web.app() or " +
+	"web.bare(); only web.app_with_state registers state (ADR-004). It returned " +
+	"(nil, false) rather than aborting the process; the handler must check the " +
+	"second result before using the first."
+
+@(private)
+FRAMEWORK_MESSAGE_STATE_TYPE_MISMATCH ::
+	"uruquim: web.state was asked for a type other than the one registered with " +
+	"web.app_with_state; the requested and registered types must match exactly " +
+	"(ADR-004, AMEND-1). It returned (nil, false) rather than aborting the " +
+	"process; the handler must check the second result before using the first."
 
 // WP36 — the two limits members of the fail-closed family.
 //
