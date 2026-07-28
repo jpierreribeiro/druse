@@ -284,6 +284,15 @@ path registered on another method → 405 + Allow
 
 `Allow` names only the methods registered for that path, always in the order
 `GET, POST, PUT, PATCH, DELETE`, comma-and-space separated, never duplicated.
+
+**`HEAD` and `OPTIONS` are served but never listed.** On a route registered only
+for GET, `HEAD` answers 200 with an empty body and `OPTIONS` answers 204 with
+`Allow: GET` — three methods supported, one advertised. RFC 9110 §10.2.1 says
+`Allow` is the set of methods the resource *supports*, so this is a known
+deviation held in place on purpose: the five-verb order is frozen (WP32b) and
+the router corpus refuses an `Allow` containing HEAD or OPTIONS, after an
+earlier attempt to add them was rejected as importing another router's
+conventions. Do not read `Allow` as a capability probe for those two methods.
 Phase 1 exposes no way to read response headers, so it is verified internally.
 Both bodies are empty until WP6 renders the error envelope.
 

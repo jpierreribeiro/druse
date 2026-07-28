@@ -518,6 +518,16 @@ path exists under another method -> 405 + Allow, {"error":{"code":"method_not_al
 `Allow` lists only the methods registered for that path, always in the order
 `GET, POST, PUT, PATCH, DELETE`, comma-and-space separated, with no duplicates.
 
+**It does NOT list `HEAD` or `OPTIONS`, and the server answers both anyway.**
+Measured on a route registered only for GET: `HEAD` returns 200 with an empty
+body and `OPTIONS` returns 204 carrying `Allow: GET`. So the resource supports
+three methods and the header names one. RFC 9110 §10.2.1 defines `Allow` as the
+methods *supported* by the resource, so this is a deliberate deviation, not an
+oversight — the five-verb order is frozen (WP32b) and
+`tests/c08-router-corpus` rejects an `Allow` that includes HEAD or OPTIONS.
+Written down here because a client that reads `Allow` to decide whether it may
+send `HEAD` will get the wrong answer, and nothing else in the docs said so.
+
 ### Route identity
 
 ```text
