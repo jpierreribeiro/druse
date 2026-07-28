@@ -1426,6 +1426,39 @@ env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_merged_
 echo "--- WP9 raw-wire corpus: mutation controls (the cases must detect) ---"
 env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
 
+# --- the mutation-control scripts, EXECUTED ------------------------------
+#
+# WHY THIS STAGE EXISTS. Seventeen control scripts were `bash -n`'d at the top
+# of this gate and never run by it. An audit executed them: FOUR were broken,
+# and had been for as long as nobody had looked.
+#
+#	check_wp20  the `observe` signature gained a guard; the mutation's
+#	            pattern stopped matching, AND its probe tree copied only
+#	            web/internal/transport, so it could not compile either
+#	check_wp21  same tree problem — `ingest` and `stream` were added to
+#	            web/internal later and the transport imports them
+#	check_wp23  the request-id counter became an atomic add; the uniqueness
+#	            guard has been unguarded since that refactor
+#	check_wp36  the dispatched check moved behind an accessor
+#
+# A syntax check proves a script PARSES. It cannot prove the mutation still
+# applies, that the probe tree still compiles, or that the suite still detects
+# what the script is named after — and every one of those four failures is
+# exactly the kind this project's evidence standard exists to catch. As
+# check_wp9_mutations.sh puts it: an unapplied mutation is a control that
+# stopped controlling.
+#
+# COST, measured: 261 s for all seventeen, the slowest being wp41 at 48 s.
+echo "--- mutation-control scripts (executed, not merely parsed) ---"
+for uruquim_control in c7 wp16 wp17 wp18 wp19 wp20 wp21 wp22 wp23 wp24 wp25 \
+                       wp30 wp36 wp37 wp38 wp39 wp41; do
+  timeout 900 env URUQUIM_ODIN_BIN="$URUQUIM_COMPILER" \
+    ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+    bash "$URUQUIM_ROOT/build/check_${uruquim_control}_controls.sh" >/dev/null 2>&1 ||
+    fail "build/check_${uruquim_control}_controls.sh did not pass. It is a MUTATION CONTROL: it weakens a guard and requires the suite named after it to go red. A failure here is either a real regression or a control that has gone stale against a refactor — and a stale control is the more likely, so check whether its patterns still match the code before doubting the code."
+  echo "control: check_${uruquim_control}_controls.sh -> all mutations detected"
+done
+
 # The gate leaves NO artifact in the working tree.
 echo "--- WP69 blocking boundary: process-isolated liveness evidence ---"
 bash "$URUQUIM_ROOT/build/check_wp69_controls.sh"
