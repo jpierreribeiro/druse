@@ -48,6 +48,7 @@ bash -n "$URUQUIM_ROOT/build/check_test.sh"
 bash -n "$URUQUIM_ROOT/build/check_public_api.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp3_mutations.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
+bash -n "$URUQUIM_ROOT/build/check_merged_fix_mutations.sh"
 bash -n "$URUQUIM_ROOT/build/check_g11_teardown.sh"
 bash -n "$URUQUIM_ROOT/build/check_examples.sh"
 bash -n "$URUQUIM_ROOT/build/check_docs.sh"
@@ -1416,6 +1417,12 @@ echo "PASS: the previously ungated evidence suites run in the gate"
 # The raw-wire corpus is only worth its runtime if its cases DETECT the defects
 # they are named after. It could not report a failure at all until this
 # session's logger fix, so that had never been established for any of them.
+# The nine fixes merged in 44bdcda were controlled by hand at merge time. This
+# asks whether anything in the tree still notices if they are reverted — the
+# multipart one was guarded only by a suite CI did not run until this session.
+echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
+env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_merged_fix_mutations.sh"
+
 echo "--- WP9 raw-wire corpus: mutation controls (the cases must detect) ---"
 env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
 
