@@ -302,6 +302,7 @@ are CPU-bound, size `max_handlers` deliberately and scale with more processes.
 
 ```odin
 web.refused_connections()   // running total of admission refusals
+web.stats().saturation_refusals // acceptor refusals while every Handler lane is active
 web.observe(&app, on_framework_error)
 web.use(&app, web.logger)
 web.use(&app, web.request_id)
@@ -328,6 +329,11 @@ web.use(&app, web.request_id)
   Capacity is `lanes ÷ mean handler dwell`. C-05 also showed that the first
   visible refusal is scheduler-dependent, so do not infer a fixed resource
   ordering from a single 503 or admission refusal.
+* **`web.stats().saturation_refusals` counts the acceptor boundary.** It rises
+  when every Handler lane is active and a newly accepted socket is closed
+  before an HTTP request is parsed. This is deliberately a transport refusal:
+  the acceptor must not manufacture a 503 for a request it has never read.
+  Request-aware overload paths may still return 503 with `Retry-After`.
 * **`observe`** receives a typed event for every framework-detected failure.
   It cannot change the response; it is for exporting to metrics or alerting.
 * **Key every metric on `web.route(ctx)`, never on `ctx.request.path`.** The
@@ -514,8 +520,9 @@ the topology those limitations make mandatory:
   request contending for a busy lane queues silently on that lane's socket.
   Saturation therefore appears as **rising lane utilization**, which you read
   from `web.stats().handler_dwell_ns`: utilization approaching 1 means the lane
-  pool is saturated; the acceptor still answers 503 + `Retry-After: 1` only when
-  **every** lane is blocked. Capacity is roughly `lanes ÷ mean handler dwell`.
+  pool is saturated; when **every** lane is blocked the acceptor closes new
+  sockets without writing HTTP and increments `saturation_refusals`. Capacity
+  is roughly `lanes ÷ mean handler dwell`.
   `max_handlers` controls service capacity; `max_connections` bounds how many
   clients can be admitted or left waiting. Ten repeated C-05 runs observed
   either lane saturation or admission refusal first, so their ordering is not

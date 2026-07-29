@@ -58,12 +58,13 @@ refused_connections :: proc() -> int {
 // dwell). The predecessor, `lane_collisions`, was MISNAMED rather than dead: its
 // lane-collision increment was unreachable under dedicated accept (WP119), but
 // the acceptor's saturation refusal also incremented it, so the number moved
-// while meaning something other than its name. Handled by replacing the failed
-// counter, not by reviving it.
+// while meaning something other than its name. `saturation_refusals` now names
+// that acceptor resource honestly, while dwell remains the Handler-utilization
+// signal.
 //
 // WHY A STRUCT OF INTEGERS AND NOT A METRICS API. The same reason as
 // `refused_connections`: a framework that exports a metrics abstraction has
-// chosen a vendor for its users. Eight running totals an application reads and
+// chosen a vendor for its users. Ten running totals an application reads and
 // hands to whatever it already runs is the smallest thing that discharges the
 // obligation. **Redaction holds by construction**: every field is an integer,
 // so no request-derived byte can reach an observer through it — the gate pins
@@ -76,6 +77,9 @@ Server_Stats :: struct {
 	// Admission — identical to `refused_connections()`, included so one read
 	// answers the whole write-and-refuse picture.
 	refused_connections:   int,
+	// Acceptor-side Handler saturation. This is a TCP refusal before any HTTP
+	// request has been parsed, so it must never be described as a 503 response.
+	saturation_refusals:   int,
 	// Buffered responses.
 	responses_sent:        int, // sends that completed without error
 	response_bytes:        i64, // bytes reported on-the-wire for those sends
@@ -100,12 +104,13 @@ Server_Stats :: struct {
 }
 
 // stats returns the running server's write-side counters, or the zero value
-// when no server is running. It allocates nothing and reads nine integers under
+// when no server is running. It allocates nothing and reads ten integers under
 // one lock, so the snapshot is coherent.
 stats :: proc() -> Server_Stats {
 	s := transport.server_stats()
 	return Server_Stats {
 		refused_connections   = s.refused_connections,
+		saturation_refusals   = s.saturation_refusals,
 		responses_sent        = s.responses_sent,
 		response_bytes        = s.response_bytes,
 		send_errors           = s.send_errors,

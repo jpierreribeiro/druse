@@ -237,6 +237,16 @@ Server :: struct {
 	// hand — same atomic discipline as the counters above. Deletable with the
 	// vendored backend when `core:net/http` lands.
 	handler_dwell_ns:     i64,
+	// URUQUIM PATCH 42 (acceptor saturation interop) — BRIDGE. The dedicated
+	// acceptor may discover that every Handler lane is active before it has
+	// parsed or associated an HTTP request with the accepted socket. Sending an
+	// HTTP response in that state is invalid for clients that have not yet
+	// registered a request in flight (Go net/http reports it as an unsolicited
+	// response). The acceptor now refuses at the transport layer and counts that
+	// distinct resource here. It is deliberately not `refused_total`, which is
+	// the max-connections admission budget, and not `handler_dwell_ns`, which
+	// measures work that actually dispatched.
+	refused_saturation_total: int,
 	// Once the server starts closing/shutdown this is set to true, all threads will check it
 	// and start their thread local shutdown procedure.
 	//
@@ -1175,18 +1185,12 @@ accept_all_handlers_active :: proc(s: ^Server) -> bool {
 	return true
 }
 
-@(private)
-ACCEPT_OVERLOAD_RESPONSE: string : (
-	"HTTP/1.1 503 Service Unavailable\r\n" +
-	"Content-Length: 0\r\n" +
-	"Connection: close\r\n" +
-	"Retry-After: 1\r\n\r\n"
-)
-
 // The dedicated acceptor cannot run the HTTP adapter when every application
-// lane is blocked, but it can still make the existing saturation contract
-// observable: a complete, bounded 503 response followed by close.  The
-// explicit one-lane compatibility mode deliberately keeps its old wait.
+// lane is blocked. At this point it has accepted a TCP socket but has NOT
+// parsed or associated an HTTP request, so it must not manufacture an HTTP
+// response. Refuse at the transport layer, count the refusal under its own
+// resource, and let request-aware overload paths keep their 503 + Retry-After.
+// The explicit one-lane compatibility mode deliberately keeps its old wait.
 @(private)
 accept_refuse_handler_saturation :: proc(s: ^Server) {
 	if !s.pending_accept.valid {
@@ -1195,21 +1199,9 @@ accept_refuse_handler_saturation :: proc(s: ^Server) {
 	sock := s.pending_accept.socket
 	s.pending_accept = {}
 	sync.atomic_store_explicit(&s.pending_waiting, false, .Release)
-	sent := 0
-	data := transmute([]u8)ACCEPT_OVERLOAD_RESPONSE
-	for sent < len(data) {
-		n, err := net.send_tcp(sock, data[sent:])
-		if err != nil || n <= 0 {
-			break
-		}
-		sent += n
-	}
 	net.close(sock)
 	_ = sync.atomic_add(&s.active_connections, -1)
-	// Campaign C: no lane_collisions increment here — this acceptor-side
-	// saturation 503 is a different resource from the dead lane-collision
-	// path; if its count is worth publishing it belongs under its own name
-	// (`refused_saturation_total`), not the retired one.
+	_ = sync.atomic_add(&s.refused_saturation_total, 1)
 }
 
 @(private)

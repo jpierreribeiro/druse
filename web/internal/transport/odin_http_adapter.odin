@@ -376,6 +376,7 @@ _server_stats :: proc() -> Server_Stats {
 	}
 	out := Server_Stats {
 		refused_connections   = sync.atomic_load(&server.refused_total),
+		saturation_refusals   = sync.atomic_load(&server.refused_saturation_total),
 		responses_sent        = sync.atomic_load(&server.responses_sent),
 		response_bytes        = sync.atomic_load(&server.response_bytes),
 		send_errors           = sync.atomic_load(&server.send_errors),

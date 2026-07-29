@@ -55,9 +55,16 @@ grep -q 'FIRST OBSERVED REFUSAL' "$URUQUIM_SUITE" ||
 grep -q 'total_malformed == 0' "$URUQUIM_SUITE" ||
   fail "the malformed-reply assertion is gone; under saturation every outcome must be one the design NAMES, and that assertion is the only thing checking it"
 
-# --- 1b. H-4: every lane 503 carries Retry-After -----------------------------
-grep -q 'total_lane_503_no_retry == 0' "$URUQUIM_SUITE" ||
-  fail "the Retry-After assertion is gone. A 503 lane refusal that does not tell the client when to come back invites an immediate retry onto the same contended pool, which collides again. The ramp reliably produces 503s, so the property is checked over real refusals."
+# --- 1b. PATCH 42: no HTTP before a request is parsed ------------------------
+grep -q 'total_lane_503 == 0' "$URUQUIM_SUITE" ||
+  fail "the assertion rejecting pre-request HTTP is gone. The dedicated acceptor has no parsed request and must refuse saturation at the transport layer."
+grep -q 'saturation_after - saturation_before == 8' "$URUQUIM_SUITE" ||
+  fail "the deterministic saturation_refusals delta assertion is gone; a published counter that never moves is decorative."
+grep -q 'atomic_add(&s.refused_saturation_total, 1)' "$URUQUIM_SERVER" ||
+  fail "the acceptor saturation refusal no longer increments its dedicated counter."
+if grep -q 'ACCEPT_OVERLOAD_RESPONSE' "$URUQUIM_SERVER"; then
+  fail "the acceptor again owns a raw HTTP response. HTTP may only be emitted after request parsing and association."
+fi
 # The ramp must demonstrably overwhelm the server, and a run that produced no
 # 503 must SAY so. Two earlier forms of this both gated on the scheduler rather
 # than on the code:
@@ -71,8 +78,6 @@ grep -q 'total_lane_503_no_retry == 0' "$URUQUIM_SUITE" ||
 # wait is the scheduling detail that must not gate.
 grep -q "total_served < total_driven" "$URUQUIM_SUITE" ||
   fail "the assertion that the ramp actually saturates the server is gone; without it every refusal and dwell assertion below can pass on a run that was never under load"
-grep -q 'NOT exercised\|NOT be evidence\|NOT evidence' "$URUQUIM_SUITE" ||
-  fail "the suite no longer reports when a run produced no lane 503. Retry-After is then checked over an empty set and the run reads as evidence for a property it never exercised."
 # Campaign C — the dwell counter must be OBSERVABLE and WIRED, replacing the
 # retired lane_collisions. Asserted in two places: the suite compares
 # handler_dwell_ns against served dispatches, and the accumulator lives at the
@@ -127,7 +132,38 @@ env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
   "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
   "-out:$URUQUIM_TMP/c05"
 
+# PATCH 42 negative control: restore the forbidden acceptor-side HTTP write in
+# an isolated tree. The behavioural corpus must go red specifically because it
+# observed pre-request 503 bytes; a shape-only grep is not evidence.
+URUQUIM_MUT="$URUQUIM_TMP/pre-request-http-mutant"
+mkdir -p "$URUQUIM_MUT/tests"
+cp -R "$URUQUIM_ROOT/web" "$URUQUIM_MUT/"
+cp -R "$URUQUIM_ROOT/vendor" "$URUQUIM_MUT/"
+cp -R "$URUQUIM_ROOT/tests/c05-saturation" "$URUQUIM_MUT/tests/"
+perl -0pi -e 's@(\tsync\.atomic_store_explicit\(&s\.pending_waiting, false, \.Release\)\n)(\tnet\.close\(sock\))@$1\tdata := transmute([]u8)string("HTTP/1.1 503 Service Unavailable\\r\\nContent-Length: 0\\r\\nConnection: close\\r\\nRetry-After: 1\\r\\n\\r\\n")\n\t_, _ = net.send_tcp(sock, data)\n$2@' \
+  "$URUQUIM_MUT/vendor/odin-http/server.odin"
+grep -q 'HTTP/1.1 503 Service Unavailable' \
+  "$URUQUIM_MUT/vendor/odin-http/server.odin" ||
+  fail "the pre-request HTTP mutation no longer applies"
+
+set +e
+URUQUIM_MUT_OUT="$(
+  env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
+    "$URUQUIM_MUT/tests/c05-saturation" \
+    "-collection:uruquim=$URUQUIM_MUT" -define:ODIN_TEST_THREADS=1 \
+    "-out:$URUQUIM_TMP/c05-pre-request-mutant" 2>&1
+)"
+URUQUIM_MUT_RC=$?
+set -e
+test "$URUQUIM_MUT_RC" -ne 0 ||
+  fail "the acceptor emitted HTTP before parsing a request and the saturation corpus stayed green"
+grep -q 'HTTP 503 responses were emitted before a request was parsed' \
+  <<<"$URUQUIM_MUT_OUT" || {
+    echo "$URUQUIM_MUT_OUT" >&2
+    fail "the pre-request HTTP mutant failed for the wrong reason"
+  }
+
 echo "c05: the six outcomes stay distinguishable; first observed refusal is reported without pretending its ordering is deterministic"
 echo "c05: the accept-cancel spin is GONE (PATCH 28) — the wedge is impossible by construction, not merely bounded (F-C05-1 superseded)"
-echo "c05: the perimeter-6 finding and the perimeter-7 Server_Stats specification are on record"
+echo "c05: acceptor saturation is transport-only and counted; restoring pre-request HTTP makes the corpus RED"
 echo "PASS: C-05 combined-saturation and write-observability controls"

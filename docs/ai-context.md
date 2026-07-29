@@ -173,8 +173,11 @@ status, the request ID and its own counts, and never a path, header, body or
 parameter.** Key your metrics on `web.route(ctx)`, never on
 `ctx.request.path`.
 
-`web.stats()` returns a `Server_Stats` — nine running totals for the send and
-saturation sides, which `refused_connections` did not cover: `responses_sent`,
+`web.stats()` returns a `Server_Stats` — ten running totals for admission,
+saturation and sending. `refused_connections` counts the `max_connections`
+budget; `saturation_refusals` counts sockets closed by the dedicated acceptor
+when every Handler lane is active, before any HTTP request is parsed. The
+remaining fields are `responses_sent`,
 `response_bytes` (on the wire), `send_errors`, `write_deadline_aborts`,
 `handler_dwell_ns`, and the three detached-stream counters `stream_refused_full`,
 `stream_refused_budget`, `stream_aborted_slow` (previously reachable from no
@@ -187,7 +190,9 @@ It replaced `lane_collisions`, which dedicated accept made misleading rather
 than dead — handlers run synchronously on the lane thread, so the
 503-on-collision path is unreachable, and the only increments the counter still
 received came from the acceptor's saturation refusals while real lane saturation
-presented as silent queueing. `handler_dwell_ns` is a running total of
+presented as silent queueing. The acceptor refusal now has the honest
+`saturation_refusals` name and is a transport refusal, never a pre-request 503.
+`handler_dwell_ns` is a running total of
 time inside dispatched handlers: difference it over an interval for
 utilization (Δdwell / (lanes × Δwall)) and for mean dwell against
 `responses_sent`. A rising utilization says: raise `max_handlers`, shorten the

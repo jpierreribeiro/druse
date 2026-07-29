@@ -37,6 +37,16 @@ degradation instead of collapsing every non-200 into one bucket.
 
 ### The result, re-measured after dedicated accept
 
+**Corrective measurement, 2026-07-29.** The acceptor-side 503 in the historical
+table below was emitted before the acceptor had parsed or associated a request.
+Go `net/http` observed it as an unsolicited response. Patch 42 removes that
+protocol-invalid write: all-lanes-active now closes the socket at the transport
+boundary and increments `web.stats().saturation_refusals`. A deterministic
+four-lane barrier drives eight such sockets and requires eight transport
+refusals, zero pre-request HTTP replies and a counter delta of eight. Restoring
+the old raw 503 in an isolated mutant makes the corpus red. The table remains
+historical evidence for why the defect was found, not the current contract.
+
 The original record pinned one representative run as an architectural ordering:
 "the Handler lane binds first, at four." That conclusion did not survive the
 dedicated-accept architecture or repetition. Ten consecutive runs of the
@@ -56,8 +66,8 @@ current tree on the local 4-vCPU host produced:
 
 **F-C05-2, corrected — the first visible refusal is scheduler-dependent.**
 Dedicated accept assigns work to available lanes; under excess concurrency,
-requests may wait on lane-owned sockets, meet the acceptor's all-lanes-blocked
-503, or reach the connection admission budget. Which of those becomes the
+requests may wait on lane-owned sockets, meet the acceptor's all-lanes-active
+transport refusal, or reach the connection admission budget. Which becomes the
 first *observed refusal* is not a stable ordering and must not gate.
 
 What remains deterministic is the capacity model: synchronous handler service
@@ -75,14 +85,14 @@ a diagnostic; it does not assert its kind or level.
 
 ### H-4 follow-ups (the operational corrections this measurement demanded)
 
-1. **The 503 now carries `Retry-After: 1`** (vendored change at the
+1. **Historical, superseded by Patch 42:** the 503 carried `Retry-After: 1` (vendored change at the
    `dispatch_exchange` refusal path). A refusal that does not say *when* to come
    back invites an immediate retry onto the same contended pool, which collides
    again — the refusal creates the retry storm it was trying to shed. One second
    is the smallest honest hint (a synchronous handler's dwell is the thing being
    waited out). The C-05 ramp requires `Lane_Refused_No_Retry` to be zero and
-   explicitly reports when a particular run produced no 503, because that run
-   is then not evidence for this header property.
+   explicitly reported when a particular run produced no 503. The acceptor no
+   longer emits that response at all; request-aware 503 paths retain the header.
 
 2. **There is no explicit application-dispatch queue or work stealing.**
    Dedicated accept chooses an available least-loaded lane and bounds handoffs.

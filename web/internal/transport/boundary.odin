@@ -175,6 +175,7 @@ refused_connections :: proc() -> int {
 // and streamed writes in one read.
 Server_Stats :: struct {
 	refused_connections:   int,
+	saturation_refusals:   int,
 	responses_sent:        int,
 	response_bytes:        i64,
 	send_errors:           int,

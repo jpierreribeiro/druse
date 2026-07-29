@@ -2258,6 +2258,31 @@ monotonically increasing — a differenced sample could go negative. Pinned by
 |---|---|---|---|---|---|---|
 | `Server_Stats` (field) | A | C | `build/phase1-public-signatures.txt` (the frozen row) | `tests/c05-saturation` (dwell tracked under ramp; control red) | `docs/operations.md` | `lane_collisions` removed; `handler_dwell_ns` added; struct remains 9 integer fields, no string |
 
+## Amendment 34 — acceptor saturation is transport-only and observable
+
+**Date: 2026-07-29. Authority: owner-approved post-soak corrective plan.
+Ledger effect: no symbol added; one integer field,
+`saturation_refusals: int`, is added to the frozen `Server_Stats` value.**
+
+The dedicated acceptor previously emitted a raw HTTP 503 when all Handler lanes
+were active, before it had parsed or associated a request. Go `net/http`
+reported those bytes as an unsolicited response on an idle channel. The
+acceptor now closes the socket without HTTP and increments a dedicated running
+total. `refused_connections` remains the max-connections admission budget;
+`handler_dwell_ns` remains dispatched Handler time.
+
+The behavioural evidence is non-vacuous: `tests/c05-saturation` holds four
+lanes behind a barrier, drives eight additional sockets, requires eight
+transport refusals, zero pre-request HTTP replies and an exact
+`saturation_refusals` delta of eight. Its isolated mutant restores the raw 503
+and must fail on the forbidden bytes.
+
+Current signature:
+
+```
+application	type	Server_Stats :: struct {refused_connections: int, saturation_refusals: int, responses_sent: int, response_bytes: i64, send_errors: int, write_deadline_aborts: int, handler_dwell_ns: i64, stream_refused_full: int, stream_refused_budget: int, stream_aborted_slow: int}
+```
+
 ## Amendment 32 — Corrective WP C1 (friction F8-1): `Status` gains 409/413/429/503
 
 **Date: 2026-07-24. Authority: the Corrective Program (`planning/corrective-program-plan.md`),
