@@ -63,6 +63,19 @@ JSON_DIRECT_PREFLIGHT_PARSE :: #config(URUQUIM_JSON_DIRECT_PREFLIGHT_PARSE, true
 @(private)
 JSON_FUSED_TREE_DECODE :: #config(URUQUIM_JSON_FUSED_TREE_DECODE, true)
 
+// The fused decoder and its preceding shape walk used to resolve the same
+// struct key independently: validation scanned tags twice (known + unknown)
+// and the destination write scanned them a third time. A standalone RTTI cache
+// was measured before tree fusion and rejected; it could not remove the later
+// stdlib decode's lookups. This descriptor is deliberately narrower and is
+// enabled only when the fused path will consume it too, so one request-local
+// target table serves both validation and destination writes.
+//
+// Keep the private rollback alongside JSON_FUSED_TREE_DECODE until the A/B
+// campaign has decided whether the integrated form clears the adoption floor.
+@(private)
+JSON_FUSED_TARGET_DESCRIPTORS :: #config(URUQUIM_JSON_FUSED_TARGET_DESCRIPTORS, true)
+
 @(private)
 JSON_FIELD_PATH_MAX :: ERROR_NAME_ESCAPED_MAX
 
@@ -289,6 +302,184 @@ json_struct_target :: proc(
 }
 
 @(private)
+Json_Field_Target :: struct {
+	name:       string,
+	offset:     uintptr,
+	field_type: ^reflect.Type_Info,
+}
+
+@(private)
+Json_Struct_Descriptor :: struct {
+	type_id: typeid,
+	targets: [dynamic]Json_Field_Target,
+}
+
+@(private)
+Json_Target_Cache :: struct {
+	descriptors: [dynamic]Json_Struct_Descriptor,
+	allocator:   mem.Allocator,
+	failed:      bool,
+}
+
+@(private)
+json_tag_name :: proc(tag: string) -> string {
+	for i in 0 ..< len(tag) {
+		if tag[i] == ',' {
+			return tag[:i]
+		}
+	}
+	return tag
+}
+
+@(private)
+json_descriptor_has_name :: proc(descriptor: ^Json_Struct_Descriptor, name: string) -> bool {
+	for target in descriptor.targets {
+		if target.name == name {
+			return true
+		}
+	}
+	return false
+}
+
+@(private)
+json_descriptor_append :: proc(
+	descriptor: ^Json_Struct_Descriptor,
+	name: string,
+	offset: uintptr,
+	field_type: ^reflect.Type_Info,
+) -> bool {
+	// Earlier entries win. The construction order below is the decoder's
+	// precedence order, so an outer/default field cannot be displaced by a
+	// flattened child and a lower-precedence duplicate is simply omitted.
+	if json_descriptor_has_name(descriptor, name) {
+		return true
+	}
+	appended, err := append(
+		&descriptor.targets,
+		Json_Field_Target{name = name, offset = offset, field_type = field_type},
+	)
+	return err == nil && appended == 1
+}
+
+@(private)
+json_descriptor_collect :: proc(
+	descriptor: ^Json_Struct_Descriptor,
+	info: ^reflect.Type_Info,
+	base_offset: uintptr = 0,
+) -> bool {
+	fields := reflect.struct_fields_zipped(info.id)
+
+	// Pass 1: explicit json tags.
+	for field in fields {
+		tag, explicit := reflect.struct_tag_lookup(field.tag, "json")
+		if !explicit {
+			continue
+		}
+		if !json_descriptor_append(
+			descriptor,
+			json_tag_name(tag),
+			base_offset + field.offset,
+			field.type,
+		) {
+			return false
+		}
+	}
+
+	// Pass 2: ordinary field names (no tag, or an empty tag name).
+	for field in fields {
+		if json_tag_name(reflect.struct_tag_get(field.tag, "json")) == "" {
+			if !json_descriptor_append(
+				descriptor,
+				field.name,
+				base_offset + field.offset,
+				field.type,
+			) {
+				return false
+			}
+		}
+	}
+
+	// Pass 3: flattened `using _` children, recursively retaining their own
+	// explicit/default/flattened precedence.
+	for field in fields {
+		if field.is_using && field.name == "_" {
+			base := reflect.type_info_base(field.type)
+			if _, ok := base.variant.(reflect.Type_Info_Struct); ok {
+				if !json_descriptor_collect(
+					descriptor,
+					base,
+					base_offset + field.offset,
+				) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+@(private)
+json_target_cache_lookup :: proc(
+	cache: ^Json_Target_Cache,
+	info: ^reflect.Type_Info,
+	key: string,
+) -> (offset: uintptr, field_type: ^reflect.Type_Info, found: bool) {
+	info := reflect.type_info_base(info)
+	descriptor_index := -1
+	for descriptor, i in cache.descriptors {
+		if descriptor.type_id == info.id {
+			descriptor_index = i
+			break
+		}
+	}
+
+	if descriptor_index < 0 {
+		targets, alloc_err := make(
+			[dynamic]Json_Field_Target,
+			0,
+			len(reflect.struct_fields_zipped(info.id)),
+			cache.allocator,
+		)
+		if alloc_err != nil {
+			cache.failed = true
+			return 0, nil, false
+		}
+		appended, append_err := append(
+			&cache.descriptors,
+			Json_Struct_Descriptor{type_id = info.id, targets = targets},
+		)
+		if append_err != nil || appended != 1 {
+			cache.failed = true
+			return 0, nil, false
+		}
+		descriptor_index = len(cache.descriptors) - 1
+		if !json_descriptor_collect(&cache.descriptors[descriptor_index], info) {
+			cache.failed = true
+			return 0, nil, false
+		}
+	}
+
+	for target in cache.descriptors[descriptor_index].targets {
+		if target.name == key {
+			return target.offset, target.field_type, true
+		}
+	}
+	return 0, nil, false
+}
+
+@(private)
+json_struct_resolve :: proc(
+	info: ^reflect.Type_Info,
+	key: string,
+	cache: ^Json_Target_Cache = nil,
+) -> (offset: uintptr, field_type: ^reflect.Type_Info, found: bool) {
+	if cache != nil {
+		return json_target_cache_lookup(cache, info, key)
+	}
+	return json_struct_target(info, key)
+}
+
+@(private)
 Json_Tree_Decode_Result :: enum {
 	Success,
 	Unsupported,
@@ -371,6 +562,7 @@ json_tree_decode :: proc(
 	dst: rawptr,
 	info: ^reflect.Type_Info,
 	allocator: mem.Allocator,
+	target_cache: ^Json_Target_Cache = nil,
 ) -> Json_Tree_Decode_Result {
 	info := reflect.type_info_base(info)
 
@@ -437,7 +629,7 @@ json_tree_decode :: proc(
 		}
 		for child, i in v {
 			child_dst := rawptr(uintptr(base) + uintptr(i * elem.size))
-			if result := json_tree_decode(child, child_dst, elem, allocator); result != .Success {
+			if result := json_tree_decode(child, child_dst, elem, allocator, target_cache); result != .Success {
 				return result
 			}
 		}
@@ -448,12 +640,12 @@ json_tree_decode :: proc(
 			return .Unsupported
 		}
 		for key, child in v {
-			offset, field_type, found := json_struct_target(info, key)
+			offset, field_type, found := json_struct_resolve(info, key, target_cache)
 			if !found {
-				return .Unsupported
+				return target_cache != nil && target_cache.failed ? .Internal : .Unsupported
 			}
 			field_dst := rawptr(uintptr(dst) + offset)
-			if result := json_tree_decode(child, field_dst, field_type, allocator); result != .Success {
+			if result := json_tree_decode(child, field_dst, field_type, allocator, target_cache); result != .Success {
 				return result
 			}
 		}
@@ -484,6 +676,7 @@ json_struct_known_check :: proc(
 	object: json.Object,
 	info: ^reflect.Type_Info,
 	path: ^Json_Field_Path,
+	target_cache: ^Json_Target_Cache = nil,
 ) -> Json_Decode_Issue {
 	// Validate each present key against the field the DECODER will write —
 	// resolved through `json_struct_field`, which shares `json_struct_target`'s
@@ -501,13 +694,20 @@ json_struct_known_check :: proc(
 	// refusal path are stable for the same reason.
 	best_key := ""
 	best_issue := Json_Decode_Issue{}
+	unknown := ""
 	for key, child in object {
-		winner, found := json_struct_field(info, key)
+		_, winner, found := json_struct_resolve(info, key, target_cache)
 		if !found {
-			continue // the caller's unknown scan reports this key
+			if target_cache != nil && target_cache.failed {
+				return Json_Decode_Issue{kind = .Internal}
+			}
+			if unknown == "" || key < unknown {
+				unknown = key
+			}
+			continue
 		}
 		old := json_path_push(path, key)
-		issue := json_shape_check(child, winner, path)
+		issue := json_shape_check(child, winner, path, target_cache)
 		json_path_restore(path, old)
 		if issue.kind == .None {
 			continue
@@ -522,11 +722,22 @@ json_struct_known_check :: proc(
 	if best_key != "" {
 		return best_issue
 	}
+	if unknown != "" {
+		old := json_path_push(path, unknown)
+		issue := json_issue_at(.Unknown_Field, path)
+		json_path_restore(path, old)
+		return issue
+	}
 	return {}
 }
 
 @(private)
-json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Json_Field_Path) -> Json_Decode_Issue {
+json_shape_check :: proc(
+	value: json.Value,
+	info: ^reflect.Type_Info,
+	path: ^Json_Field_Path,
+	target_cache: ^Json_Target_Cache = nil,
+) -> Json_Decode_Issue {
 	if info == nil {
 		return json_issue_at(.Unsupported_Destination, path)
 	}
@@ -550,7 +761,7 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 		first_issue: Json_Decode_Issue
 		for variant in union_info.variants {
 			candidate_path := path^
-			issue := json_shape_check(value, variant, &candidate_path)
+			issue := json_shape_check(value, variant, &candidate_path, target_cache)
 			if issue.kind == .None {
 				return {}
 			}
@@ -703,7 +914,7 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 			return json_issue_at(.Invalid_Field, path)
 		}
 		for item in v {
-			if issue := json_shape_check(item, elem, path); issue.kind != .None {
+			if issue := json_shape_check(item, elem, path, target_cache); issue.kind != .None {
 				return issue
 			}
 		}
@@ -720,24 +931,7 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 			// write, selecting the lexicographically smallest failing key, so
 			// two invalid values cannot make the selected error depend on map
 			// iteration order.
-			if issue := json_struct_known_check(v, info, path); issue.kind != .None {
-				return issue
-			}
-
-			// Select the lexicographically smallest unknown key. Map order is
-			// deliberately not allowed to leak into the stable client result.
-			unknown := ""
-			for key in v {
-				if _, known := json_struct_field(info, key); !known {
-					if unknown == "" || key < unknown {
-						unknown = key
-					}
-				}
-			}
-			if unknown != "" {
-				old := json_path_push(path, unknown)
-				issue := json_issue_at(.Unknown_Field, path)
-				json_path_restore(path, old)
+			if issue := json_struct_known_check(v, info, path, target_cache); issue.kind != .None {
 				return issue
 			}
 			return {}
@@ -745,7 +939,7 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 		case reflect.Type_Info_Map:
 			for key, child in v {
 				old := json_path_push(path, key)
-				issue := json_shape_check(child, t.value, path)
+				issue := json_shape_check(child, t.value, path, target_cache)
 				json_path_restore(path, old)
 				if issue.kind != .None {
 					return issue
@@ -936,16 +1130,39 @@ body_json_preflight :: proc(
 	}
 
 	path: Json_Field_Path
-	issue := json_shape_check(value, info, &path)
+	fused_eligible :=
+		JSON_FUSED_TREE_DECODE &&
+		json_tree_type_supported(info)
+	target_cache: Json_Target_Cache
+	target_cache_ptr: ^Json_Target_Cache
+	if fused_eligible && JSON_FUSED_TARGET_DESCRIPTORS {
+		descriptors, cache_err := make(
+			[dynamic]Json_Struct_Descriptor,
+			temporary_allocator,
+		)
+		if cache_err != nil {
+			return Json_Decode_Issue{kind = .Internal}
+		}
+		target_cache.descriptors = descriptors
+		target_cache.allocator = temporary_allocator
+		target_cache_ptr = &target_cache
+	}
+
+	issue := json_shape_check(value, info, &path, target_cache_ptr)
 	if issue.kind == .Invalid_Field && issue.path.len == 0 {
 		issue.path.bytes[0] = '$'
 		issue.path.len = 1
 	}
 	if issue.kind == .None &&
-	   JSON_FUSED_TREE_DECODE &&
-	   json_tree_type_supported(info) {
+	   fused_eligible {
 		request_arena_init(ctx)
-		switch json_tree_decode(value, dst, info, request_arena_allocator(ctx)) {
+		switch json_tree_decode(
+			value,
+			dst,
+			info,
+			request_arena_allocator(ctx),
+			target_cache_ptr,
+		) {
 		case .Success:
 			decoded^ = true
 		case .Unsupported:
