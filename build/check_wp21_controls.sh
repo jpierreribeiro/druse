@@ -71,11 +71,15 @@ internal_tree() { # name
 root_tree() { # name
   local t="$URUQUIM_W21_TMP/$1"
   mkdir -p "$t/build" "$t/web/testing" "$t/web/internal/transport" "$t/tests" "$t/vendor" "$t/docs"
-  cp "$URUQUIM_ROOT"/build/check_public_api.sh "$t/build/"
-  cp "$URUQUIM_ROOT"/build/check_docs.sh "$t/build/"
-  cp "$URUQUIM_ROOT"/build/check.sh "$t/build/"
+  # Copy the whole gate-support directory. The documentation programme added
+  # Python checkers, the signature ledger and the cookbook generator after
+  # this control was first written; copying only the three shell entry points
+  # made the UNMUTATED baseline fail before the recovery mutation ran.
+  cp -r "$URUQUIM_ROOT"/build/. "$t/build/"
   cp "$URUQUIM_ROOT"/README.md "$t/"
-  cp "$URUQUIM_ROOT"/docs/*.md "$t/docs/"
+  # The active documentation is recursive now (`docs/guide/` plus its
+  # cookbook pages), so a top-level `*.md` copy is no longer a valid baseline.
+  cp -r "$URUQUIM_ROOT"/docs/. "$t/docs/"
   cp "$URUQUIM_ROOT"/web/*.odin "$t/web/"
   cp "$URUQUIM_ROOT"/web/testing/*.odin "$t/web/testing/"
   # REPOINTED (audit): copy ALL of web/internal, not just transport. `ingest`
@@ -89,6 +93,11 @@ root_tree() { # name
   # markers point into examples/. Without them the copy fails for a reason
   # that has nothing to do with the mutation under test.
   cp -r "$URUQUIM_ROOT"/examples "$t/examples"
+  # check_docs.sh intentionally uses `git grep` for repository-wide banned
+  # vocabulary. Give the throwaway tree a real index so that check does not
+  # become vacuous (or print "not a git repository" and continue).
+  git -C "$t" init -q
+  git -C "$t" add .
   printf '%s' "$t"
 }
 
