@@ -193,58 +193,6 @@ json_path_restore :: proc(path: ^Json_Field_Path, old: int) {
 	path.len = old
 }
 
-// json_struct_field finds the same ordinary and flattened-using fields as the
-// stdlib decoder, with the SAME precedence as `json_struct_target`: explicit
-// json tags first, then ordinary field names, then flattened `using _`
-// children. This keeps shape validation and tree decode in agreement — J1.
-@(private)
-json_struct_field :: proc(info: ^reflect.Type_Info, key: string) -> (field_type: ^reflect.Type_Info, found: bool) {
-	fields := reflect.struct_fields_zipped(info.id)
-	// Pass 1: explicit json tags.
-	for field in fields {
-		tag, explicit := reflect.struct_tag_lookup(field.tag, "json")
-		if !explicit {
-			continue
-		}
-		name := tag
-		for i in 0 ..< len(tag) {
-			if tag[i] == ',' {
-				name = tag[:i]
-				break
-			}
-		}
-		if name == key {
-			return field.type, true
-		}
-	}
-	// Pass 2: ordinary field names (no tag, or empty tag).
-	for field in fields {
-		tag := reflect.struct_tag_get(field.tag, "json")
-		name := tag
-		for i in 0 ..< len(tag) {
-			if tag[i] == ',' {
-				name = tag[:i]
-				break
-			}
-		}
-		if name == "" && field.name == key {
-			return field.type, true
-		}
-	}
-	// Pass 3: flattened `using _` children.
-	for field in fields {
-		if field.is_using && field.name == "_" {
-			base := reflect.type_info_base(field.type)
-			if _, ok := base.variant.(reflect.Type_Info_Struct); ok {
-				if nested, nested_ok := json_struct_field(base, key); nested_ok {
-					return nested, true
-				}
-			}
-		}
-	}
-	return nil, false
-}
-
 // json_struct_target follows the pinned stdlib decoder's field precedence:
 // explicit json tags, then ordinary field names, then flattened `using _`
 // children. It returns an offset from the outer destination.
@@ -679,8 +627,9 @@ json_struct_known_check :: proc(
 	target_cache: ^Json_Target_Cache = nil,
 ) -> Json_Decode_Issue {
 	// Validate each present key against the field the DECODER will write —
-	// resolved through `json_struct_field`, which shares `json_struct_target`'s
-	// precedence (explicit tag, then name, then flattened `using _`). The old
+	// resolved through `json_struct_resolve`, whose descriptor and rollback
+	// target share the same precedence (explicit tag, then name, then flattened
+	// `using _`). The old
 	// walk shape-checked every declaration in order, so a key shadowed by a
 	// higher-precedence field elsewhere (J1: a later tag; J2: an outer field
 	// over a flattened child) was double-validated against the wrong type.
