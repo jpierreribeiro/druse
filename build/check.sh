@@ -49,6 +49,7 @@ bash -n "$URUQUIM_ROOT/build/check_public_api.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp3_mutations.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
 bash -n "$URUQUIM_ROOT/build/check_merged_fix_mutations.sh"
+bash -n "$URUQUIM_ROOT/build/check_m8_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_g11_teardown.sh"
 bash -n "$URUQUIM_ROOT/build/check_examples.sh"
 bash -n "$URUQUIM_ROOT/build/check_docs.sh"
@@ -1460,6 +1461,8 @@ timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/u
   "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
   -out:"$URUQUIM_BIN_TMP/m8-spool-sweep" ||
   fail "the M8 boot-sweep contract did not pass within the timeout"
+env URUQUIM_COMPILER="$URUQUIM_COMPILER" \
+  bash "$URUQUIM_ROOT/build/check_m8_controls.sh"
 
 echo "--- M6 allocation-failure degradation on the response path (odin test) ---"
 timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
