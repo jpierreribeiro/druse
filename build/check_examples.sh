@@ -77,8 +77,12 @@ for URUQUIM_NAME in $URUQUIM_EXPECTED_EXAMPLES; do
   # them. WP37 removed `web.state` and `web.app_with_state` for the same
   # reason, and example 07 exists to teach them. `web.group` stays FOREVER: ADR-024 rejects it in every phase, so it is
   # not deferred API, it is refused API.
+  # `web.bytes` left this list when corrective WP C2 shipped it: it is a
+  # RATIFIED application symbol in the ledger, so banning it here refused an
+  # example the surface allows. The rest stay: `web.group` is refused forever
+  # (ADR-024) and the others are not in the ledger.
   for URUQUIM_FUTURE in 'web\.group' \
-    'web\.serve_with' 'web\.serve_transport' 'web\.body_limit' 'web\.bytes' \
+    'web\.serve_with' 'web\.serve_transport' 'web\.body_limit' \
     'web\.redirect' 'web\.conflict'; do
     if grep -nE "$URUQUIM_FUTURE" <<<"$URUQUIM_CODE"; then
       fail "examples/$URUQUIM_NAME uses future-phase API matching /$URUQUIM_FUTURE/ (AMEND-4)"

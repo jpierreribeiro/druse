@@ -411,6 +411,7 @@ python3 build/check_docs_symbols.py
 python3 build/check_docs_arity.py
 python3 build/check_docs_coverage.py
 python3 build/gen_cookbook.py --check
+python3 build/gen_reference.py --check
 python3 - <<'PY'
 import re,os,glob,sys
 bad=[]

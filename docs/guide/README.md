@@ -1,9 +1,12 @@
 # The Druse guide
 
-This teaches you to build an application with Druse and Crystals. It is not the
-reference. The reference is `docs/canonical-patterns.md`, `docs/ai-context.md`
-and `druse-crystals/docs/crystals.md`, and this guide links into them instead
-of repeating them.
+This teaches you to build an application with Druse and Crystals.
+
+**It is not the reference.** To look up a signature, go to
+[`../reference/README.md`](../reference/README.md) — every symbol in the public
+ledger, generated from the ledger itself. `docs/canonical-patterns.md` holds the
+recommended form of each task, and `druse-crystals/docs/crystals.md` documents
+the Crystals.
 
 **Assumes:** you can program. It does not assume you know Odin, HTTP servers or
 manual memory management.
@@ -154,9 +157,9 @@ guide has not reached it yet.
 merely listed here. `build/check_docs_coverage.py` enforces that, and it
 ignores this file so a mention in the map cannot count as coverage.
 
-The reference remains the place to look up a signature. `docs/ai-context.md`
-is the complete list, and if a symbol is not there it does not exist — do not
-guess a name.
+To look up a signature, use [`../reference/README.md`](../reference/README.md).
+It is generated from the ledger, so it is the whole surface: if a symbol is not
+there, it does not exist — do not guess a name.
 
 **Crystals packages with no page.** 40 of 44 are covered. The four that are
 not: `apitest` and `preflight` (both test and deploy tooling, not application

@@ -73,6 +73,10 @@ nothing about vocabulary.
 Show the whole thing that compiles. A sample with `...` in the middle teaches a
 reader to guess.
 
+**A reference page is never written by hand.** `build/gen_reference.py` builds
+`docs/reference/` from `build/phase1-public-signatures.txt` and the doc comment
+above each declaration. Edit the source comment, not the page.
+
 **A cookbook page never contains typed code.** It carries extraction markers,
 and `build/gen_cookbook.py` inlines the program from a real example the build
 check compiles. `build/check_docs.sh` fails when a page has drifted from its
