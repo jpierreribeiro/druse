@@ -333,11 +333,11 @@ and reproduction instructions are in
 
 1. **Do not revisit transport flags for this gap.** The decode-only control
    isolates CPU in JSON/RTTI.
-2. **Prototype an integrated fused-target descriptor, not the rejected
-   standalone cache.** The post-fusion profile puts field-tag lookup at 10.16%
-   self CPU. A descriptor owned by the disposable parse arena could resolve
-   effective field targets once per concrete struct, but it needs a new A/B and
-   must preserve explicit-tag/default-name/flattened-using precedence.
+2. **Completed 2026-07-29: integrated fused-target descriptor.** The
+   request-local descriptor is now shared by shape validation and fused
+   destination writes. It improved medium decode throughput by about 15% in
+   both A/B orders without a small-echo regression. See
+   `2026-07-29-json-fused-target-descriptors.md`.
 3. **Do not revive the standalone RTTI cache unchanged.** It was measured and
    failed the application-path adoption rule.
 4. **Study a one-pass typed parser.** The fused decoder removes the second token

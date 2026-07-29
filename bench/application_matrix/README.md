@@ -54,6 +54,12 @@ need runtime configuration. For framework-maintainer rollback/A-B only:
       -define:URUQUIM_JSON_FUSED_TREE_DECODE=false \
       -out:/tmp/uruquim-json-stdlib-control
 
+    odin build bench/application_matrix/uruquim \
+      -collection:uruquim=. \
+      -o:speed \
+      -define:URUQUIM_JSON_FUSED_TARGET_DESCRIPTORS=false \
+      -out:/tmp/uruquim-json-target-control
+
 Do not restart an io_uring server between every short `wrk` repetition. On the
 reference VPS, rapid process churn temporarily caused bind/start failures and
 contaminated an early A/B. Keep each binary alive for all repetitions, stop it,
@@ -106,3 +112,5 @@ stricter than the Go/Fastify cases, so benchmark tables must carry this note.
 The measured 2026-07-25 one-box study, including medians, error rates, profile,
 soak and the two-box publication caveat, is in
 `docs/reports/2026-07-25-json-application-performance.md`.
+The integrated fused-target follow-up is recorded in
+`docs/reports/2026-07-29-json-fused-target-descriptors.md`.

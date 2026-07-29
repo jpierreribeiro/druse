@@ -50,6 +50,14 @@ run_expected_red() { # package, output binary, diagnostic tokens...
 
 run_green "$URUQUIM_ROOT/tests/wp67-json-boundary/decoder" decoder-green
 
+# The private rollback must retain the exact public semantics while the
+# descriptor A/B remains reproducible.
+env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
+  "$URUQUIM_ROOT/tests/wp67-json-boundary/decoder" \
+  "-collection:uruquim=$URUQUIM_ROOT" \
+  "-define:URUQUIM_JSON_FUSED_TARGET_DESCRIPTORS=false" \
+  "-out:$URUQUIM_TMP/descriptor-rollback-green"
+
 run_expected_red \
   "$URUQUIM_ROOT/tests/wp67-json-boundary/schema" schema-red \
   "wp67_an_explicitly_required_field_may_not_be_absent" \
@@ -96,7 +104,29 @@ if env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
   fail "unknown-field mutation unexpectedly passed"
 fi
 
+# The integrated descriptor is not accepted on benchmark numbers alone. A
+# second mutant zeros every resolved destination offset; the decoder contract
+# must become red, proving the corpus actually traverses and checks descriptor
+# targets (including the tagged/flattened precedence cases).
+URUQUIM_TARGET_MUTANT="$URUQUIM_TMP/target-mutant"
+mkdir "$URUQUIM_TARGET_MUTANT"
+cp "$URUQUIM_ROOT"/web/*.odin "$URUQUIM_TARGET_MUTANT/"
+ln -s "$URUQUIM_ROOT/vendor" "$URUQUIM_TARGET_MUTANT/vendor"
+sed -i \
+  's/Json_Field_Target{name = name, offset = offset, field_type = field_type}/Json_Field_Target{name = name, offset = 0, field_type = field_type}/' \
+  "$URUQUIM_TARGET_MUTANT/json_decode.odin"
+grep -q 'Json_Field_Target{name = name, offset = 0' \
+  "$URUQUIM_TARGET_MUTANT/json_decode.odin" ||
+  fail "fused-target mutation was not applied"
+if env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
+    "$URUQUIM_ROOT/tests/wp67-json-boundary/decoder" \
+    "-collection:uruquim=$URUQUIM_TARGET_MUTANT" \
+    "-out:$URUQUIM_TMP/target-mutant" >/dev/null 2>&1; then
+  fail "zero-offset fused-target mutation unexpectedly passed"
+fi
+
 echo "wp68: syntax, type/path, unknown-field and allocator taxonomy are green"
 echo "wp68: memory and real-socket paths return the same 400 envelope"
+echo "wp68: fused target descriptors have rollback and a red offset mutation"
 echo "wp68: requiredness and declared validation remain RED for WP81"
 echo "PASS: WP68 honest request decoding controls"
