@@ -417,3 +417,68 @@ Ela veio da proposta, está certa, e fica. As correções deste documento não
 mudam a divisão — mudam **o que roda de cada lado da borda**: o substream sobe,
 o stream principal fica, a evidência é recortada onde ela nasce, e a decisão do
 produto é tomada em E1, com vídeo real, antes do primeiro `package` em Odin.
+
+---
+
+## 13. Auditoria de evidência — o que os testes do core realmente provam
+
+**Feita em 2026-07-29 contra esta árvore.** A seção 8 lista garantias; esta seção
+diz quais delas o Uruquim já prova, e a resposta reordena parte do trabalho.
+
+**Provado, e é precedente a copiar:**
+
+- **Não-inanição com controle negativo.** `tests/wp71-concurrent-serving/` bloqueia
+  três lanes e exige que uma conexão nova responda em 250 ms antes de qualquer
+  liberação; o pacote `one/` exige o oposto com uma lane só, provando que o
+  laboratório detecta inanição real. É a forma de teste para "uma câmera travada
+  não atrasa as outras 49".
+- **Laboratório de falhas com semente e trilha comparável.**
+  `tests/support/fault_lab/lab.odin` — menu fechado de falhas, seletor com
+  semente, trilha de 256 eventos, comparação byte-a-byte entre execuções.
+  `tests/c03-fault-campaign/` injeta RST via `SO_LINGER 0`.
+- **`web/stream.odin` já é o slot da seção 8**: `Sent / Full / Closed`, nunca
+  parcial, nunca bloqueia, e token velho colapsa em `Closed` — a ideia de
+  `generation`, implementada e testada.
+
+**Não coberto, e a seção 8 depende disso:**
+
+| Garantia | Estado |
+|---|---|
+| Deadline que se propaga | `web/context.odin` não tem campo de deadline. Todo deadline é varredura de socket no transporte |
+| Descarte contado | `refused_connections` aparece em 4 linhas de teste, todas de contrato de superfície; nenhuma o vê incrementar. `c05-saturation` recusa gatilhar em recusas |
+| Pool / slab | Não existe. Nada em `web/` recicla buffer |
+| Retenção de arena | Pior caso `max_connections × maior resposta já servida`, sem knob, medida e deliberadamente não asserida |
+| Justiça / isolamento | Sem DRR, sem fila por tenant, sem teste de isolamento |
+| Relógio falso / partição | Todo teste de deadline queima wall-clock. O mais próximo de partição é peer parado |
+
+**A consequência dura: o `web` não entra no binário do agente.**
+`planning/later-phases-plan.md:336` registra P4-3 (estado por servidor no lugar
+dos globais) como *"prerequisite for two servers or any embedded use"*, e não foi
+feito — `g_server` segue global, declarado abertamente em
+`web/internal/transport/odin_http_adapter.odin:111`, com R-20 aberto no risk
+register. O agente usa `config` e `http_client`; o resto é dele.
+
+**Duas decisões novas, que a seção 8 não tinha:**
+
+1. **Relógio injetado desde a primeira linha.** Um daemon com ring de 20 s,
+   janela de confirmação e cooldown de minutos não pode ser testado queimando
+   wall-clock — a suíte do core mostra o preço, com janelas de 250 ms e margens
+   de 2 s espalhadas por toda parte. `Clock` passado na abertura da sessão; o
+   relógio real é uma implementação entre outras.
+2. **Todo contador de descarte nasce com controle negativo.** Um teste que força
+   o descarte e assere o incremento, e outro que assere que ele não incrementa no
+   caminho saudável. Sem isso repete-se o `lane_collisions`: um contador que
+   existiu, ficou inalcançável e foi aposentado.
+
+**E uma que a auditoria dos Crystals impôs:** o canal de comando nuvem→agente é
+**long-poll, não SSE**. `http_client` manda `Connection: close` em toda requisição
+(`vendor/odin-http/client/bridge.odin:31`) e seu pool limita requisições em voo —
+uma resposta SSE permanentemente aberta consome uma permissão para sempre. SSE
+continua certo para o painel, que é browser.
+
+**Risco novo, registrado:** o padrão de binding C dos Crystals verifica ABI com
+`nm` em dois símbolos, sem assinatura, aridade ou layout de struct, e sem
+sanitizer na fronteira FFI. Isso sobrevive porque libpq é `rawptr` opaco.
+GStreamer passa structs e callbacks; ONNX Runtime passa struct-de-ponteiros-de-
+função com layout dependente de versão. **O precedente cobre o método, não a
+parte difícil.**
