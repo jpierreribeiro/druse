@@ -95,6 +95,57 @@ STATIC_CONTENT_TYPE :: "Content-Type"
 @(private)
 STATIC_ETAG_MAX :: 40
 
+// static_if_none_match implements RFC 9110 §13.1.2's comparison for the
+// `If-None-Match` field: `"*" / #entity-tag`, compared with the WEAK function.
+//
+// AUDIT R10 — this was `match == etag`, a single exact byte compare, which
+// fails all three of the field's forms. The cost is not cosmetic: a client that
+// sends a LIST — which browsers and proxies do whenever they hold more than one
+// cached variant — never received a 304, so the whole file was re-sent on every
+// revalidation. Measured: a list, the weak form and `*` all answered 200.
+//
+// THE THREE RULES, and each is one line of the loop below:
+//
+//	`*` matches any existing representation. The file was found, so it exists.
+//	the field is a COMMA-SEPARATED list; any member matching is a match.
+//	comparison is WEAK, so `W/"x"` and `"x"` are the same tag.
+//
+// WHAT IT MUST NOT DO, and this is the half the tests spend their assertions
+// on: match too eagerly. Answering 304 to a client that does NOT hold this
+// representation shows it stale content it can never refresh — a worse failure
+// than the one being fixed. So members are compared WHOLE after the `W/` prefix
+// and surrounding whitespace are removed; a prefix of a tag is not the tag, and
+// there is no substring test anywhere in here.
+//
+// Allocation-free: it walks the field in place.
+@(private)
+static_if_none_match :: proc(field: string, etag: string) -> bool {
+	rest := field
+	for len(rest) > 0 {
+		comma := strings.index_byte(rest, ',')
+		member := rest if comma < 0 else rest[:comma]
+		member = strings.trim_space(member)
+
+		if member == "*" {
+			// The caller has already established that the file exists.
+			return true
+		}
+		// The weak marker is part of the tag's spelling, not of its identity.
+		if strings.has_prefix(member, "W/") {
+			member = member[2:]
+		}
+		if member == etag {
+			return true
+		}
+
+		if comma < 0 {
+			break
+		}
+		rest = rest[comma + 1:]
+	}
+	return false
+}
+
 // STATUS_NOT_MODIFIED carries HTTP 304 WITHOUT adding a public `Status` member.
 // Unlike 409/413/429/503 (which corrective WP C1 promoted to named members
 // because applications return them), 304 is a cache negotiation the framework
@@ -389,7 +440,7 @@ static_serve :: proc(ctx: ^Context, mounts: ^Static_Mounts) -> bool {
 
 	etag := static_render_etag(ctx, info.size, info.modification_time._nsec)
 	if match, has_match := static_arrived_header(ctx, STATIC_IF_NONE_MATCH); has_match {
-		if match == etag {
+		if static_if_none_match(match, etag) {
 			n := 0
 			ctx.private.response_headers[n] = Header_Pair {
 				name  = STATIC_ETAG_HEADER,

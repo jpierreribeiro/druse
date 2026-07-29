@@ -310,12 +310,30 @@ try_send :: proc(r: ^Registry, tok: Token, data: []u8) -> Send_Result {
 	slot_wake := s.wake
 	slot_user := s.wake_user
 	sync.mutex_unlock(&s.mu)
-	// 5. wake the owner (outside the lock).
+	// 5. wake the owner, OUTSIDE the lock — and it must stay outside.
+	//
+	// A previous revision moved this call inside `s.mu` to close a slot-reuse
+	// race (M2). That deadlocks. The wake reaches `nbio.exec`, which for a
+	// FOREIGN event loop spins until the target lane's queue accepts the op:
+	//
+	//     for !mpsc_enqueue(&l.queue, op) { wake_up(l); _yield() }
+	//
+	// That queue holds 128 entries. Meanwhile the owner lane drains it only at
+	// the TOP of its tick; if the lane is already inside a pump callback that
+	// is blocked on this very `s.mu`, it can never reach the drain, the queue
+	// never empties, and the producer spins forever holding the lock. Wake
+	// outside the lock and the owner always makes progress.
+	//
+	// The race that motivated the move is closed where it actually lives
+	// instead: the owner lane is published atomically in `stream_open` and the
+	// pump refuses to run on a lane the link no longer names. See
+	// `stream_pump_arm` / `stream_pump` in the adapter.
 	if slot_wake != nil {
 		slot_wake(slot_user)
 	} else if r.wake != nil {
 		r.wake(r.wake_user)
 	}
+	sync.mutex_unlock(&s.mu)
 	// 6. a closed typed result.
 	return .Sent
 }

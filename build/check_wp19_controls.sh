@@ -95,7 +95,7 @@ assert_mutated "case-sensitive compare" "$T/header_lookup.odin" "$H"
 must_go_red "$T" "$NAMES" "1: case-sensitive compare -> case-insensitivity test"
 
 # --- 2. duplicates: LAST occurrence wins -------------------------------------
-NAMES="web.wp19_header_duplicates_first_occurrence_wins"
+NAMES="web.wp19_header_scan_takes_the_first_matching_pair"
 T="$(internal_tree lastwins)"
 assert_green_baseline "$T" "$NAMES" "2: last occurrence wins"
 H="$(md5sum "$T/header_lookup.odin" | cut -d' ' -f1)"
@@ -122,7 +122,7 @@ assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new))
 PYEOF
 assert_mutated "last occurrence wins" "$T/header_lookup.odin" "$H"
-must_go_red "$T" "$NAMES" "2: last occurrence wins -> first-wins test"
+must_go_red "$T" "$NAMES" "2: last occurrence wins -> first-matching-pair scan test"
 
 # --- 3. bearer trims token whitespace ----------------------------------------
 # Skipping leading blanks before the scan "repairs" a doubled separator —
@@ -206,4 +206,19 @@ PYEOF
 assert_mutated "OWS trim dropped" "$T/test_support.odin" "$H"
 must_go_red "$T" "$NAMES" "6: OWS trim dropped -> line-splitting test"
 
+# H4 — the in-memory driver must JOIN a repeated header name, because the socket
+# does. When these disagreed, `web.test_request` answered "first" where the wire
+# answered "first, second", and a test pinned the in-memory answer — so an
+# application could pass its own suite and behave differently in production on a
+# duplicated header (Authorization and X-Forwarded-For among them).
+grep -q 'ascii_fold_equal(pair.name, name)' "$URUQUIM_ROOT/web/test_support.odin" ||
+  fail "test_request no longer merges repeated header names case-insensitively; the in-memory driver would then disagree with the socket on duplicates (H4)"
+grep -q 'wp19_public_duplicates_are_joined_like_the_wire' \
+  "$URUQUIM_ROOT/tests/wp19-public-surface/contract_test.odin" ||
+  fail "the driver-parity case for duplicate headers is gone; nothing then keeps test_request and the socket answering alike"
+grep -q 'wp19_public_a_duplicated_authorization_is_refused' \
+  "$URUQUIM_ROOT/tests/wp19-public-surface/contract_test.odin" ||
+  fail "the duplicated-Authorization case is gone. It is the security-relevant consequence of the join: two credentials must authenticate as NEITHER, not as whichever the framework happened to pick."
+
 echo "PASS: all six WP19 mutation controls behaved as required"
+echo "wp19: the in-memory driver joins repeated header names like the wire (H4)"

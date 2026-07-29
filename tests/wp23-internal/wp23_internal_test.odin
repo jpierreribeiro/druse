@@ -213,7 +213,7 @@ wp23_the_id_appears_on_a_405_without_displacing_allow :: proc(t: ^testing.T) {
 	testing.expect_value(t, ctx.private.response.status, Status.Method_Not_Allowed)
 	testing.expect_value(t, len(ctx.private.response.headers), 3)
 	testing.expect_value(t, ctx.private.response.headers[0].name, "Allow")
-	testing.expect_value(t, ctx.private.response.headers[0].value, "POST")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "POST, OPTIONS")
 	testing.expect_value(t, ctx.private.response.headers[1].name, "Content-Type")
 	testing.expect_value(t, ctx.private.response.headers[2].name, REQUEST_ID_HEADER)
 }

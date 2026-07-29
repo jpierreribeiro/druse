@@ -16,6 +16,7 @@
 // held to it without touching this file.
 package wp9_wire
 
+import "base:runtime"
 import "core:log"
 import "core:net"
 import "core:strings"
@@ -155,6 +156,10 @@ wp9_raw_wire_corpus :: proc(t: ^testing.T) {
 		run_wire_case(t, server.port, wire_case)
 	}
 
+	// AUDIT M9 — runs on the corpus's own server, for the reason recorded on the
+	// procedure itself.
+	wp9_shrink_does_not_drop_a_pipelined_request(t, server.port)
+
 	// Across the WHOLE corpus, not one smuggled request may have executed.
 	testing.expectf(
 		t,
@@ -172,6 +177,7 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 
 	ping_before := ping_hits
 	echo_before := echo_hits
+	nobody_before := nobody_hits
 	smuggled_before := smuggled_hits
 
 	result := tc.wire_send(port, c.bytes)
@@ -186,7 +192,13 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 	// answered or closed, not left hanging.
 	testing.expectf(t, !result.timed_out, "%s: the adapter hung instead of answering or closing", c.name)
 
-	handler_ran := (ping_hits - ping_before) + (echo_hits - echo_before) > 0
+	// `/nobody` counts too. It was omitted, so the 204 case asserted
+	// `handler_must_run` against a counter its handler never touched and failed
+	// silently for as long as the logger was discarding failures.
+	handler_ran :=
+		(ping_hits - ping_before) +
+		(echo_hits - echo_before) +
+		(nobody_hits - nobody_before) > 0
 	smuggled_ran := smuggled_hits - smuggled_before > 0
 
 	testing.expectf(
@@ -269,7 +281,24 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 // ---------------------------------------------------------------------------
 
 Log_Filter :: struct {
-	inner: log.Logger,
+	inner:            log.Logger,
+	forwarded_errors: int,
+	dropped_errors:   int,
+}
+
+// A record the FRAMEWORK or the vendored backend logged about a request. Those
+// are the only ones this suite may discard: a rejected request legitimately
+// produces them, and `odin test` counts any Error record as a failure.
+//
+// Anything else — notably `core:testing`'s own `log.errorf` from an assertion —
+// is forwarded. Matching on the framework's source tree rather than on the
+// suite's own keeps that true when the suite is compiled from somewhere else.
+@(private)
+from_framework :: proc(file_path: string) -> bool {
+	return(
+		strings.contains(file_path, "/web/") ||
+		strings.contains(file_path, "/vendor/") \
+	)
 }
 
 filter_proc :: proc(
@@ -280,8 +309,31 @@ filter_proc :: proc(
 	location := #caller_location,
 ) {
 	filter := (^Log_Filter)(data)
-	if level == .Error {
+	// Swallow the framework's own diagnostics — a rejected request logs them
+	// legitimately — but NEVER a record from THIS suite, because that is how
+	// `testing.expect*` reports a FAILED ASSERTION (core/testing: expectf calls
+	// log.errorf). Filtering on level alone discarded this suite's own failures:
+	// a case demanding status 999 passed, and the H3 framing cases passed with
+	// the fix reverted. Every corpus case was decorative from the commit that
+	// introduced this suite until this line changed.
+	// FAIL OPEN. Swallow only what is positively identified as the framework's
+	// or the backend's own diagnostic; forward everything else, including
+	// anything unrecognized. The asymmetry is deliberate: forwarding a
+	// framework record costs a spurious, loud, easily-fixed failure, while
+	// swallowing an assertion costs a suite that is green and worthless — which
+	// is exactly what happened here.
+	//
+	// Identify by ORIGIN rather than by the suite's own path. An earlier
+	// revision of this fix asked whether the record came from "tests/wp9-wire",
+	// which silently reverted to swallowing assertions the moment the suite was
+	// built from a copy under a different directory — a meta-audit that runs
+	// suites out of a scratch tree caught exactly that.
+	if level == .Error && from_framework(location.file_path) {
+		filter.dropped_errors += 1
 		return
+	}
+	if level == .Error {
+		filter.forwarded_errors += 1
 	}
 	if filter.inner.procedure != nil {
 		filter.inner.procedure(filter.inner.data, level, text, options, location)
@@ -296,4 +348,120 @@ swallow_framework_log :: proc(filter: ^Log_Filter) -> log.Logger {
 		lowest_level = .Debug,
 		options = context.logger.options,
 	}
+}
+
+// THE CONTROL for the filter itself: it drives `filter_proc` directly with a
+// record from each origin, so a regression is caught by a mechanism the
+// regression cannot disable.
+@(test)
+wp9_the_log_filter_cannot_swallow_an_assertion_failure :: proc(t: ^testing.T) {
+	filter: Log_Filter
+	sink_hits := 0
+	filter.inner = log.Logger {
+		procedure = proc(data: rawptr, level: log.Level, text: string, options: log.Options, location := #caller_location) {
+			(^int)(data)^ += 1
+		},
+		data = rawptr(&sink_hits),
+		lowest_level = .Debug,
+	}
+
+	framework_loc := runtime.Source_Code_Location {
+		file_path = "/home/user/uruquim/web/internal/transport/odin_http_adapter.odin",
+	}
+	filter_proc(&filter, .Error, "backend refused a malformed request", {}, framework_loc)
+	testing.expect_value(t, filter.dropped_errors, 1)
+	testing.expect_value(t, sink_hits, 0)
+
+	suite_loc := runtime.Source_Code_Location {
+		file_path = "/somewhere/else/entirely/wire_test.odin",
+	}
+	filter_proc(&filter, .Error, "a wire case failed", {}, suite_loc)
+	testing.expect_value(t, filter.forwarded_errors, 1)
+	testing.expectf(
+		t,
+		sink_hits == 1,
+		"the wire suite's log filter swallowed an assertion failure; every corpus case is then decorative",
+	)
+}
+
+// AUDIT M9 — THE BUFFER SHRINK MUST NOT EAT A PIPELINED REQUEST.
+//
+// Vendor patch 41 returns the connection's read buffer between requests once it
+// has grown past `RETAINED_BUF_MAX`, because one large POST otherwise left that
+// keep-alive connection holding a body-sized buffer for as long as the client
+// kept the socket open. Measured over 16 idle connections: +0.01 MB each for
+// 64-byte bodies, +6.49 MB each for 3 MiB bodies — about 2.1x the body, linear.
+//
+// THE RISK THE SHRINK CREATES is this test. `s.end` is the live prefix of
+// already-arrived bytes, which on a pipelined connection is the NEXT request.
+// Discarding the buffer while that is present would drop a request the client
+// has already sent and will never resend — a silent hang, not an error. The
+// patch guards on `s.end == 0`; this proves the guard is load-bearing by
+// sending exactly the shape that would break without it: a body large enough to
+// trigger the shrink, with a second request already in flight behind it.
+// CALLED FROM `wp9_raw_wire_corpus`, NOT AN `@(test)` OF ITS OWN, and that is
+// the correction rather than a style choice.
+//
+// It WAS a separate test. The gate runs this suite with the default four
+// threads (no `-define:ODIN_TEST_THREADS=1`), and this suite keeps ONE server
+// behind a process-global `g_server` on fixed ports — the one-server-per-process
+// rule the transport documents. A second test starting its own server clobbered
+// the corpus's while it was mid-run: green every time on a serial local run,
+// and a four-minute timeout with two tests unfinished in the gate.
+//
+// The gate caught it. Sharing the corpus's server removes the collision without
+// changing this suite's concurrency for everything else.
+wp9_shrink_does_not_drop_a_pipelined_request :: proc(t: ^testing.T, port: int) {
+	// Comfortably over RETAINED_BUF_MAX (256 KiB) so the shrink is reached, and
+	// inside the body cap so the request is served rather than refused.
+	BODY :: 1024 * 1024
+	body := make([]u8, BODY, context.temp_allocator)
+	for i in 0 ..< BODY {body[i] = 'x'}
+
+	b: strings.Builder
+	strings.builder_init(&b, context.temp_allocator)
+	strings.write_string(&b, "POST /ping HTTP/1.1\r\nHost: localhost\r\nContent-Length: ")
+	strings.write_int(&b, BODY)
+	strings.write_string(&b, "\r\n\r\n")
+	strings.write_bytes(&b, body)
+	// THE SECOND REQUEST, in the same write. It is sitting in the connection's
+	// buffer while the first one is still being handled.
+	strings.write_string(&b, "GET /ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+
+	before := ping_hits
+	endpoint := net.Endpoint{address = net.IP4_Address{127, 0, 0, 1}, port = port}
+	sock, derr := net.dial_tcp(endpoint)
+	testing.expect(t, derr == nil, "must connect")
+	defer net.close(sock)
+	net.set_option(sock, .Receive_Timeout, 10 * time.Second)
+
+	payload := transmute([]u8)strings.to_string(b)
+	sent := 0
+	for sent < len(payload) {
+		n, serr := net.send_tcp(sock, payload[sent:])
+		if serr != nil || n <= 0 {break}
+		sent += n
+	}
+	testing.expect_value(t, sent, len(payload))
+
+	reply: strings.Builder
+	strings.builder_init(&reply, context.temp_allocator)
+	chunk: [8192]u8
+	for {
+		n, rerr := net.recv_tcp(sock, chunk[:])
+		if n > 0 {strings.write_bytes(&reply, chunk[:n])}
+		if n <= 0 || rerr != nil {break}
+	}
+
+	testing.expectf(
+		t,
+		ping_hits - before == 2,
+		"BOTH requests must be served: the large POST and the pipelined GET behind it. Handler ran %d time(s). One means the buffer was discarded while the second request was already in it — the client sent bytes the server threw away, and will wait forever for a reply it will never get.",
+		ping_hits - before,
+	)
+	testing.expect(
+		t,
+		strings.count(strings.to_string(reply), "HTTP/1.1 200") == 2,
+		"and both must be answered on the wire",
+	)
 }

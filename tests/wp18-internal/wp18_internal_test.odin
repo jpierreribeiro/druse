@@ -338,7 +338,7 @@ wp18_mounted_routes_participate_in_405_allow :: proc(t: ^testing.T) {
 	testing.expect_value(t, ctx.private.response.status, Status.Method_Not_Allowed)
 	testing.expect_value(t, len(ctx.private.response.headers), 2)
 	testing.expect_value(t, ctx.private.response.headers[0].name, "Allow")
-	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, POST")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, HEAD, POST, OPTIONS")
 	driver_cleanup(&ctx)
 }
 

@@ -24,6 +24,20 @@ import transport "uruquim:web/internal/transport"
 // §4.2 registered defaults (1 GiB per upload, 8 GiB per process, 64 KiB memory
 // prefix, and handler-lanes − 1 concurrent spools).
 Upload_Config :: struct {
+	// The directory spools are written into. **It is owned by exactly ONE
+	// server instance** (audit M8), and that is a contract rather than a
+	// preference: `enable_upload` SWEEPS leftover `uruquim-spool-` files out of
+	// it at boot, because a crash or a `kill -9` leaves partials behind and
+	// nothing else ever removes them — they accumulate across restarts until a
+	// disk fills.
+	//
+	// Two instances sharing one directory therefore delete each other's live
+	// spools on startup. There is no portable way to tell a live spool from an
+	// abandoned one: an mtime threshold races a slow upload, and file locks are
+	// not in the pinned core. Give each instance its own directory.
+	//
+	// Only the framework's own `uruquim-spool-` prefix is swept; anything else
+	// in the directory is left alone.
 	dir:               string,
 	per_upload_quota:  i64,
 	process_quota:     i64,
@@ -70,6 +84,28 @@ Upload :: struct {
 // not spooled: it was within `max_body` (use `web.body`/`web.form_file`), the
 // App did not `enable_upload`, or the request ran on the in-memory test
 // transport.
+//
+// AUDIT M7 — WHAT IS IN THE FILE, WHEN THE BODY WAS A MULTIPART FORM. The
+// spool holds the request body EXACTLY AS IT ARRIVED. For a
+// `multipart/form-data` request that means the framing too, not the file the
+// user picked. Measured, with `max_body` at 4096 and the same form sent twice:
+//
+//	within the cap   upload=no   form_field("caption")="hello"  form_file("photo")=100 bytes
+//	over the cap     upload=yes  form_field=UNAVAILABLE         form_file=UNAVAILABLE
+//	                 and the file's first bytes are:
+//	                 `--B\r\nContent-Disposition: form-data; name="caption"\r\n\r\nhello`
+//
+// So an application that uploads a photo and crosses `max_body` receives a
+// path whose first bytes are a boundary marker rather than a JPEG, and the two
+// accessors it was using stop answering — silently, because `ok=false` is also
+// what "no such field" looks like.
+//
+// THIS IS NOT AN OVERSIGHT WAITING FOR A STREAMING PARSER. One exists in
+// `web/internal/ingest/multipart.odin` and is deliberately NOT wired: it
+// appends to a carry buffer byte-by-byte and runs a substring search per byte,
+// so wiring it would trade a documented limitation for a quadratic one. Parse
+// the spooled file with a parser you choose, or keep multipart uploads under
+// `max_body` and use `form_file`.
 upload :: proc(ctx: ^Context) -> (up: Upload, ok: bool) {
 	sp := ctx.private.upload
 	if sp == nil {

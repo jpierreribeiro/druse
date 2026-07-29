@@ -219,7 +219,5 @@ _yield :: proc() {
 
 // WP117 — multishot recv is linux/io_uring only; stub for the union.
 @(private="package")
-_Recv_Multishot :: struct {}
 
 @(private="package")
-_ring_fd :: proc(l: ^Event_Loop = nil) -> int { return -1 }

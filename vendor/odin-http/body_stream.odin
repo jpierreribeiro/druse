@@ -89,8 +89,13 @@ body_stream :: proc(
 	s.on_chunk = on_chunk
 	s.on_done = on_done
 
+	// URUQUIM PATCH 37 (audit H3) — the shared predicate; see request.odin.
 	enc, ok := headers_get_unsafe(req.headers, "transfer-encoding")
-	if ok && strings.has_suffix(enc, "chunked") {
+	is_chunked := false
+	if ok {
+		is_chunked = transfer_encoding_chunked_final(enc)
+	}
+	if is_chunked {
 		_stream_chunked(s)
 	} else {
 		_stream_length(s)

@@ -848,7 +848,7 @@ wp6_automatic_405_is_a_json_envelope_and_keeps_allow :: proc(t: ^testing.T) {
 	// D3: `Allow` FIRST, `Content-Type` second, deterministically.
 	testing.expect_value(t, len(ctx.private.response.headers), 2)
 	testing.expect_value(t, ctx.private.response.headers[0].name, "Allow")
-	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, POST")
+	testing.expect_value(t, ctx.private.response.headers[0].value, "GET, HEAD, POST, OPTIONS")
 	testing.expect_value(t, ctx.private.response.headers[1].name, "Content-Type")
 	testing.expect_value(t, ctx.private.response.headers[1].value, "application/json")
 }

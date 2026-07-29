@@ -179,7 +179,15 @@ Server_Stats :: struct {
 	response_bytes:        i64,
 	send_errors:           int,
 	write_deadline_aborts: int,
-	lane_collisions:       int,
+	// Campaign C: total nanoseconds lanes spent inside dispatched handlers,
+	// as a running total. Replaces `lane_collisions`, whose lane-collision
+	// increment was unreachable under dedicated accept (handlers run on the
+	// lane, so the 503-on-collision path never fires) and which therefore only
+	// ever counted the acceptor's saturation refusals — a different resource
+	// under a name that promised lane collisions. The operator
+	// differences this against wall time per lane for utilization, and
+	// against `responses_sent` for mean dwell.
+	handler_dwell_ns:      i64,
 	stream_refused_full:   int,
 	stream_refused_budget: int,
 	stream_aborted_slow:   int,

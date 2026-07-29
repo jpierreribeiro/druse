@@ -221,16 +221,22 @@ Server :: struct {
 	response_bytes:       i64, // bytes handed to the socket for those responses
 	send_errors:          int, // buffered-response sends that completed with an error
 	write_deadline_aborts:int, // connections aborted by the sweep's write-deadline branch
-	// URUQUIM PATCH 31 (item 2 — lane-collision observability) — BRIDGE. How many
-	// requests were refused with 503 because their lane was already running a
-	// synchronous Handler (`handler_lane_enter` returned false). This is the ONLY
-	// visible signal of the framework's first saturation point: C-05 measured that
-	// the Handler lane binds first (capacity is `lanes ÷ dwell`), and a 503 on
-	// collision can arrive with OTHER lanes idle, so it is invisible in latency and
-	// in `refused_total` (which counts connection admission, a different resource).
-	// Written by the adapter at the collision site, read without a request in hand —
-	// same atomic discipline as the counters above. Deletable with the backend.
-	lane_collisions:      int,
+	// URUQUIM PATCH 35 (Campaign C) — BRIDGE. Total nanoseconds lanes spent
+	// inside dispatched handlers, as a running total for the life of the server
+	// (WP50's counter shape: a scraper differences it). This replaces
+	// `lane_collisions`, whose NAMED source is dead under dedicated accept —
+	// handlers run synchronously on the lane, so `handler_lane_enter` cannot
+	// return false and the 503-on-collision path is unreachable. The counter
+	// still moved, because the acceptor's saturation refusal below also
+	// incremented it, so it reported a different resource under the documented
+	// saturation signal's name while real lane saturation presents as silent
+	// head-of-line queueing. The operator derives
+	// utilization = Δhandler_dwell_ns / (lanes × Δwall_ns) and
+	// mean dwell   = Δhandler_dwell_ns / Δresponses_sent.
+	// Written by the lane that runs the dispatch, read without a request in
+	// hand — same atomic discipline as the counters above. Deletable with the
+	// vendored backend when `core:net/http` lands.
+	handler_dwell_ns:     i64,
 	// Once the server starts closing/shutdown this is set to true, all threads will check it
 	// and start their thread local shutdown procedure.
 	//
@@ -1200,7 +1206,10 @@ accept_refuse_handler_saturation :: proc(s: ^Server) {
 	}
 	net.close(sock)
 	_ = sync.atomic_add(&s.active_connections, -1)
-	_ = sync.atomic_add(&s.lane_collisions, 1)
+	// Campaign C: no lane_collisions increment here — this acceptor-side
+	// saturation 503 is a different resource from the dead lane-collision
+	// path; if its count is worth publishing it belongs under its own name
+	// (`refused_saturation_total`), not the retired one.
 }
 
 @(private)
@@ -1716,6 +1725,62 @@ conn_handle_req :: proc(c: ^Connection, allocator := context.temp_allocator) {
 			return
 		}
 
+		// URUQUIM PATCH 39 (audit H2) — an absolute-form target whose authority
+		// disagrees with the Host field is REFUSED.
+		//
+		// RFC 9112 §3.2.2: "When an origin server receives a request with an
+		// absolute-form of request-target, the origin server MUST ignore the
+		// received Host header field (if any) and instead use the host
+		// information of the request-target." §3.2 obliges a client sending
+		// absolute-form to send a Host field carrying that same authority, so
+		// agreement is what a conforming client produces and disagreement is not
+		// an accident.
+		//
+		// WHAT WAS MEASURED, on a socket, before this patch:
+		//
+		//   GET http://evil.example/report HTTP/1.1
+		//   Host: good.example
+		//     -> 200, and `web.header(ctx, "host")` returned "good.example"
+		//
+		// Two authorities in one request, never reconciled, and the application
+		// was handed the half the RFC says to ignore. An application that tenants,
+		// signs URLs, or builds absolute redirects from `Host` is then reading a
+		// different request than a front proxy routing or caching on the target's
+		// authority — one request, two identities, which is cache poisoning and
+		// tenant confusion by the same mechanism.
+		//
+		// REFUSED, NOT REPAIRED, and that is deliberate: this is the CL+TE
+		// disposition (patch WP9 D2) applied to authority instead of framing.
+		// Overwriting the Host field with the target's authority would satisfy
+		// the letter of the MUST while leaving the two hops disagreeing about
+		// which request this was, silently. When the two AGREE, "ignore the Host
+		// field and use the target's" and "use the Host field" are the same
+		// answer, so the MUST is satisfied by construction on every request that
+		// survives.
+		//
+		// `url.host` is empty for origin-form (`/path` starts with the separator),
+		// so ordinary traffic never reaches the comparison. `OPTIONS *` is exempt
+		// BY NAME: `url_parse` finds no `/` in `*` and files the whole target as
+		// the host, so a rule keyed only on "host is non-empty" would answer 400
+		// to the legal server-capabilities ping — the corpus carries a case for it.
+		if rline := &l.req.line.(Requestline); l.req.url.host != "" {
+			is_options_star := rline.method == .Options && rline.target.(string) == "*"
+			if !is_options_star {
+				host_field, has_host := headers_get_unsafe(l.req.headers, "host")
+				if has_host && !ascii_equal_fold(host_field, l.req.url.host) {
+					log.warnf(
+						"request-target authority %q disagrees with the Host field %q",
+						l.req.url.host,
+						host_field,
+					)
+					headers_set_close(&l.res.headers)
+					l.res.status = .Bad_Request
+					respond(&l.res)
+					return
+				}
+			}
+		}
+
 		l.req.headers.readonly = true
 
 		l.conn.scanner.max_token_size = bufio.DEFAULT_MAX_SCAN_TOKEN_SIZE
@@ -1834,6 +1899,41 @@ server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 				_ = sync.atomic_add(&s.write_deadline_aborts, 1)
 				// Abort, not close: a graceful close would flush kernel
 				// buffers to the slow reader first — see `connection_abort`.
+				connection_abort(conn)
+				continue
+			}
+			// URUQUIM PATCH 40 (audit M4) — WHEN NO WRITE DEADLINE IS SET, THE
+			// ARRIVAL DEADLINE COVERS THE SEND, deliberately and under its own
+			// name.
+			//
+			// This branch is not new behaviour; it is the behaviour that was
+			// already happening by accident. Before patch 40, `send_started`
+			// was left at zero whenever the write deadline was off, so a
+			// stalled send fell through to the arrival branch below and was
+			// closed as a slow REQUEST. Measured: a client that stopped
+			// reading a 64 MiB body was cut at `max_request_time` and told the
+			// request had been too slow to arrive.
+			//
+			// Now that `send_started` is always stamped, that no longer
+			// happens on its own — and simply letting it stop would REMOVE a
+			// protection applications have been relying on without knowing.
+			// Leaving a send unbounded is worse than bounding it with the only
+			// number the operator gave us, so one of the two deadlines always
+			// covers the send. What changes is that it now says so, counts as
+			// a write abort, and ABORTS rather than closing gracefully — a
+			// graceful close would flush the pending bytes to the very reader
+			// that stopped reading (ADR-039).
+			//
+			// An operator who wants a different bound for sends sets
+			// `max_write_time`; this branch then never fires, because the one
+			// above owns the connection.
+			if effective_write == 0 && read_t > 0 && conn.send_started != (time.Time{}) &&
+			   time.diff(conn.send_started, now) > read_t {
+				log.infof(
+					"uruquim: response send exceeded max_request_time with no max_write_time set; aborting connection %i",
+					conn.socket,
+				)
+				_ = sync.atomic_add(&s.write_deadline_aborts, 1)
 				connection_abort(conn)
 				continue
 			}

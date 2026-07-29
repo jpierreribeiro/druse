@@ -29,7 +29,7 @@ a standardized JSON envelope.
 - **Route organisation:** `web.router()` builds a detached `Router` with the
   same verbs and `use`; `web.mount(&app, "/prefix", &r)` attaches it. A
   one-route Router is the route-level guard.
-- **Request headers:** `web.header` (case-insensitive, first occurrence wins)
+- **Request headers:** `web.header` (case-insensitive; a repeated name is joined with `", "` per RFC 9110 §5.3)
   and `web.bearer_token` (strict RFC 6750). Pure lookups — no automatic
   response, nothing logged, values are request-lifetime views.
 - **Observability:** `web.observe` registers one observer that receives a
@@ -176,21 +176,22 @@ parameter.** Key your metrics on `web.route(ctx)`, never on
 `web.stats()` returns a `Server_Stats` — nine running totals for the send and
 saturation sides, which `refused_connections` did not cover: `responses_sent`,
 `response_bytes` (on the wire), `send_errors`, `write_deadline_aborts`,
-`lane_collisions`, and the three detached-stream counters `stream_refused_full`,
+`handler_dwell_ns`, and the three detached-stream counters `stream_refused_full`,
 `stream_refused_budget`, `stream_aborted_slow` (previously reachable from no
 public API, so a slow-consumer abort was counted and then unseeable). Every
 field is an integer, so redaction holds by construction. Zero when no server
 runs, like `refused_connections`.
 
-**`lane_collisions` is the framework's first saturation signal** (item 2). A
-synchronous Handler holds its lane and cannot be preempted, so a request whose
-lane is already running one is refused with `503 + Retry-After: 1` — and because
-lanes do not share work, that 503 can arrive with OTHER lanes idle. It shows up
-in neither latency nor `refused_connections` (which counts connection
-admission). Capacity is `max_handlers ÷ handler-dwell` (C-05 measured the
-Handler lane binds first). A rising `lane_collisions` says: raise
-`max_handlers`, shorten the handler, or move blocking work (DB, upstream HTTP)
-off the lane — do not read a flat latency graph as headroom.
+**`handler_dwell_ns` is the framework's first saturation signal** (Campaign C).
+It replaced `lane_collisions`, which dedicated accept made misleading rather
+than dead — handlers run synchronously on the lane thread, so the
+503-on-collision path is unreachable, and the only increments the counter still
+received came from the acceptor's saturation refusals while real lane saturation
+presented as silent queueing. `handler_dwell_ns` is a running total of
+time inside dispatched handlers: difference it over an interval for
+utilization (Δdwell / (lanes × Δwall)) and for mean dwell against
+`responses_sent`. A rising utilization says: raise `max_handlers`, shorten the
+handler, or move blocking work (DB, upstream HTTP) off the lane.
 
 ### Security headers
 
@@ -259,8 +260,25 @@ The readers and `web.body` share ONE single-use capability (ADR-012): whichever
 runs first takes it.
 
 **An upload larger than `max_body` (4 MiB default) is refused with 413 before
-your handler runs**, and no setting makes a 2 GB upload work — the body is held
-whole. Terminate large uploads at a proxy or object store and pass a reference.
+your handler runs**, and no setting makes a 2 GB upload work in memory — the
+body is held whole. Terminate large uploads at a proxy or object store and pass
+a reference.
+
+**With `enable_upload` it is SPOOLED to disk instead of refused, and then
+`form_field`/`form_file` stop answering** (audit M7). The spool holds the body
+exactly as it arrived, framing included. Measured with `max_body` at 4096, the
+same multipart form sent twice:
+
+```text
+within the cap   upload=no   form_field("caption")="hello"   form_file("photo")=100 bytes
+over the cap     upload=yes  form_field=UNAVAILABLE          form_file=UNAVAILABLE
+                 first bytes on disk: --B\r\nContent-Disposition: form-data; ...
+```
+
+So a photo upload that crosses the cap gives you a path whose first bytes are a
+boundary marker, not a JPEG — and the accessors you were using return
+`ok=false`, which is also what "no such field" looks like. Parse the spooled
+file with a parser you choose, or keep multipart uploads under `max_body`.
 
 A malformed form yields nothing rather than a partial parse, because a missing
 field that looks like a blank one is a bug nobody attributes to the parser.
@@ -339,15 +357,27 @@ web.cors(&app, web.Cors_Options{
 })
 ```
 
+**The preflight does not consult the route table, on purpose** (audit R7). A
+preflight to a path that does not exist is answered `204` with the configured
+method list, exactly like one to a path that does — measured byte-for-byte
+identical, 183 bytes in both cases. That uniformity is the point: a preflight
+that answered differently for a real path would let any allow-listed origin
+ENUMERATE your paths, since a page can tell a passed preflight from a failed
+one. The preflight is not the authorization boundary — the real `DELETE` it
+"permitted" is still answered `405`, and the real request to a missing path
+still `404`. `Cors_Options.methods` is what your application chose to
+advertise, and nothing overrides it.
+
 ### Limits
 
 ```text
 Limits{max_body, max_request_line, max_headers, max_request_time,
        max_write_time, max_response_bytes, max_idle_time,
-       max_connections, reserved_conns, max_drain_time, max_handlers}
+       max_connections, reserved_conns, max_drain_time, max_handlers,
+       max_json_nodes}
 DEFAULT_LIMITS   4 MiB, 8000, 8000, 30 s (ns), 0 write (ns), 0 response bytes,
                  0 idle (ns), 1024 conns, 16 reserved, 10 s drain (ns),
-                 0 = auto Handlers (4..32)
+                 0 = auto Handlers (4..32), 100_000 JSON nodes
 limits(&app, l)                    set it; before the first request
 ```
 
@@ -408,6 +438,15 @@ fail-closed rather than run on a guess.
   bounded automatic policy (CPU count clamped to 4..32), `1` is explicit
   single-Handler compatibility, and 256 is the largest accepted explicit
   value. Full saturation stops Handler progress; it does not preempt user code.
+- **`max_json_nodes` bounds JSON STRUCTURE, which `max_body` cannot express.**
+  It counts JSON values plus object keys, so an N-key object costs `2N + 1`.
+  Default 100,000; `0` disables. A breach is a `413` with code
+  `body_too_complex` — deliberately not `body_too_large` (a client that retries
+  by shrinking bytes has misread it) and not `invalid_json` (the body is
+  well-formed). Measured, both bodies inside the 4 MiB cap: an array of
+  1,398,101 empty objects peaked at **588 MB RSS**, and a 322,000-key object
+  held one lane for **1.6-2.1 s**; at the default those become **20 MB** and
+  **50 ms**. Audit J3/J4, Phase-1 freeze Amendment 38.
 - Handlers may run concurrently. Mutable application state and observer/logger
   sinks are application-owned and must synchronize themselves.
 
@@ -453,7 +492,11 @@ main :: proc() {
 }
 
 show_config :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.ok(ctx, s^)
 }
 ```
@@ -464,9 +507,13 @@ plus that value; a nil pointer rejects the application fail-closed.
 
 - the App stores the **pointer**, so a handler writing through it mutates your
   value. The value must **outlive the App** — put it in `main`, beside it;
-- `web.state(ctx, T)` asserts that state was registered and that `T` is
-  **exactly** the registered type, then returns `^T`. A wrong type aborts: it
-  is a programming error, not a runtime condition (ADR-020);
+- `web.state(ctx, T)` returns `(^T, bool)`. `ok` is false when no state was
+  registered or `T` is not **exactly** the registered type — both programming
+  errors, both logged at Error level, neither varying with the request. **It
+  used to assert, which aborted the process** (ADR-020: no recoverable panic),
+  so one handler asking for the wrong type stopped every in-flight request on
+  every lane. Check `ok`; ignoring it and dereferencing `nil` restores the
+  crash without the message. Freeze Amendment 39;
 - handlers and middleware read it the same way. There is no second name;
 - it is **not** per-request storage, and there is none.
 
@@ -499,6 +546,13 @@ Pattern rules:
   percent-encoding is neither decoded nor rewritten. WP31b adds REJECTION, not
   transformation: a dot segment, an interior empty segment, a percent-encoded
   slash or a percent-encoded NUL is answered `400` before matching.
+- **`web.path` returns the RAW segment** (audit R9): `/users/a%20b` gives
+  `"a%20b"`, and `/users/%61dmin` gives `"%61dmin"`. **A naive authorization
+  compare is bypassable** — `%61dmin != "admin"` — which yields nothing alone
+  but is a real bypass once anything downstream decodes. Reject `%` in a
+  parameter that feeds an authorization decision rather than canonicalising it.
+  `%2F` and `%00`, the two that change a path's structure, are already refused
+  with `400`.
 
 Registration conflicts ARE diagnosed (WP30). Two routes registered for the same
 method and the same path shape reject the application fail-closed — every
@@ -514,8 +568,22 @@ unknown path                     -> 404 {"error":{"code":"not_found",...}}
 path exists under another method -> 405 + Allow, {"error":{"code":"method_not_allowed",...}}
 ```
 
-`Allow` lists only the methods registered for that path, always in the order
-`GET, POST, PUT, PATCH, DELETE`, comma-and-space separated, with no duplicates.
+`Allow` lists every method the path is served under, always in the frozen order
+`GET, [HEAD,] POST, PUT, PATCH, DELETE, OPTIONS`, comma-and-space separated,
+with no duplicates, independent of registration order.
+
+**`HEAD` and `OPTIONS` ARE listed, because the server answers both** (audit R8).
+A route registered only for GET emits `Allow: GET, HEAD, OPTIONS`. `HEAD` is
+conditional on GET — it is mapped to GET before matching, so a path without GET
+has no HEAD — and `OPTIONS` is unconditional wherever an `Allow` is emitted.
+Neither is a `Method` member: `Method` names what an application can REGISTER,
+and the framework emits these two as tokens.
+
+This REVERSES the earlier deviation recorded here, which said the two were
+served but never named. The original rejection conflated two things: an
+alphabetical ordering (still rejected — it would make the header depend on
+nothing anyone decided) and the listing itself (restored — RFC 9110 §10.2.1
+defines `Allow` as the methods the resource *supports*, and clients act on it).
 
 ### Route identity
 
@@ -899,8 +967,14 @@ bearer_token(ctx)  -> (value, ok)   strict RFC 6750 Authorization parse
 
 Both are PURE lookups: they never commit a response (unlike the extractors —
 an absent header is routinely not an error) and never log. `ok` means
-presence; an empty value is present. Names are case-insensitive; duplicates:
-first occurrence wins. Values are VIEWS valid only for the request — copy to
+presence; an empty value is present. Names are case-insensitive; a name that
+arrived more than once is JOINED in arrival order with `", "` (RFC 9110 §5.3),
+by the transport, before `header` sees it — `X-Dup: a` then `X-Dup: b` reads
+back as `"a, b"`, on a socket and through `web.test_request` alike. (`web.query`
+is the one that takes the first occurrence; headers never did.) A consequence
+worth knowing: a duplicated `Authorization` joins into a value that fails the
+strict bearer grammar, so `bearer_token` refuses it rather than picking one.
+Values are VIEWS valid only for the request — copy to
 persist. The token comes back verbatim: never trimmed, never normalised; a
 sloppy `Authorization` (two spaces, trailing blank, wrong scheme) is rejected,
 not repaired.

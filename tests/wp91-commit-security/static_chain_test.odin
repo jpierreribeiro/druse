@@ -38,7 +38,11 @@ State :: struct {
 
 @(private = "file")
 counting_gate :: proc(ctx: ^web.Context) {
-	state := web.state(ctx, State)
+	state, state_ok := web.state(ctx, State)
+	if !state_ok {
+		web.internal_error(ctx)
+		return
+	}
 	state.middleware_hits += 1
 	if state.deny {
 		web.unauthorized(ctx, "no")

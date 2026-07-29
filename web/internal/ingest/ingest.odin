@@ -97,6 +97,50 @@ admission_init :: proc(a: ^Admission, cfg: Spool_Config) -> bool {
 	return true
 }
 
+// sweep_orphans removes leftover spool files at boot (audit M8).
+//
+// EXPORTED, AND CALLED FROM THE SERVER START RATHER THAN FROM `admission_init`.
+// It lived in `admission_init` first, and the gate caught why that is wrong:
+// `admission_init` is a library primitive, and several `Admission` values can
+// exist in one process against one directory — the WP87 suite does exactly
+// that, four tests in parallel — so a sweep there deletes another Admission's
+// LIVE spool. Taking ownership of a directory is a property of a SERVER
+// starting, which happens once per process; initialising a struct is not.
+//
+// Nothing cleaned them. A spool is unlinked at request teardown, so the steady
+// state is empty — but a crash, a kill -9 or an OOM leaves the partial behind,
+// and across restarts those accumulate until an operator notices. The failure
+// is silent and cumulative, which is the shape that gets found by a full disk.
+//
+// IT DELETES ONLY THE FRAMEWORK'S OWN NAMESPACE, never the directory's other
+// contents: the prefix match is the whole authority for removing a file, and
+// anything an application put in there is untouched.
+//
+// THE HAZARD IT ACCEPTS, and why the directory's contract had to be written
+// down before this could be added: if two server instances share one spool
+// directory, the second one's boot deletes the first one's LIVE spools. There
+// is no portable way to tell a live spool from an abandoned one — an mtime
+// threshold races a slow upload, and file locks are not available in the pinned
+// core. So the directory is now documented as owned by exactly one instance,
+// and this sweep is correct under that contract and destructive outside it.
+//
+// Failures are ignored on purpose. A directory that cannot be read at boot is
+// reported by the first spool that tries to open a file in it, with a better
+// message than a sweep could give.
+sweep_orphans :: proc(dir: string) {
+	entries, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+	if err != nil {
+		return
+	}
+	for entry in entries {
+		if !strings.has_prefix(entry.name, SPOOL_PREFIX) {
+			continue
+		}
+		full := strings.concatenate({dir, "/", entry.name}, context.temp_allocator)
+		_ = os.remove(full)
+	}
+}
+
 admission_destroy :: proc(a: ^Admission) {
 	a^ = Admission{}
 }
@@ -190,9 +234,18 @@ begin :: proc(a: ^Admission, s: ^Spool) -> Ingest_Result {
 // directory, so entropy comes from a monotonic sequence mixed with the pid,
 // the thread id and the admission address — enough that a name cannot be
 // guessed and predicted for a symlink-race, which is the property §4.2 wants.
+//
+// AUDIT M8 — THE PID WAS IN THE COMMENT AND NOT IN THE CODE. This mixed the
+// sequence, the thread id and the admission address, and the sentence above
+// claimed a pid that was never there. Two processes started from the same
+// image can share a thread id and a sequence, leaving only the heap address to
+// separate them — which ASLR usually does and a deterministic allocator does
+// not. The comment described the property that was wanted; the code now
+// provides it.
 @(private)
 spool_name :: proc(a: ^Admission) -> string {
 	mixed := a.seq
+	mixed = mixed * 1099511628211 + u64(os.get_pid())
 	mixed = mixed * 1099511628211 + u64(os.get_current_thread_id())
 	mixed = mixed * 1099511628211 + u64(uintptr(a))
 	buf: [32]u8

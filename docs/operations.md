@@ -114,11 +114,42 @@ web.limits(&app, budget)
 | `max_request_line` | 8000 | the backend refuses the request |
 | `max_headers` | 8000 | the backend refuses the request |
 | `max_request_time` | 30 s | **the connection is closed** — this is the slowloris defence |
-| `max_write_time` | `0` = off | **the connection is reset (RST)** — a graceful close would flush kernel buffers to the slow reader first and hide the deadline; the reset is the observable, honest end (WP90 / ADR-039) |
+| `max_write_time` | `0` = off — but see below | **the connection is reset (RST)** — a graceful close would flush kernel buffers to the slow reader first and hide the deadline; the reset is the observable, honest end (WP90 / ADR-039) |
 | `max_idle_time` | `0` = off | the idle keep-alive connection is **closed gracefully**; the clock stops the moment the next request's bytes arrive |
 | `max_connections` | 1024 | the connection is **closed at accept**, not queued |
 | `reserved_conns` | 16 | slots held back from admission so a shutdown always has room |
 | `max_handlers` | `0` = auto | synchronous Handler capacity; auto resolves from CPU count, bounded to 4..32 |
+| `max_json_nodes` | 100,000 | `413` with code `body_too_complex`, before the JSON parser allocates — the structural cost bound (audit J3/J4) |
+
+**`max_write_time` at `0` does not mean sends are unbounded.** One of the two
+deadlines always covers a response send: with no write deadline configured,
+`max_request_time` bounds it instead, and the connection is **aborted** and
+counted in `web.stats().write_deadline_aborts`. This is deliberate (audit M4) —
+leaving a send unbounded is worse than bounding it with the only number you
+gave us. Before M4 the same thing happened by accident and was logged as
+`request read deadline exceeded`, about a request that had finished arriving
+long before; measured on a 64 MiB body against a client that stopped reading.
+
+Set `max_write_time` explicitly when your sends and your request arrivals
+deserve different budgets — a large download to a slow link is a legitimate
+long send, and it is bounded by `max_request_time` until you say otherwise. If
+both are `0`, sends really are unbounded and a stalled reader parks a
+connection slot until it goes away.
+
+**`max_json_nodes` bounds STRUCTURE, which `max_body` cannot see.** Two
+well-formed bodies, both inside the 4 MiB body cap, measured on a 4 vCPU host:
+a 4 MiB array of 1,398,101 empty objects decoded into a 288-byte DTO peaked at
+**588 MB of RSS**; a 4 MiB object of 322,000 keys held one Handler lane for
+**1.6-2.1 s**. Neither is malformed, so nothing else had grounds to refuse them,
+and the body really is 4 MiB in both cases — bytes are simply not what the
+decode costs scale with.
+
+The budget counts JSON values plus object keys, so an N-key object costs
+`2N + 1` and an N-element array of scalars costs `N + 1`. At the default the
+same two bodies cost **20 MB** and **50 ms**. Ordinary API traffic is two to
+three orders of magnitude below the ceiling — a 25,000-key body is still served
+— so raise it only if you knowingly accept bulk documents, and raise it having
+decided what `max_handlers` lanes of that size cost you. `0` disables it.
 
 **`max_request_time` is a REQUEST deadline, not an idle timeout.** An idle timer
 is reset by every byte, so a client trickling one byte per second resets it
@@ -276,9 +307,26 @@ web.use(&app, web.logger)
 web.use(&app, web.request_id)
 ```
 
-* **`refused_connections()` is your saturation signal.** It rising means you are
-  at `max_connections`. Zero means either nothing was refused or no server is
-  running — those are deliberately not distinguished.
+* **Lane utilization is your saturation signal — `web.stats().handler_dwell_ns`.**
+  A synchronous Handler holds its lane and cannot be preempted, and under
+  dedicated accept a request arriving at a busy lane queues silently on that
+  lane's socket — no 503, no counter, only latency. The old `lane_collisions`
+  counter was retired for exactly that reason: it never observed the lane
+  saturation its name promised, and the number it did report came from the
+  acceptor's own refusals — a different resource under a misleading label.
+  `handler_dwell_ns` is the total nanoseconds lanes spent inside handlers, a
+  running total you difference over an interval:
+
+  ```
+  utilization = Δhandler_dwell_ns / (lanes × Δwall_nanoseconds)
+  mean_dwell  = Δhandler_dwell_ns / Δresponses_sent
+  ```
+
+  Utilization approaching 1 means the lane pool binds first; mean dwell says
+  whether to raise `max_handlers` or shorten the handler. Do not read a flat
+  latency graph as headroom — queueing on a busy lane is invisible there.
+  Capacity is `lanes ÷ mean handler dwell` (C-05 measured the Handler lane
+  binds first).
 * **`observe`** receives a typed event for every framework-detected failure.
   It cannot change the response; it is for exporting to metrics or alerting.
 * **Key every metric on `web.route(ctx)`, never on `ctx.request.path`.** The
@@ -458,15 +506,17 @@ the topology those limitations make mandatory:
 * **Enable `max_write_time` and `max_idle_time`**, sized to your slowest
   legitimate client. They ship OFF because a framework-chosen number would reset
   real clients on upgrade; OFF is not a recommendation. Matrix row 5.
-* **Size `max_handlers` above your expected concurrency, and treat 503 as
-  backpressure.** C-05 measured that the Handler lane is the **first** resource
-  to bind — a synchronous handler holds its lane for its whole duration, and
-  refusals come from **collision on the lane pool, not from the pool being
-  full**: a 503 can arrive with most lanes idle, because there is no queue and no
-  work-stealing between lanes. Capacity is roughly `lanes ÷ handler-dwell`. So a
-  503 is normal load-shedding, it carries `Retry-After: 1`, and the knob for it
-  is `max_handlers` — **not** `max_connections`, which only decides how many
-  clients get to wait. Matrix row 4.
+* **Size `max_handlers` above your expected concurrency, and treat utilization as
+  the sizing signal.** C-05 measured that the Handler lane is the **first**
+  resource to bind — a synchronous handler holds its lane for its whole
+  duration. Under dedicated accept, contention does not answer 503 itself: a
+  request contending for a busy lane queues silently on that lane's socket.
+  Saturation therefore appears as **rising lane utilization**, which you read
+  from `web.stats().handler_dwell_ns`: utilization approaching 1 means the lane
+  pool binds first; the acceptor still answers 503 + `Retry-After: 1` only when
+  **every** lane is blocked. Capacity is roughly `lanes ÷ mean handler dwell`.
+  The knob is `max_handlers` — **not** `max_connections`, which only decides
+  how many clients get to wait. Matrix row 4.
 * **Tune the accept backlog** (`somaxconn`) — it is the kernel's, and the only
   place a connection can queue. Matrix row 11.
 * **One server per process**, and install your own `SIGTERM`/`SIGINT` handler

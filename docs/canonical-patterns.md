@@ -262,6 +262,49 @@ The policy REJECTS rather than transforms: a dot segment, an interior empty
 segment, a percent-encoded slash or a percent-encoded NUL is answered `400`
 before route matching. Everything else passes through byte-exact.
 
+**`web.path` therefore hands you the RAW segment, and that has one sharp
+consequence worth spelling out** (audit R9). Measured on a route
+`GET /users/:name`:
+
+```text
+/users/a%20b     -> web.path(ctx, "name") == "a%20b"     (not "a b")
+/users/%61dmin   -> web.path(ctx, "name") == "%61dmin"   (not "admin")
+/users/a%2Fb     -> 400, rejected before matching
+/users/a%00b     -> 400, rejected before matching
+```
+
+The second line is the one to read twice. **If you compare a captured parameter
+against a literal to make an authorization decision, `%61dmin` is not `admin`
+and your check passes it through.** That yields nothing on its own — the raw
+value will not match an `admin` row either — but it is a real bypass the moment
+anything downstream decodes: a proxied upstream, a client library that builds a
+URL from it, a log pipeline that normalises.
+
+The framework will not decode this for you, and that is the same decision as
+the rest of the policy: decoding is normalisation, and every normalisation rule
+is a way for this server and a proxy in front of it to disagree about what a
+path means. What it does instead is reject the two encodings that change a
+path's STRUCTURE — `%2F` and `%00` — so the ambiguity that could reroute a
+request is already closed.
+
+**If a captured parameter feeds an authorization decision, refuse the encoded
+form rather than trying to canonicalise it:**
+
+<!-- pseudocode: an authorization check on a captured parameter -->
+```odin
+name := web.path(ctx, "name")
+if strings.contains(name, "%") {
+	web.bad_request(ctx, "encoded path parameters are not accepted here")
+	return
+}
+if name == "admin" {
+	web.forbidden(ctx, "reserved name")
+	return
+}
+```
+
+One comparison, no decoder, and no second opinion about what the bytes mean.
+
 **Registration conflicts are diagnosed (WP30).** Registering two routes for the
 same method and the same path shape rejects the application fail-closed: every
 request answers 500 and `web.serve` refuses to start, with a diagnostic naming
@@ -282,8 +325,31 @@ unknown path                     → 404
 path registered on another method → 405 + Allow
 ```
 
-`Allow` names only the methods registered for that path, always in the order
-`GET, POST, PUT, PATCH, DELETE`, comma-and-space separated, never duplicated.
+`Allow` names every method the path is served under, always in the frozen order
+`GET, [HEAD,] POST, PUT, PATCH, DELETE, OPTIONS`, comma-and-space separated,
+never duplicated. The order is registration-independent, so two applications
+registering the same methods in different sequences emit byte-identical headers.
+
+**`HEAD` and `OPTIONS` are listed because they are served** (audit R8). A route
+registered only for GET emits `Allow: GET, HEAD, OPTIONS`, which is what that
+resource actually answers — measured: `HEAD` returns 200 with an empty body,
+`OPTIONS` returns 204. `HEAD` appears only when GET is registered, because HEAD
+*is* the GET route (it is mapped to GET before matching, so a path without GET
+has no HEAD); `OPTIONS` is unconditional wherever an `Allow` is emitted at all.
+
+Neither is a `Method` member, and neither will be: `Method` names the verbs an
+application can REGISTER, and adding two it cannot register would put
+unconstructible states in a public enum to serve a string. They are emitted as
+tokens by the framework.
+
+**This reverses an earlier decision, and the reversal is narrower than it
+looks.** The first attempt to list them was rejected — correctly — as an
+ALPHABETICAL list, which would have made the header depend on nothing anyone
+had decided. Alphabetical ordering stays rejected. Listing the two methods was
+thrown out with it, and that part was wrong: RFC 9110 §10.2.1 defines `Allow` as
+the set of methods the resource supports, and a cache, a CORS preflight or a
+monitor choosing HEAD over GET reads it and acts on it.
+
 Phase 1 exposes no way to read response headers, so it is verified internally.
 Both bodies are empty until WP6 renders the error envelope.
 
@@ -644,7 +710,11 @@ mutates your value, which is what makes a connection pool work.
 <!-- pseudocode: reading the state inside a handler -->
 ```odin
 list_users :: proc(ctx: ^web.Context) {
-	state := web.state(ctx, App_State)
+	state, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 
 	users, err := user_repository.list(state.db)
 	if err != nil {
@@ -656,10 +726,19 @@ list_users :: proc(ctx: ^web.Context) {
 }
 ```
 
-`web.state(ctx, T)` asserts that state was registered **and** that `T` is
-exactly the registered type, then returns `^T`. Both are programming errors and
-neither varies with the request, so a failing assert aborts on your first
-request rather than in front of a client (ADR-020: run under a supervisor).
+`web.state(ctx, T)` returns `(^T, bool)`. `ok` is false when state was never
+registered **or** when `T` is not exactly the registered type. Both are
+programming errors and neither varies with the request, so both are logged at
+Error level and neither can be provoked by a client.
+
+**It used to assert, and the change is about blast radius.** Odin has no
+recoverable panic (ADR-020), so the assert aborted the process — and `web.state`
+is called from inside a handler, on a lane that shares a process with every
+other in-flight request. A fault confined to one route stopped the whole server.
+Now the one request answers 500 and the rest keep being served. Check `ok`:
+ignoring it and dereferencing `nil` gives the crash back, without the sentence
+that named the mistake. (Freeze Amendment 39.)
+
 Exact type, not assignable type: there is no subtyping walk, and casting a
 `^Config` to a `^Database` because both are pointers is what the check exists
 to make impossible.

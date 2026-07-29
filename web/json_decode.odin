@@ -14,6 +14,29 @@ import "core:reflect"
 import "core:strconv"
 import "core:strings"
 
+// AUDIT J6 — DUPLICATE-KEY REJECTION IS DELEGATED, DELIBERATELY, AND GUARDED
+// BY A TEST RATHER THAN BY A SECOND IMPLEMENTATION.
+//
+// The finding asks for the behaviour to be OWNED here instead of delegated to a
+// nightly toolchain pin. It is not, and the reason is the paragraph below this
+// one: this module deliberately does not implement a second JSON grammar.
+// Detecting duplicate keys means walking object keys with unquoting applied,
+// which is a second parser by another name — and two grammars that can disagree
+// about the same body is the defect this file exists to avoid.
+//
+// WHAT REPLACES OWNERSHIP is a pin plus a test. The compiler commit is pinned
+// and `build/check.sh` refuses to run against any other, so the stdlib cannot
+// change underneath this without a deliberate act; and the contract test in
+// `tests/wp67-json-boundary/decoder` fails the moment it does.
+//
+// THAT TEST WAS HALF DECORATIVE UNTIL THIS AUDIT. It claimed to check both the
+// plain and the `\u`-escaped spelling — the escaped one being the interesting
+// case, since those keys collide only after unquoting — and its two request
+// bodies were BYTE-FOR-BYTE IDENTICAL. The escaped claim was never sent. It now
+// is, both cases go red when their duplication is removed, and a third case
+// pins that the refusal comes from duplication rather than from `\u` in a key
+// being refused outright.
+//
 // The parser is already the syntax authority and reports every malformed,
 // duplicate-key and trailing-token case the preceding `json.is_valid` pass
 // reported. Its disposable tree lives in `temporary`, and `context.allocator`
@@ -98,6 +121,11 @@ Json_Decode_Issue_Kind :: enum {
 	Unknown_Field,
 	Unsupported_Destination,
 	Internal,
+	// AUDIT J3/J4 — more JSON values and object keys than `max_json_nodes`
+	// admits. Distinct from `Invalid_Json`: the body is well-formed and the
+	// refusal is a resource decision, so it must not be reported as a syntax
+	// error the client could fix by correcting its JSON.
+	Too_Many_Nodes,
 }
 
 @(private)
@@ -152,32 +180,46 @@ json_path_restore :: proc(path: ^Json_Field_Path, old: int) {
 	path.len = old
 }
 
-@(private)
-json_field_name :: proc(field: reflect.Struct_Field) -> string {
-	tag := reflect.struct_tag_get(field.tag, "json")
-	name := tag
-	for i in 0 ..< len(tag) {
-		if tag[i] == ',' {
-			name = tag[:i]
-			break
-		}
-	}
-	if name == "" {
-		return field.name
-	}
-	return name
-}
-
 // json_struct_field finds the same ordinary and flattened-using fields as the
-// stdlib decoder. The first match wins, matching declaration order.
+// stdlib decoder, with the SAME precedence as `json_struct_target`: explicit
+// json tags first, then ordinary field names, then flattened `using _`
+// children. This keeps shape validation and tree decode in agreement — J1.
 @(private)
 json_struct_field :: proc(info: ^reflect.Type_Info, key: string) -> (field_type: ^reflect.Type_Info, found: bool) {
-	for field in reflect.struct_fields_zipped(info.id) {
-		if json_field_name(field) == key {
+	fields := reflect.struct_fields_zipped(info.id)
+	// Pass 1: explicit json tags.
+	for field in fields {
+		tag, explicit := reflect.struct_tag_lookup(field.tag, "json")
+		if !explicit {
+			continue
+		}
+		name := tag
+		for i in 0 ..< len(tag) {
+			if tag[i] == ',' {
+				name = tag[:i]
+				break
+			}
+		}
+		if name == key {
 			return field.type, true
 		}
 	}
-	for field in reflect.struct_fields_zipped(info.id) {
+	// Pass 2: ordinary field names (no tag, or empty tag).
+	for field in fields {
+		tag := reflect.struct_tag_get(field.tag, "json")
+		name := tag
+		for i in 0 ..< len(tag) {
+			if tag[i] == ',' {
+				name = tag[:i]
+				break
+			}
+		}
+		if name == "" && field.name == key {
+			return field.type, true
+		}
+	}
+	// Pass 3: flattened `using _` children.
+	for field in fields {
 		if field.is_using && field.name == "_" {
 			base := reflect.type_info_base(field.type)
 			if _, ok := base.variant.(reflect.Type_Info_Struct); ok {
@@ -443,26 +485,42 @@ json_struct_known_check :: proc(
 	info: ^reflect.Type_Info,
 	path: ^Json_Field_Path,
 ) -> Json_Decode_Issue {
-	for field in reflect.struct_fields_zipped(info.id) {
-		if field.is_using && field.name == "_" {
-			base := reflect.type_info_base(field.type)
-			if _, ok := base.variant.(reflect.Type_Info_Struct); ok {
-				if issue := json_struct_known_check(object, base, path); issue.kind != .None {
-					return issue
-				}
-			}
+	// Validate each present key against the field the DECODER will write —
+	// resolved through `json_struct_field`, which shares `json_struct_target`'s
+	// precedence (explicit tag, then name, then flattened `using _`). The old
+	// walk shape-checked every declaration in order, so a key shadowed by a
+	// higher-precedence field elsewhere (J1: a later tag; J2: an outer field
+	// over a flattened child) was double-validated against the wrong type.
+	//
+	// Keys come from a MAP, so iteration order is not the wire order and not the
+	// declaration order. Returning the first failure found would let map layout
+	// decide which of several invalid fields the client is told about: the same
+	// body with its keys transposed would name a different field. Select the
+	// LEXICOGRAPHICALLY SMALLEST failing key instead — the same rule the unknown
+	// -key scan in `json_shape_check` already applies, so both halves of the
+	// refusal path are stable for the same reason.
+	best_key := ""
+	best_issue := Json_Decode_Issue{}
+	for key, child in object {
+		winner, found := json_struct_field(info, key)
+		if !found {
+			continue // the caller's unknown scan reports this key
+		}
+		old := json_path_push(path, key)
+		issue := json_shape_check(child, winner, path)
+		json_path_restore(path, old)
+		if issue.kind == .None {
 			continue
 		}
-
-		name := json_field_name(field)
-		if child, present := object[name]; present {
-			old := json_path_push(path, name)
-			issue := json_shape_check(child, field.type, path)
-			json_path_restore(path, old)
-			if issue.kind != .None {
-				return issue
-			}
+		// `Json_Decode_Issue` carries the path BY VALUE, so the winner stays
+		// valid as the scan continues.
+		if best_key == "" || key < best_key {
+			best_key = key
+			best_issue = issue
 		}
+	}
+	if best_key != "" {
+		return best_issue
 	}
 	return {}
 }
@@ -658,8 +716,10 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 				return json_issue_at(.Unsupported_Destination, path)
 			}
 
-			// Validate declared fields in declaration order, so two invalid
-			// values cannot make the selected error depend on map iteration.
+			// Validate every PRESENT key against the field the decoder would
+			// write, selecting the lexicographically smallest failing key, so
+			// two invalid values cannot make the selected error depend on map
+			// iteration order.
 			if issue := json_struct_known_check(v, info, path); issue.kind != .None {
 				return issue
 			}
@@ -705,6 +765,99 @@ json_shape_check :: proc(value: json.Value, info: ^reflect.Type_Info, path: ^Jso
 // arena, then compares that tree with the destination RTTI. The arena is
 // destroyed before the real typed decode, so the caller never owns the
 // preflight tree and every failure path has one obvious cleanup point.
+// json_scan_structure walks a request body once, without allocating, and
+// reports how many JSON nodes it contains and how deeply it nests.
+//
+// TWO ANSWERS FROM ONE PASS because they guard two different failures. Depth
+// guards the stack: the pinned `core:encoding/json` validator and parser are
+// both recursive-descent and neither bounds its own recursion, so a body under
+// `max_body` that is nothing but `[` overflows a worker thread's stack and
+// aborts the process. Node count guards memory and lane time (audit J3/J4): a
+// 4 MiB body of `[{},{},…]` peaked at 588 MB of RSS, and a 4 MiB body of
+// 322,000 object keys held a Handler lane for 2.08 s. Both are well-formed and
+// inside every limit the framework had.
+//
+// THE COUNT IS EXACT, and the arithmetic is worth stating because the obvious
+// version is wrong on precisely the shape that matters:
+//
+//	every value except the root is the child of exactly one container;
+//	a container holding n children carries n-1 commas;
+//	so  values = commas + non-empty containers + 1.
+//
+// Counting containers rather than NON-EMPTY containers double-counts every
+// `{}` — and the J3 shape is 1.4 million of them, so that error would land
+// exactly on the body this exists to bound. A container is empty when its
+// closer arrives with nothing but whitespace since its opener.
+//
+// Object KEYS are added on (one per `:`). They are not JSON values, so they do
+// not belong in the identity above, but each is a string the tree allocates and
+// hashes — and they are the entire cost J4 measured, on a body whose value
+// count is otherwise unremarkable.
+//
+// String contents are skipped with escape tracking, so punctuation inside a
+// JSON string is never miscounted — a body of `{"a":"{{{{,,,,"}` counts as the
+// two nodes it is.
+//
+// It is called on EVERY JSON body, so it does no work per byte beyond a switch.
+@(private)
+json_scan_structure :: proc(raw: []u8) -> (nodes: int, max_depth: int) {
+	depth := 0
+	in_string := false
+	escaped := false
+	commas := 0
+	colons := 0
+	non_empty_containers := 0
+	// True while nothing but whitespace has been seen since the innermost
+	// container opened, which is what makes that container empty.
+	fresh_container := false
+
+	for b in raw {
+		if in_string {
+			if escaped {
+				escaped = false
+			} else if b == '\\' {
+				escaped = true
+			} else if b == '"' {
+				in_string = false
+			}
+			continue
+		}
+		switch b {
+		case '"':
+			in_string = true
+			fresh_container = false
+		case '[', '{':
+			depth += 1
+			if depth > max_depth {
+				max_depth = depth
+			}
+			fresh_container = true
+		case ']', '}':
+			depth -= 1
+			if !fresh_container {
+				non_empty_containers += 1
+			}
+			// The container that just closed is content of its parent, so the
+			// parent is not fresh whatever it looked like before.
+			fresh_container = false
+		case ',':
+			commas += 1
+			fresh_container = false
+		case ':':
+			colons += 1
+			fresh_container = false
+		case ' ', '\t', '\r', '\n':
+		// Whitespace leaves `{   }` empty.
+		case:
+			// A scalar byte: a digit, `-`, or a letter of true/false/null. Its
+			// container has content.
+			fresh_container = false
+		}
+	}
+
+	return commas + non_empty_containers + 1 + colons, max_depth
+}
+
 @(private)
 body_json_preflight :: proc(
 	raw: []u8,
@@ -720,36 +873,27 @@ body_json_preflight :: proc(
 	// pre-scan is a single allocation-free pass that counts bracket/brace depth
 	// while skipping string contents, so a `[` inside a JSON string is never
 	// miscounted. A body deeper than the ceiling is a malformed request.
+	//
+	// AUDIT J3/J4 — the same pass also counts STRUCTURES, and the body is
+	// refused below if it carries more than the lane can afford. See
+	// `json_scan_structure` for the arithmetic and `max_json_nodes` for the
+	// measurements that set the ceiling.
+	node_count, max_depth := json_scan_structure(raw)
+	if max_depth > JSON_NEST_DEPTH_MAX {
+		return Json_Decode_Issue{kind = .Invalid_Json}
+	}
+
+	// Refused BEFORE the parser, which is the whole point: doing this after the
+	// tree exists would bound nothing, since building the tree is the cost.
 	{
-		depth := 0
-		max_depth := 0
-		in_string := false
-		escaped := false
-		for b in raw {
-			if in_string {
-				if escaped {
-					escaped = false
-				} else if b == '\\' {
-					escaped = true
-				} else if b == '"' {
-					in_string = false
-				}
-				continue
-			}
-			switch b {
-			case '"':
-				in_string = true
-			case '[', '{':
-				depth += 1
-				if depth > max_depth {
-					max_depth = depth
-				}
-			case ']', '}':
-				depth -= 1
-			}
-		}
-		if max_depth > JSON_NEST_DEPTH_MAX {
-			return Json_Decode_Issue{kind = .Invalid_Json}
+		node_cap := ctx.private.limits.max_json_nodes
+		// A zero here is a Context the framework built without a budget, not an
+		// application choice — `web.limits` refuses a negative and an
+		// application that wants no limit sets zero deliberately. The read path
+		// follows `max_body`'s precedent and treats it as "no limit" rather than
+		// substituting a default the caller never asked for.
+		if node_cap > 0 && node_count > node_cap {
+			return Json_Decode_Issue{kind = .Too_Many_Nodes}
 		}
 	}
 

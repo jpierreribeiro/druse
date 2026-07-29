@@ -223,3 +223,78 @@ wp89_concurrent_producers_deliver_exactly_once_in_producer_order :: proc(t: ^tes
 	testing.expect_value(t, total_sent, PRODUCERS * SENDS_PER_PRODUCER)
 	testing.expect_value(t, stream.queued_events(&r, tok), 0)
 }
+
+// --- M2: the wake must be invoked with the slot lock RELEASED ---------------
+//
+// THE DEFECT THIS PINS. A revision moved `try_send`'s wake call inside `s.mu`
+// to close a slot-reuse race. The wake reaches `nbio.exec`, which for a foreign
+// event loop SPINS until the target lane's 128-entry queue accepts the op:
+//
+//     for !mpsc_enqueue(&l.queue, op) { wake_up(l); _yield() }
+//
+// The owner lane drains that queue only at the top of its tick. If the lane is
+// already inside a pump callback blocked on this very `s.mu`, it can never
+// reach the drain, the queue never empties, and the producer spins forever
+// holding the lock. Two threads, no progress, no diagnostic.
+//
+// The registry cannot see `nbio`, so this asserts the property that makes the
+// deadlock impossible instead of the deadlock itself: at the moment the wake
+// runs, the slot mutex is free. A `try_lock` that FAILS here means the wake is
+// back under the lock. Deliberately not written as "call try_send re-entrantly
+// and see if it hangs" — a test that proves a lock bug by deadlocking can only
+// hang the runner, which is the WP58 harness rule.
+@(private)
+Lock_Probe :: struct {
+	reg:      ^stream.Registry,
+	slot:     i32,
+	ran:      int,
+	was_free: bool,
+}
+
+@(private)
+probe_wake :: proc(user: rawptr) {
+	p := (^Lock_Probe)(user)
+	p.ran += 1
+	// The producer holds no other lock here, so a failure to acquire means the
+	// wake itself is running underneath `s.mu`.
+	if sync.mutex_try_lock(&p.reg.slots[p.slot].mu) {
+		p.was_free = true
+		sync.mutex_unlock(&p.reg.slots[p.slot].mu)
+	} else {
+		p.was_free = false
+	}
+}
+
+@(test)
+wp88_the_slot_wake_runs_outside_the_slot_lock :: proc(t: ^testing.T) {
+	r: stream.Registry
+	testing.expect(t, stream.registry_init(&r, stream.Capacity{}))
+	defer stream.registry_destroy(&r)
+
+	probe: Lock_Probe
+	probe.reg = &r
+
+	tok, opened := stream.open(&r, 1, probe_wake, &probe)
+	testing.expect_value(t, opened, stream.Open_Result.Opened)
+	probe.slot = tok.slot
+
+	testing.expect_value(t, stream.try_send(&r, tok, []u8{'a'}), stream.Send_Result.Sent)
+	testing.expect_value(t, probe.ran, 1)
+	testing.expect(
+		t,
+		probe.was_free,
+		"try_send invoked the slot wake while still holding s.mu; a wake that reaches a full cross-thread queue will spin under this lock and deadlock the owner lane",
+	)
+
+	// `close` takes the same path and must obey the same rule.
+	probe.ran = 0
+	probe.was_free = false
+	testing.expect(t, stream.close(&r, tok))
+	testing.expect_value(t, probe.ran, 1)
+	testing.expect(
+		t,
+		probe.was_free,
+		"close invoked the slot wake while still holding s.mu; same deadlock, same lock",
+	)
+	_ = stream.retire(&r, tok.slot)
+}

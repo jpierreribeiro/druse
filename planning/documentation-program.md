@@ -406,6 +406,17 @@ first.
 
 All four run in the same gate as the code.
 
+**One of them needs a second checkout.** `build/check_docs_symbols.py` resolves
+each `alias.symbol` against the directory that alias imports, and 28 of the 29
+aliases live in `uruquim-crystals` (§2). Where that repository is not beside
+this one, the checker cannot read a single definition, so every crystal symbol
+looks unknown — 232 findings that say nothing about the documentation. It
+therefore reports those aliases as `UNCHECKED`, by name and by count, and
+passes on the packages it can actually see. Point it with `$URUQUIM_CRYSTALS`;
+set `$URUQUIM_CRYSTALS_REQUIRED=1` wherever the checkout is guaranteed, so a
+missing corpus fails there instead of skipping. A check that goes vacuous
+without saying so is worse than one that fails.
+
 ### FIXES-WANTED.md — the by-product that matters most
 
 Writing the guide is the **last cheap moment to change the API.** While no

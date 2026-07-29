@@ -83,8 +83,19 @@ wp19_public_empty_value_is_present :: proc(t: ^testing.T) {
 	testing.expect_value(t, missing.status, web.Status.Not_Found)
 }
 
+// THE DEFECT THIS PINS. This case used to be named
+// `wp19_public_duplicates_first_occurrence_wins` and asserted `"first"`, which
+// is what the in-memory driver did and what the docs promised in four places.
+// It is not what a socket does. The backend's `header_parse` combines repeated
+// names into one entry with `", "` (RFC 9110 §5.3) before the core sees them,
+// so the same request over the wire reaches `header` as `"first, second"` —
+// measured on a real socket. The two drivers disagreed on a documented
+// contract and this test ratified the wrong one: the failure mode the project
+// already recorded for J1 (a fast path and a fallback classifying the same
+// input differently) and for S2 (a test whose name is broader than its
+// evidence). `test_request` now merges, so both drivers answer alike.
 @(test)
-wp19_public_duplicates_first_occurrence_wins :: proc(t: ^testing.T) {
+wp19_public_duplicates_are_joined_like_the_wire :: proc(t: ^testing.T) {
 	a := web.app()
 	defer web.destroy(&a)
 	web.get(&a, "/dup", first_wins_probe)
@@ -96,7 +107,32 @@ wp19_public_duplicates_first_occurrence_wins :: proc(t: ^testing.T) {
 		headers = {"X-Dup: first", "x-dup: second"},
 	)
 	testing.expect_value(t, res.status, web.Status.OK)
-	testing.expect_value(t, res.body, "first")
+	testing.expect_value(t, res.body, "first, second")
+}
+
+// The security-relevant consequence of the join, stated as a test rather than
+// as a claim in a comment: two `Authorization` headers do NOT resolve to one of
+// them. They join into `"Bearer a, Bearer b"`, whose token would contain a
+// comma and a space, and the strict RFC 6750 grammar refuses whitespace inside
+// the token — so the request is unauthenticated, not authenticated as either
+// credential. A framework that silently picked the first (or the last) would be
+// making a smuggling decision on the application's behalf.
+@(test)
+wp19_public_a_duplicated_authorization_is_refused :: proc(t: ^testing.T) {
+	a := web.app()
+	defer web.destroy(&a)
+	web.use(&a, require_auth)
+	web.get(&a, "/secret", secret)
+
+	// The first credential is the valid one; if first-occurrence-wins were the
+	// rule, this would be a 200.
+	res := web.test_request(
+		&a,
+		.GET,
+		"/secret",
+		headers = {"Authorization: Bearer s3cret", "Authorization: Bearer other"},
+	)
+	testing.expect_value(t, res.status, web.Status.Unauthorized)
 }
 
 // ---------------------------------------------------------------------------

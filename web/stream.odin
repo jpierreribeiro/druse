@@ -59,6 +59,42 @@ stream :: proc(ctx: ^Context, content_type := "") -> (s: Stream, ok: bool) {
 	if ctx.private.stream_detached || ctx.private.stream_exchange == nil {
 		return Stream{}, false
 	}
+	// AUDIT M5 — A COMMITTED RESPONSE IS NOT A STREAM, and this must be checked
+	// BEFORE `stream_begin`, which detaches the connection.
+	//
+	// The comment below says the single-commit guard covers a Handler that also
+	// calls a responder. It does — in ONE direction. A responder AFTER a stream
+	// is refused by that guard. A stream after a responder was not: the commit
+	// here failed silently while `stream_detached` was set anyway, so the
+	// adapter framed the connection as a stream and the buffered response was
+	// abandoned mid-air.
+	//
+	// MEASURED, on a socket, before this check existed:
+	//
+	//	web.text(ctx, .OK, "...")   then web.stream(ctx)
+	//	  -> 200, chunked, the buffered body GONE, the stream's chunks sent
+	//
+	//	web.text(ctx, .Bad_Request, "...") then web.stream(ctx)
+	//	  -> **400**, chunked, the refusal body GONE, the stream's chunks sent
+	//	     UNDER THE 400
+	//
+	// The second is the one that decides this is a defect rather than a
+	// curiosity: the status came from one response and the body from another,
+	// silently. An application whose early-return path forgot its `return`
+	// ships a refusal carrying streamed content, and nothing anywhere says so.
+	//
+	// Framing itself was never corrupt — the reply is chunked-only, one status
+	// line, no `Content-Length` alongside it. That was worth checking, because a
+	// response carrying both is the ambiguity vendor patch WP9 D2 refuses on the
+	// request side; it does not happen here.
+	//
+	// Refusing returns `ok = false`, which is this procedure's existing contract
+	// for "a stream could not be opened" — the caller already has to handle it,
+	// and now gets it for the one case where continuing would have produced a
+	// wrong answer instead of no answer.
+	if ctx.private.response.committed {
+		return Stream{}, false
+	}
 	slot, generation, opened := transport.stream_begin(ctx.private.stream_exchange)
 	if !opened {
 		return Stream{}, false

@@ -256,16 +256,51 @@ allow_value :: proc(a: ^App, path: string, buffer: []u8) -> (value: string, allo
 		return "", false
 	}
 
+	// AUDIT R8 — HEAD AND OPTIONS ARE NAMED, because they are served.
+	//
+	// RFC 9110 §10.2.1: "The Allow header field lists the set of methods
+	// supported by the resource." WP32b made HEAD and OPTIONS automatic, and
+	// this value went on listing the five registrable verbs — so a GET-only
+	// route answered `Allow: GET` while, measured on a socket, HEAD returned
+	// 200 and OPTIONS returned 204. The header was not a summary of what the
+	// resource supports; it was a summary of what an application had typed.
+	//
+	// A CLIENT ACTS ON THIS. A cache deciding whether a HEAD is safe to issue, a
+	// CORS preflight, an API explorer, a monitor choosing HEAD over GET — each
+	// reads `Allow` and is told a method is unsupported that in fact answers.
+	//
+	// NEITHER IS A `Method` MEMBER, and that is deliberate rather than an
+	// obstacle. `Method` is `{UNKNOWN, GET, POST, PUT, PATCH, DELETE}` — the
+	// verbs an application can REGISTER — and adding two it cannot register
+	// would put unconstructible states in a public enum to serve a string. They
+	// are emitted as tokens here instead, which is exactly what they are: the
+	// framework's own contribution to a resource's method set.
+	//
+	// HEAD is conditional on GET because it IS the GET route: `implicit_from_token`
+	// maps HEAD to GET before matching, so a path with no GET has no HEAD.
+	// OPTIONS is unconditional because `options_answer` answers any path that
+	// reaches this procedure at all — this is only called where
+	// `default_responses` is on, which is the same gate OPTIONS sits behind.
 	n := 0
+	emit :: proc(buffer: []u8, n: int, token: string) -> int {
+		n := n
+		if n > 0 {
+			n += copy(buffer[n:], ", ")
+		}
+		return n + copy(buffer[n:], token)
+	}
 	for method in ALLOW_METHOD_ORDER {
 		if method not_in methods {
 			continue
 		}
-		if n > 0 {
-			n += copy(buffer[n:], ", ")
+		n = emit(buffer, n, method_token(method))
+		// Directly after GET, so the pair reads the way every other server
+		// writes it and the order stays a framework property.
+		if method == .GET {
+			n = emit(buffer, n, ALLOW_TOKEN_HEAD)
 		}
-		n += copy(buffer[n:], method_token(method))
 	}
+	n = emit(buffer, n, ALLOW_TOKEN_OPTIONS)
 
 	return string(buffer[:n]), true
 }

@@ -58,13 +58,38 @@ grep -q 'total_malformed == 0' "$URUQUIM_SUITE" ||
 # --- 1b. H-4: every lane 503 carries Retry-After -----------------------------
 grep -q 'total_lane_503_no_retry == 0' "$URUQUIM_SUITE" ||
   fail "the Retry-After assertion is gone. A 503 lane refusal that does not tell the client when to come back invites an immediate retry onto the same contended pool, which collides again. The ramp reliably produces 503s, so the property is checked over real refusals."
-grep -q 'total_lane_503 > 0' "$URUQUIM_SUITE" ||
-  fail "the assertion that the ramp actually produces a lane 503 is gone; without it the Retry-After check is vacuous"
-# item 2 — the lane-collision counter must be OBSERVABLE, not just felt as a 503.
-grep -q 'stats.lane_collisions) >= total_lane_503' "$URUQUIM_SUITE" ||
-  fail "the assertion that web.stats().lane_collisions covers the client-observed lane 503s is gone. A saturation counter that reads zero while clients see hundreds of 503s is decorative; this ties the counter to the refusal site (item 2)."
-grep -q 'atomic_add(&res._conn.server.lane_collisions' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
-  fail "the lane-collision counter is no longer incremented at the 503 refusal site in dispatch_exchange; web.stats().lane_collisions would then be decorative (item 2)."
+# The ramp must demonstrably overwhelm the server, and a run that produced no
+# 503 must SAY so. Two earlier forms of this both gated on the scheduler rather
+# than on the code:
+#   `total_lane_503 > 0`  — no 503 in six of nine measured runs.
+#   `total_refused > 0`   — a gate run served 36 of 88 and refused NONE; the
+#                           other 52 timed out, because under dedicated accept
+#                           saturation presents as queueing, not refusal. That
+#                           assertion contradicted Campaign C's own thesis.
+# What holds by arithmetic is that 88 clients cannot all be served on a 20-slot
+# budget with 40 ms handlers. Whether the excess is refused or merely made to
+# wait is the scheduling detail that must not gate.
+grep -q "total_served < total_driven" "$URUQUIM_SUITE" ||
+  fail "the assertion that the ramp actually saturates the server is gone; without it every refusal and dwell assertion below can pass on a run that was never under load"
+grep -q 'NOT exercised\|NOT be evidence\|NOT evidence' "$URUQUIM_SUITE" ||
+  fail "the suite no longer reports when a run produced no lane 503. Retry-After is then checked over an empty set and the run reads as evidence for a property it never exercised."
+# Campaign C — the dwell counter must be OBSERVABLE and WIRED, replacing the
+# retired lane_collisions. Asserted in two places: the suite compares
+# handler_dwell_ns against served dispatches, and the accumulator lives at the
+# dispatch bracket.
+grep -q 'stats.handler_dwell_ns >= i64(total_served)' "$URUQUIM_SUITE" ||
+  fail "the dwell-vs-served assertion is gone, or it is no longer built from the SERVED count. A saturation signal that stays flat while clients wait out hundreds of handler dwells is as decorative as lane_collisions was; this ties handler_dwell_ns to real work. It must be bounded by requests actually dispatched — bounding it by clients DRIVEN over-demands dwell by 2-3x under refusal and fails on correct code."
+grep -q 'total_served += tally\[.Served\]' "$URUQUIM_SUITE" ||
+  fail "the served count is no longer accumulated from the per-level tallies; the dwell floor would then be built from a number the run did not measure"
+grep -q 'res._conn.server.handler_dwell_ns' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+  fail "the dwell accumulator is no longer fed at the dispatch bracket in dispatch_exchange; web.stats().handler_dwell_ns would then stay zero (Campaign C)."
+# MONOTONIC. `time.now`/`time.since` is CLOCK_REALTIME and signed, so an NTP
+# step backward during a dispatch subtracts from a counter operators read as
+# monotonically increasing. `tick_now`/`tick_since` is CLOCK_MONOTONIC_RAW.
+grep -q 'i64(time.tick_since(dispatch_started))' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+  fail "the dispatch bracket no longer measures elapsed monotonic time; without it, handler_dwell_ns counts nothing (Campaign C)."
+grep -q 'dispatch_started := time.tick_now()' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+  fail "the dispatch bracket's start timestamp is not tick_now(). A wall-clock start makes the dwell delta signed: an NTP step back during a dispatch decrements handler_dwell_ns and an operator differencing it sees a negative rate."
 grep -q 'Retry-After' "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
   fail "the lane-refusal 503 no longer sets Retry-After (H-4). The refusal path at dispatch_exchange must add the header before respond()."
 

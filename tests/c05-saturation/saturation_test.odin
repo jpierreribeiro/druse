@@ -286,6 +286,20 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	total_malformed := 0
 	total_lane_503 := 0
 	total_lane_503_no_retry := 0
+	// Requests the server actually DISPATCHED. Only these charge handler dwell:
+	// a refusal is answered before dispatch and a timed-out client never got a
+	// reply. The dwell floor below is built from this, NOT from the number of
+	// clients driven — those are not the same number and differ by 2-3x once
+	// the ramp starts refusing.
+	total_served := 0
+	// Any refusal the design NAMES, of whichever kind bound first.
+	total_refused := 0
+	// Clients that waited out CLIENT_PATIENCE without a reply. Under dedicated
+	// accept this is the COMMON face of saturation, not an anomaly: a request
+	// arriving at a busy lane queues on that lane's socket, so the ramp binds
+	// as latency rather than as a 503. Counted separately because a bound that
+	// presents as queueing is still a bound.
+	total_timed_out := 0
 	first_refusal_kind := Outcome.Served
 	first_refusal_level := 0
 
@@ -305,6 +319,13 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		total_malformed += tally[.Malformed]
 		total_lane_503 += tally[.Lane_Refused] + tally[.Lane_Refused_No_Retry]
 		total_lane_503_no_retry += tally[.Lane_Refused_No_Retry]
+		total_served += tally[.Served]
+		total_refused +=
+			tally[.Lane_Refused] +
+			tally[.Lane_Refused_No_Retry] +
+			tally[.Admission_Refused] +
+			tally[.Connect_Failed]
+		total_timed_out += tally[.Timed_Out]
 
 		// The FIRST level at which anything is refused names the binding
 		// constraint. A lane refusal counts whether or not it carried Retry-After
@@ -342,16 +363,20 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	after := one_request(server.port)
 	fmt.printf("[c05] after the ramp: %v\n", after)
 
-	// item 2 — the lane-collision counter must be VISIBLE, not just felt as a
-	// 503. Read it on the server BEFORE stop. Every lane 503 a client saw was
-	// counted on the server first, so the server total is at least the
-	// client-observed total; a decorative counter (never incremented) would read
-	// zero while the clients saw hundreds of 503s.
+	// Campaign C — `lane_collisions` is RETIRED: under dedicated accept the
+	// ramp's 503s come only from the acceptor's own saturation refusal, and a
+	// request contending for a busy lane queues silently on the lane's socket
+	// instead of being refused. The observable saturation signal is now dwell:
+	// total nanoseconds lanes spent inside handlers. After the ramp, that
+	// total must cover every request we DROVE (served OR refused), with a
+	// floor way below one dwell per request, because it counts only time
+	// inside the dispatch bracket (queue time excluded).
 	stats := web.stats()
 	fmt.printf(
-		"[c05] web.stats().lane_collisions=%d (clients observed %d lane 503s)\n",
-		stats.lane_collisions,
+		"[c05] web.stats().handler_dwell_ns=%d (clients observed %d lane 503s; handler dwell %v)\n",
+		stats.handler_dwell_ns,
 		total_lane_503,
+		WORK_DWELL,
 	)
 
 	returned := false
@@ -396,27 +421,88 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		total_lane_503,
 		total_lane_503_no_retry,
 	)
+	// NON-VACUITY, stated over what the ramp DETERMINISTICALLY produces.
+	//
+	// Two earlier forms of this assertion were both wrong, and the second was
+	// wrong in an instructive way:
+	//
+	//   `total_lane_503 > 0` — a coin flip. Over nine runs on a 4-vCPU host the
+	//   ramp produced zero 503s in six, failing the gate on correct code, on
+	//   this tree and on the tree before Campaign C alike.
+	//
+	//   `total_refused > 0` — also a coin flip, for a reason worth writing
+	//   down. A gate run served 36 of 88 clients and REFUSED NONE: the other 52
+	//   timed out. Under dedicated accept a request meeting a busy lane queues
+	//   on that lane's socket, so saturation's normal face is latency, not a
+	//   refusal. That is precisely Campaign C's thesis, and an assertion that
+	//   demanded a refusal contradicted it.
+	//
+	// What IS deterministic is that the ramp overwhelms the server: 88 clients
+	// against a 20-slot budget with 40 ms handlers cannot all be served, by
+	// arithmetic rather than by timing. Whether the excess is refused or merely
+	// made to wait is exactly the scheduling detail that must NOT gate.
+	total_driven := 0
+	for clients in LEVELS {
+		total_driven += clients
+	}
 	testing.expectf(
 		t,
-		total_lane_503 > 0,
-		"the ramp produced no lane 503 at all; the Retry-After assertion would then be vacuous (is max_handlers or the dwell wrong?)",
+		total_served < total_driven,
+		"every one of the %d driven clients was served on a %d-slot budget with %v handlers; the ramp did not saturate anything, so the assertions below are vacuous",
+		total_driven,
+		MAX_CONNECTIONS - RESERVED_CONNS,
+		WORK_DWELL,
 	)
+	fmt.printf(
+		"[c05] ramp outcome: %d/%d served, %d refused, %d timed out — saturation presented as %s\n",
+		total_served,
+		total_driven,
+		total_refused,
+		total_timed_out,
+		"refusal" if total_refused > 0 else "queueing (no refusal at all)",
+	)
+	if total_lane_503 == 0 {
+		fmt.printf(
+			"[c05] NOTE: no lane 503 occurred this run (the ramp bound on %v first), so the Retry-After property was NOT exercised — this run is not evidence for H-4\n",
+			first_refusal_kind,
+		)
+	}
 	testing.expectf(
 		t,
 		total_lane_503_no_retry == 0,
 		"%d lane 503s arrived without a Retry-After header; a refusal that does not say when to retry invites an immediate re-collision (H-4)",
 		total_lane_503_no_retry,
 	)
-	// item 2 — the counter is WIRED, not decorative: the server counted at least
-	// every lane 503 a client observed. Equality is the common case; the server
-	// count can only exceed it (a collision whose 503 lost a connect race still
-	// incremented). A zero here beside hundreds of client 503s is the bug this
-	// assertion exists to catch.
+	// Campaign C — the dwell counter is WIRED, not decorative. A dwell total
+	// that stays near zero while every SERVED request ran a 40 ms handler is a
+	// dead saturation signal, which is the defect this replaced.
+	//
+	// The floor is built from requests the server actually DISPATCHED. The
+	// first version of this assertion summed LEVELS — every client driven,
+	// including the ones that were refused before dispatch or timed out — and
+	// called it `served_all`. That is 88 where the real figure is 30-36, so it
+	// demanded ~2.5x the dwell the run can possibly produce and passed only on
+	// the margin between the WORK_DWELL/4 floor and the true WORK_DWELL. On a
+	// slower host it fails on correct code. Count what was served.
+	min_dwell_ns := i64(WORK_DWELL / 4)
 	testing.expectf(
 		t,
-		int(stats.lane_collisions) >= total_lane_503,
-		"web.stats().lane_collisions=%d is below the %d lane 503s clients observed; the saturation counter is not wired to the refusal site",
-		stats.lane_collisions,
-		total_lane_503,
+		stats.handler_dwell_ns >= i64(total_served) * min_dwell_ns,
+		"web.stats().handler_dwell_ns=%d is far below the %d SERVED dispatches at %v dwell each; the dwell accumulator is not wired to the dispatch bracket",
+		stats.handler_dwell_ns,
+		total_served,
+		WORK_DWELL,
 	)
+	// The floor above is a wiring check and passes at a quarter of the real
+	// dwell. Report the mean so a bracket that measures the WRONG interval
+	// (rather than none at all) is visible to a reader even when it clears the
+	// floor.
+	if total_served > 0 {
+		fmt.printf(
+			"[c05] mean dwell = %v over %d served dispatches (handler sleeps %v)\n",
+			time.Duration(stats.handler_dwell_ns / i64(total_served)),
+			total_served,
+			WORK_DWELL,
+		)
+	}
 }

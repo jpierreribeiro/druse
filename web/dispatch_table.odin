@@ -130,12 +130,26 @@ ALLOW_HEADER_NAME :: "Allow"
 @(private)
 ALLOW_METHOD_ORDER :: [5]Method{.GET, .POST, .PUT, .PATCH, .DELETE}
 
-// ALLOW_VALUE_MAX is the byte length of the longest possible `Allow` value,
-// "GET, POST, PUT, PATCH, DELETE" — every method, comma-and-space separated.
-// The value is built into a fixed request-local buffer of exactly this size, so
-// producing a 405 allocates nothing.
+// ALLOW_TOKEN_HEAD and ALLOW_TOKEN_OPTIONS are the two methods the FRAMEWORK
+// serves and an application cannot register (audit R8). They are tokens rather
+// than `Method` members on purpose: `Method` names what a route can be
+// registered under, and adding two verbs no public procedure accepts would put
+// unconstructible states in a public enum to serve a string. See `allow_value`.
 @(private)
-ALLOW_VALUE_MAX :: 29
+ALLOW_TOKEN_HEAD :: "HEAD"
+
+@(private)
+ALLOW_TOKEN_OPTIONS :: "OPTIONS"
+
+// ALLOW_VALUE_MAX is the byte length of the longest possible `Allow` value,
+// "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS" — every registrable method
+// plus the two the framework serves itself, comma-and-space separated:
+// 3+4+4+3+5+6+7 tokens = 32, plus six ", " separators = 12. The value is built
+// into a fixed request-local buffer of exactly this size, so producing a 405
+// allocates nothing, and a buffer one byte short would truncate the header
+// rather than fail loudly — which is why this is derived and not estimated.
+@(private)
+ALLOW_VALUE_MAX :: 44
 
 // route_register is the SINGLE registration path. `get`, `post`, `put`, `patch`
 // and `delete` are one-line delegations to it, so there is exactly one place

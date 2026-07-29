@@ -47,6 +47,8 @@ bash -n "$URUQUIM_ROOT/build/check.sh"
 bash -n "$URUQUIM_ROOT/build/check_test.sh"
 bash -n "$URUQUIM_ROOT/build/check_public_api.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp3_mutations.sh"
+bash -n "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
+bash -n "$URUQUIM_ROOT/build/check_merged_fix_mutations.sh"
 bash -n "$URUQUIM_ROOT/build/check_g11_teardown.sh"
 bash -n "$URUQUIM_ROOT/build/check_examples.sh"
 bash -n "$URUQUIM_ROOT/build/check_docs.sh"
@@ -77,7 +79,6 @@ bash -n "$URUQUIM_ROOT/build/check_phase7_spec.sh"
 bash -n "$URUQUIM_ROOT/build/check_phase7_freeze.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp87_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_wp88_controls.sh"
-bash -n "$URUQUIM_ROOT/build/check_wp94_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_c01_controls.sh"
 bash -n "$URUQUIM_ROOT/build/check_readiness_matrix.sh"
 bash -n "$URUQUIM_ROOT/build/check_c03_controls.sh"
@@ -1135,11 +1136,6 @@ env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp87_co
 echo "--- WP88/WP89 stream registry and cross-lane delivery controls ---"
 env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp88_controls.sh"
 
-# WP93/WP94 — the opt-in spool substrate (WP87 body corpus green unedited)
-# and the streaming multipart parser proven fragmentation-invariant.
-echo "--- WP93/WP94 spool and streaming-multipart controls ---"
-env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp94_controls.sh"
-
 # WP67 — the desired decoder/schema suites are committed RED. The control
 # proves each is red for the pre-registered reason and that the current 500 is
 # identical on the memory and real-socket transports.
@@ -1362,11 +1358,125 @@ rm -rf "$URUQUIM_ROOT/tests/wp61-public-surface/fixture"
 # not a test result. The bound is generous — the suite's own phases take about
 # four seconds — so a timeout means genuinely stuck, never slow.
 echo "--- WP58/59 drain deadline: stop returns with connections held open (odin test) ---"
+# ONE SERVER PER PROCESS, so this suite runs SEQUENTIALLY — the same rule
+# tests/c03-fault-campaign carries, and for the same reason. `web.stop` sets its
+# App's drain bit and then calls `transport.request_stop()`, which acts on the
+# process-global server WITHOUT consulting the App it was handed. This package
+# holds two tests, and `wp65_is_draining_is_false_until_stop` calls `stop` twice
+# on a serverless App; under the parallel runner those calls shut down the
+# server `wp58_drain_anatomy` is measuring, and its eight keep-alive dials find
+# nothing ("expected held to be 8, got 0"). Measured on a 4-vCPU host: 3 failures
+# in 15 runs with the default runner, 0 in 15 with THREADS=1.
 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
   timeout 120 \
   "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/wp58-drain" \
-  "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_BIN_TMP/wp58-drain" \
+  "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$URUQUIM_BIN_TMP/wp58-drain" \
   || fail "the drain suite failed or timed out; a timeout means the drain is stuck, which is the defect it exists to catch"
+
+# ---------------------------------------------------------------------------
+# Suites that were in the tree but in no gate script.
+#
+# A test nobody runs is not coverage, and these were being CITED as coverage:
+# `tests/wp7_5-c2-upload` is the behaviour evidence recorded in
+# planning/phase-1-freeze.md for three frozen public symbols (`Upload`,
+# `Upload_Config`, `enable_upload`); `tests/multipart-content` is the case the
+# July audit identified as the one that actually catches the multipart defect
+# (the similarly-named wp63 case does not, finding S2);
+# `tests/h2-graceful-acquire` is the evidence in the closure record that a
+# server which cannot acquire its event loop fails gracefully instead of
+# aborting. All eleven orphans were run and pass; the six with a citation are
+# wired in here. The four multishot suites and g76-scale-sockets are left out
+# deliberately and listed in build/check_test.sh, which now fails on any NEW
+# orphan.
+#
+# THREADS=1 for the ones that drive a server: one server per process.
+echo "--- Previously ungated suites: multipart, HEAD framing, ingest, upload ---"
+for URUQUIM_UNGATED in \
+  multipart-content \
+  head-content-length \
+  ingest-leak \
+  h2-graceful-acquire \
+  wp7_5-c1-inbound-stream \
+  wp7_5-c2-upload; do
+  env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+    timeout 180 \
+    "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/$URUQUIM_UNGATED" \
+    "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+    -out:"$URUQUIM_BIN_TMP/$URUQUIM_UNGATED" ||
+    fail "tests/$URUQUIM_UNGATED failed; it is cited as evidence for a merged fix or a frozen symbol"
+done
+echo "PASS: the previously ungated evidence suites run in the gate"
+
+# The raw-wire corpus is only worth its runtime if its cases DETECT the defects
+# they are named after. It could not report a failure at all until this
+# session's logger fix, so that had never been established for any of them.
+# The nine fixes merged in 44bdcda were controlled by hand at merge time. This
+# asks whether anything in the tree still notices if they are reverted — the
+# multipart one was guarded only by a suite CI did not run until this session.
+echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
+env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_merged_fix_mutations.sh"
+
+echo "--- WP9 raw-wire corpus: mutation controls (the cases must detect) ---"
+env URUQUIM_COMPILER="$URUQUIM_COMPILER" bash "$URUQUIM_ROOT/build/check_wp9_mutations.sh"
+
+# --- the mutation-control scripts, EXECUTED ------------------------------
+#
+# WHY THIS STAGE EXISTS. Seventeen control scripts were `bash -n`'d at the top
+# of this gate and never run by it. An audit executed them: FOUR were broken,
+# and had been for as long as nobody had looked.
+#
+#	check_wp20  the `observe` signature gained a guard; the mutation's
+#	            pattern stopped matching, AND its probe tree copied only
+#	            web/internal/transport, so it could not compile either
+#	check_wp21  same tree problem — `ingest` and `stream` were added to
+#	            web/internal later and the transport imports them
+#	check_wp23  the request-id counter became an atomic add; the uniqueness
+#	            guard has been unguarded since that refactor
+#	check_wp36  the dispatched check moved behind an accessor
+#
+# A syntax check proves a script PARSES. It cannot prove the mutation still
+# applies, that the probe tree still compiles, or that the suite still detects
+# what the script is named after — and every one of those four failures is
+# exactly the kind this project's evidence standard exists to catch. As
+# check_wp9_mutations.sh puts it: an unapplied mutation is a control that
+# stopped controlling.
+#
+# COST, measured: 261 s for all seventeen, the slowest being wp41 at 48 s.
+# M6 — allocation failure on the response path is a degraded 500, not a dead
+# process. The suite drives `copy_response` through an allocator rigged to fail
+# at each of its allocations in turn; before the fix, budget 0 produced
+# "Index 0 is out of range 0..<0" and Illegal_Instruction, which under ADR-020
+# is the whole process. Serial: it asserts on a shared transport type and needs
+# no ports.
+# M8 — orphaned spool files are swept at boot, and nothing else in the
+# directory is. A crash leaves partials behind and nothing removed them, so
+# they accumulated across restarts until a disk filled. The suite's second half
+# is the line the sweep must not cross: files the application put in the
+# directory are not the framework's to delete. Serial: it owns a fixed port.
+echo "--- M8 boot sweep of orphaned spool files (odin test) ---"
+timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+  "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/m8-spool-sweep" \
+  "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$URUQUIM_BIN_TMP/m8-spool-sweep" ||
+  fail "the M8 boot-sweep contract did not pass within the timeout"
+
+echo "--- M6 allocation-failure degradation on the response path (odin test) ---"
+timeout 120 env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+  "$URUQUIM_COMPILER" test "$URUQUIM_ROOT/tests/m6-allocation-failure" \
+  "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$URUQUIM_BIN_TMP/m6-allocation-failure" ||
+  fail "the M6 allocation-failure contract did not pass within the timeout"
+
+echo "--- mutation-control scripts (executed, not merely parsed) ---"
+for uruquim_control in c7 wp16 wp17 wp18 wp19 wp20 wp21 wp22 wp23 wp24 wp25 \
+                       wp30 wp36 wp37 wp38 wp39 wp41; do
+  timeout 900 env URUQUIM_ODIN_BIN="$URUQUIM_COMPILER" \
+    ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
+    bash "$URUQUIM_ROOT/build/check_${uruquim_control}_controls.sh" >/dev/null 2>&1 ||
+    fail "build/check_${uruquim_control}_controls.sh did not pass. It is a MUTATION CONTROL: it weakens a guard and requires the suite named after it to go red. A failure here is either a real regression or a control that has gone stale against a refactor — and a stale control is the more likely, so check whether its patterns still match the code before doubting the code."
+  echo "control: check_${uruquim_control}_controls.sh -> all mutations detected"
+done
 
 # The gate leaves NO artifact in the working tree.
 echo "--- WP69 blocking boundary: process-isolated liveness evidence ---"

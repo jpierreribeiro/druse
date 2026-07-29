@@ -78,7 +78,11 @@ root_tree() { # name
   cp "$URUQUIM_ROOT"/docs/*.md "$t/docs/"
   cp "$URUQUIM_ROOT"/web/*.odin "$t/web/"
   cp "$URUQUIM_ROOT"/web/testing/*.odin "$t/web/testing/"
-  cp "$URUQUIM_ROOT"/web/internal/transport/*.odin "$t/web/internal/transport/"
+  # REPOINTED (audit): copy ALL of web/internal, not just transport. `ingest`
+  # and `stream` were added later and the transport imports them, so the copied
+  # tree stopped compiling and every mutation here reported a BROKEN PROBE
+  # instead of a result.
+  cp -r "$URUQUIM_ROOT"/web/internal/. "$t/web/internal/"
   cp -r "$URUQUIM_ROOT"/vendor/odin-http "$t/vendor/odin-http"
   cp -r "$URUQUIM_ROOT"/tests/. "$t/tests/"
   # The docs gate resolves every `compile:` marker to a real file, and those

@@ -54,7 +54,7 @@ Classification vocabulary (§3 of `production-readiness-closure.md`):
 **OK** · **LIMITATION** (acceptable, delegated, with a mandatory topology) ·
 **OPEN** (a Closure WP owns it) · **FUTURE** (evidence-gated).
 
-<!-- c02-rows: 13 -->
+<!-- c02-rows: 14 -->
 
 | # | Resource | Limit | Deadline | Cancellation | Saturation policy | Metric | Shutdown | Class |
 |---|---|---|---|---|---|---|---|---|
@@ -71,6 +71,7 @@ Classification vocabulary (§3 of `production-readiness-closure.md`):
 | 11 | Accept backlog | the kernel's (`listen` backlog, `somaxconn`) | kernel | kernel | SYN drop | external (`ss -lnt` Recv-Q) | the listening socket is closed by `serve` after every lane returns | LIMITATION — **delegated to the kernel**, mandatory topology: tune `somaxconn` |
 | 12 | Total process memory | **none** — the core sets no aggregate cap | n/a | n/a | the OOM killer | external | n/a | LIMITATION — **delegated to a cgroup / supervisor**, mandatory and tested by C-06 |
 | 13 | TLS termination | n/a | n/a | n/a | n/a | external | n/a | LIMITATION — **delegated to the reverse proxy** by decision; the topology is now **TESTED** (C-06): `proxy_buffering off` proven mandatory (a buffering proxy withholds a stream entirely — nothing in 1.23 s against 150 ms direct) and the forwarded client address proven believed only from a trusted hop |
+| 14 | JSON body decode (preflight tree + typed destination) | `max_json_nodes`, default **100,000** JSON values plus object keys | none of its own — `max_request_time` has already stopped, since the body has arrived; the decode runs inside the Handler's lane time | **not cancellable.** The decode is synchronous inside the handler call, so the only bound is the one applied BEFORE it starts — which is why the count is taken in the pre-scan and not from the parser | refused **413** with code `body_too_complex` before the parser allocates, so a refused body costs one pass over its bytes and no tree. Deliberately NOT `body_too_large` (a client retrying by shrinking bytes has misread it) and not `invalid_json` (the body is well-formed). **Measured (J3/J4): this is the resource `max_body` could not see** — two bodies inside the 4 MiB cap cost **588 MB RSS** and **1.6-2.1 s of one lane**; at the default they cost **20 MB** and **50 ms** | none of its own. The cost is visible through `handler_dwell_ns` (lane time) and through the process RSS an operator already watches; a per-decode counter was NOT added because the bound is enforced before the cost is paid, so the interesting number is the refusal, not the decode | nothing outstanding — the decode holds no transport resource and completes or is refused within the handler call that owns it | OK — bounded by default. **The aggregate remains delegated**: 100,000 nodes is ~15 MB of preflight tree, so `max_handlers` lanes decoding maximal bodies is still `max_handlers x ~15 MB`, sized by a cgroup exactly as C-04 records for `max_response_bytes` |
 
 ---
 

@@ -196,6 +196,109 @@ wp61_a_matching_etag_answers_304 :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(second.body), 0)
 }
 
+// AUDIT R10 — `If-None-Match` IS A LIST, AND THE COMPARISON IS WEAK.
+//
+// RFC 9110 §13.1.2: the field is `"*" / #entity-tag`, and If-None-Match uses
+// the WEAK comparison function. A single exact byte compare fails all three
+// forms, and the cost is not cosmetic: a client that sends a list — which
+// browsers and proxies do whenever they hold more than one cached variant —
+// never gets a 304, so the whole file is re-sent on every revalidation.
+//
+// THE NEGATIVE CASES ARE THE ONES THAT MATTER, because the failure mode of a
+// careless fix is worse than the defect: matching too eagerly answers 304 to a
+// client that does NOT hold this representation, and that client then shows
+// stale content it can never refresh. A substring compare would do exactly
+// that.
+@(private = "file")
+etag_case :: proc(t: ^testing.T, app: ^web.App, header: string, want: int, why: string) {
+	line := strings.concatenate({"If-None-Match: ", header}, context.temp_allocator)
+	headers := [?]string{line}
+	res := web.test_request(app, .GET, "/assets/app.js", headers = headers[:])
+	testing.expectf(t, int(res.status) == want, "%s: If-None-Match: %s gave %d, expected %d", why, header, int(res.status), want)
+}
+
+@(test)
+r10_if_none_match_accepts_a_list_a_weak_tag_and_a_star :: proc(t: ^testing.T) {
+	if !make_fixture() {
+		testing.expect(t, false, "fixture")
+		return
+	}
+	app: web.App
+	mounted_app(&app)
+	defer web.destroy(&app)
+
+	first := web.test_request(&app, .GET, "/assets/app.js")
+	etag, has_etag := header_value(first, "ETag")
+	testing.expect(t, has_etag, "the first response must carry an ETag")
+
+	// --- the three forms that must now match -----------------------------
+	etag_case(t, &app, etag, 304, "the exact tag (already worked)")
+	etag_case(
+		t,
+		&app,
+		strings.concatenate({`"nomatch", `, etag}, context.temp_allocator),
+		304,
+		"a LIST whose second member matches",
+	)
+	etag_case(
+		t,
+		&app,
+		strings.concatenate({etag, `, "other"`}, context.temp_allocator),
+		304,
+		"a LIST whose first member matches",
+	)
+	etag_case(
+		t,
+		&app,
+		strings.concatenate({"W/", etag}, context.temp_allocator),
+		304,
+		"the WEAK form of the same tag — If-None-Match compares weakly",
+	)
+	etag_case(t, &app, "*", 304, "`*` matches any existing representation")
+
+	// --- and the ones that must NOT ---------------------------------------
+	etag_case(t, &app, `"nomatch"`, 200, "an unrelated tag")
+	etag_case(t, &app, `"a", "b", "c"`, 200, "a list with no member matching")
+	// A GENUINE prefix: the tag's own opening bytes, closed early. The first
+	// draft of this case built `"` + trim_left(etag, `"`), which reassembles the
+	// ORIGINAL tag — it asserted 200 for an exact match and failed for the right
+	// reason on the wrong input. Worth leaving the note: a negative control that
+	// accidentally tests the positive case proves nothing.
+	inner := strings.trim(etag, `"`)
+	prefix := strings.concatenate({`"`, inner[:min(len(inner), 6)], `"`}, context.temp_allocator)
+	etag_case(
+		t,
+		&app,
+		prefix,
+		200,
+		"a PREFIX of the tag is not the tag — a substring compare would answer 304 here and serve stale content forever",
+	)
+	etag_case(t, &app, "", 200, "an empty field is not a match")
+
+	// A LONGER tag with this one embedded in it is a different representation.
+	//
+	// HONEST NOTE ON WHAT THIS DOES NOT PROVE. It was added believing it would
+	// catch a `strings.contains(field, etag)` implementation. It does not, and
+	// neither does anything else here: the quotes are part of the tag, so a
+	// substring search over well-formed input agrees with a whole-member
+	// comparison on every case in this suite. The mutation that seemed obvious
+	// turned out to be nearly equivalent to the real thing.
+	//
+	// What IS pinned, each by its own mutation run against this suite: the
+	// exact-compare regression (4 failures), the comma split (2), the `W/`
+	// strip (1), and `*` (1). The assertion below stays because it is true and
+	// cheap, not because it guards that particular mistake.
+	inner2 := strings.trim(etag, `"`)
+	superstring := strings.concatenate({`"x`, inner2, `x"`}, context.temp_allocator)
+	etag_case(
+		t,
+		&app,
+		superstring,
+		200,
+		"a tag that CONTAINS this one is not this one — a substring search would answer 304 and serve another representation's content",
+	)
+}
+
 // ---------------------------------------------------------------------------
 // The rejections.
 // ---------------------------------------------------------------------------
