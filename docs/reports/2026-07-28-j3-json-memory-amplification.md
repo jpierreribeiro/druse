@@ -63,9 +63,10 @@ the peak scales with is element count times destination size, neither of which
 
 - **Concurrency.** One request was measured. Whether N simultaneous requests
   multiply the peak cleanly, or contend earlier on the allocator, is untested.
-- **A cgroup verdict.** The C-04 sizing rule is `max_connections × largest
-  response`; this is a REQUEST-side multiplier that rule does not model, but
-  what a given `MemoryMax` survives has not been tried.
+- **A cgroup verdict.** Corrected C-04 explicitly rejects a universal
+  `max_connections × response` formula. This request-side multiplier is another
+  reason the cgroup envelope must come from a representative concurrent
+  campaign; what a given `MemoryMax` survives has not been tried.
 - **The fix.** Bounding this means a new `Limits` field (element count, or a
   decoded-size ceiling), which is a public-API change under the Phase-1 freeze
   and needs owner sign-off. Nothing here chooses the shape.

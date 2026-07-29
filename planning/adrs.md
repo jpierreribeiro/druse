@@ -2144,16 +2144,18 @@ none; the requirement it keeps is the one nobody disputes.
   program (item 5a).** Specified ahead of time by the Closure's C-04
   (`planning/closure-response-size-and-memory.md` §2, "the specification, handed
   forward"); this ADR ratifies that specification and records the implementation.
+  **Evidence amendment, 2026-07-28:** the limit stands, but C-04's original
+  per-connection retention attribution and sizing formula are withdrawn.
 
 - **Context.** Response write was the one framework-owned resource in the C-02
   matrix (row 5) whose *size* had **no bound at all**. `max_write_time` bounds
   how long a response may take to leave, not how many bytes it is. Responses are
-  buffered whole (ADR-014), and C-04 *measured* that a connection retains ~1.0×
-  the largest response it ever served and still holds ~0.75× after 1,600 small
-  ones (F-C04-1/3). The worst case is therefore `max_connections × largest
-  response` — 1024× at the defaults — bounded by nothing an operator could set.
-  `max_body` caps what a client may *send*; nothing capped what a handler could
-  *build*.
+  buffered whole (ADR-014). Corrected C-04 attribution measured substantial
+  transient amplification while constructing a 4 MiB response, but also proved
+  that completed sends release every oversize connection-arena block. The
+  remaining process RSS was allocator high-water, not a live per-connection
+  body. `max_body` caps what a client may *send*; nothing capped what a handler
+  could *build*.
 
 - **Decision.** Add `max_response_bytes: int` to `Limits`, **default 0 = off**,
   matching the `max_write_time`/`max_idle_time` convention: a framework-chosen
@@ -2180,10 +2182,11 @@ none; the requirement it keeps is the one nobody disputes.
   snapshot moves) but whose *symbol count* does not. Application ledger stays 80,
   union 82.
 
-- **Aggregate memory remains delegated.** This bounds ONE response. Total process
-  memory across `max_connections` is still sized by a memory cgroup per the C-04
-  rule; the per-response limit is the local guard, the cgroup the aggregate one.
-  Both are documented in `docs/operations.md`.
+- **Aggregate memory remains delegated.** This bounds ONE response body, not
+  handler temporaries, in-flight send duration or allocator high-water. Total
+  process memory is sized by a cgroup from a representative concurrent campaign;
+  the per-response limit is the local guard, the measured cgroup the aggregate
+  one. Both are documented in `docs/operations.md`.
 
 - **Reversibility. MEDIUM.** A new public `Limits` field is frozen once shipped;
   defaulting to 0 (off) means it changes nothing for an application that never

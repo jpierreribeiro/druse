@@ -1203,12 +1203,11 @@ echo "--- C-03 fault campaign: RST flood, lane contention, disconnects, coincide
 timeout 300 env URUQUIM_COMPILER="$URUQUIM_COMPILER" \
   bash "$URUQUIM_ROOT/build/check_c03_controls.sh"
 
-# C-04 (Closure) — response size and memory retention. It runs in the gate
-# because the core DELEGATES total memory to a cgroup, and a delegation is
-# acceptable only while the operator is told what to size it to. The number that
-# rule rests on (a connection retains ~1x the largest response it ever served)
-# is a measurement, and a measurement nobody re-takes is a claim.
-echo "--- C-04 response size and memory retention: the two-phase soak ---"
+# C-04 (Closure) — response-memory attribution. It runs in the gate because RSS
+# cannot identify a live owner: the socket soak checks short-run stability, the
+# direct arena assertion proves oversize blocks are released, and its mutant
+# proves that assertion can turn red.
+echo "--- C-04 response memory: RSS high-water plus growing-arena reclamation ---"
 timeout 180 env URUQUIM_COMPILER="$URUQUIM_COMPILER" \
   bash "$URUQUIM_ROOT/build/check_c04_controls.sh"
 

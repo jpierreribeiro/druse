@@ -477,33 +477,34 @@ the topology those limitations make mandatory:
   panic (ADR-020) — and a handler blocked in foreign code cannot be preempted,
   so the supervisor's kill is the outer bound on shutdown. Keep
   `max_drain_time` (default 10 s) well inside `TimeoutStopSec`.
-* **Set `max_response_bytes`, then run under a memory cgroup sized by a measured
-  rule.** `max_response_bytes` (ADR-045, default 0 = off) caps ONE response: a
+* **Set `max_response_bytes`, then run under a memory cgroup sized by a
+  representative concurrent measurement.** `max_response_bytes` (ADR-045,
+  default 0 = off) caps ONE response body: a
   handler that builds a larger body gets a standardized 500 before the bytes are
   copied to the wire, converting an out-of-memory that kills every in-flight
   request into one typed `Response_Too_Large` an observer sees. Set it to the
-  largest response any handler legitimately builds. It is the write-side mirror of
-  `max_body`.
+  largest response any handler legitimately builds. It is the write-side mirror
+  of `max_body`, but it does not bound arbitrary temporary allocations the
+  handler makes before committing that body.
 
-  The cgroup is still the AGGREGATE guard, because the per-response limit bounds
-  one response and total process memory is `max_connections` of them. C-04
-  measured the shape: a connection retains **~1.0× the largest response it ever
-  served**, held for the connection's life, and there is no per-request leak. So
-  size the cgroup for
+  C-04 corrected an earlier attribution error. A completed 4 MiB response left
+  its connection arena with one 1 MiB reservation, only 4,040 bytes committed
+  and zero used; the body-sized blocks were released. The process RSS remained
+  above baseline anyway, so RSS high-water must not be described as a live
+  per-connection body. During construction, however, that same test used about
+  25.2 MiB of arena space for a 4 MiB response, and a slow in-flight send retains
+  its completed buffer until send completion.
 
-  > `max_connections × min(max_response_bytes, largest response your handlers can build) + baseline`
-
-  which, with `max_response_bytes` set, is a number you control directly rather
-  than one your handlers imply. Unset, it is **1024 ×** your largest response at
-  the defaults, and `max_connections` is the only setting that moves the product.
-  Two further levers reduce it:
-  - **`max_idle_time` is a memory control, not only a slot economy.** Closing an
-    idle keep-alive connection **destroys its arena**, returning the retained
-    response memory; a connection you keep alive keeps its peak footprint.
-  - **`web.stream` does not pay the retention at all.** Streamed chunks leave
-    through the registry's ring, not the connection arena, so a large streamed
-    response costs a window, not its length. Prefer it for big payloads — the
-    win is memory, not only latency. Matrix rows 5, 8 and 12.
+  There is no universal `max_connections × response size` multiplier. Measure a
+  concurrent matrix using your body-size distribution, handler allocation
+  behaviour, `max_handlers`, `max_connections` and slow-reader policy. Put the
+  cgroup above the measured peak plus explicit headroom, then verify the
+  over-budget failure. Two strong levers are:
+  - **Enable `max_write_time`.** It bounds how long a slow reader may retain an
+    in-flight buffered response.
+  - **Use `web.stream` for large output.** Streamed chunks leave through the
+    registry's bounded ring, so memory scales with the configured window rather
+    than total response length. Matrix rows 5, 8 and 12.
 * **Enable `max_write_time` and `max_idle_time`**, sized to your slowest
   legitimate client. They ship OFF because a framework-chosen number would reset
   real clients on upgrade; OFF is not a recommendation. Matrix row 5.

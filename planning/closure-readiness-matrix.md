@@ -65,7 +65,7 @@ Classification vocabulary (§3 of `production-readiness-closure.md`):
 | 5 | Response write (buffered) | `max_response_bytes`, **default 0 = off** (ADR-045); a strictly larger built body is replaced with a 500 before copy-out | `max_write_time`, **default OFF** | `nbio.remove(conn.pending_send)` | the connection and its buffer are retained for as long as the client chooses; RST at the deadline when one is set | **`web.stats()`** — `responses_sent`, `response_bytes`, `send_errors`, `write_deadline_aborts` (Closure H-3) | cancelled at close; **deadline not enforced during drain — F-C01-2** | OK — per-response bound SHIPPED (ADR-045); aggregate still delegated to cgroup (C-04); metric SHIPPED (H-3) |
 | 6 | Detached response stream | per-stream event and byte caps + a process-wide byte budget (`web/internal/stream` registry) | `max_write_time` per send, or the pre-registered **30 s** default when unset — a stream is bounded whether tuned or not | `stream.close` + `retire`; an externally-initiated end reaches it through the connection teardown hook | `Full` refusal — the bounded queue refuses, never waits and never drops silently | `refused_stream_full`, `refused_budget_full`, `aborted_slow` — **now reachable through `web.stats()` (Closure H-3)** | `drain_begin` wakes every owner, the terminator follows the last queued event, bounded by `max_drain_time` (WP95) | OK — metric shipped (H-3) |
 | 7 | Spool ingest (opt-in large-body upload) | per-upload quota + the configured spool directory; opt-in, default off | the request deadline (`max_request_time`) | `upload_cancel` at driver teardown — exactly once, idempotent | admission refuse; refuses new spools once draining (WP95) | none exposed | admission stops at drain; a spooled file is deleted at teardown unless `upload_persist` moved it | LIMITATION — no metric; the substrate is opt-in |
-| 8 | Per-connection arena (`virtual.Arena`, growing) | **none directly** — it grows to the largest request or response the connection has held, so it is bounded by `max_body` on the read side and by nothing on the write side | n/a | n/a — freed wholesale at teardown | process memory. **Measured (C-04): a connection retains ~1.0× the largest response it ever served, persisting at ~0.75× while it serves small ones. Worst case `max_connections × largest response` — 1024× at the defaults** | **none exposed**; retention is measured by `tests/c04-response-size`, not reported by the framework | destroyed in `connection_teardown`; **leaked if the drain deadline expires with the close still outstanding — F-C01-4** | LIMITATION — **delegated to a cgroup, with a measured sizing rule** (C-04); no per-request leak (F-C04-2) |
+| 8 | Per-connection arena (`virtual.Arena`, growing) | no direct byte limit; `free_all` runs after a completed response and deallocates every oversize block, retaining only the initial 1 MiB reservation with usage reset to zero | n/a | n/a — request cleanup calls `free_all`; teardown destroys the remaining first block | **Measured (corrected C-04):** one 4 MiB response transiently used 25,167,567 arena bytes across seven blocks; after send completion the arena had one 1 MiB reservation, 4,040 bytes committed and zero used. Process RSS nevertheless stayed above baseline, so RSS high-water is not a live arena-owner measurement | none exposed; the semantic and RSS shape are gated by `tests/c04-response-size` | oversized blocks are released after each completed response; the arena is destroyed in `connection_teardown`; **leaked if the drain deadline expires with the close still outstanding — F-C01-4** | LIMITATION — transient/in-flight aggregate and allocator high-water are **delegated to a cgroup sized from a representative concurrent campaign** (C-04) |
 | 9 | Static file read | `Static_Options.max_file_size`, default **8 MiB**; a larger file is answered 404 | **none** | **none — the read is synchronous** (`os.read_entire_file_from_path`) | it **blocks its handler lane** for the duration of the read, and the file is buffered whole (ADR-014) | none | not interruptible: it is inside the handler, so row 4's answer applies | LIMITATION — sized by `max_file_size`; **FUTURE:** an async read needs the F-C01-6 handles first |
 | 10 | Periodic lane timers (Date cache 1 s, deadline sweep 250 ms) | two per lane, fixed | their own period | **none — the handles are dropped**; they self-terminate by not rescheduling once `closing` is set | n/a | none | the final drain waits up to one period for the outstanding timeout — **measured at 991 ms** (C-01 P1) | LIMITATION — bounded by the period, declared in the C-01 inventory |
 | 11 | Accept backlog | the kernel's (`listen` backlog, `somaxconn`) | kernel | kernel | SYN drop | external (`ss -lnt` Recv-Q) | the listening socket is closed by `serve` after every lane returns | LIMITATION — **delegated to the kernel**, mandatory topology: tune `somaxconn` |
@@ -84,14 +84,14 @@ owns it.
    0 = off.** A strictly larger built body is replaced with the standardized 500
    (`Framework_Error.Response_Too_Large`) on the shared path before copy-out, so
    an out-of-memory that would kill every in-flight request becomes one typed
-   failure. **Measured (C-04): a connection retains ~1.0× the largest response
-   it ever served, and still holds ~0.75× of it after 1,600 subsequent small
-   responses — the footprint is per-connection and outlives the request**, so a
-   per-response bound is what caps the retention. The AGGREGATE across
-   `max_connections` — worst case `max_connections × largest response`, 1024× at
-   the defaults — remains *DELEGATED to a memory cgroup*, with the sizing rule in
-   `planning/closure-response-size-and-memory.md`. Two guards, two scopes: the
-   limit bounds one response, the cgroup bounds the process.
+   failure. **Corrected C-04 attribution:** completed responses release their
+   oversize arena blocks; the earlier ~1.0× “retained per connection” claim was
+   RSS high-water misattributed to a live owner. A 4 MiB response did transiently
+   use about 25.2 MiB of arena space, and an in-flight send keeps its completed
+   buffer until it finishes. There is no universal multiplier: the AGGREGATE is
+   *DELEGATED to a memory cgroup* sized from a representative concurrent
+   campaign. Two guards, two scopes: the limit bounds one response body, the
+   measured cgroup bounds the process.
 2. **The write and idle deadlines default OFF.** `max_write_time` and
    `max_idle_time` exist and work; they ship disabled because a
    framework-chosen number would reset real slow clients on upgrade. *Enable
@@ -111,12 +111,12 @@ owns it.
    were maintained in the registry and reachable from no public API. An operator
    can now see slow-consumer aborts. The twelve-file ledger amendment that
    deferred it was done under H-3.
-5. **Arena retention after large responses** is now measured (entry 1), and
-   there is **no per-request leak** — 1,600 small responses on already-grown
-   arenas cost negative RSS in all three runs. What remains owed is the
-   *hours-long* soak, which only a quiet machine can give; it is recorded
-   alongside the 3,000 real-socket SSE round, the project's other undemonstrated
-   scale claim. *Owner: C-04, deferred with a named obligation.*
+5. **Large-response arena reclamation** is now attributed (entry 1): oversize
+   blocks are released after send completion. The 1,600-small-response phase
+   showed no continuing RSS growth in the short local workload, but that is not
+   a universal leak proof. A concurrent buffered-response matrix and the
+   *hours-long* mixed-size soak remain owed; the latter is recorded beside the
+   3,000-real-socket SSE round. *Owner: C-04, named VPS obligations.*
 6. **A blocking handler is not preemptible and a faulting one aborts the
    process.** Both are by construction (Odin has no recoverable panic). The
    supervisor is the outer bound. *Owner: the mandatory topology — C-06.*

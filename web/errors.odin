@@ -1117,8 +1117,9 @@ framework_report :: proc($T: typeid, kind: Framework_Error, loc := #caller_locat
 FRAMEWORK_MESSAGE_RESPONSE_TOO_LARGE ::
 	"uruquim: a handler built a response larger than Limits.max_response_bytes, " +
 	"so the framework replaced it with a 500 before copying it to the transport. " +
-	"A response is buffered whole (ADR-014) and retained per connection, so an " +
-	"unbounded one is an out-of-memory that would kill every in-flight request. " +
+	"A response is buffered whole (ADR-014), and its construction plus an " +
+	"in-flight send can hold multiple body-sized allocations. An unbounded one " +
+	"can exhaust the process and kill every in-flight request. " +
 	"Lower the response size, raise max_response_bytes, or stream large output " +
 	"with web.stream."
 

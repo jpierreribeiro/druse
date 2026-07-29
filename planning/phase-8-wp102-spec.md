@@ -169,8 +169,9 @@ client ──TLS──▶ Caddy (reverse proxy, proxy_buffering off, XFF)
 - Supervisor: **systemd**, `Restart=always`, `TimeoutStopSec` set above the
   app's `max_drain_time` so the framework drain runs before the kill (the
   Hardening H-4 rule; matches `docs/operations.md`).
-- Memory: a cgroup sized by the C-04 rule (`max_connections × largest response`);
-  large downloads use the spool/stream path so they do not pay the retention.
+- Memory: a cgroup sized from the corrected C-04 concurrent response campaign;
+  large downloads use the spool/stream path so memory scales with the bounded
+  stream window rather than total output length.
 - PostgreSQL: a dedicated instance, isolated under `/opt/uruquim-verify` on the
   VPS, provisioned in WP103; **the server never migrates on boot** — migrations
   are a separate, checksum-guarded deploy step (crystals `db/migrate`).

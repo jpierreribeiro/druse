@@ -1127,8 +1127,9 @@ write_response :: proc(res: ^http.Response, out: Outbound) {
 // PATH, after the handler had already produced an answer.
 //
 // IT IS NOT A THEORETICAL PRESSURE. Two measurements in this same audit make it
-// reachable: J3 peaked at 588 MB of RSS for one in-limit request, and M9
-// measured GB-scale retention across idle keep-alive connections.
+// reachable: J3 peaked at 588 MB of RSS for one in-limit request, and corrected
+// C-04 attribution found about 25.2 MiB of live connection-arena space while a
+// handler produced one 4 MiB buffered response.
 //
 // THE DEGRADATION ALLOCATES NOTHING, which is the only thing that can be true
 // on this path: a 500 with no headers and no body, from fields already owned by

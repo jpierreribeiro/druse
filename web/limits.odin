@@ -120,10 +120,10 @@ Limits :: struct {
 	// THE MIRROR OF `max_body` ON THE WRITE SIDE. `max_body` caps what a client
 	// may SEND; this caps what a handler may BUILD. It exists because response
 	// size was the one framework-owned resource with no bound at all (C-04
-	// amber cell #1): responses are buffered whole (ADR-014) and a connection
-	// retains ~1× the largest response it ever served (measured, F-C04-1), so
-	// the worst case is `max_connections × largest response` — 1024× at the
-	// defaults, bounded by nothing.
+	// amber cell #1): responses are buffered whole (ADR-014), and response
+	// construction plus an in-flight send can hold multiple body-sized
+	// allocations. Completed responses release their oversize connection-arena
+	// blocks; the aggregate live peak and process RSS still require a cgroup.
 	//
 	// A BREACH IS A 500, NOT A TRUNCATION. Exactly this many bytes is allowed;
 	// a strictly larger committed body is replaced — before it is copied to the
@@ -136,10 +136,10 @@ Limits :: struct {
 	// the body the framework BUILT, so a HEAD whose body is suppressed on the
 	// wire is still measured by what it allocated.
 	//
-	// DELEGATION REMAINS THE OTHER HALF. This limit bounds ONE response; total
-	// process memory across `max_connections` is still sized by a cgroup, per
-	// the C-04 rule in `planning/closure-response-size-and-memory.md`. The limit
-	// is the per-response guard; the cgroup is the aggregate one.
+	// DELEGATION REMAINS THE OTHER HALF. This limit bounds ONE response body,
+	// not arbitrary handler temporaries, allocator high-water or the aggregate
+	// across concurrent/in-flight responses. Size the cgroup from a
+	// representative concurrent campaign as recorded by C-04.
 	max_response_bytes: int,
 
 	// WP90 / ADR-039 — how long a keep-alive connection may sit IDLE between

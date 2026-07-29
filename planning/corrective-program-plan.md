@@ -108,9 +108,9 @@ Campaign design (report deliverable, §4):
 - **Saturation & failure at scale** — pool-at-cap, lane contention, RST floods,
   and the deferred WP110 cells (network interruption, upload interruption, proxy
   misconfiguration) on hardware that can actually generate the load.
-- **What I measure** — throughput/latency by route, RSS vs connections (validate
-  the C-04 per-connection retention rule at scale), pool/stream counters return
-  to baseline, zero unclassified failures.
+- **What I measure** — throughput/latency by route; C-04 live allocation and RSS
+  across a concurrent buffered-response/slow-reader matrix; pool/stream counters
+  return to baseline; zero unclassified failures.
 - **Report** — `planning/corrective-scale-report.md`: environments, method,
   numbers, what held, what didn't, and the capacity/cost envelope for a real
   deployment. This is the evidence that "serious, validated architecture" is a

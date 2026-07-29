@@ -23,7 +23,13 @@ URUQUIM_SUITE="$URUQUIM_ROOT/tests/c04b-response-limit/contract_test.odin"
 fail() { echo "C04B-CONTROL-FAIL: $*" >&2; exit 1; }
 
 URUQUIM_ODIN="${URUQUIM_ODIN_BIN:-odin}"
-URUQUIM_ODIN_DIR="$(cd "$(dirname "$(readlink -f "$URUQUIM_ODIN")")" && pwd)"
+if [[ "$URUQUIM_ODIN" != */* ]]; then
+  URUQUIM_ODIN="$(command -v "$URUQUIM_ODIN")"
+fi
+URUQUIM_ODIN="$(readlink -f "$URUQUIM_ODIN")"
+URUQUIM_ODIN_DIR="$(cd "$(dirname "$URUQUIM_ODIN")" && pwd)"
+URUQUIM_TMP="$(mktemp -d -t uruquim-c04b-controls-XXXXXXXX)"
+trap 'rm -rf "$URUQUIM_TMP"' EXIT
 
 # --- the surface exists as ratified ------------------------------------------
 grep -qE 'max_response_bytes: int' "$URUQUIM_LIMITS" ||
@@ -44,7 +50,8 @@ grep -qE 'len\(res\.body\) <= limit' "$URUQUIM_ERRORS" ||
 # --- the behaviour is wired: the suite is green ------------------------------
 test -f "$URUQUIM_SUITE" || fail "tests/c04b-response-limit/contract_test.odin is missing"
 env ODIN_ROOT="$URUQUIM_ODIN_DIR" "$URUQUIM_ODIN" test "$URUQUIM_ROOT/tests/c04b-response-limit" \
-  -collection:uruquim="$URUQUIM_ROOT" >/dev/null 2>&1 ||
+  -collection:uruquim="$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$URUQUIM_TMP/c04b" >/dev/null 2>&1 ||
   fail "the C-04b response-limit suite did not pass"
 
 echo "C-04b control: max_response_bytes replaces an over-limit response with a 500 before copy-out, exactly-the-limit served, default off, breach observed as Response_Too_Large; suite green"

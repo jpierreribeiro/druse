@@ -420,11 +420,13 @@ fail-closed rather than run on a guess.
   may BUILD. A committed body strictly larger than the limit is replaced with
   the standardized **500** before it reaches the wire — never truncated — and
   reported as `Framework_Error.Response_Too_Large`. Responses are buffered whole
-  (ADR-014) and retained per connection, so an unbounded one is an
-  out-of-memory that kills every in-flight request; the limit converts that into
-  one typed 500. It measures the body the framework built, so a HEAD is bounded
-  by what it allocated. Stream large output with `web.stream` instead of raising
-  it. Enforced on the shared path, so a test and a socket agree (413-for-request,
+  (ADR-014), and construction plus an in-flight send can hold multiple
+  body-sized allocations; the limit converts an over-budget response into one
+  typed 500. Completed responses release oversize connection-arena blocks, but
+  aggregate memory and allocator RSS still need a measured cgroup. It measures
+  the body the framework built, so a HEAD is bounded by what it allocated.
+  Stream large output with `web.stream` instead of raising it. Enforced on the
+  shared path, so a test and a socket agree (413-for-request,
   500-for-response, both by construction).
 - **`max_idle_time` bounds the quiet gap between keep-alive requests**, in
   nanoseconds, `0` = off (the default). The clock stops the moment the next
