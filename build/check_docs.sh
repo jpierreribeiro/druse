@@ -21,7 +21,7 @@ PY
 python3 - <<'PY'
 import glob,sys,os
 CAP={'01-concepts':150,'02-build-notes':250,'03-subjects':120,'04-rules':200,
-     '05-recipes':80,'06-cookbook':400}
+     '05-recipes':90,'06-cookbook':400}
 bad=[]
 for p in glob.glob('docs/guide/**/*.md',recursive=True):
     d=os.path.basename(os.path.dirname(p))

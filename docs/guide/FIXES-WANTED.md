@@ -214,3 +214,32 @@ already lists the seven real commands.
 
 **Cost of not doing it.** A reader follows a documented command that does not
 exist, during an incident, which is when they reached for `migrate` at all.
+
+---
+
+## 12 — No decision on JWT, access tokens or refresh tokens
+
+**Where the warning lives:** [`03-subjects/backend-glossary.md`](03-subjects/backend-glossary.md).
+
+`auth/session` states "No JWT: this is a server-side session, and revocation is
+the point." That is a scope statement **for that package**, and it is correct
+there. It is not a project decision, and it has been read as one — including in
+this guide, once.
+
+No ADR mentions JWT. `access token` and `refresh token` appear nowhere in either
+repository. A reader arriving from another stack finds silence and cannot tell
+refusal from absence.
+
+**Proposal.** Decide, and record it. Either an ADR refusing signed stateless
+tokens with the revocation argument, or a Crystal: a transport-free Library that
+signs and verifies, plus a Request adapter — the shape `csrf` + `web/csrf`
+already has.
+
+Worth noting for whoever decides: the hard parts exist. `csrf` does HMAC
+signing, `api_key` does scopes, and a refresh token **is** a server-side session
+under another name, which `auth/session` already provides. What is missing is
+the short-lived signed access token, and with it the revocation window that
+`auth/session` exists to avoid.
+
+**Cost of not doing it.** Every new user asks, and the answer lives in one
+comment inside one package.

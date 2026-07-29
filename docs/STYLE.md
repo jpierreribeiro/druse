@@ -110,6 +110,11 @@ A subject page is the one a reader arrives at with a question — `routing.md`,
 `request.md`, `response.md`. Name it for the question, not for the packages it
 touches.
 
+The recipe cap was 80 and was raised to 90 once, deliberately, when three pages
+sat just above it and the only way down was cutting content rather than
+padding. A cap is a judgement, not a measurement; change it in the open when it
+stops serving the page, and never by exceeding it quietly.
+
 ## 8. What the reader is told about risk
 
 State a limit as a fact. Do not apologise for it, and do not hide it.
