@@ -5,7 +5,7 @@
 package test_c7_request_state
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 Auth :: struct {
 	account_id: i64,

@@ -18,7 +18,6 @@ def program(path):
     src=open(path).read()
     src=src[src.index('package '):]                       # drop the header comment
     src=re.sub(r'\n//[^\n]*(\n//[^\n]*)*\n(?=\S)','\n',src)  # drop teaching comments
-    src=src.replace('uruquim:','druse:')                  # the collection is renamed
     return "```odin\n"+src.strip()+"\n```"
 
 def render(page):

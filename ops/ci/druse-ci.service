@@ -1,0 +1,16 @@
+[Unit]
+Description=Druse clean verification gate
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=druse-ci
+Group=druse-ci
+EnvironmentFile=-/etc/druse-ci.env
+ExecStart=/opt/druse-ci/run.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/druse-ci /var/lib/druse-ci

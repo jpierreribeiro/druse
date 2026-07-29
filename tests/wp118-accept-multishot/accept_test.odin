@@ -7,7 +7,7 @@ package test_wp118
 import "core:testing"
 import "core:sys/linux"
 import uring "core:sys/linux/uring"
-import br "uruquim:vendor/uring_buf_ring"
+import br "druse:vendor/uring_buf_ring"
 
 @(test)
 multishot_accept_one_sqe_many_conns :: proc(t: ^testing.T) {

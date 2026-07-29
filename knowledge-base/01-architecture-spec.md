@@ -1,11 +1,11 @@
-# Uruquim — Architecture Specification
+# Druse — Architecture Specification
 
 ## Purpose
 
-This document defines the architecture of Uruquim, a high-performance HTTP
+This document defines the architecture of Druse, a high-performance HTTP
 microframework for Odin.
 
-Uruquim borrows the ergonomics *goals* of Gin/FastAPI-class frameworks while
+Druse borrows the ergonomics *goals* of Gin/FastAPI-class frameworks while
 rejecting the implementation assumptions that come from garbage-collected
 runtimes, reflection-rich type systems, and object-oriented design. It is
 designed to be idiomatic for Odin:
@@ -1160,8 +1160,8 @@ SHALL make database/config/auth integration natural via `app_with_state` +
 ## Reference Project Structure
 
 ```text
-uruquim/
-├── web/                        public package (import web "uruquim:web")
+druse/
+├── web/                        public package (import web "druse:web")
 │   ├── app.odin                app / bare / app_with_state / destroy
 │   ├── routing.odin            get/post/... , router/group/mount
 │   ├── context.odin

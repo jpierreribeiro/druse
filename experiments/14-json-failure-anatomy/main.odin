@@ -4,7 +4,7 @@ package json_failure_anatomy
 import json "core:encoding/json"
 import "core:fmt"
 import "core:mem"
-import web "uruquim:web"
+import web "druse:web"
 
 Address :: struct {
 	number: int `json:"number"`,

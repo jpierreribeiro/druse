@@ -1,4 +1,4 @@
-# Uruquim — Throwaway Prototypes
+# Druse — Throwaway Prototypes
 
 These experiments exist to **ratify or refute** proposed Phase-1 public
 signatures with real Odin, per the freeze discipline: *specification text
@@ -22,7 +22,7 @@ pointer-dereference prototype before that restriction can be reconsidered.
 
 ```bash
 # 1. install dev-2026-07a into an isolated prefix and put it on PATH
-export PATH="/tmp/uruquim-odin-toolchain:$PATH"
+export PATH="/tmp/druse-toolchain:$PATH"
 odin version    # current binary prints dev-2026-07-nightly:819fdc7
 
 # 2. run the verification-only runner (never modifies sources)

@@ -12,7 +12,7 @@ Handlers would see only `^Context` built from `^Request`/`^Response` — never
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..
+odin run . -collection:druse=../..
 odin check .
 ```
 

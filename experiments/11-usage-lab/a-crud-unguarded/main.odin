@@ -4,7 +4,7 @@
 // baseline the concept budget is measured against, and it must stay at 14.
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 Item :: struct {
 	id:   int `json:"id"`,

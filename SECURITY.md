@@ -1,6 +1,6 @@
 # Security policy
 
-Uruquim parses HTTP from untrusted clients, so it has a real attack surface and
+Druse parses HTTP from untrusted clients, so it has a real attack surface and
 needs a real place to report problems.
 
 ## Reporting a vulnerability
@@ -9,13 +9,13 @@ needs a real place to report problems.
 
 Report it privately through GitHub's advisory form:
 
-<https://github.com/jpierreribeiro/uruquim/security/advisories/new>
+<https://github.com/jpierreribeiro/druse/security/advisories/new>
 
 If that is unavailable, open a public issue containing only the words "security
 report, please contact me" and no technical detail, and you will be contacted to
 arrange a private channel.
 
-Useful reports include: the Odin toolchain version, the Uruquim commit, whether
+Useful reports include: the Odin toolchain version, the Druse commit, whether
 `web.serve` or `web.test_request` was in use, and the smallest input that
 reproduces the problem — a raw request on the wire is ideal, since the framing
 layer is where the highest-severity issues have been found so far.
@@ -29,7 +29,7 @@ told honestly what the timeline looks like.
 In scope, and treated seriously:
 
 - request smuggling, response splitting, or any framing ambiguity between
-  Uruquim and an upstream proxy;
+  Druse and an upstream proxy;
 - crashes, hangs, or unbounded memory growth triggerable by a remote client;
 - reading or writing memory outside its lifetime — a request view that outlives
   the request, a double free, a use-after-free;
@@ -47,14 +47,14 @@ Out of scope, because they are documented limitations rather than defects:
 - **only one server per process is supported.** Starting a second concurrently
   is not supported and is known to misbehave; see `planning/post-phase1-audit.md`
   finding A-4;
-- **no TLS.** Run Uruquim behind a reverse proxy that terminates TLS;
-- **no trusted-proxy handling.** Uruquim does not read `Forwarded` or
+- **no TLS.** Run Druse behind a reverse proxy that terminates TLS;
+- **no trusted-proxy handling.** Druse does not read `Forwarded` or
   `X-Forwarded-For`, so it cannot be tricked by them — but it also cannot tell
   you the original client address. Phase 4, ADR-013;
 - panics abort the process. Odin has no recoverable panic; see
   `planning/phase-2-plan.md` FINDING-A.
 
-A report that Uruquim is unsuitable for direct exposure to the public internet
+A report that Druse is unsuitable for direct exposure to the public internet
 is not a vulnerability — the README says so already.
 
 ## Supported versions
@@ -62,14 +62,14 @@ is not a vulnerability — the README says so already.
 There is no release yet, so **only the current `main` is supported.** No
 backports exist and no version is designated long-term.
 
-Uruquim is built against a single pinned Odin toolchain, recorded in
+Druse is built against a single pinned Odin toolchain, recorded in
 `odin-version.txt`. A report against a different toolchain is welcome but may be
 closed as unreproducible if it depends on compiler behaviour that the pinned
 version does not have.
 
 ## Vendored dependencies
 
-Uruquim vendors the root server package of
+Druse vendors the root server package of
 [`laytan/odin-http`](https://github.com/laytan/odin-http) under `vendor/`, at a
 pinned commit, with five local security patches recorded in
 `vendor/odin-http/VENDOR.md`.

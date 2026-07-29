@@ -1,4 +1,4 @@
-# Uruquim — Odin fit audit
+# Druse — Odin fit audit
 
 **Verdict: `ODIN_NATIVE_WITH_FRICTION`.**
 
@@ -11,9 +11,9 @@ prototype was built in `/tmp` and discarded.
 
 ## 1. Summary for the owner
 
-The question was whether Uruquim is genuinely an Odin framework or a Go/Rust/JS
+The question was whether Druse is genuinely an Odin framework or a Go/Rust/JS
 framework wearing Odin syntax. **It is genuinely Odin.** The evidence is not
-stylistic impression — it is that the shapes Uruquim chose are the same shapes
+stylistic impression — it is that the shapes Druse chose are the same shapes
 Odin's own standard library chose, verified against the pinned compiler's
 `core/` sources.
 
@@ -21,7 +21,7 @@ The clearest example is the one that looked most like a flaw. `App` is
 copyable by the language but must not be copied. I reproduced the failure: copy
 the app, destroy both, and the program segfaults, with no compiler warning. That
 sounds damning until you run the same experiment on `core:strings.Builder` —
-Odin's own standard library type — which **segfaults identically**. Uruquim did
+Odin's own standard library type — which **segfaults identically**. Druse did
 not invent a hazard; it inherited the ownership model Odin actually has. A
 framework that tried to "fix" this would be the un-Odin one.
 
@@ -60,7 +60,7 @@ Claims below are labelled by evidence class: **[STATED]** by the maintainers,
 
 Odin's FAQ is explicit: *"We believe that data and code should be separate
 concepts; data should not have 'behaviour'. Use a procedure."* **[STATED]**
-Uruquim has no methods, no builders, no fluent chains, no interfaces. Every
+Druse has no methods, no builders, no fluent chains, no interfaces. Every
 operation is a free procedure taking its subject as the first argument:
 `web.get(&app, ...)`, `web.ok(ctx, value)`. This is not a near-miss; it is the
 stated rule applied literally.
@@ -78,7 +78,7 @@ deliberately paired **[CORE]**:
 `web.app() -> App` plus `web.destroy(&app)` is exactly the `builder_make` /
 `builder_destroy` shape. **[INFERENCE]** The rule that actually holds in core is
 not "always return by value" but "the destructor mirrors the constructor's name
-and takes a pointer" — which Uruquim follows.
+and takes a pointer" — which Druse follows.
 
 ### 2.3 Omitting `#optional_ok` is the core-aligned choice, not a quirk
 
@@ -115,13 +115,13 @@ dialects."* **[STATED]** The 34-symbol ledger contains no synonym pair. `ok` and
 Ada_Case types, snake_case procedures, SCREAMING_SNAKE constants. Verified
 against core, where the convention holds at ~84% for structs and ~90% for enums
 by raw count, and effectively ~100% once C/OS/file-format bindings that
-intentionally mirror foreign identifiers are excluded **[CORE]**. Uruquim
+intentionally mirror foreign identifiers are excluded **[CORE]**. Druse
 complies without exception.
 
 ### 2.6 Small core, dependencies out of core
 
 FAQ, on why things are missing from the standard library: *"when it is complete,
-it will remain small"* **[STATED]**. Uruquim's instinct to keep the public
+it will remain small"* **[STATED]**. Druse's instinct to keep the public
 surface at 34 symbols and push middleware, uploads and OpenAPI outward is the
 same instinct, applied at framework scale.
 
@@ -394,7 +394,7 @@ first route plus one `strings.clone` per route, freed once.
 
 `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md` are all absent from
 the repository root. The tree vendors MIT-licensed code (`vendor/odin-http`) and
-correctly preserves that licence, but Uruquim itself grants no rights. Under
+correctly preserves that licence, but Druse itself grants no rights. Under
 default copyright a public repository without a licence is "all rights
 reserved": nobody may legally use it. **[INFERENCE, but the legal default is not
 in dispute.]**
@@ -520,7 +520,7 @@ strings.builder_destroy(&b)
 strings.builder_destroy(&c)   // Segmentation fault
 ```
 
-This is Odin's ownership model, not a Uruquim defect. See §11 (REJECTED_CONCERN).
+This is Odin's ownership model, not a Druse defect. See §11 (REJECTED_CONCERN).
 
 Operations impossible in Phase 1, discovered by trying: reading a request
 header, setting a response header, sending a body or headers via `test_request`,
@@ -542,7 +542,7 @@ compiled: design 3 would change the frozen `Handler` shape (ADR-011) and design
 2 collapses into design 4 in practice.
 
 The current contract is *more* implicit, and that implicitness buys a real
-property: every Uruquim service in the world returns the same
+property: every Druse service in the world returns the same
 `invalid_path_parameter` envelope, with no effort. The explicit alternative
 costs two lines per extraction and hands error-message design to every
 application author.
@@ -863,7 +863,7 @@ session, which is a predictability signal, not a study.
 Proposed before any 1.0 stability commitment:
 
 * **Participants:** 3–5 Odin programmers, including at least one newcomer to the
-  language and one experienced systems programmer. None involved in Uruquim.
+  language and one experienced systems programmer. None involved in Druse.
 * **Materials:** `docs/quick-start.md` and the three examples only. No access to
   `web/` sources — needing to read internals is itself a finding.
 * **Tasks:** (1) hello world; (2) JSON endpoint; (3) `:param` route with integer
@@ -892,7 +892,7 @@ Official Odin sources, all accessed 2026-07-19:
 | https://github.com/odin-lang/Odin/wiki/naming-convention | naming conventions (wiki, semi-official) |
 
 Primary source inspected directly: the pinned toolchain's own `core/` tree at
-`/tmp/uruquim-odin-toolchain/core/` — `strings/builder.odin`, `net/`, `os/`,
+`/tmp/druse-toolchain/core/` — `strings/builder.odin`, `net/`, `os/`,
 `bufio/`, `container/`, `slice/`, `mem/virtual/`. Where this document says
 **[CORE]**, the claim was verified against those files, not recalled.
 
@@ -900,4 +900,4 @@ Evidence labelling used throughout: **[STATED]** = maintainer statement with
 quote; **[CORE]** = idiom observed in the pinned standard library;
 **[INFERENCE]** = the author's reasoning. No forum opinion, slogan or popularity
 claim is treated as normative, and no comparison framework's published
-benchmarks are cited as evidence about Uruquim.
+benchmarks are cited as evidence about Druse.

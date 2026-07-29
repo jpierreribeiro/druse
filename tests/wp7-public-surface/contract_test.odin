@@ -1,6 +1,6 @@
 // WP7 public-surface contract, from OUTSIDE the package.
 //
-// This package is an EXTERNAL consumer of `uruquim:web`. It exercises
+// This package is an EXTERNAL consumer of `druse:web`. It exercises
 // `web.body` through the ratified public surface only, and adds NO public
 // symbol — every test uses the same 34 symbols that existed before WP7.
 //
@@ -22,7 +22,7 @@ package wp7_public_surface
 
 import "core:encoding/json"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 Create_User :: struct {
 	name:  string   `json:"name"`,

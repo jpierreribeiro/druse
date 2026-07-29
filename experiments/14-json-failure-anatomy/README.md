@@ -5,7 +5,7 @@
 Run:
 
 ```sh
-odin run experiments/14-json-failure-anatomy -collection:uruquim=.
+odin run experiments/14-json-failure-anatomy -collection:druse=.
 ```
 
 ## Observed matrix before any patch

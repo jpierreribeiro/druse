@@ -13,7 +13,7 @@ flagged. Per-request state is one slice header + a few scalars; no per-hop heap.
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..
+odin run . -collection:druse=../..
 odin check .
 ```
 

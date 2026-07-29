@@ -1,5 +1,5 @@
 // WP19 public surface contract — `header` and `bearer_token` as an EXTERNAL
-// consumer of `uruquim:web` sees them, plus the `headers` parameter that makes
+// consumer of `druse:web` sees them, plus the `headers` parameter that makes
 // them testable in memory.
 //
 // The canonical pattern this suite pins is the one the docs teach from today
@@ -9,7 +9,7 @@ package test_wp19_public
 
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 require_auth :: proc(ctx: ^web.Context) {
 	token, ok := web.bearer_token(ctx)

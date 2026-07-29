@@ -93,5 +93,5 @@ The functional/concurrency/drill/soak results are recorded in the board's
 ## 6. What I need from the owner
 
 SSH (or a key) to the larger VPS(s), each with Docker (for the isolated PostgreSQL)
-and the same isolation convention (`/opt/uruquim-verify`, never the box's own
+and the same isolation convention (`/opt/druse-verify`, never the box's own
 services). Nothing else — the build, deploy, and suites are scripted.

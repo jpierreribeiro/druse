@@ -7,7 +7,7 @@ of `planning/production-readiness-closure.md` §4.
 
 ## 0. Why a test and not another paragraph
 
-`docs/operations.md` tells operators to run Uruquim behind a reverse proxy, and
+`docs/operations.md` tells operators to run Druse behind a reverse proxy, and
 the readiness matrix (C-02, rows 12 and 13) delegates **TLS** and **total
 memory** to that topology by decision. The Closure's own classification rule
 (§3) says what that costs:
@@ -31,7 +31,7 @@ therefore carries a ~150-line relay of its own:
 - **+** it runs everywhere the gate runs, forever, with no external dependency;
 - **+** it can switch the one behaviour the contract turns on — response
   buffering — which an installed proxy would need a config file to change;
-- **−** it is **not evidence about nginx.** It proves Uruquim behaves correctly
+- **−** it is **not evidence about nginx.** It proves Druse behaves correctly
   *under the contract*; it cannot prove any particular proxy implements it.
 
 **A real-proxy interop round is therefore OWED**, and is recorded here beside the

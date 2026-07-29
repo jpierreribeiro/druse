@@ -45,7 +45,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 CANDIDATE_PORTS :: [?]int{55037, 55363, 55631, 55907}
 

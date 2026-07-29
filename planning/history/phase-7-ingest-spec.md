@@ -23,7 +23,7 @@ implementation is held to these, not free to choose them after a result.
 |---|---|
 | memory ownership and chunk validity | one chunk buffer at a time; a body of any size costs one chunk, never its length (G7-9). The application receives an explicitly owned spool, not a view into transport memory |
 | temporary directory | application-designated, **required** to opt in; the core never writes to a silent `/tmp` |
-| filename generation | a generated `uruquim-spool-<mixed-hex>` name, `0600`; the client filename is metadata handed to the application, **never** a path the parser opens |
+| filename generation | a generated `druse-spool-<mixed-hex>` name, `0600`; the client filename is metadata handed to the application, **never** a path the parser opens |
 | symlink policy | the spool file is created `O_CREATE\|O_TRUNC\|O_WRONLY` at a generated name inside the designated dir; a client filename with `../` is recorded verbatim and reaches no filesystem call |
 | per-upload / concurrent / process quota | `per_upload_quota` (default 1 GiB), `max_concurrent` admission (default 1, sized below lane capacity), `process_quota` (default 8 GiB), all checked mid-body |
 | maximum fields / parts / header bytes | field values and header blocks are bounded by `memory_prefix_max` (default 64 KiB) and a hard `MP_FIELD_MAX` ceiling; exceeding refuses the body |
@@ -31,7 +31,7 @@ implementation is held to these, not free to choose them after a result.
 | disk-full / filesystem error | a write error is the typed `Disk_Full` terminal; the partial file is deleted and the process-quota reservation returned |
 | request deadline / client disconnect | a disconnect mid-body is the typed `Disconnected` terminal (cleanup); the request deadline is `max_request_time`, unchanged |
 | early refusal / unread-body connection | admission refuses BEFORE any byte is read (`Refused_Admission`); the connection policy is the adapter's existing one |
-| shutdown / crash leftovers | drain cancels active spools (`Cancelled_By_Drain`); the `uruquim-spool-` prefix is the documented operator sweep target, because the core never scans directories at boot |
+| shutdown / crash leftovers | drain cancels active spools (`Cancelled_By_Drain`); the `druse-spool-` prefix is the documented operator sweep target, because the core never scans directories at boot |
 | direct-to-object-store consumer | out of scope for WP94's Productive arm; the Advanced incremental consumer (WP86 arm H) is refused unless it meets its full bar, and refusing it does not refuse safe uploads |
 
 ## 2. The streaming multipart parser

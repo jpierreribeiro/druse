@@ -40,7 +40,7 @@ Illegal instruction (core dumped)      exit=132
 
 The only non-returning escape available on POSIX is `core/sys/posix/setjmp.odin`,
 and a `longjmp` out of a panicking frame skips every `defer` in between — which
-in Uruquim means leaking the request arena, the owned response body and the
+in Druse means leaking the request arena, the owned response body and the
 connection state, per fault.
 
 Consequences for `knowledge-base/03-development-phases.md` §Phase 2:
@@ -142,7 +142,7 @@ a prompt as-is.**
 ### Objective
 
 Answer, with compiling and measured evidence on the pinned toolchain, every
-mechanical question about a middleware chain in Uruquim, so that WP15 specifies
+mechanical question about a middleware chain in Druse, so that WP15 specifies
 something already known to work. **No production file is modified.** The only
 repository output is one findings document.
 
@@ -203,7 +203,7 @@ next :: proc(ctx: ^Context)
 
 ### Probes (the actual work)
 
-Build in `/tmp/uruquim-p2-mw`, using the copy-`web/*.odin`-into-a-throwaway-package
+Build in `/tmp/druse-p2-mw`, using the copy-`web/*.odin`-into-a-throwaway-package
 technique the gate already uses (`build/check.sh:104`). Nothing is written back
 to `web/`.
 
@@ -307,7 +307,7 @@ the observer, any documentation change, any change to `web/` or `build/`.
   `-disable-assert` change the answer? What does a bounds-check failure do (it
   does not go through `panic`)? Which `defer`s are skipped in each candidate,
   and can the resulting leak be measured?
-* **Likely files.** `/tmp/uruquim-p2-recovery/**`; repository output
+* **Likely files.** `/tmp/druse-p2-recovery/**`; repository output
   `planning/phase-2-prototype-recovery.md`.
 * **RED tests.** A program that panics inside a handler must first be shown to
   kill the process **today** — that is the baseline any candidate must beat.
@@ -464,7 +464,7 @@ accepted, amended or rejected by the owner.
 
 > **Status: DELIVERED, pending one full-gate run on the pinned toolchain.**
 > The web/ and web/testing file sets are derived from in-file ledger markers
-> (`// uruquim:file application|test-support|test-machinery`) instead of
+> (`// druse:file application|test-support|test-machinery`) instead of
 > enumerated; the adapter is derived as the single backend importer; the
 > vendor code-shape greps are replaced by wire-corpus coverage assertions;
 > private declaration pins (`response_commit`, `dispatch`) are
@@ -951,7 +951,7 @@ project's own *sentences*. The reference study is the argument for closing that 
 and the argument is empirical rather than theoretical: an equally careful
 project was measured against its own README and **six of its public claims came
 back "imprecisa" or "não demonstrada"** — not because anyone was dishonest, but
-because prose has no compiler and drifts while every test stays green. Uruquim
+because prose has no compiler and drifts while every test stays green. Druse
 has already lived a small version of this: WP21 found three active documents
 still promising a "panic recovery (Phase 2)" that ADR-020 had made impossible.
 

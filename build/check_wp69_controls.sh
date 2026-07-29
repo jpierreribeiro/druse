@@ -3,73 +3,73 @@
 # promoted the measured candidate through the public, transport-neutral gate.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP69-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-if test -n "${URUQUIM_COMPILER:-}"; then
-  URUQUIM_ODIN="$URUQUIM_COMPILER"
-elif test -n "${URUQUIM_ODIN_BIN:-}"; then
-  URUQUIM_ODIN="$URUQUIM_ODIN_BIN"
+if test -n "${DRUSE_COMPILER:-}"; then
+  DRUSE_ODIN="$DRUSE_COMPILER"
+elif test -n "${DRUSE_ODIN_BIN:-}"; then
+  DRUSE_ODIN="$DRUSE_ODIN_BIN"
 elif command -v odin >/dev/null 2>&1; then
-  URUQUIM_ODIN="$(command -v odin)"
-elif test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_ODIN=/tmp/uruquim-odin-toolchain/odin
+  DRUSE_ODIN="$(command -v odin)"
+elif test -x /tmp/druse-toolchain/odin; then
+  DRUSE_ODIN=/tmp/druse-toolchain/odin
 else
   fail "odin compiler not found"
 fi
 
-URUQUIM_ODIN="$(readlink -f "$URUQUIM_ODIN")"
-URUQUIM_ODIN_ROOT="$(cd "$(dirname "$URUQUIM_ODIN")" && pwd)"
-URUQUIM_TMP="$(mktemp -d -t uruquim-wp69-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_TMP"' EXIT
+DRUSE_ODIN="$(readlink -f "$DRUSE_ODIN")"
+DRUSE_ODIN_ROOT="$(cd "$(dirname "$DRUSE_ODIN")" && pwd)"
+DRUSE_TMP="$(mktemp -d -t druse-wp69-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_TMP"' EXIT
 
 run_green() {
   local suite="$1"
-  timeout 20 env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
-    "$URUQUIM_ROOT/tests/wp69-concurrency-lab/$suite" \
-    "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
-    "-out:$URUQUIM_TMP/$suite"
+  timeout 20 env ODIN_ROOT="$DRUSE_ODIN_ROOT" "$DRUSE_ODIN" test \
+    "$DRUSE_ROOT/tests/wp69-concurrency-lab/$suite" \
+    "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+    "-out:$DRUSE_TMP/$suite"
 }
 
-for URUQUIM_SUITE in candidate negative saturation slow-io repeatability drain; do
-  run_green "$URUQUIM_SUITE"
+for DRUSE_SUITE in candidate negative saturation slow-io repeatability drain; do
+  run_green "$DRUSE_SUITE"
 done
 
-URUQUIM_REPORT="$(timeout 20 env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" run \
-  "$URUQUIM_ROOT/experiments/15-blocking-boundary" \
-  "-collection:uruquim=$URUQUIM_ROOT" "-out:$URUQUIM_TMP/report")"
-for URUQUIM_FACT in \
+DRUSE_REPORT="$(timeout 20 env ODIN_ROOT="$DRUSE_ODIN_ROOT" "$DRUSE_ODIN" run \
+  "$DRUSE_ROOT/experiments/15-blocking-boundary" \
+  "-collection:druse=$DRUSE_ROOT" "-out:$DRUSE_TMP/report")"
+for DRUSE_FACT in \
   "one-lane, one blocker      health_before_release=false" \
   "four lanes, three blockers health_before_release=true" \
   "four lanes, four blockers  health_before_release=false" \
   "job-pool arm                 not viable"; do
-  grep -qF "$URUQUIM_FACT" <<<"$URUQUIM_REPORT" || fail "report drifted: $URUQUIM_FACT"
+  grep -qF "$DRUSE_FACT" <<<"$DRUSE_REPORT" || fail "report drifted: $DRUSE_FACT"
 done
 
-URUQUIM_MUTANT="$URUQUIM_TMP/mutant"
-mkdir "$URUQUIM_MUTANT"
-cp "$URUQUIM_ROOT/tests/wp69-concurrency-lab/candidate/candidate_test.odin" "$URUQUIM_MUTANT/"
-sed -i 's/50970, 4/50970, 1/' "$URUQUIM_MUTANT/candidate_test.odin"
-if timeout 20 env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
-    "$URUQUIM_MUTANT" "-collection:uruquim=$URUQUIM_ROOT" \
-    -define:ODIN_TEST_THREADS=1 "-out:$URUQUIM_TMP/mutant-bin" >/dev/null 2>&1; then
+DRUSE_MUTANT="$DRUSE_TMP/mutant"
+mkdir "$DRUSE_MUTANT"
+cp "$DRUSE_ROOT/tests/wp69-concurrency-lab/candidate/candidate_test.odin" "$DRUSE_MUTANT/"
+sed -i 's/50970, 4/50970, 1/' "$DRUSE_MUTANT/candidate_test.odin"
+if timeout 20 env ODIN_ROOT="$DRUSE_ODIN_ROOT" "$DRUSE_ODIN" test \
+    "$DRUSE_MUTANT" "-collection:druse=$DRUSE_ROOT" \
+    -define:ODIN_TEST_THREADS=1 "-out:$DRUSE_TMP/mutant-bin" >/dev/null 2>&1; then
   fail "one-lane mutation unexpectedly preserved candidate liveness"
 fi
 
-if test -f "$URUQUIM_ROOT/planning/phase-6-concurrent-serving.md"; then
+if test -f "$DRUSE_ROOT/planning/phase-6-concurrent-serving.md"; then
   grep -qF "opts.thread_count = handler_concurrency" \
-    "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+    "$DRUSE_ROOT/web/internal/transport/odin_http_adapter.odin" ||
     fail "WP71 no longer maps the measured capacity through the adapter"
   grep -qF "max_handlers:     int" \
-    "$URUQUIM_ROOT/web/internal/transport/boundary.odin" ||
+    "$DRUSE_ROOT/web/internal/transport/boundary.odin" ||
     fail "WP71 no longer carries Handler capacity through the neutral boundary"
 else
   grep -qF "opts.thread_count = 1" \
-    "$URUQUIM_ROOT/web/internal/transport/odin_http_adapter.odin" ||
+    "$DRUSE_ROOT/web/internal/transport/odin_http_adapter.odin" ||
     fail "before WP71, WP69 must not ship speculative public concurrency"
 fi
 

@@ -34,65 +34,65 @@
 # control it did not run.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP21-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W21_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W21_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W21_ODIN="$(command -v odin)"
+DRUSE_W21_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W21_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W21_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W21_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W21_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W21_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W21_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W21_ODIN"; then
-  echo "WP21 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W21_ODIN"; then
+  echo "WP21 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W21_TMP="$(mktemp -d -t uruquim-wp21-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W21_TMP"' EXIT
+DRUSE_W21_TMP="$(mktemp -d -t druse-wp21-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W21_TMP"' EXIT
 
 internal_tree() { # name
-  local t="$URUQUIM_W21_TMP/$1"
+  local t="$DRUSE_W21_TMP/$1"
   mkdir -p "$t"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/"
-  cp "$URUQUIM_ROOT"/tests/wp21-internal/*.odin "$t/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/"
+  cp "$DRUSE_ROOT"/tests/wp21-internal/*.odin "$t/"
   printf '%s' "$t"
 }
 
 # root_tree copies enough of the repository that the PUBLIC suites — which
-# resolve `uruquim:web` through the collection — can be compiled against a
+# resolve `druse:web` through the collection — can be compiled against a
 # mutated package. A mutation to `web/` is invisible to a public suite unless
 # the collection points at the mutated copy, so the copy is the probe.
 root_tree() { # name
-  local t="$URUQUIM_W21_TMP/$1"
+  local t="$DRUSE_W21_TMP/$1"
   mkdir -p "$t/build" "$t/web/testing" "$t/web/internal/transport" "$t/tests" "$t/vendor" "$t/docs"
   # Copy the whole gate-support directory. The documentation programme added
   # Python checkers, the signature ledger and the cookbook generator after
   # this control was first written; copying only the three shell entry points
   # made the UNMUTATED baseline fail before the recovery mutation ran.
-  cp -r "$URUQUIM_ROOT"/build/. "$t/build/"
-  cp "$URUQUIM_ROOT"/README.md "$t/"
+  cp -r "$DRUSE_ROOT"/build/. "$t/build/"
+  cp "$DRUSE_ROOT"/README.md "$t/"
   # The active documentation is recursive now (`docs/guide/` plus its
   # cookbook pages), so a top-level `*.md` copy is no longer a valid baseline.
-  cp -r "$URUQUIM_ROOT"/docs/. "$t/docs/"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/web/"
-  cp "$URUQUIM_ROOT"/web/testing/*.odin "$t/web/testing/"
+  cp -r "$DRUSE_ROOT"/docs/. "$t/docs/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/web/"
+  cp "$DRUSE_ROOT"/web/testing/*.odin "$t/web/testing/"
   # REPOINTED (audit): copy ALL of web/internal, not just transport. `ingest`
   # and `stream` were added later and the transport imports them, so the copied
   # tree stopped compiling and every mutation here reported a BROKEN PROBE
   # instead of a result.
-  cp -r "$URUQUIM_ROOT"/web/internal/. "$t/web/internal/"
-  cp -r "$URUQUIM_ROOT"/vendor/odin-http "$t/vendor/odin-http"
-  cp -r "$URUQUIM_ROOT"/tests/. "$t/tests/"
+  cp -r "$DRUSE_ROOT"/web/internal/. "$t/web/internal/"
+  cp -r "$DRUSE_ROOT"/vendor/odin-http "$t/vendor/odin-http"
+  cp -r "$DRUSE_ROOT"/tests/. "$t/tests/"
   # The docs gate resolves every `compile:` marker to a real file, and those
   # markers point into examples/. Without them the copy fails for a reason
   # that has nothing to do with the mutation under test.
-  cp -r "$URUQUIM_ROOT"/examples "$t/examples"
+  cp -r "$DRUSE_ROOT"/examples "$t/examples"
   # check_docs.sh intentionally uses `git grep` for repository-wide banned
   # vocabulary. Give the throwaway tree a real index so that check does not
   # become vacuous (or print "not a git repository" and continue).
@@ -109,16 +109,16 @@ assert_mutated() { # label file before-hash
 }
 
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W21_ODIN" test "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W21_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W21_ODIN" test "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W21_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 
 # run_public compiles a PUBLIC suite against a mutated root copy: the collection
-# points into the copy, so `import web "uruquim:web"` resolves to the mutation.
+# points into the copy, so `import web "druse:web"` resolves to the mutation.
 run_public() { # root-tree suite test-names
-  env -u ODIN_ROOT "$URUQUIM_W21_ODIN" test "$1/tests/$2" \
-    "-collection:uruquim=$1" -out:"$URUQUIM_W21_TMP/runner-public" \
+  env -u ODIN_ROOT "$DRUSE_W21_ODIN" test "$1/tests/$2" \
+    "-collection:druse=$1" -out:"$DRUSE_W21_TMP/runner-public" \
     "-define:ODIN_TEST_NAMES=$3" 2>&1
 }
 
@@ -324,13 +324,13 @@ echo "CONTROL 6: a doc promising recovery -> REJECTED by the gate as required"
 # `panic` reaches `assertion_failure_proc`, while a bounds-check failure is
 # `proc "contextless"` and cannot consult a hook even in principle. BOTH abort.
 # That is why no hook-based design could have delivered recovery.
-WP21_PROBE_DIR="$URUQUIM_W21_TMP/abort"
+WP21_PROBE_DIR="$DRUSE_W21_TMP/abort"
 mkdir -p "$WP21_PROBE_DIR/baseline" "$WP21_PROBE_DIR/panic" "$WP21_PROBE_DIR/bounds"
 
 cat >"$WP21_PROBE_DIR/baseline/main.odin" <<'ODINEOF'
 package wp21_abort_baseline
 
-import web "uruquim:web"
+import web "druse:web"
 
 healthy :: proc(ctx: ^web.Context) {
 	web.text(ctx, .OK, "pong")
@@ -351,10 +351,10 @@ ODINEOF
 cat >"$WP21_PROBE_DIR/panic/main.odin" <<'ODINEOF'
 package wp21_abort_panic
 
-import web "uruquim:web"
+import web "druse:web"
 
 faulting :: proc(ctx: ^web.Context) {
-	panic("uruquim WP21 probe: a fault inside a handler")
+	panic("druse WP21 probe: a fault inside a handler")
 }
 
 main :: proc() {
@@ -372,7 +372,7 @@ ODINEOF
 cat >"$WP21_PROBE_DIR/bounds/main.odin" <<'ODINEOF'
 package wp21_abort_bounds
 
-import web "uruquim:web"
+import web "druse:web"
 
 faulting :: proc(ctx: ^web.Context) {
 	// A bounds-check failure: `bounds_check_error` is `proc "contextless"` and
@@ -393,8 +393,8 @@ main :: proc() {
 ODINEOF
 
 build_probe() { # dir out
-  env -u ODIN_ROOT "$URUQUIM_W21_ODIN" build "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$2" 2>&1
+  env -u ODIN_ROOT "$DRUSE_W21_ODIN" build "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$2" 2>&1
 }
 
 for WP21_PROBE in baseline panic bounds; do

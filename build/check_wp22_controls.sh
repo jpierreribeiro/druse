@@ -32,34 +32,34 @@
 # reports a control it did not run.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP22-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W22_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W22_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W22_ODIN="$(command -v odin)"
+DRUSE_W22_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W22_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W22_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W22_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W22_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W22_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W22_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W22_ODIN"; then
-  echo "WP22 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W22_ODIN"; then
+  echo "WP22 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
-URUQUIM_W22_ODIN_DIR="$(cd "$(dirname "$URUQUIM_W22_ODIN")" && pwd)"
+DRUSE_W22_ODIN_DIR="$(cd "$(dirname "$DRUSE_W22_ODIN")" && pwd)"
 
-URUQUIM_W22_TMP="$(mktemp -d -t uruquim-wp22-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W22_TMP"' EXIT
+DRUSE_W22_TMP="$(mktemp -d -t druse-wp22-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W22_TMP"' EXIT
 
 internal_tree() { # name
-  local t="$URUQUIM_W22_TMP/$1"
+  local t="$DRUSE_W22_TMP/$1"
   mkdir -p "$t"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/"
-  cp "$URUQUIM_ROOT"/tests/wp22-internal/*.odin "$t/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/"
+  cp "$DRUSE_ROOT"/tests/wp22-internal/*.odin "$t/"
   printf '%s' "$t"
 }
 
@@ -74,8 +74,8 @@ assert_mutated() { # label file before-hash
 # inside the throwaway package. `which` selects the target so a control can
 # mutate `web/` and still exercise the EXTERNAL contract.
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W22_ODIN" test "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W22_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W22_ODIN" test "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W22_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 
@@ -234,19 +234,19 @@ fi
 # `web::logger` and the helpers as `web::[logger.odin]::*`, so a pattern
 # carrying only the file-qualified form would miss a regression that linked the
 # public procedure while dead-stripping its helpers.
-URUQUIM_W22_SYMS='web::(logger$|\[logger\.odin\])'
+DRUSE_W22_SYMS='web::(logger$|\[logger\.odin\])'
 
 wp22_build_consumer() { # label use-line
   local label="$1"
   local use_line="$2"
-  local tree="$URUQUIM_W22_TMP/$label"
+  local tree="$DRUSE_W22_TMP/$label"
   mkdir -p "$tree/app" "$tree/vendor"
-  cp -r "$URUQUIM_ROOT/web" "$tree/web"
-  cp -r "$URUQUIM_ROOT/vendor/odin-http" "$tree/vendor/odin-http"
+  cp -r "$DRUSE_ROOT/web" "$tree/web"
+  cp -r "$DRUSE_ROOT/vendor/odin-http" "$tree/vendor/odin-http"
   cat >"$tree/app/main.odin" <<ODIN
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 ping :: proc(ctx: ^web.Context) {
 	web.text(ctx, .OK, "pong")
@@ -260,30 +260,30 @@ $use_line
 	web.serve(&app, 8080)
 }
 ODIN
-  ( cd "$tree" && env ODIN_ROOT="$URUQUIM_W22_ODIN_DIR" \
-      PATH="$URUQUIM_W22_ODIN_DIR:/usr/bin:/bin" \
-      "$URUQUIM_W22_ODIN" build app "-collection:uruquim=$tree" -out:app.bin >/dev/null ) ||
+  ( cd "$tree" && env ODIN_ROOT="$DRUSE_W22_ODIN_DIR" \
+      PATH="$DRUSE_W22_ODIN_DIR:/usr/bin:/bin" \
+      "$DRUSE_W22_ODIN" build app "-collection:druse=$tree" -out:app.bin >/dev/null ) ||
     fail "the $label consumer did not build; control 7 proved nothing"
   printf '%s' "$tree/app.bin"
 }
 
-URUQUIM_W22_NEG_BIN="$(wp22_build_consumer never-logs "")"
-URUQUIM_W22_NEG="$(nm "$URUQUIM_W22_NEG_BIN" 2>/dev/null | grep -cE "$URUQUIM_W22_SYMS" || true)"
+DRUSE_W22_NEG_BIN="$(wp22_build_consumer never-logs "")"
+DRUSE_W22_NEG="$(nm "$DRUSE_W22_NEG_BIN" 2>/dev/null | grep -cE "$DRUSE_W22_SYMS" || true)"
 
-URUQUIM_W22_POS_BIN="$(wp22_build_consumer does-log "	web.use(&app, web.logger)")"
-URUQUIM_W22_POS="$(nm "$URUQUIM_W22_POS_BIN" 2>/dev/null | grep -cE "$URUQUIM_W22_SYMS" || true)"
+DRUSE_W22_POS_BIN="$(wp22_build_consumer does-log "	web.use(&app, web.logger)")"
+DRUSE_W22_POS="$(nm "$DRUSE_W22_POS_BIN" 2>/dev/null | grep -cE "$DRUSE_W22_SYMS" || true)"
 
-if test "$URUQUIM_W22_POS" -eq 0; then
-  fail "the POSITIVE control links no logger symbol either; the pattern /$URUQUIM_W22_SYMS/ matches nothing, so the zero-assertion below would prove nothing"
+if test "$DRUSE_W22_POS" -eq 0; then
+  fail "the POSITIVE control links no logger symbol either; the pattern /$DRUSE_W22_SYMS/ matches nothing, so the zero-assertion below would prove nothing"
 fi
 
-if test "$URUQUIM_W22_NEG" -ne 0; then
+if test "$DRUSE_W22_NEG" -ne 0; then
   echo "--- logger symbols linked into an application that never names web.logger ---" >&2
-  nm "$URUQUIM_W22_NEG_BIN" | grep -E "$URUQUIM_W22_SYMS" | sed 's/^[0-9a-f]* //' >&2
-  fail "an application that never references web.logger links $URUQUIM_W22_NEG logger symbol(s); the middleware must cost nothing when unused"
+  nm "$DRUSE_W22_NEG_BIN" | grep -E "$DRUSE_W22_SYMS" | sed 's/^[0-9a-f]* //' >&2
+  fail "an application that never references web.logger links $DRUSE_W22_NEG logger symbol(s); the middleware must cost nothing when unused"
 fi
 
-echo "CONTROL 7: application that never names web.logger -> $URUQUIM_W22_NEG logger symbols ($(stat -c%s "$URUQUIM_W22_NEG_BIN") bytes)"
-echo "CONTROL 7: application that DOES use web.logger    -> $URUQUIM_W22_POS logger symbols ($(stat -c%s "$URUQUIM_W22_POS_BIN") bytes) [positive control]"
+echo "CONTROL 7: application that never names web.logger -> $DRUSE_W22_NEG logger symbols ($(stat -c%s "$DRUSE_W22_NEG_BIN") bytes)"
+echo "CONTROL 7: application that DOES use web.logger    -> $DRUSE_W22_POS logger symbols ($(stat -c%s "$DRUSE_W22_POS_BIN") bytes) [positive control]"
 
 echo "PASS: all seven WP22 mutation controls behaved as required"

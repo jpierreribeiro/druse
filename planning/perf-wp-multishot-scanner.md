@@ -43,7 +43,7 @@ Server pinned cores 0-3, wrk cores 4-7, keep-alive `/ping`, distributed load
 | server | req/s | per-core mpstat |
 |---|---|---|
 | bare nbio echo (reuseport, no framework, hardcoded "pong") | ~78k | usr~20 sys~30 **iowait~30-50** soft~5 idle=0 |
-| **Uruquim framework** (`web.app`, full parse/route/lanes/arena) | ~78k | usr~24 sys~37 **iowait~28** soft~11 idle=0 |
+| **Druse framework** (`web.app`, full parse/route/lanes/arena) | ~78k | usr~24 sys~37 **iowait~28** soft~11 idle=0 |
 | fasthttp (Go zero-alloc ceiling) | **~280k** | usr~40 sys~38 **iowait=0** soft~22 idle=0 |
 | Go net/http | ~162k | — |
 
@@ -122,7 +122,7 @@ not a throughput**, so it is single-box-valid:
 
 | server | syscalls **per request** | rps |
 |---|---|---|
-| **Uruquim framework** (`web.app`) | **4.97 `io_uring_enter`/req** | 80.7k |
+| **Druse framework** (`web.app`) | **4.97 `io_uring_enter`/req** | 80.7k |
 | **bare nbio echo** (no framework) | **4.99 `io_uring_enter`/req** | 79.0k |
 | **fasthttp** (Go netpoller) | **0.02 `epoll_pwait`/req** | 281k |
 
@@ -188,7 +188,7 @@ written. Moving shared accept ownership off Handler lanes removes the
 per-request accept cancel/re-arm and lets each connection remain affine to one
 lane. On four server cores this produced:
 
-| load | Uruquim | fasthttp | Uruquim p99 | fasthttp p99 |
+| load | Druse | fasthttp | Druse p99 | fasthttp p99 |
 |---|---:|---:|---:|---:|
 | c100 | 259–260k req/s | 278k req/s | 619–625 µs | 1.13 ms |
 | c400 | 283k req/s | 290k req/s | 2.46 ms | 2.76 ms |

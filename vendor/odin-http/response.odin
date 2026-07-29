@@ -8,7 +8,7 @@ import "core:nbio"
 import "core:slice"
 import "core:strconv"
 import "core:sync"
-// URUQUIM PATCH 19/20 (WP90 / ADR-039) — deadline stamps on the send and
+// DRUSE PATCH 19/20 (WP90 / ADR-039) — deadline stamps on the send and
 // keep-alive paths.
 import "core:time"
 
@@ -338,10 +338,10 @@ response_send_got_body :: proc(r: ^Response, will_close: bool) {
 	}
 
 	buf := bytes.buffer_to_bytes(&r._buf)
-	// URUQUIM PATCH 19 (WP90 / ADR-039) — the write-deadline clock starts when
+	// DRUSE PATCH 19 (WP90 / ADR-039) — the write-deadline clock starts when
 	// the completed response is handed to the event loop, and the operation
 	// handle is retained so a deadline abort (or any close) can cancel it.
-	// URUQUIM PATCH 32 (performance candidate), WITHDRAWN BY PATCH 40 (audit M4).
+	// DRUSE PATCH 32 (performance candidate), WITHDRAWN BY PATCH 40 (audit M4).
 	//
 	// Patch 32 stamped this only when a buffered-write deadline was configured,
 	// to save a clock syscall per response on the default-off path. The saving
@@ -370,12 +370,12 @@ response_send_got_body :: proc(r: ^Response, will_close: bool) {
 
 @(private)
 on_response_sent :: proc(op: ^nbio.Operation, conn: ^Connection) {
-	// URUQUIM PATCH 19 (WP90) — the send is over, however it ended; the write
+	// DRUSE PATCH 19 (WP90) — the send is over, however it ended; the write
 	// deadline no longer applies and there is nothing left to cancel.
 	conn.pending_send = nil
 	conn.send_started = {}
 
-	// URUQUIM PATCH 28 (Closure H-3) — the write-side counters, stamped where the
+	// DRUSE PATCH 28 (Closure H-3) — the write-side counters, stamped where the
 	// send actually ends. `op.send.sent` is the byte count the backend reports on
 	// the completion, so `response_bytes` is bytes-on-the-wire, not bytes-queued.
 	if op.send.err != nil {
@@ -407,11 +407,11 @@ clean_request_loop :: proc(conn: ^Connection, close: Maybe(bool) = nil) {
 
 	conn.loop.res = {}
 
-	// URUQUIM PATCH 6 (WP46) — the request is over; clear its deadline stamp so
+	// DRUSE PATCH 6 (WP46) — the request is over; clear its deadline stamp so
 	// an idle keep-alive connection is not swept as a slow request. The next
 	// `conn_handle_req` stamps the next one.
 	conn.request_started = {}
-	// URUQUIM PATCH 19 (WP90) — same rule for the write side: whatever path
+	// DRUSE PATCH 19 (WP90) — same rule for the write side: whatever path
 	// ended this request cycle, no send deadline may leak into the next one.
 	conn.send_started = {}
 
@@ -419,7 +419,7 @@ clean_request_loop :: proc(conn: ^Connection, close: Maybe(bool) = nil) {
 		connection_close(conn)
 	} else {
 		if !connection_set_state(conn, .Idle) { return }
-		// URUQUIM PATCH 20 (WP90 / ADR-039) — the keep-alive gap starts here
+		// DRUSE PATCH 20 (WP90 / ADR-039) — the keep-alive gap starts here
 		// and ends when the next request's bytes arrive (`on_rline1`). The
 		// idle sweep reads this stamp; `request_started` keeps its Patch-6
 		// meaning untouched.
@@ -433,7 +433,7 @@ clean_request_loop :: proc(conn: ^Connection, close: Maybe(bool) = nil) {
 	}
 }
 
-// URUQUIM PATCH 22 (WP90b) — BRIDGE: the three hooks a detached response
+// DRUSE PATCH 22 (WP90b) — BRIDGE: the three hooks a detached response
 // stream needs from the backend, and nothing more. The adapter owns the pump
 // (chunk framing, owner-lane sends, registry interplay); the backend
 // contributes exactly what is private to it: the heading writer, the request
@@ -447,10 +447,10 @@ clean_request_loop :: proc(conn: ^Connection, close: Maybe(bool) = nil) {
 // the ADAPTER to send on the owner lane. The request-read deadline stamp is
 // cleared: the request has fully arrived, and a long-lived response is not a
 // slow request. The write deadline still applies per send (Patch 19 stamps).
-// URUQUIM PATCH 19 (WP92 amendment) — the pre-registered slow-consumer
+// DRUSE PATCH 19 (WP92 amendment) — the pre-registered slow-consumer
 // default for detached streams (phase-7-spec.md §4.1): when the application
 // left the write deadline off, a stream still gets 30 seconds per send.
-URUQUIM_STREAM_DEFAULT_WRITE_TIMEOUT :: 30 * time.Second
+DRUSE_STREAM_DEFAULT_WRITE_TIMEOUT :: 30 * time.Second
 
 // stream_effective_write_deadline resolves the deadline a detached stream's
 // sends live under. Pure, so the WP92 suite pins the resolution directly.
@@ -458,7 +458,7 @@ stream_effective_write_deadline :: proc(configured: time.Duration) -> time.Durat
 	if configured > 0 {
 		return configured
 	}
-	return URUQUIM_STREAM_DEFAULT_WRITE_TIMEOUT
+	return DRUSE_STREAM_DEFAULT_WRITE_TIMEOUT
 }
 
 stream_prepare :: proc(r: ^Response) -> []u8 {

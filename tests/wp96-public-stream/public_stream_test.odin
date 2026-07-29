@@ -16,7 +16,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // A shared place for a worker to reach the stream token the Handler opened.
 Shared :: struct {

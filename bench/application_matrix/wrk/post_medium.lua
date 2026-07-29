@@ -9,7 +9,7 @@ for i = 1, 64 do
 end
 
 wrk.method = "POST"
-wrk.path = os.getenv("URUQUIM_BENCH_PATH") or "/json/medium"
+wrk.path = os.getenv("DRUSE_BENCH_PATH") or "/json/medium"
 wrk.headers["Content-Type"] = "application/json"
 wrk.body = '{"request_id":"req-0123456789abcdef","items":['
   .. table.concat(items, ",")

@@ -3,14 +3,14 @@
 **Status: PLAN, 2026-07-24. OWNER-MANDATED.** The owner authorized closing all
 eight Phase-8 friction findings (F8-1..F8-8) and driving the framework from
 "controlled pilot" to unconditional production readiness — *"não quero que falte
-nada para os usuários de Uruquim ... uma arquitetura séria e validada."* This is
+nada para os usuários de Druse ... uma arquitetura séria e validada."* This is
 the **corrective WP program** the friction ledger always pointed to: each change
 is a **separately-gated WP with the original freeze ritual**, never an accretion
 shortcut. Phases are NOT renumbered — these are corrective WPs **C1..C7**, off
 the phase timeline.
 
 Roadmap position: Phase 8 (proof-by-use) produced the findings; this program
-*repairs* them. The board (`uruquim-board`) is the acceptance harness — each
+*repairs* them. The board (`druse-board`) is the acceptance harness — each
 corrective WP is done when the board can drop its workaround and its RED test
 goes green.
 
@@ -33,8 +33,8 @@ goes green.
    delegated.
 
 ### The ledger-amendment ritual (per public symbol added) — the 6-to-12 files
-From `uruquim-gate-amendment-checklist`: `build/check_public_api.sh` (the
-`URUQUIM_EXPECTED_EXPORTS` list + the app-count and union-count checks + echo
+From `druse-gate-amendment-checklist`: `build/check_public_api.sh` (the
+`DRUSE_EXPECTED_EXPORTS` list + the app-count and union-count checks + echo
 lines + remove from the later-phase ban list); `build/check_phase1_freeze.sh`
 (counts, citation floor, future-vocabulary regex); `build/phase1-public-signatures.txt`
 (run the freeze gate FIRST, verify the diff is exactly the new rows);

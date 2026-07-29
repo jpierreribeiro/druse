@@ -1,4 +1,4 @@
-// Uruquim example 02 — a JSON API in CRUD shape.
+// Druse example 02 — a JSON API in CRUD shape.
 //
 // This is the proof that a small CRUD-style API is expressible with the public
 // Phase-1 surface alone: no allocator setup, no transport selection, no
@@ -13,7 +13,7 @@
 //
 // Run it from the repository root:
 //
-//	odin run examples/02-json-api -collection:uruquim=.
+//	odin run examples/02-json-api -collection:druse=.
 //
 // Try it:
 //
@@ -31,7 +31,7 @@
 // moment the server handles two requests at once.
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 // Data transfer objects. The `json:"..."` tags decide the names on the wire.
 User :: struct {

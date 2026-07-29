@@ -21,19 +21,19 @@
 # BLOCKED and exits 2 — it never reports a control it did not run.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP16-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W16_TMP="$(mktemp -d -t uruquim-wp16-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W16_TMP"' EXIT
+DRUSE_W16_TMP="$(mktemp -d -t druse-wp16-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W16_TMP"' EXIT
 
 # A minimal static tree: exactly what check_public_api.sh reads.
 static_tree() {
-  local t="$URUQUIM_W16_TMP/static-$1"
+  local t="$DRUSE_W16_TMP/static-$1"
   # web/internal now holds three private packages: check_public_api.sh (amended
   # by WP87/WP94) requires the subdir set to be EXACTLY {transport, stream,
   # ingest}, so the static tree must mirror all three or the subdir guard fires
@@ -41,15 +41,15 @@ static_tree() {
   # copied until WP7.5-C1 found the staleness.)
   mkdir -p "$t/build" "$t/web/testing" "$t/web/internal/transport" \
     "$t/web/internal/stream" "$t/web/internal/ingest" "$t/tests" "$t/vendor"
-  cp "$URUQUIM_ROOT"/build/check_public_api.sh "$t/build/"
-  cp "$URUQUIM_ROOT"/build/check.sh "$t/build/"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/web/"
-  cp "$URUQUIM_ROOT"/web/testing/*.odin "$t/web/testing/"
-  cp "$URUQUIM_ROOT"/web/internal/transport/*.odin "$t/web/internal/transport/"
-  cp "$URUQUIM_ROOT"/web/internal/stream/*.odin "$t/web/internal/stream/"
-  cp "$URUQUIM_ROOT"/web/internal/ingest/*.odin "$t/web/internal/ingest/"
-  cp -r "$URUQUIM_ROOT"/vendor/odin-http "$t/vendor/odin-http"
-  cp -r "$URUQUIM_ROOT"/tests/. "$t/tests/"
+  cp "$DRUSE_ROOT"/build/check_public_api.sh "$t/build/"
+  cp "$DRUSE_ROOT"/build/check.sh "$t/build/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/web/"
+  cp "$DRUSE_ROOT"/web/testing/*.odin "$t/web/testing/"
+  cp "$DRUSE_ROOT"/web/internal/transport/*.odin "$t/web/internal/transport/"
+  cp "$DRUSE_ROOT"/web/internal/stream/*.odin "$t/web/internal/stream/"
+  cp "$DRUSE_ROOT"/web/internal/ingest/*.odin "$t/web/internal/ingest/"
+  cp -r "$DRUSE_ROOT"/vendor/odin-http "$t/vendor/odin-http"
+  cp -r "$DRUSE_ROOT"/tests/. "$t/tests/"
   printf '%s' "$t"
 }
 
@@ -120,24 +120,24 @@ must_pass "$T" "6: vendor patch re-applied differently"
 # the change must STILL fail, at section 3b — the named assertion that a group
 # over private members is unfreezable (ADR-021 as amended). Both layers need
 # `odin doc`, so this control requires the pinned toolchain.
-URUQUIM_W16_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W16_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W16_ODIN="$(command -v odin)"
+DRUSE_W16_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W16_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W16_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W16_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W16_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W16_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W16_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W16_ODIN"; then
-  echo "CONTROL 5: private-member proc group -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN)." >&2
+if test -z "$DRUSE_W16_ODIN"; then
+  echo "CONTROL 5: private-member proc group -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN)." >&2
   echo "The five static controls above ran and passed; control 5 DID NOT RUN." >&2
   exit 2
 fi
 
-F="$URUQUIM_W16_TMP/freeze"
+F="$DRUSE_W16_TMP/freeze"
 mkdir -p "$F"
 # The freeze gate resolves evidence citations against the whole tree, so the
 # control tree is a full copy of the repository (sans VCS metadata).
-( cd "$URUQUIM_ROOT" && tar --exclude=.git -cf - . ) | ( cd "$F" && tar -xf - )
+( cd "$DRUSE_ROOT" && tar --exclude=.git -cf - . ) | ( cd "$F" && tar -xf - )
 
 cat >>"$F/web/serve.odin" <<'ODIN'
 
@@ -155,7 +155,7 @@ wp16_probe_group :: proc {
 }
 ODIN
 
-if OUT="$( cd "$F" && env URUQUIM_ODIN_BIN="$URUQUIM_W16_ODIN" bash build/check_phase1_freeze.sh 2>&1 )"; then
+if OUT="$( cd "$F" && env DRUSE_ODIN_BIN="$DRUSE_W16_ODIN" bash build/check_phase1_freeze.sh 2>&1 )"; then
   echo "$OUT" >&2
   fail "control '5: private-member proc group' layer 1 PASSED; the freeze gate no longer notices an injected exported group"
 fi
@@ -168,7 +168,7 @@ echo "CONTROL 5 (layer 1: injected group vs snapshot) -> FAILED as required"
 grep -E '^\s*\+(application|test-support)\s' <<<"$OUT" | sed -E 's/^\s*\+//' \
   >>"$F/build/phase1-public-signatures.txt"
 LC_ALL=C sort -o "$F/build/phase1-public-signatures.txt" "$F/build/phase1-public-signatures.txt"
-if OUT2="$( cd "$F" && env URUQUIM_ODIN_BIN="$URUQUIM_W16_ODIN" bash build/check_phase1_freeze.sh 2>&1 )"; then
+if OUT2="$( cd "$F" && env DRUSE_ODIN_BIN="$DRUSE_W16_ODIN" bash build/check_phase1_freeze.sh 2>&1 )"; then
   echo "$OUT2" >&2
   fail "control '5' layer 2 PASSED: a refreshed snapshot laundered a private-member group past the freeze gate; the 3b guard is dead"
 fi

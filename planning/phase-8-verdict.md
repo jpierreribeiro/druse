@@ -9,7 +9,7 @@ ratification of the ADR-028 amendment (Gate 4), pre-release hygiene (Gate 5), an
 the WP112 human condition + merge/tag (Gate 6). This document does not itself
 freeze or tag anything.
 
-The reference application is `jpierreribeiro/uruquim-board`; the deployment-#5
+The reference application is `jpierreribeiro/druse-board`; the deployment-#5
 line is board `corrective-repin` `c5e1dfd` on the corrective core (`phase8`
 `03c2bce`) + crystals (`corrective` `7c64d47`). Framework findings and their
 resolutions live in `planning/phase-8-friction-ledger.md`.
@@ -26,9 +26,9 @@ the owner's sign-offs.
 ## 1. What Phase 8 built and proved
 
 A real, multi-user, data-backed operations/project board, built and operated
-**only through pinned public Uruquim + Crystals contracts** (separate repo; no
+**only through pinned public Druse + Crystals contracts** (separate repo; no
 friend import; G8-1 structural), then deployed, evolved and faulted on real
-hardware (VPS `45.32.215.234`, isolated under `/opt/uruquim-verify`).
+hardware (VPS `45.32.215.234`, isolated under `/opt/druse-verify`).
 
 Proven **live against real PostgreSQL** (not just typecheck):
 

@@ -1,6 +1,6 @@
 // Deterministic blocking-boundary instrument shared by WP69 tests and report.
 // It uses odin-http directly so the experiment can vary its existing lane
-// count without adding a speculative Uruquim public setting before evidence.
+// count without adding a speculative Druse public setting before evidence.
 package blocking_lab
 
 import "core:net"
@@ -10,7 +10,7 @@ import "core:strings"
 import "core:sync"
 import "core:thread"
 import "core:time"
-import http "uruquim:vendor/odin-http"
+import http "druse:vendor/odin-http"
 
 Observation_Window :: 250 * time.Millisecond
 Baseline_Ceiling :: 25 * time.Millisecond

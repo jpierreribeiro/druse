@@ -11,7 +11,7 @@ control the decision.
 - Protocol and security claims must be checked against RFCs or official
   implementation documentation before entering normative text.
 - Performance claims are hypotheses until measured on the pinned Odin
-  toolchain and representative Uruquim workloads.
+  toolchain and representative Druse workloads.
 - Go, Rust, Zig, C, NGINX, Envoy, and other frameworks are comparative
   evidence, not Odin-language evidence.
 

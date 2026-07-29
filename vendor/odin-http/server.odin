@@ -10,7 +10,7 @@ import "core:log"
 import "core:mem"
 import "core:mem/virtual"
 import "core:nbio"
-// URUQUIM PATCH 19 (WP90) — for the SO_LINGER abort in `connection_abort`.
+// DRUSE PATCH 19 (WP90) — for the SO_LINGER abort in `connection_abort`.
 // `core:net`'s own `.Linger` option is unusable here: on this pinned
 // toolchain it marshals a `timeval` where the kernel expects `struct linger`.
 import "core:sys/linux"
@@ -21,11 +21,11 @@ import "core:sync"
 import "core:thread"
 import "core:time"
 
-// URUQUIM PATCH 32 (adopted performance path) — one acceptor owns the shared
+// DRUSE PATCH 32 (adopted performance path) — one acceptor owns the shared
 // listen socket and assigns each connection once to an available lane. The
 // previous shared-accept implementation remains available as a build-time
 // rollback control.
-URUQUIM_DEDICATED_ACCEPT :: #config(URUQUIM_DEDICATED_ACCEPT, true)
+DRUSE_DEDICATED_ACCEPT :: #config(DRUSE_DEDICATED_ACCEPT, true)
 
 Server_Opts :: struct {
 	// Whether the server should accept every request that sends a "Expect: 100-continue" header automatically.
@@ -47,7 +47,7 @@ Server_Opts :: struct {
 	// The HTTP spec does not specify any limits but in practice it is safer.
 	// defaults to 8000.
 	limit_headers:           int,
-	// URUQUIM PATCH 8 (WP47) — bounded admission.
+	// DRUSE PATCH 8 (WP47) — bounded admission.
 	//
 	// The maximum number of concurrent connections the SERVER will hold across
 	// all lanes. Zero means unbounded, which is the upstream behaviour and the
@@ -63,7 +63,7 @@ Server_Opts :: struct {
 	// honest; one that accepts everything until the kernel stops it is a server
 	// whose failure mode is an accident.
 	max_connections:         int,
-	// URUQUIM PATCH 8 (WP47) — the stop reservation.
+	// DRUSE PATCH 8 (WP47) — the stop reservation.
 	//
 	// How many connection slots are held back from ADMISSION so that a drain
 	// always has room to work in. Admission is refused at or below
@@ -73,7 +73,7 @@ Server_Opts :: struct {
 	// failure is not running out of capacity — it is running out and having none
 	// left to shut down with.**
 	reserved_connections:    int,
-	// URUQUIM PATCH 11 (WP59) — BRIDGE. The absolute drain deadline.
+	// DRUSE PATCH 11 (WP59) — BRIDGE. The absolute drain deadline.
 	//
 	// How long a graceful shutdown may take, measured from the moment
 	// `server_shutdown` is observed. Zero means unbounded, which is the upstream
@@ -91,7 +91,7 @@ Server_Opts :: struct {
 	// cannot finish teardown until it returns. Other lanes may still enforce
 	// their deadline. The supervisor's kill is still the outer bound.
 	max_drain_time:          time.Duration,
-	// URUQUIM PATCH 6 (WP46 / ADR-031) — the request read deadline.
+	// DRUSE PATCH 6 (WP46 / ADR-031) — the request read deadline.
 	//
 	// How long ONE request may take to arrive, from its first byte to its last.
 	// Zero disables it, which is the upstream behaviour and the default here, so
@@ -100,7 +100,7 @@ Server_Opts :: struct {
 	// WHY THIS EXISTS: the upstream read has no deadline at all — `scanner.odin`
 	// carries a `TODO: some kinda timeout on this` at the recv site — so a client
 	// that opens a connection and sends one byte a minute, or sends a valid
-	// prefix and stops, holds the connection open indefinitely. Uruquim's WP41
+	// prefix and stops, holds the connection open indefinitely. Druse's WP41
 	// fault laboratory demonstrated both against this server before this patch
 	// existed. It is slowloris: one socket, no bandwidth, held forever.
 	//
@@ -111,7 +111,7 @@ Server_Opts :: struct {
 	// allocation, and no timer-capacity question — at the cost of granularity,
 	// which for a defence measured in seconds is not a cost.
 	request_read_timeout:    time.Duration,
-	// URUQUIM PATCH 19 (WP90 / ADR-039) — the response write deadline.
+	// DRUSE PATCH 19 (WP90 / ADR-039) — the response write deadline.
 	//
 	// How long ONE response send may take, from the moment the completed
 	// response is handed to the event loop until the backend reports it sent.
@@ -131,7 +131,7 @@ Server_Opts :: struct {
 	// "does not fire": its test watched for EOF that the kernel's buffered
 	// bytes delayed past the test window.)
 	response_write_timeout:  time.Duration,
-	// URUQUIM PATCH 20 (WP90 / ADR-039) — the idle keep-alive timeout.
+	// DRUSE PATCH 20 (WP90 / ADR-039) — the idle keep-alive timeout.
 	//
 	// How long a connection may sit BETWEEN requests before the server closes
 	// it. Zero disables it (upstream behaviour, default). Distinct from the
@@ -190,7 +190,7 @@ Server :: struct {
 	accept_failures: int,
 	refused_connections: int,
 	lanes_ready:     sync.Wait_Group,
-	// URUQUIM PATCH 33 (transport audit F2) — the acceptor assigns work into a
+	// DRUSE PATCH 33 (transport audit F2) — the acceptor assigns work into a
 	// LANE'S event loop (`next_tick_poly` allocates from the lane's operation
 	// pool, enqueues on the lane's MPSC and writes the lane's eventfd). Nothing
 	// used to order "the acceptor stopped assigning" against "the lane released
@@ -201,15 +201,15 @@ Server :: struct {
 	// allocated from a destroyed arena. Set once by the acceptor when no further
 	// assignment is possible; every lane waits for it before releasing.
 	accept_drained: Atomic(bool),
-	// URUQUIM PATCH 8 (WP47, amended by WP71) — the admission budget is
+	// DRUSE PATCH 8 (WP47, amended by WP71) — the admission budget is
 	// server-wide. A lane-local `len(td.conns)` multiplied the public limit by
 	// the number of Handler lanes once concurrent serving shipped.
 	active_connections: int,
-	// URUQUIM PATCH 12 (WP70) — BRIDGE. Connections refused for admission since
+	// DRUSE PATCH 12 (WP70) — BRIDGE. Connections refused for admission since
 	// this server started. Written by every lane and read by the adapter, so the
 	// total is atomic; the lane-local transition counter below needs no sharing.
 	refused_total:  int,
-	// URUQUIM PATCH 28 (Closure H-3) — BRIDGE. The write-side counters behind
+	// DRUSE PATCH 28 (Closure H-3) — BRIDGE. The write-side counters behind
 	// `web.Server_Stats`. Server-wide, written by every lane through
 	// `sync.atomic_add` and read by the adapter without a request in hand — the
 	// same discipline as `refused_total`. Each is a running total for the life of
@@ -221,7 +221,7 @@ Server :: struct {
 	response_bytes:       i64, // bytes handed to the socket for those responses
 	send_errors:          int, // buffered-response sends that completed with an error
 	write_deadline_aborts:int, // connections aborted by the sweep's write-deadline branch
-	// URUQUIM PATCH 35 (Campaign C) — BRIDGE. Total nanoseconds lanes spent
+	// DRUSE PATCH 35 (Campaign C) — BRIDGE. Total nanoseconds lanes spent
 	// inside dispatched handlers, as a running total for the life of the server
 	// (WP50's counter shape: a scraper differences it). This replaces
 	// `lane_collisions`, whose NAMED source is dead under dedicated accept —
@@ -237,7 +237,7 @@ Server :: struct {
 	// hand — same atomic discipline as the counters above. Deletable with the
 	// vendored backend when `core:net/http` lands.
 	handler_dwell_ns:     i64,
-	// URUQUIM PATCH 42 (acceptor saturation interop) — BRIDGE. The dedicated
+	// DRUSE PATCH 42 (acceptor saturation interop) — BRIDGE. The dedicated
 	// acceptor may discover that every Handler lane is active before it has
 	// parsed or associated an HTTP request with the accepted socket. Sending an
 	// HTTP response in that state is invalid for clients that have not yet
@@ -250,10 +250,10 @@ Server :: struct {
 	// Once the server starts closing/shutdown this is set to true, all threads will check it
 	// and start their thread local shutdown procedure.
 	//
-	// URUQUIM PATCH 12 (WP70) — BRIDGE. The false-to-true transition also elects
+	// DRUSE PATCH 12 (WP70) — BRIDGE. The false-to-true transition also elects
 	// the single shutdown owner; repeated callers return before touching lanes.
 	closing:        Atomic(bool),
-	// URUQUIM PATCH 30 (Closure H-2 follow-up / F-C03-2) — set by a lane that
+	// DRUSE PATCH 30 (Closure H-2 follow-up / F-C03-2) — set by a lane that
 	// could not acquire its io_uring event loop, so `serve` returns an error
 	// instead of the process terminating. See `_server_thread_init`.
 	init_failed:    Atomic(bool),
@@ -270,17 +270,17 @@ Server_Thread :: struct {
 	event_loop: ^nbio.Event_Loop,
 	conns:      map[net.TCP_Socket]^Connection,
 	state:      Server_State,
-	// URUQUIM PATCH 12 (WP70) — BRIDGE. Each lane owns the Date buffer it writes
+	// DRUSE PATCH 12 (WP70) — BRIDGE. Each lane owns the Date buffer it writes
 	// and reads; sharing the server-level buffer was a cross-thread data race.
 	date:       Server_Date,
 	accept:     ^nbio.Operation,
-	// URUQUIM PATCH 13 (WP71) — BRIDGE. Synchronous Handler execution owns one
+	// DRUSE PATCH 13 (WP71) — BRIDGE. Synchronous Handler execution owns one
 	// lane; its accept stays suspended until application code returns.
 	handler_active: bool,
 	assigned_connections: int,
 	queued_handoffs:      int,
 
-	// URUQUIM PATCH 8 (WP47) — refusals since admission was last available.
+	// DRUSE PATCH 8 (WP47) — refusals since admission was last available.
 	//
 	// COUNTED, not logged per event, and the transition is what gets logged:
 	// once on entering the exhausted state and once on leaving it. Ten thousand
@@ -289,9 +289,9 @@ Server_Thread :: struct {
 	// performs on itself (WP40 §2.5).
 	refused_connections: int,
 
-	// URUQUIM PATCH 21 (WP90 / F9) — consecutive accept failures on this
+	// DRUSE PATCH 21 (WP90 / F9) — consecutive accept failures on this
 	// lane. Reset by every successful accept; reaching
-	// `URUQUIM_ACCEPT_FAILURE_LIMIT` is still fatal, so a permanently dead
+	// `DRUSE_ACCEPT_FAILURE_LIMIT` is still fatal, so a permanently dead
 	// listener cannot become a silent outage.
 	accept_failures: int,
 
@@ -307,11 +307,11 @@ Accepted_Connection :: struct {
 	valid:    bool,
 }
 
-// URUQUIM PATCH 21 (WP90 / F9) — accept-error tolerance bounds.
+// DRUSE PATCH 21 (WP90 / F9) — accept-error tolerance bounds.
 @(private)
-URUQUIM_ACCEPT_FAILURE_LIMIT :: 128
+DRUSE_ACCEPT_FAILURE_LIMIT :: 128
 @(private)
-URUQUIM_ACCEPT_RETRY_DELAY :: 10 * time.Millisecond
+DRUSE_ACCEPT_RETRY_DELAY :: 10 * time.Millisecond
 // A handoff is a `next_tick` callback on the destination lane. A hostile
 // connect/RST loop can otherwise enqueue callbacks faster than a lane can
 // observe that their sockets are already dead. Two preserves one callback
@@ -319,7 +319,7 @@ URUQUIM_ACCEPT_RETRY_DELAY :: 10 * time.Millisecond
 // failure under a ~49k connection/s RST flood. Established keep-alive
 // connections do not consume this bounded queue.
 @(private)
-URUQUIM_ACCEPT_HANDOFF_LIMIT :: 2
+DRUSE_ACCEPT_HANDOFF_LIMIT :: 2
 
 @(private, disabled = ODIN_DISABLE_ASSERT)
 assert_has_td :: #force_inline proc(loc := #caller_location) {
@@ -345,7 +345,7 @@ listen :: proc(
 	// max_free_blocks_queued = int(s.opts.max_free_blocks_queued)
 
 	acquire_err := nbio.acquire_thread_event_loop()
-	// URUQUIM PATCH 29+30 (Closure H-2 / F-C03-2) — HANDLE the acquire failure
+	// DRUSE PATCH 29+30 (Closure H-2 / F-C03-2) — HANDLE the acquire failure
 	// gracefully; do not assert on it.
 	//
 	// WHAT THIS IS. `acquire_thread_event_loop` sets up the thread's `io_uring`
@@ -363,7 +363,7 @@ listen :: proc(
 	// startup — the outcome an operator can handle instead of a crash.
 	if acquire_err != nil {
 		log.errorf(
-			"uruquim: could not acquire the io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — one event loop is set up per Handler lane per server, so raise the locked-memory limit, lower max_handlers, or run fewer concurrent servers. (F-C03-2)",
+			"druse: could not acquire the io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — one event loop is set up per Handler lane per server, so raise the locked-memory limit, lower max_handlers, or run fewer concurrent servers. (F-C03-2)",
 			acquire_err,
 		)
 		// Not enough space in internal tables/buffers to create a socket's
@@ -391,7 +391,7 @@ serve :: proc(s: ^Server, h: Handler) -> (err: net.Network_Error) {
 	thread_count := max(1, s.opts.thread_count)
 	sync.wait_group_add(&s.threads_closed, thread_count)
 	s.threads = make([]Server_Thread, thread_count, s.conn_allocator)
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		sync.wait_group_add(&s.lanes_ready, thread_count)
 		for &lane in s.threads {
 			lane.thread = thread.create_and_start_with_poly_data2(s, &lane, _server_thread_init, context)
@@ -399,7 +399,7 @@ serve :: proc(s: ^Server, h: Handler) -> (err: net.Network_Error) {
 		sync.wait(&s.lanes_ready)
 		if !atomic_load(&s.init_failed) {
 			_server_accept_loop(s)
-			// URUQUIM PATCH 33 (transport audit F4) — release the acceptor's
+			// DRUSE PATCH 33 (transport audit F4) — release the acceptor's
 			// event loop only once every lane has finished, because a lane's
 			// `handler_lane_leave` can still be calling `nbio.wake_up` on it.
 			sync.wait(&s.threads_closed)
@@ -426,14 +426,14 @@ serve :: proc(s: ^Server, h: Handler) -> (err: net.Network_Error) {
 
 	net.shutdown(s.tcp_sock, .Both)
 	net.close(s.tcp_sock)
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		for t in s.threads { thread.destroy(t.thread) }
 	} else {
 		for t in s.threads[1:] { thread.destroy(t.thread) }
 	}
 	delete(s.threads)
 
-	// URUQUIM PATCH 30 (Closure H-2 follow-up / F-C03-2) — a lane that could not
+	// DRUSE PATCH 30 (Closure H-2 follow-up / F-C03-2) — a lane that could not
 	// acquire its event loop unwound cleanly and flagged this; report it so
 	// `web.serve` fails with a supervisor-restartable error instead of the
 	// process having terminated.
@@ -460,11 +460,11 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 	td.conns = make(map[net.TCP_Socket]^Connection)
 	// td.free_temp_blocks = make(map[int]queue.Queue(^Block))
 
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		err := nbio.acquire_thread_event_loop()
 		if err != nil {
 			log.errorf(
-				"uruquim: a Handler lane could not acquire its io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — raise the locked-memory limit or lower max_handlers. (F-C03-2)",
+				"druse: a Handler lane could not acquire its io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — raise the locked-memory limit or lower max_handlers. (F-C03-2)",
 				err,
 			)
 			atomic_store(&s.init_failed, true)
@@ -478,7 +478,7 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 	} else {
 		if td != &s.threads[0] {
 			err := nbio.acquire_thread_event_loop()
-		// URUQUIM PATCH 29+30 (Closure H-2 / F-C03-2) — the lane-thread twin of
+		// DRUSE PATCH 29+30 (Closure H-2 / F-C03-2) — the lane-thread twin of
 		// the graceful acquire handling in `listen`; same cause
 		// (RLIMIT_MEMLOCK / memory). Instead of asserting, this lane UNWINDS: it
 		// flags the failure so `serve` returns an error, elects the shutdown so
@@ -488,7 +488,7 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 		// loop it does not have.
 			if err != nil {
 			log.errorf(
-				"uruquim: a Handler lane could not acquire its io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — raise the locked-memory limit or lower max_handlers. (F-C03-2)",
+				"druse: a Handler lane could not acquire its io_uring event loop (%v). This is typically RLIMIT_MEMLOCK (ulimit -l) or memory exhaustion — raise the locked-memory limit or lower max_handlers. (F-C03-2)",
 				err,
 			)
 			atomic_store(&s.init_failed, true)
@@ -508,7 +508,7 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 	// data race even though the bytes usually looked harmless.
 	server_date_start(s)
 
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		sync.wait_group_done(&s.lanes_ready)
 	} else {
 		log.debug("accepting connections")
@@ -524,7 +524,7 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 
 		err := nbio.tick()
 		if err != nil {
-			// URUQUIM PATCH 33 (transport audit F3) — A DEAD LANE MUST NOT LOOK
+			// DRUSE PATCH 33 (transport audit F3) — A DEAD LANE MUST NOT LOOK
 			// ALIVE. This used to `break` and nothing else: `td.event_loop` stayed
 			// non-nil, so `accept_choose_lane` kept selecting this lane, the next
 			// two connections were assigned into an MPSC nobody would ever drain,
@@ -548,7 +548,7 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 
 	log.debug("event loop end")
 
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
 	} else {
 		if td != &s.threads[0] {
@@ -563,7 +563,7 @@ _server_thread_init :: proc(s: ^Server, ttd: ^Server_Thread) {
 @(private)
 SHUTDOWN_INTERVAL :: time.Millisecond * 100
 
-// URUQUIM PATCH 33 (transport audit F1) — how often the dedicated acceptor
+// DRUSE PATCH 33 (transport audit F1) — how often the dedicated acceptor
 // re-evaluates lane availability while it is holding a connection it could not
 // place. Only reached in the saturated state; see `_server_accept_loop`.
 @(private)
@@ -580,7 +580,7 @@ ACCEPT_STALL_RECHECK :: time.Millisecond * 100
 // 4. Close the main socket.
 // 5. Signal 'server_start' it can return.
 server_shutdown :: proc(s: ^Server) {
-	// URUQUIM PATCH 12 (WP70) — BRIDGE. Exactly one caller owns wake-up.
+	// DRUSE PATCH 12 (WP70) — BRIDGE. Exactly one caller owns wake-up.
 	// Repeated stop calls used to walk
 	// `s.threads` while the first drain was freeing it, which is the WP69
 	// multi-lane shutdown crash.
@@ -589,14 +589,14 @@ server_shutdown :: proc(s: ^Server) {
 	if !changed {
 		return
 	}
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		accept_loop := sync.atomic_load_explicit(&s.accept_loop, .Acquire)
 		if accept_loop != nil {
 			nbio.wake_up(accept_loop)
 		}
 	}
 	for t in s.threads {
-		// URUQUIM PATCH 30 (Closure H-2 follow-up) — a lane that has not yet
+		// DRUSE PATCH 30 (Closure H-2 follow-up) — a lane that has not yet
 		// reached `td.event_loop = current_thread_event_loop()` (still
 		// initializing, or one that FAILED to acquire and returned) has a nil
 		// loop; waking nil crashes. Skip it: an uninitialized lane will observe
@@ -627,7 +627,7 @@ _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 	// 	log.infof("had %i temp blocks to spare", blocks)
 	// }
 
-	// URUQUIM PATCH 11 (WP59) — BRIDGE. The absolute drain deadline.
+	// DRUSE PATCH 11 (WP59) — BRIDGE. The absolute drain deadline.
 	//
 	// WP58 measured what this replaces: with eight idle keep-alive connections
 	// the drain did not end at all, and releasing the clients' sockets crashed
@@ -656,7 +656,7 @@ _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 
 		for sock, conn in td.conns {
 			#partial switch conn.state {
-			// URUQUIM PATCH 26 (Closure C-03 / F-C03-1) — `.Will_Close` BELONGS
+			// DRUSE PATCH 26 (Closure C-03 / F-C03-1) — `.Will_Close` BELONGS
 			// HERE, and its absence made `max_drain_time` bound nothing.
 			//
 			// THE DEFECT. This `#partial switch` named six of the seven
@@ -727,7 +727,7 @@ _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 
 	td.state = .Cleaning
 
-	when !URUQUIM_DEDICATED_ACCEPT {
+	when !DRUSE_DEDICATED_ACCEPT {
 		nbio.remove(td.accept)
 		td.accept = nil
 	}
@@ -759,8 +759,8 @@ _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 		fmt.assertf(err == nil, "IO tick error during shutdown drain: %v", err)
 	}
 	_ = drain_expired
-	when URUQUIM_DEDICATED_ACCEPT {
-		// URUQUIM PATCH 33 (transport audit F2) — DO NOT DESTROY THIS LOOP WHILE
+	when DRUSE_DEDICATED_ACCEPT {
+		// DRUSE PATCH 33 (transport audit F2) — DO NOT DESTROY THIS LOOP WHILE
 		// THE ACCEPTOR CAN STILL ASSIGN INTO IT. `release_thread_event_loop`
 		// destroys the operation-pool arena, frees the MPSC buffer, closes the
 		// eventfd and zeroes the `Event_Loop`. The acceptor reaches all four
@@ -850,7 +850,7 @@ Connection :: struct {
 	scanner:        Scanner,
 	temp_allocator: virtual.Arena,
 	loop:           Loop,
-	// URUQUIM PATCH 6 (WP46) — when the current request began arriving, or the
+	// DRUSE PATCH 6 (WP46) — when the current request began arriving, or the
 	// zero value between requests.
 	//
 	// A REQUEST deadline rather than an idle timeout, and the difference is the
@@ -859,17 +859,17 @@ Connection :: struct {
 	// request starts and never refreshed, so total time to send a request is
 	// what is bounded.
 	request_started: time.Time,
-	// URUQUIM PATCH 19 (WP90 / ADR-039) — when the current response send was
+	// DRUSE PATCH 19 (WP90 / ADR-039) — when the current response send was
 	// handed to the event loop, or the zero value when no send is in flight.
 	// Stamped in `response_send_got_body`, cleared in `on_response_sent` and
 	// `clean_request_loop`; the sweep's write branch reads it.
 	send_started:    time.Time,
-	// URUQUIM PATCH 19 — the outstanding send operation, so closing a
+	// DRUSE PATCH 19 — the outstanding send operation, so closing a
 	// connection mid-send can cancel it. The write-side twin of Patch 10's
 	// `scanner.pending_recv`: without the cancel, teardown frees the
 	// connection while the send completion still points at it.
 	pending_send:    ^nbio.Operation,
-	// URUQUIM PATCH 19 (WP92 amendment) — a per-connection write deadline
+	// DRUSE PATCH 19 (WP92 amendment) — a per-connection write deadline
 	// that takes precedence over the server-wide one. A DETACHED STREAM must
 	// be safe without tuning (phase-7-spec.md §4.1): when the application
 	// left `max_write_time` at 0, a stream connection still gets the
@@ -877,7 +877,7 @@ Connection :: struct {
 	// slow-consumer terminal case and "off by default" for buffered
 	// responses must not mean "unbounded" for infinite ones.
 	write_deadline_override: time.Duration,
-	// URUQUIM PATCH 22 (WP92 amendment) — an owner notification fired by
+	// DRUSE PATCH 22 (WP92 amendment) — an owner notification fired by
 	// `connection_teardown` BEFORE the Connection is freed. The detached-
 	// stream adapter installs it so an EXTERNALLY-initiated end — the
 	// deadline sweep's abort, a shutdown force-close, a scanner error —
@@ -885,12 +885,12 @@ Connection :: struct {
 	// touching the freed Connection. Runs on the owner lane, once.
 	on_teardown:      proc(user: rawptr),
 	on_teardown_user: rawptr,
-	// URUQUIM PATCH 20 (WP90 / ADR-039) — when this connection last became
+	// DRUSE PATCH 20 (WP90 / ADR-039) — when this connection last became
 	// idle between requests, or the zero value while a request or response is
 	// in flight. Stamped in `clean_request_loop` on the keep-alive path,
 	// cleared when the next request's bytes arrive (`on_rline1`).
 	idle_since:      time.Time,
-	// URUQUIM PATCH 25 (Closure C-03) — the peer has already gone: the last
+	// DRUSE PATCH 25 (Closure C-03) — the peer has already gone: the last
 	// `recv` reported an orderly FIN (`received == 0`) or a reset
 	// (`Connection_Closed`). Set by `scanner_on_read`, read by
 	// `connection_close` to skip a politeness delay owed to nobody. See the
@@ -919,12 +919,12 @@ connection_close :: proc(c: ^Connection, loc := #caller_location) {
 
 	c.state = .Closing
 
-	// URUQUIM PATCH 25 (Closure C-03) — captured BEFORE the cancels below null
+	// DRUSE PATCH 25 (Closure C-03) — captured BEFORE the cancels below null
 	// it, because whether a response was in flight decides how this connection
 	// may end.
 	had_send_in_flight := c.pending_send != nil
 
-	// URUQUIM PATCH 10 (WP59) — BRIDGE. Cancel the outstanding `recv` before
+	// DRUSE PATCH 10 (WP59) — BRIDGE. Cancel the outstanding `recv` before
 	// anything below frees the connection it points at.
 	//
 	// This is a MEMORY-SAFETY fix that happens to also end the drain, and the
@@ -946,7 +946,7 @@ connection_close :: proc(c: ^Connection, loc := #caller_location) {
 		c.scanner.pending_recv = nil
 	}
 
-	// URUQUIM PATCH 19 (WP90) — the write-side twin of the cancel above, and
+	// DRUSE PATCH 19 (WP90) — the write-side twin of the cancel above, and
 	// the same memory-safety argument: the teardown callback below frees `c`,
 	// and an outstanding send completion would then dereference it. WP59
 	// measured that failure on the recv side; closing mid-send (which the
@@ -956,7 +956,7 @@ connection_close :: proc(c: ^Connection, loc := #caller_location) {
 		c.pending_send = nil
 	}
 
-	// URUQUIM PATCH 25 (Closure C-03) — THE LINGER IS A COURTESY, AND A PEER
+	// DRUSE PATCH 25 (Closure C-03) — THE LINGER IS A COURTESY, AND A PEER
 	// THAT IS ALREADY GONE IS OWED NONE.
 	//
 	// THE DEFECT IT FIXES. `docs/reports/2026-07-23-security-f001-f002.md`
@@ -1009,13 +1009,13 @@ connection_close :: proc(c: ^Connection, loc := #caller_location) {
 	})
 }
 
-// URUQUIM PATCH 19 (WP90) — the final teardown, shared by the graceful close
+// DRUSE PATCH 19 (WP90) — the final teardown, shared by the graceful close
 // above and the deadline abort below so there is exactly one free path.
 @(private)
 connection_teardown :: proc(_: ^nbio.Operation, c: ^Connection) {
 	log.debugf("closed connection: %i", c.socket)
 
-	// URUQUIM PATCH 22 (WP92 amendment) — the owner hears about the end
+	// DRUSE PATCH 22 (WP92 amendment) — the owner hears about the end
 	// before the memory goes away, whoever initiated it.
 	if c.on_teardown != nil {
 		c.on_teardown(c.on_teardown_user)
@@ -1029,14 +1029,14 @@ connection_teardown :: proc(_: ^nbio.Operation, c: ^Connection) {
 
 	scanner_destroy(&c.scanner)
 	delete_key(&td.conns, c.socket)
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		_ = sync.atomic_add(&td.assigned_connections, -1)
 	}
 	_ = sync.atomic_add(&c.server.active_connections, -1)
 	free(c, c.server.conn_allocator)
 }
 
-// URUQUIM PATCH 19 (WP90 / ADR-039) — abort a connection whose response send
+// DRUSE PATCH 19 (WP90 / ADR-039) — abort a connection whose response send
 // exceeded its deadline.
 //
 // DIFFERENT FROM `connection_close` ON PURPOSE: the graceful path does
@@ -1101,12 +1101,12 @@ accept_choose_lane :: proc(s: ^Server) -> ^Server_Thread {
 	for offset in 0 ..< n {
 		i := (s.next_lane + offset) % n
 		lane := &s.threads[i]
-		// URUQUIM PATCH 33 (transport audit F1) — these two loads are the
+		// DRUSE PATCH 33 (transport audit F1) — these two loads are the
 		// acceptor's half of the Dekker handshake in `accept_try_assign_pending`
 		// and must be sequentially consistent with the lane-side stores.
 		if lane.event_loop == nil ||
 		   sync.atomic_load_explicit(&lane.handler_active, .Seq_Cst) ||
-		   sync.atomic_load_explicit(&lane.queued_handoffs, .Seq_Cst) >= URUQUIM_ACCEPT_HANDOFF_LIMIT {
+		   sync.atomic_load_explicit(&lane.queued_handoffs, .Seq_Cst) >= DRUSE_ACCEPT_HANDOFF_LIMIT {
 			continue
 		}
 		load := sync.atomic_load(&lane.assigned_connections)
@@ -1137,7 +1137,7 @@ accept_try_assign_pending :: proc(s: ^Server) -> bool {
 	}
 	lane := accept_choose_lane(s)
 	if lane == nil {
-		// URUQUIM PATCH 33 (transport audit F1) — PUBLISH INTENT, THEN RE-SCAN.
+		// DRUSE PATCH 33 (transport audit F1) — PUBLISH INTENT, THEN RE-SCAN.
 		//
 		// This is a two-flag (Dekker) handshake: the acceptor publishes "I am
 		// about to park" and each lane publishes "I became available", and each
@@ -1207,7 +1207,7 @@ accept_refuse_handler_saturation :: proc(s: ^Server) {
 @(private)
 on_connection_assigned :: proc(_: ^nbio.Operation, item: ^Accepted_Connection) {
 	server := item.server
-	// URUQUIM PATCH 33 (transport audit F1) — lane half of the Dekker handshake:
+	// DRUSE PATCH 33 (transport audit F1) — lane half of the Dekker handshake:
 	// `atomic_add` is already sequentially consistent, and the paired load below
 	// must be too or the acceptor can park while this lane believes it signalled.
 	_ = sync.atomic_add(&td.queued_handoffs, -1)
@@ -1238,7 +1238,7 @@ on_connection_assigned :: proc(_: ^nbio.Operation, item: ^Accepted_Connection) {
 @(private)
 on_accept_dedicated :: proc(op: ^nbio.Operation, s: ^Server) {
 	s.accept = nil
-	// URUQUIM PATCH 33 (transport audit F2) — REFUSE LATE ARRIVALS. This
+	// DRUSE PATCH 33 (transport audit F2) — REFUSE LATE ARRIVALS. This
 	// callback runs from a CQE that may already have been queued in the
 	// acceptor's ring when `server_shutdown` set `closing`, and it is also
 	// reachable from the final flush loop below. Without this check it would
@@ -1260,13 +1260,13 @@ on_accept_dedicated :: proc(op: ^nbio.Operation, s: ^Server) {
 			return
 		}
 		s.accept_failures += 1
-		if s.accept_failures >= URUQUIM_ACCEPT_FAILURE_LIMIT {
+		if s.accept_failures >= DRUSE_ACCEPT_FAILURE_LIMIT {
 			fmt.panicf(
 				"accept failing persistently (%d consecutive), last error: %v",
 				s.accept_failures, op.accept.err,
 			)
 		}
-		nbio.timeout_poly(URUQUIM_ACCEPT_RETRY_DELAY, s, proc(_: ^nbio.Operation, server: ^Server) {
+		nbio.timeout_poly(DRUSE_ACCEPT_RETRY_DELAY, s, proc(_: ^nbio.Operation, server: ^Server) {
 			accept_arm(server)
 		})
 		return
@@ -1282,7 +1282,7 @@ on_accept_dedicated :: proc(op: ^nbio.Operation, s: ^Server) {
 			_ = sync.atomic_add(&s.refused_total, 1)
 			if s.refused_connections == 1 {
 				log.warnf(
-					"uruquim: admission limit reached (%i of %i slots, %i reserved for shutdown); refusing connections. This is logged ONCE per exhausted period, not per refusal.",
+					"druse: admission limit reached (%i of %i slots, %i reserved for shutdown); refusing connections. This is logged ONCE per exhausted period, not per refusal.",
 					active_connections - 1,
 					s.opts.max_connections,
 					s.opts.reserved_connections,
@@ -1294,7 +1294,7 @@ on_accept_dedicated :: proc(op: ^nbio.Operation, s: ^Server) {
 		}
 		if s.refused_connections > 0 {
 			log.infof(
-				"uruquim: admission resumed after refusing %i connection(s)",
+				"druse: admission resumed after refusing %i connection(s)",
 				s.refused_connections,
 			)
 			s.refused_connections = 0
@@ -1324,7 +1324,7 @@ _server_accept_loop :: proc(s: ^Server) {
 		if assigned {
 			accept_arm(s)
 		}
-		// URUQUIM PATCH 33 (transport audit F1) — BOUND THE PARK ONLY WHEN A
+		// DRUSE PATCH 33 (transport audit F1) — BOUND THE PARK ONLY WHEN A
 		// CONNECTION IS STRANDED. The seq-cst handshake above is what makes the
 		// wake-up reliable; this is defence in depth for the one state where a
 		// missed wake is catastrophic and silent — parked with an unassigned
@@ -1355,7 +1355,7 @@ _server_accept_loop :: proc(s: ^Server) {
 			break
 		}
 	}
-	// URUQUIM PATCH 33 (transport audit F2) — NO FURTHER ASSIGNMENT IS POSSIBLE
+	// DRUSE PATCH 33 (transport audit F2) — NO FURTHER ASSIGNMENT IS POSSIBLE
 	// FROM HERE. The accept operation is removed, any pending connection is
 	// closed, and `on_accept_dedicated` now refuses late CQEs while `closing` is
 	// set, so nothing on this thread can touch a lane's event loop again. Lanes
@@ -1378,7 +1378,7 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 		#partial switch op.accept.err {
 		case .Insufficient_Resources:
 			log.error("Connection limit reached, trying again in a bit")
-			// URUQUIM PATCH 24 (C-01 / F-C01-1) — the same guard the transient
+			// DRUSE PATCH 24 (C-01 / F-C01-1) — the same guard the transient
 			// branch below carries, and for the same reason. `on_accept`
 			// cleared `td.accept` on entry, so within this second the lane can
 			// service a request it had already read and `handler_lane_leave`
@@ -1396,7 +1396,7 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 			return
 		}
 
-		// URUQUIM PATCH 21 (WP90 / F9) — a transient accept failure must not
+		// DRUSE PATCH 21 (WP90 / F9) — a transient accept failure must not
 		// kill the process. `ECONNABORTED` (peer gave up while queued),
 		// `EINTR` and load-shed conditions are ordinary weather at accept;
 		// upstream's panic turned each into an unauthenticated remote crash.
@@ -1405,14 +1405,14 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 		// never accept again but keeps ticking would be a silent outage,
 		// which is the dishonest failure mode (WP40 §2.5).
 		td.accept_failures += 1
-		if td.accept_failures >= URUQUIM_ACCEPT_FAILURE_LIMIT {
+		if td.accept_failures >= DRUSE_ACCEPT_FAILURE_LIMIT {
 			fmt.panicf(
 				"accept failing persistently (%d consecutive), last error: %v",
 				td.accept_failures, op.accept.err,
 			)
 		}
-		log.errorf("uruquim: transient accept error (%v); re-arming accept", op.accept.err)
-		nbio.timeout_poly(URUQUIM_ACCEPT_RETRY_DELAY, server, proc(_: ^nbio.Operation, server: ^Server) {
+		log.errorf("druse: transient accept error (%v); re-arming accept", op.accept.err)
+		nbio.timeout_poly(DRUSE_ACCEPT_RETRY_DELAY, server, proc(_: ^nbio.Operation, server: ^Server) {
 			if td.accept == nil && !td.handler_active {
 				td.accept = nbio.accept_poly(server.tcp_sock, server, on_accept)
 			}
@@ -1420,7 +1420,7 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 		return
 	}
 
-	// URUQUIM PATCH 21 — a successful accept proves the listener works;
+	// DRUSE PATCH 21 — a successful accept proves the listener works;
 	// only CONSECUTIVE failures may accumulate toward the fatal limit.
 	td.accept_failures = 0
 
@@ -1431,7 +1431,7 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 		td.accept = nbio.accept_poly(server.tcp_sock, server, on_accept)
 	}
 
-	// URUQUIM PATCH 8 (WP47) — BOUNDED ADMISSION, and the inequality is the
+	// DRUSE PATCH 8 (WP47) — BOUNDED ADMISSION, and the inequality is the
 	// whole design.
 	//
 	// The budget compared against is `max_connections - reserved_connections`,
@@ -1458,11 +1458,11 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 			// WP50 §3.5 — the DROP POLICY IS OBSERVABLE. A component that can
 			// discard work must count what it discarded, because a metric that
 			// silently stops being emitted reads as "nothing happened".
-			// URUQUIM PATCH 12 (WP70) — BRIDGE. Every lane contributes.
+			// DRUSE PATCH 12 (WP70) — BRIDGE. Every lane contributes.
 			_ = sync.atomic_add(&server.refused_total, 1)
 			if td.refused_connections == 1 {
 				log.warnf(
-					"uruquim: admission limit reached (%i of %i slots, %i reserved for shutdown); refusing connections. This is logged ONCE per exhausted period, not per refusal.",
+					"druse: admission limit reached (%i of %i slots, %i reserved for shutdown); refusing connections. This is logged ONCE per exhausted period, not per refusal.",
 					active_connections - 1,
 					server.opts.max_connections,
 					server.opts.reserved_connections,
@@ -1473,7 +1473,7 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 		}
 		if td.refused_connections > 0 {
 			log.infof(
-				"uruquim: admission resumed after refusing %i connection(s)",
+				"druse: admission resumed after refusing %i connection(s)",
 				td.refused_connections,
 			)
 			td.refused_connections = 0
@@ -1492,17 +1492,17 @@ on_accept :: proc(op: ^nbio.Operation, server: ^Server) {
 	conn_handle_reqs(c)
 }
 
-// URUQUIM PATCH 13 (WP71) — BRIDGE. Keep admission aligned with actual
+// DRUSE PATCH 13 (WP71) — BRIDGE. Keep admission aligned with actual
 // synchronous Handler capacity. The adapter brackets only application dispatch,
 // so slow network reads and writes remain asynchronous and do not consume this
 // capacity unit.
 handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 	assert_has_td(loc)
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		if td.handler_active {
 			return false
 		}
-		// URUQUIM PATCH 33 (transport audit F1) — paired with the acceptor's
+		// DRUSE PATCH 33 (transport audit F1) — paired with the acceptor's
 		// seq-cst load in `accept_choose_lane`.
 		sync.atomic_store_explicit(&td.handler_active, true, .Seq_Cst)
 		return true
@@ -1514,7 +1514,7 @@ handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 		if td.accept != nil {
 			target := td.accept
 			td.accept = nil
-		// URUQUIM PATCH 28 (perf) — SUSPEND THE ACCEPT WITHOUT SPINNING.
+		// DRUSE PATCH 28 (perf) — SUSPEND THE ACCEPT WITHOUT SPINNING.
 		//
 		// The WP71 guarantee still holds: a lane about to run a synchronous
 		// handler must not keep a live accept, or the kernel could hand it a new
@@ -1550,9 +1550,9 @@ handler_lane_enter :: proc(res: ^Response, loc := #caller_location) -> bool {
 // shutdown owns admission and the accept remains absent.
 handler_lane_leave :: proc(res: ^Response, loc := #caller_location) {
 	assert_has_td(loc)
-	when URUQUIM_DEDICATED_ACCEPT {
+	when DRUSE_DEDICATED_ACCEPT {
 		assert(td.handler_active, "handler lane leave without enter", loc)
-		// URUQUIM PATCH 33 (transport audit F1) — lane half of the Dekker
+		// DRUSE PATCH 33 (transport audit F1) — lane half of the Dekker
 		// handshake; see `accept_try_assign_pending`. Both the store that makes
 		// this lane eligible again and the load of the acceptor's parking flag
 		// must be sequentially consistent, or each side can read the other as
@@ -1592,7 +1592,7 @@ conn_handle_reqs :: proc(c: ^Connection) {
 
 @(private)
 conn_handle_req :: proc(c: ^Connection, allocator := context.temp_allocator) {
-	// URUQUIM PATCH 6 (WP46) — stamp the start of this request's arrival. The
+	// DRUSE PATCH 6 (WP46) — stamp the start of this request's arrival. The
 	// sweep in `server_deadline_sweep` reads it; `clean_request_loop` clears it.
 	// Do not pay a clock syscall on the default-off path.
 	if c.server.opts.request_read_timeout > 0 {
@@ -1606,7 +1606,7 @@ conn_handle_req :: proc(c: ^Connection, allocator := context.temp_allocator) {
 
 		if !connection_set_state(l.conn, .Active) { return }
 
-		// URUQUIM PATCH 20 (WP90) — bytes arrived: the connection stopped
+		// DRUSE PATCH 20 (WP90) — bytes arrived: the connection stopped
 		// being idle the moment a request line landed, whatever its fate.
 		l.conn.idle_since = {}
 
@@ -1717,7 +1717,7 @@ conn_handle_req :: proc(c: ^Connection, allocator := context.temp_allocator) {
 			return
 		}
 
-		// URUQUIM PATCH 39 (audit H2) — an absolute-form target whose authority
+		// DRUSE PATCH 39 (audit H2) — an absolute-form target whose authority
 		// disagrees with the Host field is REFUSED.
 		//
 		// RFC 9112 §3.2.2: "When an origin server receives a request with an
@@ -1826,24 +1826,24 @@ Server_Date :: struct {
 
 @(private)
 server_date_start :: proc(s: ^Server) {
-	// URUQUIM PATCH 12 (WP70) — BRIDGE. `td.date` is lane-owned.
+	// DRUSE PATCH 12 (WP70) — BRIDGE. `td.date` is lane-owned.
 	td.date.buf.buf = slice.into_dynamic(td.date.buf_backing[:])
 	server_date_update(nil, s)
 
-	// URUQUIM PATCH 6 (WP46) — the deadline sweep starts on the same loop and
+	// DRUSE PATCH 6 (WP46) — the deadline sweep starts on the same loop and
 	// from the same place as the date tick, so there is one answer to "where do
 	// this server's periodic timers come from".
-	nbio.timeout_poly(URUQUIM_SWEEP_INTERVAL, s, server_deadline_sweep)
+	nbio.timeout_poly(DRUSE_SWEEP_INTERVAL, s, server_deadline_sweep)
 }
 
-// URUQUIM PATCH 6 (WP46 / ADR-031) — the request read deadline, enforced.
+// DRUSE PATCH 6 (WP46 / ADR-031) — the request read deadline, enforced.
 //
 // SWEEP_INTERVAL is the GRANULARITY, not the deadline. A request whose deadline
 // is 5s is closed somewhere in [5s, 5s + interval]; that slack is acceptable for
 // a defence measured in seconds, and it buys the absence of per-connection
 // timers — see the note on `Server_Opts.request_read_timeout`.
 @(private)
-URUQUIM_SWEEP_INTERVAL :: 250 * time.Millisecond
+DRUSE_SWEEP_INTERVAL :: 250 * time.Millisecond
 
 // server_deadline_sweep closes connections whose current request has taken
 // longer than the configured deadline to ARRIVE.
@@ -1858,7 +1858,7 @@ URUQUIM_SWEEP_INTERVAL :: 250 * time.Millisecond
 server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 	if atomic_load(&s.closing) { return }
 
-	// URUQUIM PATCH 19/20 (WP90 / ADR-039) — the sweep now carries three
+	// DRUSE PATCH 19/20 (WP90 / ADR-039) — the sweep now carries three
 	// deadlines: request arrival (Patch 6), response write and idle
 	// keep-alive. One connection is judged by at most one branch per pass:
 	// a sending connection by the write deadline, an arriving request by the
@@ -1884,8 +1884,8 @@ server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 			}
 			if effective_write > 0 && conn.send_started != (time.Time{}) &&
 			   time.diff(conn.send_started, now) > effective_write {
-				log.infof("uruquim: response write deadline exceeded; aborting connection %i", conn.socket)
-				// URUQUIM PATCH 28 (Closure H-3) — a write-deadline abort is the
+				log.infof("druse: response write deadline exceeded; aborting connection %i", conn.socket)
+				// DRUSE PATCH 28 (Closure H-3) — a write-deadline abort is the
 				// one send outcome an operator most needs to see: a slow reader
 				// being cut off. Counted here, on the owning lane.
 				_ = sync.atomic_add(&s.write_deadline_aborts, 1)
@@ -1894,7 +1894,7 @@ server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 				connection_abort(conn)
 				continue
 			}
-			// URUQUIM PATCH 40 (audit M4) — WHEN NO WRITE DEADLINE IS SET, THE
+			// DRUSE PATCH 40 (audit M4) — WHEN NO WRITE DEADLINE IS SET, THE
 			// ARRIVAL DEADLINE COVERS THE SEND, deliberately and under its own
 			// name.
 			//
@@ -1922,7 +1922,7 @@ server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 			if effective_write == 0 && read_t > 0 && conn.send_started != (time.Time{}) &&
 			   time.diff(conn.send_started, now) > read_t {
 				log.infof(
-					"uruquim: response send exceeded max_request_time with no max_write_time set; aborting connection %i",
+					"druse: response send exceeded max_request_time with no max_write_time set; aborting connection %i",
 					conn.socket,
 				)
 				_ = sync.atomic_add(&s.write_deadline_aborts, 1)
@@ -1932,13 +1932,13 @@ server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 			if read_t > 0 && conn.request_started != (time.Time{}) &&
 			   conn.send_started == (time.Time{}) &&
 			   time.diff(conn.request_started, now) > read_t {
-				log.infof("uruquim: request read deadline exceeded; closing connection %i", conn.socket)
+				log.infof("druse: request read deadline exceeded; closing connection %i", conn.socket)
 				connection_close(conn)
 				continue
 			}
 			if idle_t > 0 && conn.state == .Idle && conn.idle_since != (time.Time{}) &&
 			   time.diff(conn.idle_since, now) > idle_t {
-				log.infof("uruquim: idle keep-alive timeout exceeded; closing connection %i", conn.socket)
+				log.infof("druse: idle keep-alive timeout exceeded; closing connection %i", conn.socket)
 				connection_close(conn)
 			}
 		}
@@ -1947,7 +1947,7 @@ server_deadline_sweep :: proc(_: ^nbio.Operation, s: ^Server) {
 	// Rescheduled unconditionally, including when the deadline is disabled, so
 	// this procedure has exactly one exit shape and enabling the deadline never
 	// depends on a timer chain that was never started.
-	nbio.timeout_poly(URUQUIM_SWEEP_INTERVAL, s, server_deadline_sweep)
+	nbio.timeout_poly(DRUSE_SWEEP_INTERVAL, s, server_deadline_sweep)
 }
 
 // Updates the time and schedules itself for after a second.
@@ -1957,14 +1957,14 @@ server_date_update :: proc(_: ^nbio.Operation, s: ^Server) {
 
 	nbio.timeout_poly(time.Second, s, server_date_update)
 
-	// URUQUIM PATCH 12 (WP70) — BRIDGE. Update only this lane's cache.
+	// DRUSE PATCH 12 (WP70) — BRIDGE. Update only this lane's cache.
 	bytes.buffer_reset(&td.date.buf)
 	date_write(bytes.buffer_to_stream(&td.date.buf), time.now())
 }
 
 @(private)
 server_date :: proc(s: ^Server) -> string {
-	// URUQUIM PATCH 12 (WP70) — BRIDGE. Responses read their lane's cache.
+	// DRUSE PATCH 12 (WP70) — BRIDGE. Responses read their lane's cache.
 	_ = s
 	return string(td.date.buf_backing[:])
 }

@@ -14,30 +14,30 @@
 #      specification handed forward, not an open question.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_DOC="$URUQUIM_ROOT/planning/closure-record-and-verdict.md"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_DOC="$DRUSE_ROOT/planning/closure-record-and-verdict.md"
 
 fail() {
   echo "C07-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-test -f "$URUQUIM_DOC" || fail "planning/closure-record-and-verdict.md is missing; the Closure has no verdict"
+test -f "$DRUSE_DOC" || fail "planning/closure-record-and-verdict.md is missing; the Closure has no verdict"
 # Blockquote markers are stripped BEFORE flattening: the exit condition is
 # quoted as a `>` block, so a naive flatten leaves "> " inside the sentence and
 # the verbatim check fails against a document that is perfectly correct.
-URUQUIM_FLAT="$(sed 's/^> \?//' "$URUQUIM_DOC" | tr '\n' ' ' | tr -s ' ')"
+DRUSE_FLAT="$(sed 's/^> \?//' "$DRUSE_DOC" | tr '\n' ' ' | tr -s ' ')"
 
 # --- 1. Every instrument the verdict cites still exists and is gated ----------
-while read -r URUQUIM_ARTIFACT URUQUIM_GATE; do
-  test -f "$URUQUIM_ROOT/$URUQUIM_ARTIFACT" ||
-    fail "the verdict cites $URUQUIM_ARTIFACT, which no longer exists"
-  test -f "$URUQUIM_ROOT/build/$URUQUIM_GATE" ||
-    fail "the verdict rests on $URUQUIM_ARTIFACT being gated by build/$URUQUIM_GATE, which no longer exists"
-  grep -qF "$URUQUIM_ARTIFACT" "$URUQUIM_DOC" ||
-    fail "the verdict no longer cites $URUQUIM_ARTIFACT"
-  grep -qF "$URUQUIM_GATE" "$URUQUIM_ROOT/build/check.sh" ||
-    fail "build/$URUQUIM_GATE is no longer wired into the full gate; the verdict's evidence would stop being re-derived"
+while read -r DRUSE_ARTIFACT DRUSE_GATE; do
+  test -f "$DRUSE_ROOT/$DRUSE_ARTIFACT" ||
+    fail "the verdict cites $DRUSE_ARTIFACT, which no longer exists"
+  test -f "$DRUSE_ROOT/build/$DRUSE_GATE" ||
+    fail "the verdict rests on $DRUSE_ARTIFACT being gated by build/$DRUSE_GATE, which no longer exists"
+  grep -qF "$DRUSE_ARTIFACT" "$DRUSE_DOC" ||
+    fail "the verdict no longer cites $DRUSE_ARTIFACT"
+  grep -qF "$DRUSE_GATE" "$DRUSE_ROOT/build/check.sh" ||
+    fail "build/$DRUSE_GATE is no longer wired into the full gate; the verdict's evidence would stop being re-derived"
 done <<'ARTIFACTS'
 planning/closure-async-op-inventory.md check_c01_controls.sh
 planning/closure-readiness-matrix.md check_readiness_matrix.sh
@@ -49,32 +49,32 @@ planning/closure-httprouter-study.md check_c08_controls.sh
 ARTIFACTS
 
 # --- 2. The exit condition, quoted rather than paraphrased --------------------
-grep -qi 'No framework-owned operation exists without an explicitly declared owner, capacity, deadline, or cancellation' <<<"$URUQUIM_FLAT" ||
+grep -qi 'No framework-owned operation exists without an explicitly declared owner, capacity, deadline, or cancellation' <<<"$DRUSE_FLAT" ||
   fail "the verdict no longer quotes the exit condition verbatim. A phase judged against a paraphrase of its own bar is a phase that can pass by rewording."
-grep -qi 'named, mandatory, documented and tested' <<<"$URUQUIM_FLAT" ||
+grep -qi 'named, mandatory, documented and tested' <<<"$DRUSE_FLAT" ||
   fail "the exit condition's second half — that an unbounded or external thing must have a topology that is named, mandatory, documented AND TESTED — is gone"
 
 # --- 3. F-C03-2 is still named, and its RESOLUTION is recorded ----------------
 # It began as the one open defect; Hardening H-2 (patches 29+30) diagnosed and
 # fixed it. The verdict must keep naming it AND record how it was closed — a
 # resolved defect quietly dropped is as misleading as an open one hidden.
-grep -q 'F-C03-2' "$URUQUIM_DOC" ||
+grep -q 'F-C03-2' "$DRUSE_DOC" ||
   fail "F-C03-2 is no longer named in the verdict. It was the one open defect and is now resolved by H-2 (patches 29+30); a record that drops it — open or closed — turns a verdict into a claim."
-grep -qi 'patch 30' <<<"$URUQUIM_FLAT" ||
+grep -qi 'patch 30' <<<"$DRUSE_FLAT" ||
   fail "the verdict no longer records that F-C03-2 was FIXED by patch 30 (the graceful serve-failure unwind). Its diagnosis-and-fix is the phase's headline; dropping it loses the resolution."
-grep -qi 'graceful' <<<"$URUQUIM_FLAT" ||
+grep -qi 'graceful' <<<"$DRUSE_FLAT" ||
   fail "the verdict no longer describes the graceful unwind that closed F-C03-2"
 
 # --- 4. Every deferral carries a trigger -------------------------------------
-for URUQUIM_DEFERRAL in max_response_bytes Server_Stats 'real-proxy' 'hours-long' radix_compact; do
-  grep -qi "$URUQUIM_DEFERRAL" <<<"$URUQUIM_FLAT" ||
-    fail "the deferral '$URUQUIM_DEFERRAL' is no longer recorded. Deferred work in this phase means a SPECIFICATION HANDED FORWARD; an unrecorded deferral is the exact failure — a pendency that stops being trackable — that called this phase into being."
+for DRUSE_DEFERRAL in max_response_bytes Server_Stats 'real-proxy' 'hours-long' radix_compact; do
+  grep -qi "$DRUSE_DEFERRAL" <<<"$DRUSE_FLAT" ||
+    fail "the deferral '$DRUSE_DEFERRAL' is no longer recorded. Deferred work in this phase means a SPECIFICATION HANDED FORWARD; an unrecorded deferral is the exact failure — a pendency that stops being trackable — that called this phase into being."
 done
-grep -qi 'Trigger' <<<"$URUQUIM_FLAT" ||
+grep -qi 'Trigger' <<<"$DRUSE_FLAT" ||
   fail "the deferral table lost its trigger column; a deferral without a trigger is a wish"
 
 # --- 5. The rule the phase leaves behind -------------------------------------
-grep -qi 'rests on reasoning rather than on a test is not answered' <<<"$URUQUIM_FLAT" ||
+grep -qi 'rests on reasoning rather than on a test is not answered' <<<"$DRUSE_FLAT" ||
   fail "the phase's own methodological rule is gone — it was earned by C-01 getting a cell wrong and C-05's measurement catching it, and it is the most transferable thing here"
 
 echo "c07: all 7 Closure artifacts exist, are cited, and are wired into the full gate"

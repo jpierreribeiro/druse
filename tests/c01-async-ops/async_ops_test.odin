@@ -60,7 +60,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // Distinct from every port any other suite binds; this one starts and stops
 // four servers in sequence.

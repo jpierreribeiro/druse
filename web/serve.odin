@@ -7,10 +7,10 @@
 // backend — the one-way boundary of ADR-009. `serve_with` and `serve_transport`
 // are Advanced API and remain absent from Phase 1.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:mem"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // serve runs the application's HTTP server on the given port and blocks until
 // the server stops.

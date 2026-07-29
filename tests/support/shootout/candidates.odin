@@ -13,7 +13,7 @@
 //   radix_arr         radix_idx with sorted-array children instead of a map
 //
 // WHY SEGMENT-GRAINED AND NOT BYTE-GRAINED. A byte-level radix is the textbook
-// answer, and it is the wrong granularity for this framework: Uruquim's
+// answer, and it is the wrong granularity for this framework: Druse's
 // patterns are segment structures (`/users/:id`), precedence is defined per
 // segment ("static routes win over parametric ones"), and a byte tree would
 // have to reconstruct segment boundaries it deliberately erased. Measuring the

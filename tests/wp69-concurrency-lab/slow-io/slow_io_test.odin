@@ -3,7 +3,7 @@ package wp69_slow_io
 import "core:net"
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 @(test)
 idle_partial_and_slow_write_remain_non_blocking_io :: proc(t: ^testing.T) {

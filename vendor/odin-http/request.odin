@@ -41,7 +41,7 @@ headers_validate_for_server :: proc(headers: ^Headers) -> bool {
 	return headers_validate(headers)
 }
 
-// URUQUIM PATCH 37 (audit H3) — the ONE predicate that decides whether a
+// DRUSE PATCH 37 (audit H3) — the ONE predicate that decides whether a
 // message is chunked-framed, shared by `headers_validate`, `body` and
 // `body_stream` so the three cannot disagree about the framing of the same
 // request.
@@ -121,7 +121,7 @@ transfer_encoding_chunked_final :: proc(enc: string) -> bool {
 	return count == 1 && last_is_chunked
 }
 
-// URUQUIM PATCH 39 (audit H2) — ASCII case-insensitive equality, used to compare
+// DRUSE PATCH 39 (audit H2) — ASCII case-insensitive equality, used to compare
 // an absolute-form request-target's authority against the Host field.
 //
 // ASCII rather than `strings.equal_fold`: a host is `reg-name` / IP-literal
@@ -164,7 +164,7 @@ headers_validate :: proc(headers: ^Headers) -> bool {
 	// Content-Length.  Such a message might indicate an attempt to
 	// perform request smuggling (Section 9.5) or response splitting
 	// (Section 9.4) and ought to be handled as an error.
-	// URUQUIM PATCH (WP9 D2): CL+TE is REJECTED, not repaired. Deleting the
+	// DRUSE PATCH (WP9 D2): CL+TE is REJECTED, not repaired. Deleting the
 	// Content-Length and proceeding leaves the two ends of a proxy chain
 	// disagreeing about where the body stops, which is precisely the request
 	// smuggling vector RFC 9112 6.1 calls an unrecoverable error. See VENDOR.md.

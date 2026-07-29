@@ -15,49 +15,49 @@
 #   5. the suite is green and the arena semantic's mutant is red.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_DOC="$URUQUIM_ROOT/planning/closure-response-size-and-memory.md"
-URUQUIM_SUITE="$URUQUIM_ROOT/tests/c04-response-size/soak_test.odin"
-URUQUIM_RESPONSE="$URUQUIM_ROOT/vendor/odin-http/response.odin"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_DOC="$DRUSE_ROOT/planning/closure-response-size-and-memory.md"
+DRUSE_SUITE="$DRUSE_ROOT/tests/c04-response-size/soak_test.odin"
+DRUSE_RESPONSE="$DRUSE_ROOT/vendor/odin-http/response.odin"
 
 fail() {
   echo "C04-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-if test -n "${URUQUIM_COMPILER:-}"; then
-  URUQUIM_ODIN="$URUQUIM_COMPILER"
-elif test -n "${URUQUIM_ODIN_BIN:-}"; then
-  URUQUIM_ODIN="$URUQUIM_ODIN_BIN"
+if test -n "${DRUSE_COMPILER:-}"; then
+  DRUSE_ODIN="$DRUSE_COMPILER"
+elif test -n "${DRUSE_ODIN_BIN:-}"; then
+  DRUSE_ODIN="$DRUSE_ODIN_BIN"
 elif command -v odin >/dev/null 2>&1; then
-  URUQUIM_ODIN="$(command -v odin)"
-elif test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_ODIN=/tmp/uruquim-odin-toolchain/odin
+  DRUSE_ODIN="$(command -v odin)"
+elif test -x /tmp/druse-toolchain/odin; then
+  DRUSE_ODIN=/tmp/druse-toolchain/odin
 else
   fail "odin compiler not found"
 fi
 
-URUQUIM_ODIN="$(readlink -f "$URUQUIM_ODIN")"
-URUQUIM_ODIN_ROOT="$(cd "$(dirname "$URUQUIM_ODIN")" && pwd)"
-URUQUIM_TMP="$(mktemp -d -t uruquim-c04-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_TMP"' EXIT
+DRUSE_ODIN="$(readlink -f "$DRUSE_ODIN")"
+DRUSE_ODIN_ROOT="$(cd "$(dirname "$DRUSE_ODIN")" && pwd)"
+DRUSE_TMP="$(mktemp -d -t druse-c04-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_TMP"' EXIT
 
-test -f "$URUQUIM_DOC" || fail "planning/closure-response-size-and-memory.md is missing; it carries the delegation decision and the sizing rule"
-test -f "$URUQUIM_SUITE" || fail "tests/c04-response-size/soak_test.odin is missing"
-test -f "$URUQUIM_RESPONSE" || fail "vendor response cleanup is missing"
+test -f "$DRUSE_DOC" || fail "planning/closure-response-size-and-memory.md is missing; it carries the delegation decision and the sizing rule"
+test -f "$DRUSE_SUITE" || fail "tests/c04-response-size/soak_test.odin is missing"
+test -f "$DRUSE_RESPONSE" || fail "vendor response cleanup is missing"
 
 # --- 1. The two-phase shape --------------------------------------------------
-grep -q 'SMALL_ROUNDS :: [0-9]' "$URUQUIM_SUITE" ||
+grep -q 'SMALL_ROUNDS :: [0-9]' "$DRUSE_SUITE" ||
   fail "the suite lost its small-response phase; with only the big phase it reports a number that cannot distinguish retention from a leak"
-grep -q 'after_small := rss_bytes()' "$URUQUIM_SUITE" ||
+grep -q 'after_small := rss_bytes()' "$DRUSE_SUITE" ||
   fail "the suite no longer reads RSS after the small-response phase — the leak half of the measurement is gone"
-grep -q 'after_big := rss_bytes()' "$URUQUIM_SUITE" ||
+grep -q 'after_big := rss_bytes()' "$DRUSE_SUITE" ||
   fail "the suite no longer reads RSS after the big-response phase — the retention half of the measurement is gone"
-grep -q 'grew < LEAK_THRESHOLD_BYTES' "$URUQUIM_SUITE" ||
+grep -q 'grew < LEAK_THRESHOLD_BYTES' "$DRUSE_SUITE" ||
   fail "the leak assertion is gone; the suite would then print numbers and assert nothing"
 
 # --- 2. The baseline is honest -----------------------------------------------
-grep -q 'scratch\[i\] = u8(i)' "$URUQUIM_SUITE" || fail "$(cat <<'EOF'
+grep -q 'scratch\[i\] = u8(i)' "$DRUSE_SUITE" || fail "$(cat <<'EOF'
 the client scratch buffer is no longer touched before the baseline RSS reading.
 RSS counts resident pages, not reservations, so an untouched buffer becomes
 resident during phase 1 and is charged to the server-side delta. The first
@@ -67,53 +67,53 @@ EOF
 )"
 
 # --- 3. The arena reclamation semantic is wired and executable ---------------
-grep -q 'free_all(context.temp_allocator)' "$URUQUIM_RESPONSE" ||
+grep -q 'free_all(context.temp_allocator)' "$DRUSE_RESPONSE" ||
   fail "clean_request_loop no longer frees the per-connection request arena"
-grep -q 'c04_growing_arena_free_all_releases_oversize_blocks' "$URUQUIM_SUITE" ||
+grep -q 'c04_growing_arena_free_all_releases_oversize_blocks' "$DRUSE_SUITE" ||
   fail "the executable growing-arena reclamation assertion is gone"
-grep -q 'virtual.arena_free_all(&arena)' "$URUQUIM_SUITE" ||
+grep -q 'virtual.arena_free_all(&arena)' "$DRUSE_SUITE" ||
   fail "the arena semantic test no longer exercises arena_free_all"
 
 # --- 4. The corrected attribution is on record -------------------------------
-URUQUIM_FLAT="$(tr '\n' ' ' <"$URUQUIM_DOC" | tr -s ' ')"
-grep -qi 'do not leave body-sized live blocks' <<<"$URUQUIM_FLAT" ||
+DRUSE_FLAT="$(tr '\n' ' ' <"$DRUSE_DOC" | tr -s ' ')"
+grep -qi 'do not leave body-sized live blocks' <<<"$DRUSE_FLAT" ||
   fail "the corrected ownership result is gone: completed responses release body-sized arena blocks"
-grep -qi 'allocator/process high-water' <<<"$URUQUIM_FLAT" ||
+grep -qi 'allocator/process high-water' <<<"$DRUSE_FLAT" ||
   fail "the record again risks attributing RSS to a live owner without an allocator measurement"
-grep -qi 'no honest universal formula' <<<"$URUQUIM_FLAT" ||
+grep -qi 'no honest universal formula' <<<"$DRUSE_FLAT" ||
   fail "the withdrawn max_connections-times-response formula has been promoted back into a sizing guarantee"
-grep -qi 'max_response_bytes' <<<"$URUQUIM_FLAT" ||
+grep -qi 'max_response_bytes' <<<"$DRUSE_FLAT" ||
   fail "the shipped per-response limit is gone from the corrected C-04 record"
-grep -qi 'concurrent buffered-response matrix' <<<"$URUQUIM_FLAT" ||
+grep -qi 'concurrent buffered-response matrix' <<<"$DRUSE_FLAT" ||
   fail "the concurrent response-memory campaign is no longer recorded"
-grep -qi 'hours-long' <<<"$URUQUIM_FLAT" ||
+grep -qi 'hours-long' <<<"$DRUSE_FLAT" ||
   fail "the owed hours-long soak is no longer recorded. An obligation in a gated document is trackable; an obligation in a reader's memory is what this phase exists to stop relying on."
 
 # --- 5. Production green; arena-semantic mutant red --------------------------
-env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
-  "$URUQUIM_ROOT/tests/c04-response-size" \
-  "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
-  "-out:$URUQUIM_TMP/c04"
+env ODIN_ROOT="$DRUSE_ODIN_ROOT" "$DRUSE_ODIN" test \
+  "$DRUSE_ROOT/tests/c04-response-size" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  "-out:$DRUSE_TMP/c04"
 
-cp -R "$URUQUIM_ROOT/tests/c04-response-size" "$URUQUIM_TMP/mutant"
+cp -R "$DRUSE_ROOT/tests/c04-response-size" "$DRUSE_TMP/mutant"
 sed -i 's|^[[:space:]]*virtual\.arena_free_all(&arena)$|\t// C04 negative control: reclamation deliberately suppressed.|' \
-  "$URUQUIM_TMP/mutant/soak_test.odin"
-grep -q 'negative control: reclamation deliberately suppressed' "$URUQUIM_TMP/mutant/soak_test.odin" ||
+  "$DRUSE_TMP/mutant/soak_test.odin"
+grep -q 'negative control: reclamation deliberately suppressed' "$DRUSE_TMP/mutant/soak_test.odin" ||
   fail "the arena semantic mutation no longer applies"
 
 set +e
-URUQUIM_OUT="$(
-  env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
-    "$URUQUIM_TMP/mutant" \
-    "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
-    "-out:$URUQUIM_TMP/c04-mutant" 2>&1
+DRUSE_OUT="$(
+  env ODIN_ROOT="$DRUSE_ODIN_ROOT" "$DRUSE_ODIN" test \
+    "$DRUSE_TMP/mutant" \
+    "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+    "-out:$DRUSE_TMP/c04-mutant" 2>&1
 )"
-URUQUIM_RC=$?
+DRUSE_RC=$?
 set -e
-test "$URUQUIM_RC" -ne 0 ||
+test "$DRUSE_RC" -ne 0 ||
   fail "arena_free_all was removed from the semantic test and the mutant stayed green"
-grep -q 'arena_free_all retained oversize blocks' <<<"$URUQUIM_OUT" || {
-  echo "$URUQUIM_OUT" >&2
+grep -q 'arena_free_all retained oversize blocks' <<<"$DRUSE_OUT" || {
+  echo "$DRUSE_OUT" >&2
   fail "the arena semantic mutant failed for the wrong reason"
 }
 

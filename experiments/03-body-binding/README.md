@@ -13,7 +13,7 @@ Nested `string`/`[]string` fields are allocated in the substituted arena, not
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..
+odin run . -collection:druse=../..
 odin check .
 ```
 

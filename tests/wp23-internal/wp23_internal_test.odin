@@ -15,14 +15,14 @@
 // `Response`, before teardown — the WP17 `Allow` precedent.
 package web
 
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 import "core:log"
 import "core:strings"
 import "core:testing"
 
 // The quiet-logger idiom (WP17-WP22): the driver-500 test provokes a framework
 // diagnostic on purpose, and the runner records any Error line as a failure.
-// The expected `uruquim:` Errors are swallowed and EVERYTHING ELSE is forwarded
+// The expected `druse:` Errors are swallowed and EVERYTHING ELSE is forwarded
 // — `testing.expect` reports through `context.logger`, so a logger that
 // swallowed everything would make its own test unable to fail.
 @(private = "file")
@@ -39,7 +39,7 @@ wp23_quiet_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Wp23_Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

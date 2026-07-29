@@ -6,7 +6,7 @@
 package main
 
 import "core:net"
-import nbio "uruquim:vendor/nbio"
+import nbio "druse:vendor/nbio"
 
 RESP := transmute([]u8)string("HTTP/1.1 200 OK\r\ncontent-length: 4\r\nconnection: keep-alive\r\n\r\npong")
 

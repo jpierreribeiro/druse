@@ -1,6 +1,6 @@
 // WP5 public-surface contract, from OUTSIDE the package.
 //
-// This package is an EXTERNAL consumer of `uruquim:web`. It proves the part of
+// This package is an EXTERNAL consumer of `druse:web`. It proves the part of
 // the WP5 contract an application can actually observe, through the ratified
 // public surface only:
 //
@@ -28,7 +28,7 @@ package wp5_public_surface
 
 import "core:encoding/json"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // ---------------------------------------------------------------------------
 // 1. The five extractors have EXACTLY the ratified signatures.

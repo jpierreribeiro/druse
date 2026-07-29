@@ -19,7 +19,7 @@
 // Expected diagnostic: cannot index/select '.name' on a value of type 'string'
 package wp3_probe_recorded_headers
 
-import web "uruquim:web"
+import web "druse:web"
 
 probe :: proc(res: web.Recorded_Response) {
 	// `headers` exists (WP49) — but its entries are STRINGS, not pairs.

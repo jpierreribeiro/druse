@@ -5,7 +5,7 @@
 // decides no status code. A transport adapter (WP8) fills a `Request` in; the
 // dispatcher (WP4) decides what a method means for a route.
 package web
-// uruquim:file application
+// druse:file application
 
 // Method is the closed set of HTTP methods Phase 1 gives a public meaning to.
 //

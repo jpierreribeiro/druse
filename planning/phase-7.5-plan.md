@@ -68,7 +68,7 @@ Three tracks. **A is the E8-7 blocker (highest priority) and independent of B/C.
 C needs vendored-backend work like WP90. B runs when a quiet machine is
 available for the 3,000-socket round.**
 
-### Track A — Composition Crystals (`uruquim-crystals`), unblocks E8-7
+### Track A — Composition Crystals (`druse-crystals`), unblocks E8-7
 
 | WP | Name | Type | Deliverable |
 |---|---|---|---|
@@ -76,7 +76,7 @@ available for the 3,000-socket round.**
 | **7.5-A2** | `http_client` over the bridge | IMPLEMENTATION | Connect, send request, read response; bounded connection pool with a typed exhaustion result; per-connect and per-request timeouts; explicit close/drain cancellation. Plaintext (`http://`) path first, green against a local origin. |
 | **7.5-A3** | Outbound TLS + certificate verification | IMPLEMENTATION | `https://` over the OpenSSL binding: SNI, hostname + chain verification against the system trust store, a verification FAILURE that refuses (proven against a self-signed / wrong-host cert), TLS handshake under the same timeout budget. **Never promised separately from the client.** |
 | **7.5-A4** | `metrics` Prometheus exposition | IMPLEMENTATION | A Crystal that renders the existing observer counters as Prometheus text over an ordinary handler/route; the WP20 redaction rules preserved (route pattern, never path; no request-derived bytes). Bounded output; one canonical exposition format. |
-| **7.5-A5** | Composition freeze + BOM reclassification | FREEZE + DOCS | Freeze `http_client` and `metrics` in `uruquim-crystals` (ledgers, gate, `docs/`); reclassify both in `production-service-bom.md` ABERTO/candidate → **CRYSTAL** with the evidence that fired the trigger; confirm no unclassified / trigger-less-ABERTO item remains. **This is the E8-7 satisfaction.** |
+| **7.5-A5** | Composition freeze + BOM reclassification | FREEZE + DOCS | Freeze `http_client` and `metrics` in `druse-crystals` (ledgers, gate, `docs/`); reclassify both in `production-service-bom.md` ABERTO/candidate → **CRYSTAL** with the evidence that fired the trigger; confirm no unclassified / trigger-less-ABERTO item remains. **This is the E8-7 satisfaction.** |
 
 ### Track B — Hardening for SSE at scale — MOVED TO THE CLOSURE
 
@@ -90,7 +90,7 @@ quiet CI machine first becomes available; it is referenced in both plans and
 must not be run twice. Phase 7.5 therefore narrows to the two feature tracks
 below (A and C).
 
-### Track C — Public large-body upload (core `uruquim`), closes E8-2
+### Track C — Public large-body upload (core `druse`), closes E8-2
 
 | WP | Name | Type | Deliverable |
 |---|---|---|---|

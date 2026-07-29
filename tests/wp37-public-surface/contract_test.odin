@@ -20,7 +20,7 @@ package test_wp37_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(private = "file")
 Quiet :: struct {
@@ -36,7 +36,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

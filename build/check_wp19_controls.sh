@@ -20,33 +20,33 @@
 # and exits 2. On-demand, like the WP16-WP18 controls — not a per-gate step.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP19-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W19_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W19_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W19_ODIN="$(command -v odin)"
+DRUSE_W19_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W19_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W19_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W19_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W19_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W19_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W19_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W19_ODIN"; then
-  echo "WP19 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W19_ODIN"; then
+  echo "WP19 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W19_TMP="$(mktemp -d -t uruquim-wp19-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W19_TMP"' EXIT
+DRUSE_W19_TMP="$(mktemp -d -t druse-wp19-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W19_TMP"' EXIT
 
 internal_tree() { # name
-  local t="$URUQUIM_W19_TMP/$1"
+  local t="$DRUSE_W19_TMP/$1"
   mkdir -p "$t"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/"
-  cp "$URUQUIM_ROOT"/tests/wp19-internal/*.odin "$t/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/"
+  cp "$DRUSE_ROOT"/tests/wp19-internal/*.odin "$t/"
   printf '%s' "$t"
 }
 
@@ -58,8 +58,8 @@ assert_mutated() { # label file before-hash
 }
 
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W19_ODIN" test "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W19_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W19_ODIN" test "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W19_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 
@@ -211,13 +211,13 @@ must_go_red "$T" "$NAMES" "6: OWS trim dropped -> line-splitting test"
 # answered "first, second", and a test pinned the in-memory answer — so an
 # application could pass its own suite and behave differently in production on a
 # duplicated header (Authorization and X-Forwarded-For among them).
-grep -q 'ascii_fold_equal(pair.name, name)' "$URUQUIM_ROOT/web/test_support.odin" ||
+grep -q 'ascii_fold_equal(pair.name, name)' "$DRUSE_ROOT/web/test_support.odin" ||
   fail "test_request no longer merges repeated header names case-insensitively; the in-memory driver would then disagree with the socket on duplicates (H4)"
 grep -q 'wp19_public_duplicates_are_joined_like_the_wire' \
-  "$URUQUIM_ROOT/tests/wp19-public-surface/contract_test.odin" ||
+  "$DRUSE_ROOT/tests/wp19-public-surface/contract_test.odin" ||
   fail "the driver-parity case for duplicate headers is gone; nothing then keeps test_request and the socket answering alike"
 grep -q 'wp19_public_a_duplicated_authorization_is_refused' \
-  "$URUQUIM_ROOT/tests/wp19-public-surface/contract_test.odin" ||
+  "$DRUSE_ROOT/tests/wp19-public-surface/contract_test.odin" ||
   fail "the duplicated-Authorization case is gone. It is the security-relevant consequence of the join: two credentials must authenticate as NEITHER, not as whichever the framework happened to pick."
 
 echo "PASS: all six WP19 mutation controls behaved as required"

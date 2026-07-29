@@ -1,18 +1,18 @@
 # Framework `/ping` throughput harness
 
-This is the smallest real Uruquim application used by the dedicated-accept
+This is the smallest real Druse application used by the dedicated-accept
 validation. The optional first argument sets `web.Limits.max_handlers`.
 
 The measured four-core server build:
 
     odin build bench/framework_ping \
-      -collection:uruquim=. \
+      -collection:druse=. \
       -o:speed \
-      -out:/tmp/uruquim-framework-ping
+      -out:/tmp/druse-framework-ping
 
 Run the server on four cores:
 
-    taskset -c 0-3 /tmp/uruquim-framework-ping 4
+    taskset -c 0-3 /tmp/druse-framework-ping 4
 
 Run the load generator on the other four cores:
 
@@ -25,7 +25,7 @@ does not reproduce the release throughput class. On a two-box rig, replace
 cores, and omit the `4` argument (or pass the actual CPU allocation).
 
 Dedicated accept is the default. To build the retained rollback control, add
-`-define:URUQUIM_DEDICATED_ACCEPT=false`.
+`-define:DRUSE_DEDICATED_ACCEPT=false`.
 
 No runtime tuning is required for the measured path. The default also carries
 the C-03-validated limit of two not-yet-consumed connection handoffs per lane.

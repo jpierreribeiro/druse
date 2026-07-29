@@ -1,7 +1,7 @@
 # C-02 — The resource × property matrix
 
 **Status: LIVE GATE (Closure, WP C-02).** This file is the **single canonical
-list of what the Uruquim core does and does not bound.** Every other document
+list of what the Druse core does and does not bound.** Every other document
 points here rather than restating it; `build/check_readiness_matrix.sh` fails
 when a row loses a cell, when a `web.Limits` field has no row, or when the
 documents that used to keep their own lists start keeping them again.

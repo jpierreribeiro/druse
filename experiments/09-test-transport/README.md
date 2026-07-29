@@ -12,7 +12,7 @@ each asserts status + envelope code + single commit.
 
 **Command.**
 ```bash
-odin test . -collection:uruquim=../..
+odin test . -collection:druse=../..
 ```
 
 **Expected result (to verify).** All six tests pass:

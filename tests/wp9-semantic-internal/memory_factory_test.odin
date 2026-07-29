@@ -16,8 +16,8 @@ package web
 import "core:log"
 import "core:strings"
 import "core:testing"
-import tc "uruquim:tests/support/transport_conformance"
-import transport "uruquim:web/internal/transport"
+import tc "druse:tests/support/transport_conformance"
+import transport "druse:web/internal/transport"
 
 // ---------------------------------------------------------------------------
 // The fixture application. It is duplicated, deliberately and minimally, in the
@@ -239,7 +239,7 @@ wp9_filter_proc :: proc(
 	location := #caller_location,
 ) {
 	filter := (^Wp9_Log_Filter)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if filter.inner.procedure != nil {

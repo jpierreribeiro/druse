@@ -87,14 +87,14 @@ There are none of the latter two. What remains:
 > that signature. The record below is kept as the history of how it was found.
 
 > **VALIDATED IN PRODUCTION (Phase 8, deployment #1, 2026-07-24).** The very
-> first real deployment of the reference application (`uruquim-board`) hit this
+> first real deployment of the reference application (`druse-board`) hit this
 > unprompted: on the test VPS (default `RLIMIT_MEMLOCK` = 8 MiB) the server
 > exited cleanly every ~1 s under systemd instead of crashing — patch 30's
 > graceful unwind, in the field. The operational remedy the patch-29 diagnostic
 > names, `LimitMEMLOCK=infinity` in the systemd unit, made it serve. A framework
 > fix made in Hardening was confirmed by the first use, and the fix's *value* —
 > a clean, recoverable failure with a named remedy rather than a crash-loop — is
-> exactly what a real deployment needs. See `uruquim-board/DEPLOYMENTS.md` #1.
+> exactly what a real deployment needs. See `druse-board/DEPLOYMENTS.md` #1.
 
 **The original open-defect record:
 

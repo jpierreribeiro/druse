@@ -6,7 +6,7 @@ package test_c3_query_opt
 
 import "core:strconv"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // The handler echoes the three-state outcome as the status so the test can read
 // it back: absent -> 204, present+valid -> 200 (+value in body), malformed ->

@@ -29,7 +29,7 @@ package test_wp35_public
 import "core:mem"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(private = "file")
 Payload :: struct {

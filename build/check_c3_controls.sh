@@ -6,21 +6,21 @@
 # malformed value IS a 400 — proven on real (in-memory transport) traffic.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_EXTRACT="$URUQUIM_ROOT/web/extract.odin"
-URUQUIM_SUITE="$URUQUIM_ROOT/tests/c3-query-opt/contract_test.odin"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_EXTRACT="$DRUSE_ROOT/web/extract.odin"
+DRUSE_SUITE="$DRUSE_ROOT/tests/c3-query-opt/contract_test.odin"
 
 fail() { echo "C3-CONTROL-FAIL: $*" >&2; exit 1; }
 
-URUQUIM_ODIN="${URUQUIM_ODIN_BIN:-odin}"
-URUQUIM_ODIN_DIR="$(cd "$(dirname "$(readlink -f "$URUQUIM_ODIN")")" && pwd)"
+DRUSE_ODIN="${DRUSE_ODIN_BIN:-odin}"
+DRUSE_ODIN_DIR="$(cd "$(dirname "$(readlink -f "$DRUSE_ODIN")")" && pwd)"
 
-grep -qE '^query_int_opt :: proc\(ctx: \^Context, name: string\) -> \(value: int, present: bool, ok: bool\)' "$URUQUIM_EXTRACT" ||
+grep -qE '^query_int_opt :: proc\(ctx: \^Context, name: string\) -> \(value: int, present: bool, ok: bool\)' "$DRUSE_EXTRACT" ||
   fail "web.query_int_opt is missing its ratified signature"
 
-test -f "$URUQUIM_SUITE" || fail "tests/c3-query-opt/contract_test.odin is missing"
-env ODIN_ROOT="$URUQUIM_ODIN_DIR" "$URUQUIM_ODIN" test "$URUQUIM_ROOT/tests/c3-query-opt" \
-  -collection:uruquim="$URUQUIM_ROOT" >/dev/null 2>&1 ||
+test -f "$DRUSE_SUITE" || fail "tests/c3-query-opt/contract_test.odin is missing"
+env ODIN_ROOT="$DRUSE_ODIN_DIR" "$DRUSE_ODIN" test "$DRUSE_ROOT/tests/c3-query-opt" \
+  -collection:druse="$DRUSE_ROOT" >/dev/null 2>&1 ||
   fail "the C3 query-opt suite did not pass"
 
 echo "C3 control: query_int_opt reports presence (absent≠400, present carries value, malformed=400); suite green"

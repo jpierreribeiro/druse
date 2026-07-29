@@ -12,7 +12,7 @@ package test_wp96_scale
 import "core:sync"
 import "core:thread"
 import "core:testing"
-import stream "uruquim:web/internal/stream"
+import stream "druse:web/internal/stream"
 
 STREAMS :: 3000
 

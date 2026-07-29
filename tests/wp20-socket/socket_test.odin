@@ -17,7 +17,7 @@ import "core:log"
 import "core:net"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // A port set disjoint from the WP8/WP9/WP17 candidates.
 @(private = "file")
@@ -37,7 +37,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

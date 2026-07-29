@@ -280,7 +280,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> General_Error {
 
 	_flush_submissions :: proc(l: ^Event_Loop, timeout: time.Duration) -> linux.Errno {
 		for {
-			// URUQUIM PATCH 33 (transport audit F8) — SPLIT SECONDS FROM
+			// DRUSE PATCH 33 (transport audit F8) — SPLIT SECONDS FROM
 			// NANOSECONDS. This stuffed the whole duration into `tv_nsec` and
 			// never set `tv_sec`, so any timeout of one second or more produced
 			// `tv_nsec >= 1e9`, which io_uring's EXT_ARG path rejects with

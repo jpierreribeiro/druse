@@ -25,7 +25,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 @(private = "file")
 CANDIDATE_PORTS :: [?]int{56811, 57013, 57241, 57487}
@@ -44,7 +44,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

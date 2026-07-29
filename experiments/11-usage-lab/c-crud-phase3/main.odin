@@ -12,7 +12,7 @@
 // surface rather than a program's cost.
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 // The value every handler needs, created once. In a real service this is a
 // database pool; here it is the store's name and a counter.

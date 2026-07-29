@@ -17,26 +17,26 @@
 # slow is a gate people learn to skip.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_POLICY="$URUQUIM_ROOT/planning/vendor-policy.md"
-URUQUIM_VENDOR_DOC="$URUQUIM_ROOT/vendor/odin-http/VENDOR.md"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_POLICY="$DRUSE_ROOT/planning/vendor-policy.md"
+DRUSE_VENDOR_DOC="$DRUSE_ROOT/vendor/odin-http/VENDOR.md"
 
 fail() {
   echo "VENDOR-POLICY-FAIL: $*" >&2
   exit 1
 }
 
-test -f "$URUQUIM_POLICY" || fail "planning/vendor-policy.md is missing; WP51 is the precondition for any package that patches the vendored server"
-test -f "$URUQUIM_VENDOR_DOC" || fail "vendor/odin-http/VENDOR.md is missing; the vendored snapshot has no provenance"
+test -f "$DRUSE_POLICY" || fail "planning/vendor-policy.md is missing; WP51 is the precondition for any package that patches the vendored server"
+test -f "$DRUSE_VENDOR_DOC" || fail "vendor/odin-http/VENDOR.md is missing; the vendored snapshot has no provenance"
 
-URUQUIM_FLAT="$(sed -E 's/^[[:space:]]*>[[:space:]]?//' "$URUQUIM_POLICY" | tr '\n' ' ' | tr -s ' ')"
+DRUSE_FLAT="$(sed -E 's/^[[:space:]]*>[[:space:]]?//' "$DRUSE_POLICY" | tr '\n' ' ' | tr -s ' ')"
 
 # --- 1. Provenance -----------------------------------------------------------
 # The pinned commit must appear in BOTH documents. A policy that names no commit
 # is about a dependency in general; a vendor record with no commit is a copy.
-grep -qF '112c49b' "$URUQUIM_VENDOR_DOC" ||
+grep -qF '112c49b' "$DRUSE_VENDOR_DOC" ||
   fail "vendor/odin-http/VENDOR.md no longer records the pinned upstream commit"
-grep -qF '112c49b' "$URUQUIM_POLICY" ||
+grep -qF '112c49b' "$DRUSE_POLICY" ||
   fail "the vendor policy no longer names the commit it governs"
 
 # --- 2. The patch ledger is exact in both directions -------------------------
@@ -53,61 +53,61 @@ grep -qF '112c49b' "$URUQUIM_POLICY" ||
 #   b. every NUMBERED marker in the vendored sources has a row in that table —
 #      a patch applied without a disposition is one nobody knows whether to
 #      re-apply. (Patches 1-5 predate numbered markers and carry the
-#      `URUQUIM PATCH (WP9 D…)` form, so the source side is checked as a
+#      `DRUSE PATCH (WP9 D…)` form, so the source side is checked as a
 #      subset, never as an equality.)
-URUQUIM_POLICY_NUMS="$(grep -oE '^\| [0-9]+ \| .* \| .* \| \*\*(OFFER UPSTREAM|CARRY|APPEARS FIXED UPSTREAM)' "$URUQUIM_POLICY" |
+DRUSE_POLICY_NUMS="$(grep -oE '^\| [0-9]+ \| .* \| .* \| \*\*(OFFER UPSTREAM|CARRY|APPEARS FIXED UPSTREAM)' "$DRUSE_POLICY" |
   awk -F'|' '{gsub(/ /, "", $2); print $2}' | sort -n)"
-URUQUIM_POLICY_ROWS="$(printf '%s\n' "$URUQUIM_POLICY_NUMS" | grep -c . || true)"
-test "$URUQUIM_POLICY_ROWS" -gt 0 ||
+DRUSE_POLICY_ROWS="$(printf '%s\n' "$DRUSE_POLICY_NUMS" | grep -c . || true)"
+test "$DRUSE_POLICY_ROWS" -gt 0 ||
   fail "the vendor policy carries no patch dispositions at all"
-if ! diff <(printf '%s\n' "$URUQUIM_POLICY_NUMS") <(seq 1 "$URUQUIM_POLICY_ROWS") >/dev/null; then
-  fail "the vendor policy's patch numbers are not exactly 1..$URUQUIM_POLICY_ROWS (duplicate, gap or removed row)"
+if ! diff <(printf '%s\n' "$DRUSE_POLICY_NUMS") <(seq 1 "$DRUSE_POLICY_ROWS") >/dev/null; then
+  fail "the vendor policy's patch numbers are not exactly 1..$DRUSE_POLICY_ROWS (duplicate, gap or removed row)"
 fi
 
-URUQUIM_SRC_NUMS="$(grep -rhoE 'URUQUIM PATCH [0-9]+' "$URUQUIM_ROOT"/vendor/odin-http/*.odin |
+DRUSE_SRC_NUMS="$(grep -rhoE 'DRUSE PATCH [0-9]+' "$DRUSE_ROOT"/vendor/odin-http/*.odin |
   awk '{print $3}' | sort -n -u)"
-test -n "$URUQUIM_SRC_NUMS" ||
-  fail "no numbered 'URUQUIM PATCH N' marker was found in the vendored sources; a divergence that is not marked at its site cannot be re-applied"
-for URUQUIM_N in $URUQUIM_SRC_NUMS; do
-  test "$URUQUIM_N" -le "$URUQUIM_POLICY_ROWS" ||
-    fail "the vendored sources mark patch $URUQUIM_N but the policy's disposition table stops at $URUQUIM_POLICY_ROWS. A patch with no recorded disposition is one nobody knows whether to re-apply."
+test -n "$DRUSE_SRC_NUMS" ||
+  fail "no numbered 'DRUSE PATCH N' marker was found in the vendored sources; a divergence that is not marked at its site cannot be re-applied"
+for DRUSE_N in $DRUSE_SRC_NUMS; do
+  test "$DRUSE_N" -le "$DRUSE_POLICY_ROWS" ||
+    fail "the vendored sources mark patch $DRUSE_N but the policy's disposition table stops at $DRUSE_POLICY_ROWS. A patch with no recorded disposition is one nobody knows whether to re-apply."
 done
 
-URUQUIM_PATCH_MARKS="$(grep -rc 'URUQUIM PATCH' "$URUQUIM_ROOT"/vendor/odin-http/*.odin 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')"
-test "$URUQUIM_PATCH_MARKS" -gt 0 ||
-  fail "no 'URUQUIM PATCH' marker was found in the vendored sources; a divergence that is not marked at its site cannot be re-applied"
+DRUSE_PATCH_MARKS="$(grep -rc 'DRUSE PATCH' "$DRUSE_ROOT"/vendor/odin-http/*.odin 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')"
+test "$DRUSE_PATCH_MARKS" -gt 0 ||
+  fail "no 'DRUSE PATCH' marker was found in the vendored sources; a divergence that is not marked at its site cannot be re-applied"
 
 # --- 3. Every patch states whether it is upstream's bug -----------------------
 # The column that does the work: two of five are upstream bugs and three are
 # deliberate divergences, and that ratio is what makes re-vendoring predictable.
-grep -qiE 'is it upstream.s bug' "$URUQUIM_POLICY" ||
+grep -qiE 'is it upstream.s bug' "$DRUSE_POLICY" ||
   fail "the disposition table lost the column that says whether each patch fixes an UPSTREAM bug or encodes a deliberate divergence. Without it, a re-vendor cannot tell which patches might already be gone."
 
 # --- 4. The corpus rule survives ---------------------------------------------
 # This is the one most likely to be "improved" back into a grep, because a grep
 # is easier to write.
-grep -qiE 'proven by CORPUS, never by grep' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'proven by CORPUS, never by grep' <<<"$DRUSE_FLAT" ||
   fail "the policy no longer states that patches are proven by corpus rather than by grep over vendored text"
-grep -qiE 'written differently, must still pass' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'written differently, must still pass' <<<"$DRUSE_FLAT" ||
   fail "the policy lost the sentence explaining WHY: a correct re-application written differently must still pass. Without the reason, the rule reads as a preference and gets reversed."
 
-URUQUIM_CORPUS="$URUQUIM_ROOT/tests/support/transport_conformance/corpus.odin"
-test -f "$URUQUIM_CORPUS" ||
+DRUSE_CORPUS="$DRUSE_ROOT/tests/support/transport_conformance/corpus.odin"
+test -f "$DRUSE_CORPUS" ||
   fail "the raw-wire corpus is missing; it is the executable evidence the policy points at"
 
 # --- 5. The watch obligation is on the gate, not on memory -------------------
-grep -qiE 'at every phase freeze' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'at every phase freeze' <<<"$DRUSE_FLAT" ||
   fail "the policy no longer places the upstream re-check at a phase freeze. An obligation on nobody in particular is an obligation nobody performs."
-grep -qiE 'between freezes there is no watch' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'between freezes there is no watch' <<<"$DRUSE_FLAT" ||
   fail "the policy no longer admits that nothing watches upstream between freezes. Implying a vigilance nobody performs is worse than declaring the gap."
 
 # --- 6. The rules a patch must satisfy ---------------------------------------
-grep -qiE 'not a patch, it is a preference' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'not a patch, it is a preference' <<<"$DRUSE_FLAT" ||
   fail "the policy lost its test for whether something is a patch at all: a change whose necessity no failing corpus case demonstrates"
 
-if grep -nE '\b(TODO|FIXME|XXX|TBD)\b' "$URUQUIM_POLICY"; then
+if grep -nE '\b(TODO|FIXME|XXX|TBD)\b' "$DRUSE_POLICY"; then
   fail "the vendor policy contains an unfinished-work marker"
 fi
 
-echo "vendor policy: provenance pinned at 112c49b; $URUQUIM_POLICY_ROWS patch dispositions recorded; $URUQUIM_PATCH_MARKS in-source markers; corpus rule intact"
+echo "vendor policy: provenance pinned at 112c49b; $DRUSE_POLICY_ROWS patch dispositions recorded; $DRUSE_PATCH_MARKS in-source markers; corpus rule intact"
 echo "PASS: vendor maintenance policy gate (WP51)"

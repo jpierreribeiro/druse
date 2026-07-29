@@ -44,7 +44,7 @@ main :: proc() {
 	defer web.destroy(&app)
 
 	// Configuration from the environment, with the framework's own defaults as
-	// the fallback. Nothing here is Uruquim-specific — it is ordinary code that
+	// the fallback. Nothing here is Druse-specific — it is ordinary code that
 	// hands resolved integers to `web.limits`.
 	budget := web.DEFAULT_LIMITS
 	budget.max_body        = env_int("MAX_BODY", budget.max_body)

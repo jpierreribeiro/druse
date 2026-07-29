@@ -13,9 +13,9 @@
 //
 // THE LINE, and every field of it is a decision with a test:
 //
-//	uruquim: GET /orders/:id 200      a routed request
-//	uruquim: GET - 404                a miss: no pattern exists, so none is shown
-//	uruquim: GET /silent -            nothing was committed while we watched
+//	druse: GET /orders/:id 200      a routed request
+//	druse: GET - 404                a miss: no pattern exists, so none is shown
+//	druse: GET /silent -            nothing was committed while we watched
 //
 // ROUTE, NEVER PATH. The field is the REGISTERED PATTERN, the same
 // low-cardinality identity §6.2 imposes on `Framework_Event`, and for the same
@@ -48,7 +48,7 @@
 // below, because reading an uncommitted `Response`'s zero `Status` and printing
 // it as an outcome would be the framework inventing a number it never sent.
 package web
-// uruquim:file application
+// druse:file application
 
 // logger writes one line per request to `context.logger`, at `.Info` level,
 // after the rest of the chain has run.
@@ -102,7 +102,7 @@ logger :: proc(ctx: ^Context) {
 // diagnostics. It is what lets an application's own logger route or filter
 // framework lines without parsing them.
 @(private)
-LOGGER_PREFIX :: "uruquim: "
+LOGGER_PREFIX :: "druse: "
 
 // LOGGER_ABSENT is the field value for something the framework cannot supply:
 // the route on a miss, the status when nothing was committed. It is one byte

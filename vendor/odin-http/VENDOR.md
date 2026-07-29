@@ -1,7 +1,7 @@
 # Vendored dependency — laytan/odin-http (server root package)
 
 This directory is a **minimal snapshot** of the root server package of
-`laytan/odin-http`, used by the Uruquim bootstrap transport adapter
+`laytan/odin-http`, used by the Druse bootstrap transport adapter
 (`web/internal/transport/`) and by nothing else. No application imports it.
 
 ## Provenance
@@ -74,10 +74,10 @@ and one by WP7.5-C1 (streaming inbound body): the read-side twin of WP90's
 detached-stream pump, delivering a request body one bounded window at a time.
 All are minimal and fix a security issue, an upstream defect,
 a lifecycle defect or a capacity the server had no way to bound. Each is marked
-in source with `URUQUIM PATCH`, recorded below, and covered by executable
+in source with `DRUSE PATCH`, recorded below, and covered by executable
 evidence that failed before it. There are no opportunistic edits.
 
-The classification is mixed. Some patches encode Uruquim's deliberately
+The classification is mixed. Some patches encode Druse's deliberately
 stricter framing, capacity and shutdown policy; seven fix upstream lifecycle,
 parsing or keep-alive defects. The distinction is recorded per row because it
 decides whether a re-vendor carries a policy or expects a fix to disappear.

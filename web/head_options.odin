@@ -1,5 +1,5 @@
 package web
-// uruquim:file application
+// druse:file application
 
 // WP32b — automatic HEAD and OPTIONS.
 //

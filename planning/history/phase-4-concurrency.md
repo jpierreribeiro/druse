@@ -12,7 +12,7 @@ sales document.
 ## 1. What the arms are
 
 Both already exist. `Server_Opts.thread_count` in the vendored server defaults
-to the core count, and **Uruquim's adapter forces it to 1**. So this was never a
+to the core count, and **Druse's adapter forces it to 1**. So this was never a
 build; it is a one-line change — which is precisely why it needed measuring
 rather than assuming. **A cheap change is the kind that gets made without
 evidence.**

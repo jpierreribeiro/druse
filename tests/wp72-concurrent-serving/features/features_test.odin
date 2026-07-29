@@ -3,8 +3,8 @@ package wp72_features
 import "core:strings"
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/web_blocking_lab"
-import web "uruquim:web"
+import lab "druse:tests/support/web_blocking_lab"
+import web "druse:web"
 
 STATIC_DIR :: "tests/wp72-concurrent-serving/fixture"
 BOUNDARY :: "----wp72boundary"

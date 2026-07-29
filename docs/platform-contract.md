@@ -1,8 +1,8 @@
 # Platform contract
 
-**Status: PROPOSED, 2026-07-23.** The platform Uruquim actually targets, stated
+**Status: PROPOSED, 2026-07-23.** The platform Druse actually targets, stated
 as a **selected profile** — not a claim of full POSIX (IEEE 1003.1-2024)
-conformance. Uruquim uses a small, named subset of operating-system services; this
+conformance. Druse uses a small, named subset of operating-system services; this
 document is that subset and the guarantees that depend on it. It lives at the
 adapter/operations boundary, not in the public API.
 
@@ -20,9 +20,9 @@ Anything outside this profile is `NAO_APLICAVEL` until a future gate validates i
 (other architectures/OSes are an ABERTO item with a registered trigger; see the
 production-readiness audit).
 
-## The OS services Uruquim relies on (the selected 1003.1 subset)
+## The OS services Druse relies on (the selected 1003.1 subset)
 
-| Area | What Uruquim relies on | Where |
+| Area | What Druse relies on | Where |
 |---|---|---|
 | Signals | `SIGTERM`/`SIGINT` delivered to the process; the application installs the handler and calls `web.stop` (the core installs none — ADR-040). `web.stop` is async-signal-safe (atomic flag + loop wake). | app `main`, `web/lifecycle.odin` |
 | Signal-handler safety | Only async-signal-safe work in a handler: set a flag / call `web.stop`. No allocation, no logging from the handler itself. | `docs/operations.md` |
@@ -46,7 +46,7 @@ production-readiness audit).
 
 ## Deviations
 
-- Uruquim does not claim POSIX conformance and does not run a POSIX conformance
+- Druse does not claim POSIX conformance and does not run a POSIX conformance
   suite; it validates only the selected subset above, on Linux x86-64, in the
   gate. The rest of 1003.1 is `NAO_APLICAVEL`.
 - The core installs **no** signal handler by design (ADR-040): seizing process

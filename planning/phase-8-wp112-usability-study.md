@@ -24,10 +24,10 @@ the **coding-agent conditions**, run as isolated, independent attempts.
   - **B** — model *sonnet* (A/B are the convergence pair — same everything).
   - **C** — model *opus* (the model-tier axis).
 - **Materials given** — the board's own existing code, the reference app
-  `crystals/examples/notes`, and the public `uruquim:web` / `crystals:*` API.
+  `crystals/examples/notes`, and the public `druse:web` / `crystals:*` API.
   Reading the framework's INTERNAL source (`core web/`) was disallowed — the test
   is whether the public surface + examples suffice.
-- **Success bar** — the build gate must pass (`PASS: uruquim-board build gate`),
+- **Success bar** — the build gate must pass (`PASS: druse-board build gate`),
   which structurally enforces **G8-1** (no internal import) and full typecheck
   against the pinned public contracts.
 - **Recorded per condition** — files changed; compile attempts; concepts used;

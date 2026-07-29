@@ -18,9 +18,9 @@
 // transport boundary — the core still names no backend or stream type.
 package web
 
-// uruquim:file application
+// druse:file application
 
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // Stream is a value the application holds and passes to `stream_send` /
 // `stream_close`. It carries only a stale-safe identity, so a copy retained

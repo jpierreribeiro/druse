@@ -1,6 +1,6 @@
 // WP70 — the private publication boundary for concurrent serving.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:sync"
 

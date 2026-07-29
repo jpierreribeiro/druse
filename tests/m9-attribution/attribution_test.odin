@@ -21,7 +21,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 PORT :: 56191
 CONNS :: 4

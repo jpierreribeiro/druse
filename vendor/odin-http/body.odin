@@ -29,7 +29,7 @@ Do not call this more than once.
 body :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb: Body_Callback) {
 	assert(req._body_ok == nil, "you can only call body once per request")
 
-	// URUQUIM PATCH 37 (audit H3) — the shared predicate, not a suffix test.
+	// DRUSE PATCH 37 (audit H3) — the shared predicate, not a suffix test.
 	// `headers_validate` has already refused anything this would reject, so the
 	// framing decision here agrees with the admission decision by construction.
 	enc_header, ok := headers_get_unsafe(req.headers, "transfer-encoding")
@@ -128,7 +128,7 @@ _body_length :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb:
 
 	len, ok := headers_get_unsafe(req.headers, "content-length")
 	if !ok {
-		// URUQUIM PATCH 7 (WP45) — NO BODY IS NOT A FAILED BODY.
+		// DRUSE PATCH 7 (WP45) — NO BODY IS NOT A FAILED BODY.
 		//
 		// `_body_ok` is set to `false` at the top of this procedure and means
 		// "the body read was attempted and failed"; `response_must_close` reads
@@ -149,7 +149,7 @@ _body_length :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb:
 		return
 	}
 
-	// URUQUIM PATCH (WP9 D2): the length must be a WHOLE non-negative decimal.
+	// DRUSE PATCH (WP9 D2): the length must be a WHOLE non-negative decimal.
 	// `strconv.parse_int` accepts a leading '-' and stops at the first
 	// non-digit, so `-1` parsed as -1 and reached `max_token_size`, tripping the
 	// scanner's `n >= 0` assertion and KILLING THE SERVER — a remote denial of
@@ -160,7 +160,7 @@ _body_length :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb:
 		return
 	}
 
-	// URUQUIM PATCH 16 (F10) — `_is_plain_decimal` permits an arbitrarily long
+	// DRUSE PATCH 16 (F10) — `_is_plain_decimal` permits an arbitrarily long
 	// digit string, and `strconv.parse_int` wraps on overflow: a value >= 2^64
 	// wraps to a small positive, so the server would read fewer bytes than
 	// declared and treat the remainder as a second request (a smuggling/desync
@@ -257,7 +257,7 @@ _body_chunked :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb
 			size_line = size_line[:semi]
 		}
 
-		// URUQUIM PATCH 14 (F3) — a chunk-size line is unsigned hex, but
+		// DRUSE PATCH 14 (F3) — a chunk-size line is unsigned hex, but
 		// `strconv.parse_int` accepts a leading `-` and silently wraps values
 		// that overflow i64, both yielding a negative `size`. A negative size
 		// is stored as the scanner's `max_token_size`/`split_data` and reaches
@@ -315,7 +315,7 @@ _body_chunked :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb
 				s.cb(s.user_data, "", err)
 				return
 			}
-			// URUQUIM PATCH (WP9 D3): a chunk that is not terminated by CRLF is
+			// DRUSE PATCH (WP9 D3): a chunk that is not terminated by CRLF is
 			// MALFORMED INPUT, not a programming error. Upstream asserted here,
 			// so a hand-written chunked body without the trailing CRLF killed
 			// the server — a second remote denial of service. It is now
@@ -350,7 +350,7 @@ _body_chunked :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb
 			return
 		}
 
-		// URUQUIM PATCH 15 (F2) — the server freezes the request headers
+		// DRUSE PATCH 15 (F2) — the server freezes the request headers
 		// (`headers.readonly = true`) before dispatch, but a chunked body's
 		// trailer section is parsed AFTER that freeze, and parsing a trailer
 		// field mutates the header map: `header_parse` reaches
@@ -401,7 +401,7 @@ _body_chunked :: proc(req: ^Request, max_length: int = -1, user_data: rawptr, cb
 	scanner_scan(s.req._scanner, s, on_scan)
 }
 
-// URUQUIM PATCH (WP9 D2): a Content-Length must be one or more ASCII digits and
+// DRUSE PATCH (WP9 D2): a Content-Length must be one or more ASCII digits and
 // nothing else — no sign, no whitespace, no comma list, no trailing text. See
 // VENDOR.md.
 @(private)
@@ -417,7 +417,7 @@ _is_plain_decimal :: proc(s: string) -> bool {
 	return true
 }
 
-// URUQUIM PATCH 34 (HTTP audit F1) — the chunk-size counterpart of
+// DRUSE PATCH 34 (HTTP audit F1) — the chunk-size counterpart of
 // `_is_plain_decimal`, and it exists for the same reason on the other framing
 // axis. RFC 9112 §7.1 defines chunk-size as 1*HEXDIG, but both chunked paths
 // passed the line straight to `strconv.parse_int(.., 16)` and only rejected a

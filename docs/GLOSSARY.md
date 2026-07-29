@@ -19,9 +19,11 @@ use it in body text.
 Do not write `the Druse framework`, `Druse core`, `the Crystals library` or
 `the ecosystem`. `Druse` and `Crystals` already carry those meanings.
 
-**Forbidden:** `uruquim`, `uruquim-crystals`, `uruquim-odin`, and every case
-variant. These are the former names. A build check refuses them
-(`documentation-program.md` §8).
+**Forbidden:** `uruquim`, `uruquim-odin`, `uruquim-crystals`, and every case
+variant. These are the former names, retired by the `v0.10.0` rename. This line
+is one of the three places allowed to write them at all
+(`documentation-program.md` §2); a build check refuses them everywhere else
+(§8).
 
 ## Structure
 

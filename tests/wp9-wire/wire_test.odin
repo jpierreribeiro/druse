@@ -24,9 +24,9 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import tc "uruquim:tests/support/transport_conformance"
-import web "uruquim:web"
-import transport "uruquim:web/internal/transport"
+import tc "druse:tests/support/transport_conformance"
+import web "druse:web"
+import transport "druse:web/internal/transport"
 
 CANDIDATE_PORTS :: [?]int{51137, 51839, 52267, 52753}
 
@@ -366,7 +366,7 @@ wp9_the_log_filter_cannot_swallow_an_assertion_failure :: proc(t: ^testing.T) {
 	}
 
 	framework_loc := runtime.Source_Code_Location {
-		file_path = "/home/user/uruquim/web/internal/transport/odin_http_adapter.odin",
+		file_path = "/home/user/druse/web/internal/transport/odin_http_adapter.odin",
 	}
 	filter_proc(&filter, .Error, "backend refused a malformed request", {}, framework_loc)
 	testing.expect_value(t, filter.dropped_errors, 1)

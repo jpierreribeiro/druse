@@ -61,8 +61,8 @@ Phase 3 needs a clock in two places, and they are **not** the same problem:
   `web/internal/transport`, which already imports `core:net` — and the vendored
   backend behind it (`vendor/odin-http/server.odin`) already imports `core:time`
   and `core:nbio`, so the serving path links a clock today whether or not any
-  Uruquim package names one. The open cost question is what an *additional*
-  `core:time` import into Uruquim's own packages costs — entirely different from
+  Druse package names one. The open cost question is what an *additional*
+  `core:time` import into Druse's own packages costs — entirely different from
   the cost question in `web`, and it must be measured rather than assumed either
   way. **A work package that adds a `core:time` import to `web` itself needs
   owner approval and a measured justification.**
@@ -224,7 +224,7 @@ stops and records the finding instead of proceeding.**
 
 | WP | Decided arm | Grounds |
 |---|---|---|
-| **WP30** | **Diagnose-and-poison** at registration. | Fail-closed is the project default and the mechanism (ADR-019) exists and is proven. Go's precedent panics at registration; Uruquim poisons instead. Observable change — the spec and tests are still owed. |
+| **WP30** | **Diagnose-and-poison** at registration. | Fail-closed is the project default and the mechanism (ADR-019) exists and is proven. Go's precedent panics at registration; Druse poisons instead. Observable change — the spec and tests are still owed. |
 | **WP31a** | **Ratify the absence of normalisation, permanently.** Bytes received are bytes matched; `/users` and `/users/` stay distinct; `web.path` params are **raw, undecoded views** — decoding is the application's explicit choice. | The security arm and the reversible arm coincide: every normalisation rule is an opportunity for two components to disagree about what a path means. The negative-control corpus is still owed and proves the mismatch behaviour. |
 | **WP32a** | **Automatic HEAD** (respond as GET, suppress the body); **automatic OPTIONS** (reuse the `Allow` machinery); **no 501** — the SHOULD-deviation is ratified: an unknown method stays on the 404/405 path (WP9 D7). | HEAD is the RFC's MUST-support; OPTIONS costs no second machinery; 501 would open the method vocabulary with no demonstrated demand. |
 | **WP34** | **Approved: +1 symbol.** | C-2's constraint is a MUST and the framework already holds the value. The redaction rule — the pattern, never the path — becomes a gate assertion in the same change. |
@@ -348,7 +348,7 @@ shootout is not blocked by any decision here.
 **Type: PROTOTYPE.** RG-2. **It must not choose before measuring.**
 
 * **Public surface. None.**
-* **Five candidates, all measured on Uruquim's own workloads:** pointer-based
+* **Five candidates, all measured on Druse's own workloads:** pointer-based
   radix, index-based radix, hybrid, improved linear, and **class-bucketed
   linear** (static / `:param` / wildcard buckets, linear scan inside the
   matching bucket).
@@ -367,7 +367,7 @@ shootout is not blocked by any decision here.
   between a shootout and a demo.
 * **C-5 governs this work package** (`later-phases-plan.md`): the radix-router
   justification is not what folklore says. "A real, validated system does it
-  this way" is not evidence about Uruquim's route cardinalities. Class-bucketed
+  this way" is not evidence about Druse's route cardinalities. Class-bucketed
   linear arrives with its own disclaimer — **it also scans linearly inside each
   bucket** — and is a hypothesis to measure, not a result to adopt.
 * **The losing candidates and their numbers are RECORDED.** A shootout that
@@ -582,7 +582,7 @@ semantics.**
 not transform.** A dot segment, an interior empty segment, a percent-encoded
 slash or a percent-encoded NUL is answered `400` before route matching;
 everything else passes through byte-exact and undecoded, as today. Normalising
-was rejected as maximising the ways Uruquim's view of a path can differ from a
+was rejected as maximising the ways Druse's view of a path can differ from a
 proxy's; ratifying the silent absence was rejected because it leaves that
 disagreement invisible — a 404 is not a diagnosis. **The trailing slash keeps
 its Phase-1 meaning:** it is not an interior empty segment, and `/users/`
@@ -611,7 +611,7 @@ were legal the day they were written.
 **Type: SPEC + IMPLEMENTATION. Requires owner approval — observable HTTP
 semantics.**
 
-* **C-1: HEAD is effectively mandatory**, and 501 is a SHOULD that Uruquim
+* **C-1: HEAD is effectively mandatory**, and 501 is a SHOULD that Druse
   currently declines. The vendored backend's HEAD handling is currently held
   under core control by a patch the wire corpus pins (`check_public_api.sh`).
 * **The decision to produce:** automatic HEAD (respond as GET, suppress the
@@ -875,7 +875,7 @@ capacity-ledger amendment.**
   contradiction.
 * **Keep it the smallest struct HTTP actually needs.** Do not import a general
   system-specification concept from a runtime that sizes shards, pools and
-  rings; Uruquim sizes none of those.
+  rings; Druse sizes none of those.
 * **FINDING-B applies:** timeouts need a clock on the serving path. That path
   is `web/internal/transport`, which already imports `core:net`, and the
   vendored backend behind it already links `core:time` — a different cost
@@ -1008,7 +1008,7 @@ argued *against* it:
 
 * **C-6** finds that Go's `context.WithValue` and Rust's `http::Extensions`
   exist for type-erased, dynamically-keyed state crossing library boundaries —
-  which Uruquim does not have — and concludes that this **supports G-03 rather
+  which Druse does not have — and concludes that this **supports G-03 rather
   than challenging it**.
 * **G-03** forbids the context extension bag outright.
 * The honest consequence is that the canonical auth pattern's revalidation cost
@@ -1250,7 +1250,7 @@ already hit these walls is worth more than a fresh guess.
   own rejected list).
 * Take **discipline** — how a claim is evidenced, how a bound states what it
   does when full, how a benchmark avoids measuring its own error. Do **not**
-  take structure. Tina sizes shards, pools and rings; Uruquim sizes none of
+  take structure. Tina sizes shards, pools and rings; Druse sizes none of
   those, and importing a general system-specification concept would be
   cargo-culting a solution to a problem this framework does not have.
 * The dossier says this about its own strongest candidate, and it is the right
@@ -1288,7 +1288,7 @@ Read the mapped document, not the whole folder.
 | **WP29/WP30** router | `docs/07-catalogo-de-padroes.md` | Pattern catalogue, including the class-bucketed representation |
 | **WP35** arena and reuse | `docs/02-memoria-ownership-e-backpressure.md`, **P-T7** | Bounded pools, the "no malloc" claim examined, and the generational-token test for slot reuse |
 | **WP36** limits | **P-T6**, `docs/11-…roadmap` §P3-10/P3-11 | Compiled limits versus per-request lookup, and why the options struct stays small |
-| **WP37** state | `docs/08-comparacao-com-uruquim.md` | Where the two designs genuinely diverge |
+| **WP37** state | `docs/08-comparacao-com-druse.md` | Where the two designs genuinely diverge |
 | **WP38** freeze | `docs/09-propostas…` P-T1/P-T2, `docs/10-limitacoes-e-questoes-abertas.md` | The ledger discipline Phase 2 already adopted, and how the study bounds its own claims |
 
 ### Already rejected, and staying rejected
@@ -1313,7 +1313,7 @@ The remaining P-T numbers are accounted for so nobody goes looking: **P-T1,
 P-T2 and P-T4** were absorbed by Phase 2 itself (the three ledgers, the
 ownership table, and WP18 Amendment 1 plus the single-commit invariant);
 **P-T3** lives on as WP9's raw-wire corpus and grows in Phase 4 (P4-16);
-**P-T9 and P-T10** are the product track's `uruquim dev` and `uruquim doctor`,
+**P-T9 and P-T10** are the product track's `druse dev` and `druse doctor`,
 deliberately outside every phase.
 
 ---
@@ -1328,7 +1328,7 @@ them is proven here, with a test or a measurement that lives in this tree.
 ### `laytan/odin-http` upstream, and its documentation
 
 https://odin-http.laytan.dev/http/ documents the package whose root server
-Uruquim already vendors at a pinned commit (`vendor/odin-http/VENDOR.md`), so
+Druse already vendors at a pinned commit (`vendor/odin-http/VENDOR.md`), so
 this is the one external source that is also partly *in* the tree. Two things
 are worth knowing for Phase 3:
 
@@ -1342,7 +1342,7 @@ are worth knowing for Phase 3:
   validates.
 * The backend already imports `core:time` and `core:nbio` on the serving path
   (FINDING-B, as stated above): the clock exists there today, and the open cost
-  question is about Uruquim's own packages.
+  question is about Druse's own packages.
 
 ### `arturfil/coffees_odin` — a real application on the same backend
 
@@ -1354,7 +1354,7 @@ application looks like today, and it touches four Phase-3 questions:
 * **WP28 — route cardinality.** It registers **13 routes**. That is context for
   "the cardinalities this project actually targets" in the stopping rule — a
   real application sitting exactly in the 5–50 band — and it is context only,
-  never evidence (C-5): Uruquim's numbers come from Uruquim's harness.
+  never evidence (C-5): Druse's numbers come from Druse's harness.
 * **WP37 / ADR-028 — the revalidation pattern, observed in the wild.** Its auth
   middleware validates the JWT and **discards the claims**; its `/auth/me`
   handler then re-validates the same token itself. A real program on this exact

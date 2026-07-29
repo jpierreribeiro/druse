@@ -22,60 +22,60 @@
 # defence-in-depth, which is fine; they are simply not mutation-testable here.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$URUQUIM_ROOT"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$DRUSE_ROOT"
 
 fail() { echo "WP9-MUTATION-FAIL: $*" >&2; exit 1; }
 
-if test -n "${URUQUIM_COMPILER:-}"; then
-  URUQUIM_ODIN="$URUQUIM_COMPILER"
-elif test -n "${URUQUIM_ODIN_BIN:-}"; then
-  URUQUIM_ODIN="$URUQUIM_ODIN_BIN"
+if test -n "${DRUSE_COMPILER:-}"; then
+  DRUSE_ODIN="$DRUSE_COMPILER"
+elif test -n "${DRUSE_ODIN_BIN:-}"; then
+  DRUSE_ODIN="$DRUSE_ODIN_BIN"
 elif command -v odin >/dev/null 2>&1; then
-  URUQUIM_ODIN="$(command -v odin)"
-elif test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_ODIN=/tmp/uruquim-odin-toolchain/odin
+  DRUSE_ODIN="$(command -v odin)"
+elif test -x /tmp/druse-toolchain/odin; then
+  DRUSE_ODIN=/tmp/druse-toolchain/odin
 else
   fail "odin compiler not found"
 fi
-URUQUIM_ODIN="$(readlink -f "$URUQUIM_ODIN")"
-URUQUIM_ODIN_ROOT="$(cd "$(dirname "$URUQUIM_ODIN")" && pwd)"
+DRUSE_ODIN="$(readlink -f "$DRUSE_ODIN")"
+DRUSE_ODIN_ROOT="$(cd "$(dirname "$DRUSE_ODIN")" && pwd)"
 
-URUQUIM_TMP="$(mktemp -d -t uruquim-wp9-mut-XXXXXXXX)"
+DRUSE_TMP="$(mktemp -d -t druse-wp9-mut-XXXXXXXX)"
 
 # The mutations edit the real sources, so the restore must survive any exit —
 # an interrupted run must never leave a weakened guard in the tree.
-URUQUIM_TOUCHED=""
+DRUSE_TOUCHED=""
 restore() {
-  for f in $URUQUIM_TOUCHED; do
-    git -C "$URUQUIM_ROOT" checkout -- "$f" 2>/dev/null || true
+  for f in $DRUSE_TOUCHED; do
+    git -C "$DRUSE_ROOT" checkout -- "$f" 2>/dev/null || true
   done
-  rm -rf "$URUQUIM_TMP"
+  rm -rf "$DRUSE_TMP"
 }
 trap restore EXIT
 
-git -C "$URUQUIM_ROOT" diff --quiet -- vendor/odin-http ||
+git -C "$DRUSE_ROOT" diff --quiet -- vendor/odin-http ||
   fail "vendor/odin-http has uncommitted changes; this script restores by 'git checkout --' and would discard them"
 
 run_corpus() {
-  env ODIN_ROOT="$URUQUIM_ODIN_ROOT" PATH="$URUQUIM_ODIN_ROOT:/usr/bin:/bin" \
-    timeout 300 "$URUQUIM_ODIN" test "$URUQUIM_ROOT/tests/wp9-wire" \
-    "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
-    -out:"$URUQUIM_TMP/corpus" 2>&1 || true
+  env ODIN_ROOT="$DRUSE_ODIN_ROOT" PATH="$DRUSE_ODIN_ROOT:/usr/bin:/bin" \
+    timeout 300 "$DRUSE_ODIN" test "$DRUSE_ROOT/tests/wp9-wire" \
+    "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+    -out:"$DRUSE_TMP/corpus" 2>&1 || true
 }
 
 # must_go_red <label> <file> <old> <new>
 must_go_red() {
   local label="$1" file="$2"
-  URUQUIM_TOUCHED="$URUQUIM_TOUCHED $file"
-  URUQUIM_OLD="$3" URUQUIM_NEW="$4" URUQUIM_FILE="$URUQUIM_ROOT/$file" python3 - <<'PY'
+  DRUSE_TOUCHED="$DRUSE_TOUCHED $file"
+  DRUSE_OLD="$3" DRUSE_NEW="$4" DRUSE_FILE="$DRUSE_ROOT/$file" python3 - <<'PY'
 import os, sys
-p = os.environ['URUQUIM_FILE']
+p = os.environ['DRUSE_FILE']
 s = open(p).read()
-old = os.environ['URUQUIM_OLD']
+old = os.environ['DRUSE_OLD']
 if old not in s:
     sys.exit(3)
-open(p, 'w').write(s.replace(old, os.environ['URUQUIM_NEW'], 1))
+open(p, 'w').write(s.replace(old, os.environ['DRUSE_NEW'], 1))
 PY
   case $? in
     0) ;;
@@ -85,7 +85,7 @@ PY
 
   local out
   out="$(run_corpus)"
-  git -C "$URUQUIM_ROOT" checkout -- "$file"
+  git -C "$DRUSE_ROOT" checkout -- "$file"
 
   if grep -qE "Syntax Error|Error: " <<<"$out"; then
     fail "mutation '$label' did not compile; it must weaken the guard, not break the build"

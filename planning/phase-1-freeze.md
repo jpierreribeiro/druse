@@ -41,14 +41,14 @@ rather than silently degrading into a claim nobody can check.
 |---|---|
 | Odin toolchain | `dev-2026-07-nightly:819fdc7` (pinned, `odin-version.txt`) |
 | Base | `origin/main` @ `3962a48` — WP10 merged (PR #20) |
-| Gate command | `env -u ODIN_ROOT URUQUIM_ODIN_BIN=<odin> bash build/check.sh` |
+| Gate command | `env -u ODIN_ROOT DRUSE_ODIN_BIN=<odin> bash build/check.sh` |
 | Gate result | `PASS=10 FAIL=0 SKIP=0` |
 | Frozen ledgers | 32 application + 2 test-support = 34 exported |
 | Signature snapshot | `build/phase1-public-signatures.txt` (34 lines) |
 | Dependency snapshot | `build/phase1-direct-dependencies.txt` (15 lines) |
 
 The compiler is the source of truth for the surface. The snapshots are generated
-by `odin doc web -collection:uruquim=. -short` (procedures) and `odin doc web`
+by `odin doc web -collection:druse=. -short` (procedures) and `odin doc web`
 (expanded type bodies), normalized only by removing the unstable
 `/* file!offset */` position markers. Names, argument lists, results, genericity,
 field names, enum members and enum backing types are preserved verbatim, because
@@ -310,7 +310,7 @@ path. The recorder registers **lazily**, so an application that never calls
 
 Evidence: `tests/wp3-public-surface/contract_test.odin::wp3_two_recorded_responses_survive_until_destroy`,
 `tests/wp3-public-surface/contract_test.odin::wp3_unused_test_support_is_a_noop_destroy`,
-`build/check_g11_teardown.sh::URUQUIM_G11_PATTERN`.
+`build/check_g11_teardown.sh::DRUSE_G11_PATTERN`.
 
 ### Transport
 
@@ -339,10 +339,10 @@ every gate run).
 
 | Package | Direct imports |
 |---|---|
-| `web` | `core:mem`, `core:strings`, `core:encoding/json`, `core:os`, `core:reflect`, `core:strconv`, `uruquim:web/testing`, `uruquim:web/internal/transport` |
+| `web` | `core:mem`, `core:strings`, `core:encoding/json`, `core:os`, `core:reflect`, `core:strconv`, `druse:web/testing`, `druse:web/internal/transport` |
 | `web/testing` | `core:mem`, `core:strings` |
-| `web/internal/transport` | `core:mem`, `core:net`, `core:slice`, `core:strings`, `core:time`, `uruquim:vendor/odin-http` |
-| `examples/01..03` | `uruquim:web` only |
+| `web/internal/transport` | `core:mem`, `core:net`, `core:slice`, `core:strings`, `core:time`, `druse:vendor/odin-http` |
+| `examples/01..03` | `druse:web` only |
 
 **Third-party.** Exactly one vendored dependency:
 
@@ -396,17 +396,17 @@ over.
 
 | # | Guardrail | Result | Evidence |
 |---|---|---|---|
-| G-01 | One operation, one name | **PASS** | `build/check_public_api.sh::URUQUIM_EXPECTED_EXPORTS` — two-way `comm` diff of the extracted inventory; no synonym pair exists. `ok`/`created` are sanctioned exact delegations, proven by `tests/wp6-internal/wp6_internal_test.odin::wp6_ok_is_byte_identical_to_json_ok` |
-| G-02 | Framework types stop at the HTTP boundary | **PASS (review-enforced only)** | `docs/canonical-patterns.md::boundary`. Structurally, `body` fills a caller-owned plain struct: `tests/wp7-internal/wp7_internal_test.odin::wp7_binds_nested_strings_and_slices`. **No gate asserts that a domain package is free of `uruquim:web`** — see the caveat below |
+| G-01 | One operation, one name | **PASS** | `build/check_public_api.sh::DRUSE_EXPECTED_EXPORTS` — two-way `comm` diff of the extracted inventory; no synonym pair exists. `ok`/`created` are sanctioned exact delegations, proven by `tests/wp6-internal/wp6_internal_test.odin::wp6_ok_is_byte_identical_to_json_ok` |
+| G-02 | Framework types stop at the HTTP boundary | **PASS (review-enforced only)** | `docs/canonical-patterns.md::boundary`. Structurally, `body` fills a caller-owned plain struct: `tests/wp7-internal/wp7_internal_test.odin::wp7_binds_nested_strings_and_slices`. **No gate asserts that a domain package is free of `druse:web`** — see the caveat below |
 | G-03 | `Context` is not an extension bag | **PASS** | `build/check_public_api.sh::user_data` bans `user_data`/`locals`/`values`, `map[string]any`, `any` and `rawptr` in exported declarations; shape locked to `request` + `private`. Probe: `tests/wp2-public-surface/probes/context_has_no_response.odin::web.Context` |
 | G-04 | Response side effects singular and visible | **PASS** | `tests/wp2-internal/wp2_internal_test.odin::wp2_second_commit_is_rejected_and_changes_nothing`; `tests/wp6-public-surface/contract_test.odin::wp6_the_first_response_wins`; `tests/wp5-public-surface/contract_test.odin::wp5_continued_handler_code_cannot_replace_the_400` |
 | G-05 | Request views never escape implicitly | **PASS** | `tests/wp2-internal/wp2_internal_test.odin::wp2_buffer_reuse_invalidates_retained_views` and `::wp2_explicit_copy_survives_buffer_reuse`; `tests/wp6-internal/wp6_internal_test.odin::wp6_text_copies_the_caller_buffer` |
-| G-06 | Backend stays private | **PASS** | `build/check_public_api.sh::URUQUIM_BACKEND_USERS` requires exactly ONE backend importer, inside `web/internal/transport/` (the adapter, derived rather than named — WP16), and bans `odin-http`/`nbio`/`laytan` in `web/` and `examples/`; `tests/wp9-public-surface/contract_test.odin::wp9_added_no_transport_surface` |
+| G-06 | Backend stays private | **PASS** | `build/check_public_api.sh::DRUSE_BACKEND_USERS` requires exactly ONE backend importer, inside `web/internal/transport/` (the adapter, derived rather than named — WP16), and bans `odin-http`/`nbio`/`laytan` in `web/` and `examples/`; `tests/wp9-public-surface/contract_test.odin::wp9_added_no_transport_surface` |
 | G-07 | Optionals do not enlarge core | **PASS** | `build/check_public_api.sh::serve_with` — hard rejection loop over `use`, `router`, `group`, `mount`, `next`, `header`, `bearer_token`, `serve_with`, `recovery`, `Response`, `Transport` and more |
 | G-08 | Defaults claimed only when delivered | **PASS** | `build/check_docs.sh::production.ready` — stale-claim blacklist; the 4 MiB cap is real and tested: `tests/wp7-internal/wp7_internal_test.odin::wp7_exactly_the_limit_is_not_too_large` |
 | G-09 | Public growth carries evidence | **PASS** | Satisfied by §5 of this manifest plus `build/phase1-public-signatures.txt` and `build/phase1-direct-dependencies.txt`; enforced by `build/check_phase1_freeze.sh::evidence` |
 | G-10 | No linter/analyzer as a product | **PASS** | Enforcement is compile probes, behavior tests and static repository assertions only — `build/check_public_api.sh::static repository assertions`. No CLI, generator or analyzer exists in the tree |
-| G-11 | Test-support ledger and cost separated | **PASS** | `build/check_g11_teardown.sh::URUQUIM_G11_PATTERN` with a positive control and a static-edge mutation. Executed: never-tests → **0** `web/testing` symbols; does-test → **11**; mutation → 4, correctly rejected |
+| G-11 | Test-support ledger and cost separated | **PASS** | `build/check_g11_teardown.sh::DRUSE_G11_PATTERN` with a positive control and a static-edge mutation. Executed: never-tests → **0** `web/testing` symbols; does-test → **11**; mutation → 4, correctly rejected |
 
 **No guardrail is deferred.** Every Phase-1 obligation is met in Phase 1; the
 deferrals recorded in §11 are features that do not belong to Phase 1 at all.
@@ -415,12 +415,12 @@ deferrals recorded in §11 are features that do not belong to Phase 1 at all.
 
 G-02 is the only guardrail whose PASS rests on documentation and reviewer
 discipline instead of an executable check. Nothing in the repository asserts that
-an application's domain package is free of `uruquim:web`; all three examples are
+an application's domain package is free of `druse:web`; all three examples are
 single-file `package main` programs, so they neither demonstrate nor violate the
 boundary. G-10 explicitly sanctions review as an enforcement mode, so this is not
 a broken promise — but a reader cannot tell "enforced" from "unenforced" here.
 **Forwarded to Phase 2: add a multi-package example plus a gate asserting the
-domain package does not import `uruquim:web`.** This does not block the freeze:
+domain package does not import `druse:web`.** This does not block the freeze:
 it constrains no frozen signature and no frozen behavior.
 
 ### Risk and open-question triage
@@ -1058,7 +1058,7 @@ observer. `Context_Internal` still holds no `^App` — the WP4 D3 decision stand
 Request-scoped typed state **does not exist and is not scheduled**. C-6 found
 that Go's `context.WithValue` and Rust's `http::Extensions` exist for
 type-erased, dynamically-keyed state crossing library boundaries — which
-Uruquim does not have — and concluded that this SUPPORTS G-03. The honest
+Druse does not have — and concluded that this SUPPORTS G-03. The honest
 consequence is recorded rather than softened: the canonical auth pattern's
 revalidation cost (WP24) stands until an ADR decides otherwise, and
 `build/check_examples.sh` rejects a comment that schedules its removal.
@@ -1143,7 +1143,7 @@ work comment saying a timeout is wanted there. Real deadlines are
 surgery inside the vendored event loop, not a field. Shipping without those
 fields is the reversible arm: adding a field later is an amendment, while
 shipping one that silently does nothing would be a lie with a version number on
-it. **No document may claim Uruquim has configurable timeouts.**
+it. **No document may claim Druse has configurable timeouts.**
 
 **THE DERIVATION WAS MEASURED, as the plan required, and the measurement does
 not distinguish the shapes on cost.** Consumer built at `-o:speed`, one POST
@@ -1618,7 +1618,7 @@ went from 990 ms to 3 s. The shipped code ticks directly instead.
 
 **Rollback.** Set the field to zero and the previous behaviour returns exactly —
 no deadline, no forced close. The vendored patches (9, 10, 11) are marked
-`URUQUIM PATCH — BRIDGE` per `vendor-policy.md` §8 and are expected to be
+`DRUSE PATCH — BRIDGE` per `vendor-policy.md` §8 and are expected to be
 **deleted** when `core:net/http` lands in January 2027, not ported. Patch 10 is
 the exception worth offering upstream regardless: the use-after-free it fixes is
 upstream's, not this project's.
@@ -1734,7 +1734,7 @@ symlink whatever it points at**.
 
 Two of those deserve their reasons in the ledger:
 
-- **`%` is refused outright.** Uruquim never decodes the path (WP31a,
+- **`%` is refused outright.** Druse never decodes the path (WP31a,
   permanent), so `%2e%2e` would sail past a textual `..` check untouched and be
   decoded by something downstream. A file whose name needs percent encoding is
   not worth that.
@@ -2078,12 +2078,12 @@ public symbol; the public stream surface waits for its evidence and freezes
 at WP101.
 
 **Dependency-manifest change, deliberate:** `web/internal/transport` now
-imports `uruquim:web/internal/stream` (the WP88/WP89 registry — first-party,
+imports `druse:web/internal/stream` (the WP88/WP89 registry — first-party,
 same license, same owner) and `core:strconv` (hex chunk-size framing in the
 detached-stream pump). The snapshot and this manifest were updated together.
 `package web` itself imports neither; the one-way rules hold: stream imports
 nothing of web or the backend, and the transport still never imports
-`uruquim:web`.
+`druse:web`.
 
 **Rollback.** Internal wiring: removable with the WP90b adapter code and the
 vendored bridge patch 22, leaving WP88/WP89 as unlinked machinery.
@@ -2472,7 +2472,7 @@ application	proc	request_state :: proc(ctx: ^Context, $R: typeid) -> ^R
 ADR-028 decided request-scoped state "does not exist, and there will not be one."
 C7 reopens that on a NARROW reading and the fix is deliberately not the pattern
 ADR-028 rejected: not Go's `context.WithValue`, not Rust's `http::Extensions`
-(type-erased, dynamically-keyed state crossing library boundaries — which Uruquim
+(type-erased, dynamically-keyed state crossing library boundaries — which Druse
 does not have). It is ONE application-declared TYPE per request, typeid-checked —
 `web.state`'s `rawptr`+`typeid` discipline applied per request instead of per
 application.

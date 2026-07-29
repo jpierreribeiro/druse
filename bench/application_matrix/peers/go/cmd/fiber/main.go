@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gofiber/fiber/v3"
-	"uruquim-bench/application-matrix-go/workload"
+	"druse-bench/application-matrix-go/workload"
 )
 
 func main() {

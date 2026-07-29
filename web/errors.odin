@@ -16,7 +16,7 @@
 // exported envelope type, no error-code enum, and no way for an application to
 // construct or inspect an envelope: the ledger stays at exactly 32.
 package web
-// uruquim:file application
+// druse:file application
 
 import encoding_json "core:encoding/json"
 import "core:mem"
@@ -867,32 +867,32 @@ Framework_Report :: struct {
 // runner's records.
 @(private)
 FRAMEWORK_MESSAGE_MARSHAL_FAILED ::
-	"uruquim: response payload could not be serialized; Phase 1 accepts " +
+	"druse: response payload could not be serialized; Phase 1 accepts " +
 	"concrete values only, not pointers or procedures (ADR-003). Responding 500."
 
 @(private)
 FRAMEWORK_MESSAGE_BODY_DECODE_FAILED ::
-	"uruquim: request body could not be decoded into the destination type; " +
+	"druse: request body could not be decoded into the destination type; " +
 	"the JSON is valid but does not fit it, or the destination is invalid. " +
 	"Responding 500."
 
 @(private)
 FRAMEWORK_MESSAGE_BODY_CONSUMED_TWICE ::
-	"uruquim: web.body was called more than once on one request; the body is a " +
+	"druse: web.body was called more than once on one request; the body is a " +
 	"single-use capability (ADR-012). The second call decodes nothing."
 
 @(private)
 FRAMEWORK_MESSAGE_NO_RESPONSE ::
-	"uruquim: a handler returned without producing a response; the driver is " +
+	"druse: a handler returned without producing a response; the driver is " +
 	"sending 500. A handler must call a web.* responder, or the route is a bare() miss."
 
 @(private)
 FRAMEWORK_MESSAGE_INVALID_PORT ::
-	"uruquim: web.serve was given a port outside 1..65535; not binding."
+	"druse: web.serve was given a port outside 1..65535; not binding."
 
 @(private)
 FRAMEWORK_MESSAGE_LISTEN_FAILED ::
-	"uruquim: web.serve could not bind/listen on the requested port; returning."
+	"druse: web.serve could not bind/listen on the requested port; returning."
 
 // The owner-approved ADR-019 diagnostic (planning/phase-2-spec.md §5),
 // verbatim. The `use()` call site additionally appends the count of
@@ -900,7 +900,7 @@ FRAMEWORK_MESSAGE_LISTEN_FAILED ::
 // fixed buffer (web/middleware.odin) — never through `core:fmt`.
 @(private)
 FRAMEWORK_MESSAGE_USE_AFTER_ROUTE ::
-	"uruquim: web.use was called after a route was already registered; " +
+	"druse: web.use was called after a route was already registered; " +
 	"ordered middleware cannot protect routes registered before it (ADR-019). " +
 	"Register every web.use before the first web.get/post/put/patch/delete/mount. " +
 	"This application is rejected fail-closed: every request will answer 500 " +
@@ -912,7 +912,7 @@ FRAMEWORK_MESSAGE_USE_AFTER_ROUTE ::
 
 @(private)
 FRAMEWORK_MESSAGE_MOUNT_POISONED_ROUTER ::
-	"uruquim: web.mount was given a Router that was already rejected " +
+	"druse: web.mount was given a Router that was already rejected " +
 	"fail-closed (ADR-019); the application inherits the rejection, because a " +
 	"mis-ordered router must not become a healthy application. Fix the " +
 	"Router's registration order — every web.use before its first route — and " +
@@ -921,14 +921,14 @@ FRAMEWORK_MESSAGE_MOUNT_POISONED_ROUTER ::
 
 @(private)
 FRAMEWORK_MESSAGE_MOUNT_CLOSED_ROUTER ::
-	"uruquim: web.mount was given a Router that was already mounted; mount " +
+	"druse: web.mount was given a Router that was already mounted; mount " +
 	"closes the router (ADR-019/ADR-024). Build a separate Router value for " +
 	"each mount. This application is rejected fail-closed: every request will " +
 	"answer 500 and web.serve will refuse to start."
 
 @(private)
 FRAMEWORK_MESSAGE_ROUTER_CLOSED ::
-	"uruquim: a route or middleware was registered on a Router after web.mount " +
+	"druse: a route or middleware was registered on a Router after web.mount " +
 	"had already copied it; mount closes the router (ADR-019/ADR-024), so the " +
 	"late registration could never serve. Register everything on a Router " +
 	"before mounting it. This Router is rejected fail-closed: every request " +
@@ -942,7 +942,7 @@ FRAMEWORK_MESSAGE_ROUTER_CLOSED ::
 // ADR-019 exists to refuse. The application is now rejected instead.
 @(private)
 FRAMEWORK_MESSAGE_MOUNT_ALLOCATION_FAILED ::
-	"uruquim: web.mount could not allocate storage for the routes it was " +
+	"druse: web.mount could not allocate storage for the routes it was " +
 	"copying, so the application would have served only part of the Router. " +
 	"Registration allocates from context.allocator; a bounded allocator that " +
 	"runs out here would otherwise drop routes SILENTLY and answer 404 for " +
@@ -951,7 +951,7 @@ FRAMEWORK_MESSAGE_MOUNT_ALLOCATION_FAILED ::
 
 @(private)
 FRAMEWORK_MESSAGE_MOUNT_INVALID_PREFIX ::
-	"uruquim: web.mount was given an invalid prefix; a prefix must begin with " +
+	"druse: web.mount was given an invalid prefix; a prefix must begin with " +
 	"'/' and must not end with '/', and nothing is normalised (ADR-024, WP4 " +
 	"D5). This application is rejected fail-closed: every request will answer " +
 	"500 and web.serve will refuse to start."
@@ -960,7 +960,7 @@ FRAMEWORK_MESSAGE_MOUNT_INVALID_PREFIX ::
 // dispatch. There is no pattern to name — the offence is temporal.
 @(private)
 FRAMEWORK_MESSAGE_USE_AFTER_DISPATCH ::
-	"uruquim: web.use was called after the application had already dispatched " +
+	"druse: web.use was called after the application had already dispatched " +
 	"a request; the middleware set must be complete before the first dispatch " +
 	"(ADR-019/ADR-023). Register every web.use before the first registration " +
 	"or request. This application is rejected fail-closed: every request will " +
@@ -985,7 +985,7 @@ FRAMEWORK_MESSAGE_USE_AFTER_DISPATCH ::
 // buffer — never `core:fmt` — exactly like the invalid-prefix diagnostic.
 @(private)
 FRAMEWORK_MESSAGE_ROUTE_CONFLICT ::
-	"uruquim: two routes were registered for the same method and the same path " +
+	"druse: two routes were registered for the same method and the same path " +
 	"shape, so the second could never serve — the first already owns that slot " +
 	"and first registration wins. PARAMETER NAMES DO NOT DISTINGUISH ROUTES: " +
 	"\"/users/:id\" and \"/users/:uid\" are the same pattern to the router, and " +
@@ -1001,7 +1001,7 @@ FRAMEWORK_MESSAGE_ROUTE_CONFLICT ::
 // the first request instead — the same failure, discovered later, by a client.
 @(private)
 FRAMEWORK_MESSAGE_NIL_STATE ::
-	"uruquim: web.app_with_state was given a nil state pointer; the application " +
+	"druse: web.app_with_state was given a nil state pointer; the application " +
 	"would abort on the first handler that called web.state (ADR-004, AMEND-1). " +
 	"Create the state value first and pass its address. This application is " +
 	"rejected fail-closed: every request will answer 500 and web.serve will " +
@@ -1015,14 +1015,14 @@ FRAMEWORK_MESSAGE_NIL_STATE ::
 // naming the mistake instead of a bare segfault.
 @(private)
 FRAMEWORK_MESSAGE_STATE_UNREGISTERED ::
-	"uruquim: web.state was called on an application built with web.app() or " +
+	"druse: web.state was called on an application built with web.app() or " +
 	"web.bare(); only web.app_with_state registers state (ADR-004). It returned " +
 	"(nil, false) rather than aborting the process; the handler must check the " +
 	"second result before using the first."
 
 @(private)
 FRAMEWORK_MESSAGE_STATE_TYPE_MISMATCH ::
-	"uruquim: web.state was asked for a type other than the one registered with " +
+	"druse: web.state was asked for a type other than the one registered with " +
 	"web.app_with_state; the requested and registered types must match exactly " +
 	"(ADR-004, AMEND-1). It returned (nil, false) rather than aborting the " +
 	"process; the handler must check the second result before using the first."
@@ -1034,7 +1034,7 @@ FRAMEWORK_MESSAGE_STATE_TYPE_MISMATCH ::
 // boot-time rejection.
 @(private)
 FRAMEWORK_MESSAGE_LIMITS_AFTER_DISPATCH ::
-	"uruquim: web.limits was called after the application had already dispatched " +
+	"druse: web.limits was called after the application had already dispatched " +
 	"a request; the byte budget is read on the request path, so changing it " +
 	"while serving would make two clients get two different answers to the same " +
 	"body. Set every limit before the first request. This application is " +
@@ -1043,7 +1043,7 @@ FRAMEWORK_MESSAGE_LIMITS_AFTER_DISPATCH ::
 
 @(private)
 FRAMEWORK_MESSAGE_LIMITS_INVALID ::
-	"uruquim: web.limits was given a zero or negative budget; a Limits value " +
+	"druse: web.limits was given a zero or negative budget; a Limits value " +
 	"must set every field, because there is no unset state to tell a forgotten " +
 	"field apart from a deliberate one. Start from web.DEFAULT_LIMITS and " +
 	"change what you mean to change. This application is rejected fail-closed: " +
@@ -1052,7 +1052,7 @@ FRAMEWORK_MESSAGE_LIMITS_INVALID ::
 // WP48 — an unusable trusted-proxy set.
 @(private)
 FRAMEWORK_MESSAGE_TRUST_INVALID ::
-	"uruquim: web.trust_proxies was given more prefixes than the framework " +
+	"druse: web.trust_proxies was given more prefixes than the framework " +
 	"stores, or an EMPTY prefix. An empty prefix matches every peer, which " +
 	"would trust the whole internet through a typo, and a dropped entry would " +
 	"leave your configuration quietly untrue. Trusting a proxy decides whose " +
@@ -1063,7 +1063,7 @@ FRAMEWORK_MESSAGE_TRUST_INVALID ::
 // WP47 — a reservation that swallows its own budget.
 @(private)
 FRAMEWORK_MESSAGE_LIMITS_RESERVATION ::
-	"uruquim: web.limits was given a connection reservation at least as large " +
+	"druse: web.limits was given a connection reservation at least as large " +
 	"as the connection limit, so admission would refuse every connection while " +
 	"looking like a working configuration. The reservation is slots held back " +
 	"for shutdown, not the budget itself: reserved_conns must be smaller than " +
@@ -1115,7 +1115,7 @@ framework_report :: proc($T: typeid, kind: Framework_Error, loc := #caller_locat
 // property of the response, and the typed observer carries the route and status.
 @(private)
 FRAMEWORK_MESSAGE_RESPONSE_TOO_LARGE ::
-	"uruquim: a handler built a response larger than Limits.max_response_bytes, " +
+	"druse: a handler built a response larger than Limits.max_response_bytes, " +
 	"so the framework replaced it with a 500 before copying it to the transport. " +
 	"A response is buffered whole (ADR-014), and its construction plus an " +
 	"in-flight send can hold multiple body-sized allocations. An unbounded one " +
@@ -1131,7 +1131,7 @@ FRAMEWORK_MESSAGE_RESPONSE_TOO_LARGE ::
 // discovered later by whoever finds it first.
 @(private)
 FRAMEWORK_MESSAGE_CORS_AFTER_DISPATCH ::
-	"uruquim: web.cors was called after the application had already dispatched " +
+	"druse: web.cors was called after the application had already dispatched " +
 	"a request; the policy is read on the request path, so changing it while " +
 	"serving would let two clients get two different answers about who may " +
 	"read a response. Set the policy before the first request. This " +
@@ -1140,7 +1140,7 @@ FRAMEWORK_MESSAGE_CORS_AFTER_DISPATCH ::
 
 @(private)
 FRAMEWORK_MESSAGE_CORS_INVALID ::
-	"uruquim: web.cors was given an empty origin list, an empty origin, a " +
+	"druse: web.cors was given an empty origin list, an empty origin, a " +
 	"negative max_age, or more origins than the framework stores. An " +
 	"allow-list that allows nothing is an unfinished policy rather than a " +
 	"restrictive one, and a dropped entry would leave your configuration " +
@@ -1149,7 +1149,7 @@ FRAMEWORK_MESSAGE_CORS_INVALID ::
 
 @(private)
 FRAMEWORK_MESSAGE_CORS_WILDCARD ::
-	"uruquim: web.cors was given a wildcard that cannot mean what it looks " +
+	"druse: web.cors was given a wildcard that cannot mean what it looks " +
 	"like. `*` with credentials = true is refused by every browser, and the " +
 	"obvious workaround — echoing whatever Origin arrives — shares " +
 	"authenticated data with whichever site asks. `*` alongside named origins " +
@@ -1175,7 +1175,7 @@ cors_poison :: proc(a: ^App, message: string, loc := #caller_location) {
 // WP61 — the two static-mount members of the fail-closed family.
 @(private)
 FRAMEWORK_MESSAGE_STATIC_AFTER_DISPATCH ::
-	"uruquim: web.static was called after the application had already " +
+	"druse: web.static was called after the application had already " +
 	"dispatched a request; a mount owns a path prefix, so adding one while " +
 	"serving would change what a path means between two requests. Mount every " +
 	"directory before the first request. This application is rejected " +
@@ -1184,7 +1184,7 @@ FRAMEWORK_MESSAGE_STATIC_AFTER_DISPATCH ::
 
 @(private)
 FRAMEWORK_MESSAGE_STATIC_INVALID ::
-	"uruquim: web.static was given a prefix that is not absolute, a prefix " +
+	"druse: web.static was given a prefix that is not absolute, a prefix " +
 	"ending in a slash, an empty directory, a negative max_file_size, or more " +
 	"mounts than the framework stores. A mount that silently does not work is " +
 	"a 404 nobody traces back to a typo, and one that silently works on the " +

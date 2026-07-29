@@ -151,7 +151,7 @@ path_int :: proc(ctx: ^Context) -> (int, bool) {
 	return 42, true
 }
 
-// Model A: current Uruquim shape. Helpers respond, and a central typed helper
+// Model A: current Druse shape. Helpers respond, and a central typed helper
 // formats/logs application failures without changing Handler.
 json_a :: proc(ctx: ^Context, status: Status, value: $T) {
 	ctx.json_calls += 1

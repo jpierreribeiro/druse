@@ -13,7 +13,7 @@ framework storage or public API.
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..
+odin run . -collection:druse=../..
 odin check .
 ```
 

@@ -1,6 +1,6 @@
 # Quick Start
 
-Uruquim is a small HTTP framework for Odin, aimed at JSON APIs. You write
+Druse is a small HTTP framework for Odin, aimed at JSON APIs. You write
 handlers; it does routing, JSON, and the standard error responses.
 
 This page takes you from nothing to a running API. It assumes you can program,
@@ -15,14 +15,14 @@ but not that you know Odin or anything about memory management or HTTP servers.
 
 ## The one flag
 
-Uruquim is used through an Odin *collection*. Every command that builds your
+Druse is used through an Odin *collection*. Every command that builds your
 program includes:
 
 ```text
--collection:uruquim=/path/to/uruquim
+-collection:druse=/path/to/druse
 ```
 
-That is what makes `import web "uruquim:web"` resolve. From inside this
+That is what makes `import web "druse:web"` resolve. From inside this
 repository the path is simply `.`.
 
 ## Your first server
@@ -33,7 +33,7 @@ Create a directory with a `main.odin`:
 ```odin
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	app := web.app()
@@ -59,13 +59,13 @@ Four things happen here:
 ## Run it
 
 ```text
-odin run . -collection:uruquim=/path/to/uruquim
+odin run . -collection:druse=/path/to/druse
 ```
 
 Or, from the repository root, run the example directly:
 
 ```text
-odin run examples/01-hello-world -collection:uruquim=.
+odin run examples/01-hello-world -collection:druse=.
 ```
 
 ## Try it
@@ -191,7 +191,7 @@ The four that will surprise you first, so nothing does:
   out-of-bounds index takes the server down; the client sees an empty reply.
   There is no recovery middleware and there never will be — Odin has no
   recoverable panic (ADR-020). Run under a supervisor with `Restart=always`.
-  What Uruquim *does* guarantee is the other half: a handler that returns
+  What Druse *does* guarantee is the other half: a handler that returns
   without responding gets the standardized 500. See `docs/errors.md`.
 - **The write and idle timeouts are OFF by default.** `Limits.max_request_time`
   bounds request *arrival* (a slowloris defence) and is on. `Limits.max_write_time`
@@ -207,7 +207,7 @@ The four that will surprise you first, so nothing does:
   core installs no `SIGTERM`/`SIGINT` handler — your `main` must install one and
   call `web.stop`. See `docs/operations.md` for the pattern.
 
-Uruquim is usable for building and testing a JSON API today, and for a
+Druse is usable for building and testing a JSON API today, and for a
 controlled pilot behind a reverse proxy under a supervisor. Read
 `docs/operations.md` before exposing it to real traffic.
 

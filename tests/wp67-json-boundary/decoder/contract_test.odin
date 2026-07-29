@@ -8,7 +8,7 @@ import json "core:encoding/json"
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 Address :: struct {
 	number: int `json:"number"`,
@@ -67,7 +67,7 @@ filter_log :: proc(
 	location := #caller_location,
 ) {
 	f := (^Log_Filter)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if f.inner.procedure != nil {

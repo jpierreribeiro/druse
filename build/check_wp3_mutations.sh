@@ -11,7 +11,7 @@
 # It never mutates the real repository: all work happens under `mktemp -d`.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "MUTATION-FAIL: $*" >&2
@@ -67,22 +67,22 @@ mutate_sed() { # label file sed-args...
 
 fresh_tree() {
   local t
-  t="$(mktemp -d -t uruquim-wp3-mutation-XXXXXXXX)"
+  t="$(mktemp -d -t druse-wp3-mutation-XXXXXXXX)"
   mkdir -p "$t/build" "$t/web/testing" "$t/web/internal/transport" "$t/tests" "$t/vendor"
   # WP87: the checker now pins web/internal/ to exactly {transport, stream,
   # ingest}, so the fresh tree must carry the two sentinel packages too.
   mkdir -p "$t/web/internal/stream" "$t/web/internal/ingest"
-  cp "$URUQUIM_ROOT"/build/check_public_api.sh "$t/build/"
+  cp "$DRUSE_ROOT"/build/check_public_api.sh "$t/build/"
   # The checker's 11f section reads its caller to prove every socket suite
   # runs under an external timeout, so the caller travels with it.
-  cp "$URUQUIM_ROOT"/build/check.sh "$t/build/"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/web/"
-  cp "$URUQUIM_ROOT"/web/testing/*.odin "$t/web/testing/"
-  cp "$URUQUIM_ROOT"/web/internal/transport/*.odin "$t/web/internal/transport/"
-  cp "$URUQUIM_ROOT"/web/internal/stream/*.odin "$t/web/internal/stream/"
-  cp "$URUQUIM_ROOT"/web/internal/ingest/*.odin "$t/web/internal/ingest/"
-  cp -r "$URUQUIM_ROOT"/vendor/odin-http "$t/vendor/odin-http"
-  cp -r "$URUQUIM_ROOT"/tests/. "$t/tests/"
+  cp "$DRUSE_ROOT"/build/check.sh "$t/build/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/web/"
+  cp "$DRUSE_ROOT"/web/testing/*.odin "$t/web/testing/"
+  cp "$DRUSE_ROOT"/web/internal/transport/*.odin "$t/web/internal/transport/"
+  cp "$DRUSE_ROOT"/web/internal/stream/*.odin "$t/web/internal/stream/"
+  cp "$DRUSE_ROOT"/web/internal/ingest/*.odin "$t/web/internal/ingest/"
+  cp -r "$DRUSE_ROOT"/vendor/odin-http "$t/vendor/odin-http"
+  cp -r "$DRUSE_ROOT"/tests/. "$t/tests/"
   printf '%s' "$t"
 }
 
@@ -116,11 +116,11 @@ printf '\nimport _ "core:testing"\n' >>"$T/web/testing/recorder.odin"
 expect_reject "$T" "core:testing in machinery" \
   "web/testing/ imports core:testing"
 
-# 5. The back-edge import (uruquim:web) inside the machinery.
+# 5. The back-edge import (druse:web) inside the machinery.
 T="$(fresh_tree)"; TREES+=("$T")
-printf '\nimport _ "uruquim:web"\n' >>"$T/web/testing/recorder.odin"
-expect_reject "$T" "uruquim:web import in machinery" \
-  "web/testing/ imports uruquim:web"
+printf '\nimport _ "druse:web"\n' >>"$T/web/testing/recorder.odin"
+expect_reject "$T" "druse:web import in machinery" \
+  "web/testing/ imports druse:web"
 
 # 6. An @(init) proc in the machinery.
 T="$(fresh_tree)"; TREES+=("$T")
@@ -534,14 +534,14 @@ echo "PASS: WP7 mutation checks (10 forbidden body-binding states all rejected)"
 # 42. The adapter importing `web` — the back-edge the one-way boundary forbids
 #     (ADR-009 / WP8 D1).
 T="$(fresh_tree)"; TREES+=("$T")
-printf '\nimport _ "uruquim:web"\n' >>"$T/web/internal/transport/boundary.odin"
-expect_reject "$T" "transport importing uruquim:web" \
-  "web/internal/transport imports uruquim:web"
+printf '\nimport _ "druse:web"\n' >>"$T/web/internal/transport/boundary.odin"
+expect_reject "$T" "transport importing druse:web" \
+  "web/internal/transport imports druse:web"
 
 # 43. The backend imported OUTSIDE the adapter — here, straight into `web`.
 #     Only web/internal/transport may name odin-http.
 T="$(fresh_tree)"; TREES+=("$T")
-printf '\nimport _ "uruquim:vendor/odin-http"\n' >>"$T/web/serve.odin"
+printf '\nimport _ "druse:vendor/odin-http"\n' >>"$T/web/serve.odin"
 expect_reject "$T" "backend imported into web/" \
   "the vendored backend must be imported by exactly one file"
 
@@ -607,16 +607,16 @@ expect_reject "$T" "networking added to web/testing" \
 # 51. The transport importing web — the one-way boundary again, now that WP9
 #     added a second importer of the transport package.
 T="$(fresh_tree)"; TREES+=("$T")
-printf '\nimport _ "uruquim:web"\n' >>"$T/web/internal/transport/boundary.odin"
-expect_reject "$T" "transport importing uruquim:web (WP9)" \
-  "web/internal/transport imports uruquim:web"
+printf '\nimport _ "druse:web"\n' >>"$T/web/internal/transport/boundary.odin"
+expect_reject "$T" "transport importing druse:web (WP9)" \
+  "web/internal/transport imports druse:web"
 
 # 52. HEAD->GET re-enabled. The backend must not rewrite a method before the
 #     core decides (WP9 D7). The adapter is addressed the way the checker
 #     addresses it — as the one file importing the backend — so renaming it
 #     breaks neither the guardrail nor this probe.
 T="$(fresh_tree)"; TREES+=("$T")
-T_ADAPTER="$(grep -rlE '"uruquim:vendor/odin-http"' "$T/web/internal/transport" | head -1)"
+T_ADAPTER="$(grep -rlE '"druse:vendor/odin-http"' "$T/web/internal/transport" | head -1)"
 test -n "$T_ADAPTER" || fail "BROKEN PROBE ('HEAD->GET re-enabled'): no adapter found in the copied tree"
 mutate_sed "HEAD->GET re-enabled" "$T_ADAPTER" \
   's/opts.redirect_head_to_get = false/opts.redirect_head_to_get = true/'
@@ -626,7 +626,7 @@ expect_reject "$T" "HEAD->GET re-enabled" \
 # 53. The backend's automatic 100-continue re-enabled, which would make the
 #     server answer "continue" and then wait for a body (WP9 D5).
 T="$(fresh_tree)"; TREES+=("$T")
-T_ADAPTER="$(grep -rlE '"uruquim:vendor/odin-http"' "$T/web/internal/transport" | head -1)"
+T_ADAPTER="$(grep -rlE '"druse:vendor/odin-http"' "$T/web/internal/transport" | head -1)"
 test -n "$T_ADAPTER" || fail "BROKEN PROBE ('automatic 100-continue re-enabled'): no adapter found in the copied tree"
 mutate_sed "automatic 100-continue re-enabled" "$T_ADAPTER" \
   's/opts.auto_expect_continue = false/opts.auto_expect_continue = true/'
@@ -677,7 +677,7 @@ expect_reject "$T" "stray web/testing/oops.odin with no machinery marker" \
 
 # 57c. A file carrying BOTH ledger markers — the two counts must never overlap.
 T="$(fresh_tree)"; TREES+=("$T")
-printf '// uruquim:file test-support\n' >>"$T/web/serve.odin"
+printf '// druse:file test-support\n' >>"$T/web/serve.odin"
 expect_reject "$T" "web/serve.odin marked with both ledgers" \
   "ledger markers; exactly one is required"
 
@@ -710,7 +710,7 @@ expect_accept "$T" "vendor patch respelled equivalently"
 #     The derived file set accepts a new file that declares its ledger; the
 #     ledger diffs still bound what it may export.
 T="$(fresh_tree)"; TREES+=("$T")
-printf 'package web\n// uruquim:file application\n\n@(private)\nwp16_split_helper :: proc() {}\n' \
+printf 'package web\n// druse:file application\n\n@(private)\nwp16_split_helper :: proc() {}\n' \
   >"$T/web/errors_split.odin"
 expect_accept "$T" "new marked application file (a split), exporting nothing"
 

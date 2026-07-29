@@ -1,6 +1,6 @@
 // WP9 — SEMANTIC CONFORMANCE, real-HTTP factory.
 //
-// This package is an EXTERNAL consumer of `uruquim:web`: it registers routes and
+// This package is an EXTERNAL consumer of `druse:web`: it registers routes and
 // calls `web.serve` exactly as an application would, then drives the SAME shared
 // matrix (`tests/support/transport_conformance`) that the in-memory factory runs
 // in `tests/wp9-semantic-internal/`.
@@ -21,9 +21,9 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import tc "uruquim:tests/support/transport_conformance"
-import web "uruquim:web"
-import transport "uruquim:web/internal/transport"
+import tc "druse:tests/support/transport_conformance"
+import web "druse:web"
+import transport "druse:web/internal/transport"
 
 // ---------------------------------------------------------------------------
 // The fixture application — byte-identical routes to the in-memory suite.
@@ -346,7 +346,7 @@ filter_proc :: proc(
 	location := #caller_location,
 ) {
 	filter := (^Log_Filter)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if filter.inner.procedure != nil {

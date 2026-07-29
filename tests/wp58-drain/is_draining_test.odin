@@ -23,7 +23,7 @@
 package wp58_drain
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(test)
 wp65_is_draining_is_false_until_stop :: proc(t: ^testing.T) {

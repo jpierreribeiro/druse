@@ -1,5 +1,5 @@
 // WP20 public surface contract — `observe`, `Framework_Event` and the
-// now-public `Framework_Error`, as an EXTERNAL consumer of `uruquim:web` sees
+// now-public `Framework_Error`, as an EXTERNAL consumer of `druse:web` sees
 // them.
 //
 // The redaction constraint (§6.2) is enforced BY TYPE, and this suite is where
@@ -13,11 +13,11 @@ package test_wp20_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // The quiet-logger idiom (WP17/WP18/WP19): these tests deliberately trigger
 // framework diagnostics, and the runner records Error-level output as a
-// failure, so the expected `uruquim:` lines are swallowed and everything else
+// failure, so the expected `druse:` lines are swallowed and everything else
 // is forwarded.
 Quiet :: struct {
 	inner: log.Logger,
@@ -31,7 +31,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

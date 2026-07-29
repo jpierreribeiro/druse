@@ -219,7 +219,7 @@ recommendation · documentation impact · reversibility.
 - **Status.** **ACCEPTED** — option A for Phase 1; B/C deferred as a possible
   future breaking design, never as a second canonical handler.
 - **Context.** Echo returns a dynamic Go `error` from every handler, enabling a
-  global error handler. Uruquim currently uses `Handler :: proc(ctx)` and
+  global error handler. Druse currently uses `Handler :: proc(ctx)` and
   self-responding extractors/responders. Odin has no equivalent universal
   `error`, and `any` is forbidden as public error transport.
 - **Options.** (A) keep void handler; framework failures flow through an
@@ -954,7 +954,7 @@ commands and outputs.
   copy per middleware, O(depth) lookup) and Rust's `http::Extensions` (a boxed
   `HashMap<TypeId, Box<dyn Any>>`) — and concluded that both exist for
   type-erased, dynamically-keyed state crossing library boundaries, which
-  Uruquim does not have. Its conclusion is that struct fields in request
+  Druse does not have. Its conclusion is that struct fields in request
   storage dominate both, and that this **supports G-03 rather than challenging
   it**. Option (A) is also the only reversible one: adding a mechanism later is
   a pure strengthening, while shipping one and withdrawing it breaks
@@ -971,7 +971,7 @@ commands and outputs.
 
 - **Observed datapoint (2026-07-20, reference only).** One external real
   program was examined: `arturfil/coffees_odin`, a third-party CRUD service
-  written against the same odin-http backend Uruquim vendors. Its auth
+  written against the same odin-http backend Druse vendors. Its auth
   middleware validates the JWT and **discards the claims**; its `/auth/me`
   handler then re-validates the same token itself. So a real program on this
   exact backend pays the revalidation cost today — at string-comparison cost,
@@ -1083,7 +1083,7 @@ commands and outputs.
     guarantee stops at the byte budget: `web.serve` bound directly to a port is
     not a defensible configuration, and every document has to keep saying so.
   - **B** costs a vendored patch and the obligation to prove it. Its benefit is
-    that the guarantee becomes the framework's, and the sentence *"Uruquim
+    that the guarantee becomes the framework's, and the sentence *"Druse
     bounds its own per-request working memory"* gains a time dimension it
     currently lacks.
   - **C** is R-T3, rejected and staying rejected.
@@ -1160,7 +1160,7 @@ idle deadlines come from `http.Server` — the standard library's server, not th
 framework. Gin never patched `net/http`, because it never had to.
 
 So the gap here is **not a framework-design gap, it is a foundation gap**:
-Uruquim is already the thin, fast layer, and the server beneath it is not yet
+Druse is already the thin, fast layer, and the server beneath it is not yet
 production-grade. Naming it correctly changes what the right fix is.
 
 **What stands.**
@@ -1248,7 +1248,7 @@ none; the requirement it keeps is the one nobody disputes.
   the watcher.** The draft recommends `dev/watch` on the grounds that its blast
   radius on the core is structurally none. That is true and it is the reason to
   choose something else: it *"proves nothing about the coupling contract,
-  because it never touches `uruquim:web` — half the idea would still be
+  because it never touches `druse:web` — half the idea would still be
   untested, and the half with all the danger in it"* (the draft's own words). A
   ~40-line `web/health` returning a detached `web.Router` tests the load-bearing
   mechanism and simultaneously exercises the draft's own failure criterion —
@@ -1348,7 +1348,7 @@ none; the requirement it keeps is the one nobody disputes.
   now is what stops the decision being made later by whoever is tired.
 
 - **Context, and it is the most consequential thing Phase 4 has to face.**
-  Uruquim is a thin, fast layer — a radix router with flat dispatch, chains
+  Druse is a thin, fast layer — a radix router with flat dispatch, chains
   flattened at registration, a frozen 50-symbol surface, and gates that hold all
   of it. **The layer is in good shape. The foundation under it is not
   established.** Three facts, each checked rather than recalled:
@@ -1806,7 +1806,7 @@ none; the requirement it keeps is the one nobody disputes.
 - **Status.** ACCEPTED DIRECTION, 2026-07-21, owner decision. Exact driver and
   public signatures remain prototype-gated in WP74–WP80.
 
-- **Decision.** Uruquim's data path is explicit SQL, positional bindings,
+- **Decision.** Druse's data path is explicit SQL, positional bindings,
   fail-closed row decoding, typed errors with SQLSTATE, bounded pooling,
   explicit transactions and a transport-free migration engine. A separate CLI
   and an explicit application call before `web.serve` consume the same engine.
@@ -1889,12 +1889,12 @@ none; the requirement it keeps is the one nobody disputes.
 
 - **Context.** `production-service-bom.md` classifies every capability as CORE,
   CRYSTAL, DELEGADO, RECUSADO or ABERTO. A **Crystal** is a first-party optional
-  package that **depends on Uruquim**. Several genuinely useful pieces —
+  package that **depends on Druse**. Several genuinely useful pieces —
   a `traceparent`/`tracestate` parser, a 12-factor env/flag config loader, a
-  generic HTTP client engine over `core:net` — do **not** need to know Uruquim
+  generic HTTP client engine over `core:net` — do **not** need to know Druse
   at all. An earlier draft proposed naming such independent libraries as a
   distinct third tier. The owner rejects that: an independent library that does
-  not know Uruquim is simply an ordinary Odin library, and giving it a
+  not know Druse is simply an ordinary Odin library, and giving it a
   project-specific tier name is ceremony without payload — exactly the kind the
   project refuses.
   Those libraries are consumed like any other dependency; the standing principle
@@ -1902,13 +1902,13 @@ none; the requirement it keeps is the one nobody disputes.
   the dependency direction below, not by minting a name.
 
 - **Decision.** Formalize two tiers:
-  - **Core (`uruquim:web`)** — the mandatory HTTP core; fundamental mechanisms
+  - **Core (`druse:web`)** — the mandatory HTTP core; fundamental mechanisms
     and invariants only.
-  - **Crystal** — first-party optional package that **may** depend on Uruquim;
-    ships in `uruquim-crystals`; one-way dependency into the core's frozen public
+  - **Crystal** — first-party optional package that **may** depend on Druse;
+    ships in `druse-crystals`; one-way dependency into the core's frozen public
     surface (CE-E3). Examples: `http_client`, `metrics`, the PostgreSQL stack,
     SSE. A Crystal (or the application) is free to use ordinary Odin libraries
-    that know nothing of Uruquim — a `traceparent` parser, a config loader, a
+    that know nothing of Druse — a `traceparent` parser, a config loader, a
     generic transport client engine — the same way any Odin program depends on a
     library; those are not a tier, they are just dependencies.
   Dependency direction is strict: `application → Crystal → web`; **never**
@@ -2253,7 +2253,7 @@ none; the requirement it keeps is the one nobody disputes.
 
 - **Status.** **ACCEPTED, 2026-07-25, readiness-hardening program (item 1).**
   Records the decision behind item 1's deliverable — the turnkey supervisor unit
-  (`ops/deploy/uruquim.service`) and the fault-diagnosis workflow — and closes the
+  (`ops/deploy/druse.service`) and the fault-diagnosis workflow — and closes the
   question the audit raised: "a faulting handler aborts the whole process; how is
   that made operable and not a silent trap?"
 
@@ -2278,7 +2278,7 @@ none; the requirement it keeps is the one nobody disputes.
      faulting handler *on the stack with its full call chain* — more information,
      at zero risk, using tooling the mandatory supervisor already provides.
 
-- **What item 1 ships instead.** The turnkey `ops/deploy/uruquim.service` (item
+- **What item 1 ships instead.** The turnkey `ops/deploy/druse.service` (item
   1a) makes the mandatory topology copy-paste — `Restart=on-failure`,
   `TimeoutStopSec` past `max_drain_time`, `MemoryMax` by the C-04 rule, and
   `LimitMEMLOCK` for io_uring (F-C03-2) — and `docs/operations.md` §"Diagnosing a

@@ -5,7 +5,7 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:strconv"
-import web "uruquim:web"
+import web "druse:web"
 
 Reply :: struct {
 	ok: bool `json:"ok"`,

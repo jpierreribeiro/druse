@@ -7,13 +7,13 @@
 // WHY THIS LIVES IN `web/` AND NOT `web/internal/memory/`. The plan proposed a
 // subpackage. In Odin a subdirectory is a SEPARATE PACKAGE, and this code must
 // reach `Context_Internal` and the private typed report — so a subpackage would
-// have to import `uruquim:web`, the back-edge WP3 ratified as a compile cycle
+// have to import `druse:web`, the back-edge WP3 ratified as a compile cycle
 // (probe C5), or expose an importable auxiliary surface. That is the exact
 // refutation WP4 recorded for the dispatcher, so the machinery is a top-level
 // package-private file and `build/check_public_api.sh` permits this one extra
 // name (WP7 D1).
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:mem"
 

@@ -16,7 +16,7 @@ across: correct type, wrong type, `nil` state, and state lifetime.
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..
+odin run . -collection:druse=../..
 odin check .
 ```
 

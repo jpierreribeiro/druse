@@ -19,7 +19,7 @@
 // proxies it has, at which point it sees what those proxies report — and only
 // then.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:strings"
 

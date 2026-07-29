@@ -1,5 +1,5 @@
 // WP22 public surface contract — `web.logger`, as an EXTERNAL consumer of
-// `uruquim:web` sees it.
+// `druse:web` sees it.
 //
 // WHAT THIS SUITE IS FOR. `logger` is the first framework component whose
 // OUTPUT is the product: everything else is judged by the response it commits,
@@ -24,7 +24,7 @@ package test_wp22_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // ---------------------------------------------------------------------------
 // The capture logger.
@@ -59,7 +59,7 @@ capture_proc :: proc(
 ) {
 	record := (^Capture)(data)
 
-	if strings.has_prefix(text, "uruquim: ") {
+	if strings.has_prefix(text, "druse: ") {
 		// Framework output. The Info lines are the logger's product and are
 		// recorded; the Error lines are diagnostics a test provoked on purpose,
 		// and the runner counts any Error line as a failure, so they are
@@ -136,7 +136,7 @@ wp22_public_logs_one_line_per_request :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, res.status, web.Status.OK)
 	testing.expect_value(t, cap.count, 1)
-	testing.expect_value(t, captured(&cap, 0), "uruquim: GET /ping 200")
+	testing.expect_value(t, captured(&cap, 0), "druse: GET /ping 200")
 }
 
 @(test)
@@ -156,7 +156,7 @@ wp22_public_logs_the_committed_status_not_a_guess :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, res.status, web.Status.Created)
 	testing.expect_value(t, cap.count, 1)
-	testing.expect_value(t, captured(&cap, 0), "uruquim: POST /things 201")
+	testing.expect_value(t, captured(&cap, 0), "druse: POST /things 201")
 }
 
 @(test)
@@ -173,7 +173,7 @@ wp22_public_two_requests_log_two_lines :: proc(t: ^testing.T) {
 	_ = web.test_request(&a, .GET, "/ping")
 
 	testing.expect_value(t, cap.count, 2)
-	testing.expect_value(t, captured(&cap, 1), "uruquim: GET /ping 200")
+	testing.expect_value(t, captured(&cap, 1), "druse: GET /ping 200")
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ wp22_public_logs_a_404 :: proc(t: ^testing.T) {
 	// does not populate an identity it cannot supply, and it will NOT fall back
 	// to the raw path — which is exactly the attacker-controlled text a 404 log
 	// would otherwise be full of.
-	testing.expect_value(t, captured(&cap, 0), "uruquim: GET - 404")
+	testing.expect_value(t, captured(&cap, 0), "druse: GET - 404")
 	testing.expect(
 		t,
 		!strings.contains(captured(&cap, 0), "secrets"),
@@ -221,7 +221,7 @@ wp22_public_logs_a_405 :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, res.status, web.Status.Method_Not_Allowed)
 	testing.expect_value(t, cap.count, 1)
-	testing.expect_value(t, captured(&cap, 0), "uruquim: POST - 405")
+	testing.expect_value(t, captured(&cap, 0), "druse: POST - 405")
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ wp22_public_never_emits_query_header_or_body :: proc(t: ^testing.T) {
 
 	// The PATTERN, not the path: low-cardinality identity, and the captured
 	// parameter value is request data like any other.
-	testing.expect_value(t, line, "uruquim: POST /orders/:id 200")
+	testing.expect_value(t, line, "druse: POST /orders/:id 200")
 
 	testing.expect(t, !strings.contains(line, "42"), "the captured path parameter must not be logged")
 	testing.expect(t, !strings.contains(line, "SECRETQUERY"), "no query byte may be logged")
@@ -277,9 +277,9 @@ wp22_public_crlf_in_a_pattern_is_escaped :: proc(t: ^testing.T) {
 	a := web.app()
 	defer web.destroy(&a)
 	web.use(&a, web.logger)
-	web.get(&a, "/a\r\nuruquim: GET /forged 200", ok_handler)
+	web.get(&a, "/a\r\ndruse: GET /forged 200", ok_handler)
 
-	res := web.test_request(&a, .GET, "/a\r\nuruquim: GET /forged 200")
+	res := web.test_request(&a, .GET, "/a\r\ndruse: GET /forged 200")
 
 	testing.expect_value(t, res.status, web.Status.OK)
 	testing.expect_value(t, cap.count, 1)
@@ -381,7 +381,7 @@ wp22_public_uncommitted_status_is_not_invented :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, res.status, web.Status.Internal_Server_Error)
 	testing.expect_value(t, cap.count, 1)
-	testing.expect_value(t, captured(&cap, 0), "uruquim: GET /silent -")
+	testing.expect_value(t, captured(&cap, 0), "druse: GET /silent -")
 }
 
 // ---------------------------------------------------------------------------

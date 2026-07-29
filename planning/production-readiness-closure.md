@@ -35,7 +35,7 @@ deadline?"* It is:
 > How did a known, recorded pending item stop being trackable until it
 > reappeared by accident?
 
-**The diagnosis: Uruquim has an excellent per-feature discipline** (spec →
+**The diagnosis: Druse has an excellent per-feature discipline** (spec →
 tests → implementation → freeze → ledgers) **but no layer above it** that
 reconciles every promise and pendency into one readiness matrix before
 "production" is claimed. The facts are correct in each document (phase plans,
@@ -252,7 +252,7 @@ block the verdict; an unclassified cell or a **blocking absence** does.
 
 ## 6. The httprouter comparative study (WP C-08, non-blocking)
 
-`httprouter` (Go) is **reference, not dependency**: Uruquim already has a
+`httprouter` (Go) is **reference, not dependency**: Druse already has a
 private, segment-oriented radix router (the WP29 benchmark fell from ~883 µs to
 ~1.5 µs at 5,000 routes, near-constant 5→5,000). Value ranking: copying the
 router — low; **implementation reference — high; test corpus — very high;** a
@@ -265,38 +265,38 @@ Two bounded steps, in order:
    multi-param, deep paths, catch-all, static-vs-param conflicts, differently
    named params in the same position, invalid routes, trailing slash, method
    collection for OPTIONS — into `tests/router_external_corpus_test.odin`, **not**
-   to prove Uruquim behaves like httprouter but to prove **every difference is
+   to prove Druse behaves like httprouter but to prove **every difference is
    deliberate.**
 2. **Later (measurement): an experimental `radix_compact`.** A private,
    experimental compressed-radix competitor (`radix_idx` = current;
-   `radix_compact` = httprouter-inspired) measured in Uruquim's own harness for
+   `radix_compact` = httprouter-inspired) measured in Druse's own harness for
    the one unmeasured cost — **registration time and memory** (a node + a map per
    distinct segment): registration/route, memory at 50/500/5,000 routes, node/map
    counts, teardown cost, lookup p50/p95, `Allow` build, deep/shared-prefix
    behaviour. **Keep only on material gain**, same harness, same gate.
 
-**What must NOT be copied** (Uruquim's deliberate semantics, to preserve as a
+**What must NOT be copied** (Druse's deliberate semantics, to preserve as a
 **negative corpus**):
 
 - **Precedence:** httprouter forbids a static and a param route at the same
-  position; Uruquim's rule is **static wins param**, WITH controlled backtracking
+  position; Druse's rule is **static wins param**, WITH controlled backtracking
   (`/users/me/settings` + `/users/:id/profile`; a request to `/users/me/profile`
   must abandon the static branch and try the param branch). A literal port of
   httprouter's tree would break this — any compact implementation must keep the
   backtracking.
 - **Automatic path correction** (trailing-slash redirect, case-fix, path
-  cleanup) — directly conflicts with Uruquim's security policy: no
+  cleanup) — directly conflicts with Druse's security policy: no
   normalization, `/users` ≠ `/users/`, case-sensitive, reject `..`/`.`/`//`/
   `%2F`/`%00` before routing. This is a **contrast/negative corpus**, never a
   feature to copy.
 - **Catch-all (`*filepath`)** — possibly useful later (reverse proxy, SPA
-  fallback, path-preserving gateways), but Uruquim already has safe static
+  fallback, path-preserving gateways), but Druse already has safe static
   mounts; do **not** add `*filepath` to core without a real case the current
   system cannot express. httprouter's code/tests are a good reference **if** the
   need arises (last-segment-only, conflict rules, precedence, alloc-free
   capture).
 
-**What Uruquim already has and need not borrow:** automatic HEAD/OPTIONS, 405
+**What Druse already has and need not borrow:** automatic HEAD/OPTIONS, 405
 with frozen-order `Allow`, alloc-free per-request params, conflict diagnostics
 (`/users/:id` vs `/users/:uid` refused), and the deliberate absence of panic
 recovery (Odin has none; supervision is the model).

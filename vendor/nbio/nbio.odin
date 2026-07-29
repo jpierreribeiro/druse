@@ -405,7 +405,7 @@ Execute an operation.
 If the operation is attached to another thread's event loop, it is queued to be executed on that event loop,
 optionally waking that loop up (from a blocking `tick`) with `trigger_wake_up`.
 
-URUQUIM (transport audit T1) — TWO HAZARDS, both load-bearing:
+DRUSE (transport audit T1) — TWO HAZARDS, both load-bearing:
 
 1. `trigger_wake_up = false` BREAKS THE MPSC'S CORRECTNESS RULE for a
    cross-thread call. The queue tolerates a producer stalled between claiming a
@@ -415,7 +415,7 @@ URUQUIM (transport audit T1) — TWO HAZARDS, both load-bearing:
    wake can leave its item — and every item queued behind it — sitting until
    some unrelated wake happens to arrive. See the invariant comment on
    `Multi_Producer_Single_Consumer` in mpsc.odin. Safe only for a SAME-THREAD
-   `exec`, where no queue is involved at all. Uruquim never passes it, and
+   `exec`, where no queue is involved at all. Druse never passes it, and
    `build/check_public_api.sh` keeps it that way.
 
 2. THE ENQUEUE SPINS, so hold no lock across this call. When the target loop's

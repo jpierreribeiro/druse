@@ -23,9 +23,9 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
-// The poison report and the serve refusal are EXPECTED Error-level `uruquim:`
+// The poison report and the serve refusal are EXPECTED Error-level `druse:`
 // log lines; the pinned test runner records Error output as a failure, so the
 // test swallows exactly those and forwards everything else (the WP8 idiom).
 @(private = "file")
@@ -42,7 +42,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

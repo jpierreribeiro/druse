@@ -232,7 +232,7 @@ Poison-the-App versus a cured abort remains a WP17 prototype, per ADR-019.
 existing static-message report path (`context.logger`, no `core:fmt`, no
 `core:log` — the WP6 measured rule):
 
-> `uruquim: web.use was called after a route was already registered; ordered
+> `druse: web.use was called after a route was already registered; ordered
 > middleware cannot protect routes registered before it (ADR-019). Register
 > every web.use before the first web.get/post/put/patch/delete/mount. This
 > application is rejected fail-closed: every request will answer 500 and
@@ -371,7 +371,7 @@ amended and the wording is already accepted:
   standardized `internal_error` 500, identically under `web.serve` and
   `web.test_request`, in default and `-o:speed` builds, repeatably.
 * A handler that faults aborts the process; the documentation says so plainly;
-  Uruquim is expected to run under a supervisor. A "last-gasp responder" is
+  Druse is expected to run under a supervisor. A "last-gasp responder" is
   Phase 4 vocabulary and is never called recovery.
 
 * Implementation: WP21 (documentation + the two Test Gate items).

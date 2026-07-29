@@ -1,6 +1,6 @@
 // WP1 compile contract for the Phase-1 public API skeleton.
 //
-// This package is an EXTERNAL consumer of `uruquim:web`. It therefore proves
+// This package is an EXTERNAL consumer of `druse:web`. It therefore proves
 // two things at once: that every Phase-1 symbol exists with the exact public
 // name and signature, and that each one is actually exported.
 //
@@ -11,7 +11,7 @@
 package wp1_public_api
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // Payload/DTO types belong to the application, never to the framework.
 User :: struct {

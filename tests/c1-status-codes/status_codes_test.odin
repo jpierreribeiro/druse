@@ -9,7 +9,7 @@
 package test_c1_status_codes
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(test)
 c1_named_members_equal_their_http_codes :: proc(t: ^testing.T) {

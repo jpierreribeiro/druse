@@ -4,7 +4,7 @@
 // body, ok, and 404 — using a deliberately SIMPLE (non-radix) dispatcher?
 //
 // THROWAWAY. Not imported by any product package.
-// Run with: odin test . -collection:uruquim=../..
+// Run with: odin test . -collection:druse=../..
 package test_transport
 
 import "core:testing"

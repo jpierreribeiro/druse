@@ -9,7 +9,7 @@
 // WHY THIS LIVES IN `web/` AND NOT `web/internal/dispatch/`. The plan proposed a
 // subpackage. In Odin a subdirectory is a SEPARATE PACKAGE, and this code must
 // name `App`, `Handler`, `Context`, `Method` and the internal `Response` — so a
-// subpackage would have to import `uruquim:web`, which is the back-edge WP3
+// subpackage would have to import `druse:web`, which is the back-edge WP3
 // already ratified as a compile cycle (probe C5). The alternatives are
 // duplicating the types, bridging through an untyped pointer, or freezing an
 // internal ABI, and all three are forbidden. The dispatcher is therefore
@@ -24,7 +24,7 @@
 // precedence, per-method isolation, 404, 405 with `Allow` — true and
 // test-pinned, so that replacing this table later changes nothing publicly.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:strings"
 

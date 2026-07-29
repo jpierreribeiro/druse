@@ -6,37 +6,37 @@
 #   2. a framework that deletes files outside its own spool namespace.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_SOURCE="$URUQUIM_ROOT/web/internal/ingest/ingest.odin"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_SOURCE="$DRUSE_ROOT/web/internal/ingest/ingest.odin"
 
 fail() {
   echo "M8-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-if test -n "${URUQUIM_COMPILER:-}"; then
-  URUQUIM_ODIN="$URUQUIM_COMPILER"
-elif test -n "${URUQUIM_ODIN_BIN:-}"; then
-  URUQUIM_ODIN="$URUQUIM_ODIN_BIN"
+if test -n "${DRUSE_COMPILER:-}"; then
+  DRUSE_ODIN="$DRUSE_COMPILER"
+elif test -n "${DRUSE_ODIN_BIN:-}"; then
+  DRUSE_ODIN="$DRUSE_ODIN_BIN"
 elif command -v odin >/dev/null 2>&1; then
-  URUQUIM_ODIN="$(command -v odin)"
-elif test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_ODIN=/tmp/uruquim-odin-toolchain/odin
+  DRUSE_ODIN="$(command -v odin)"
+elif test -x /tmp/druse-toolchain/odin; then
+  DRUSE_ODIN=/tmp/druse-toolchain/odin
 else
   fail "odin compiler not found"
 fi
 
-URUQUIM_ODIN="$(readlink -f "$URUQUIM_ODIN")"
-URUQUIM_ODIN_ROOT="$(cd "$(dirname "$URUQUIM_ODIN")" && pwd)"
-URUQUIM_TMP="$(mktemp -d -t uruquim-m8-controls-XXXXXXXX)"
+DRUSE_ODIN="$(readlink -f "$DRUSE_ODIN")"
+DRUSE_ODIN_ROOT="$(cd "$(dirname "$DRUSE_ODIN")" && pwd)"
+DRUSE_TMP="$(mktemp -d -t druse-m8-controls-XXXXXXXX)"
 
 restore() {
-  git -C "$URUQUIM_ROOT" checkout -- web/internal/ingest/ingest.odin 2>/dev/null || true
-  rm -rf "$URUQUIM_TMP"
+  git -C "$DRUSE_ROOT" checkout -- web/internal/ingest/ingest.odin 2>/dev/null || true
+  rm -rf "$DRUSE_TMP"
 }
 trap restore EXIT
 
-git -C "$URUQUIM_ROOT" diff --quiet -- web/internal/ingest/ingest.odin ||
+git -C "$DRUSE_ROOT" diff --quiet -- web/internal/ingest/ingest.odin ||
   fail "ingest.odin has uncommitted changes; the control restores that file"
 
 run_red() {
@@ -44,21 +44,21 @@ run_red() {
 
   sed -i \
     "s/if !strings.has_prefix(entry.name, SPOOL_PREFIX) {/if $replacement {/" \
-    "$URUQUIM_SOURCE"
-  grep -qF "if $replacement {" "$URUQUIM_SOURCE" ||
+    "$DRUSE_SOURCE"
+  grep -qF "if $replacement {" "$DRUSE_SOURCE" ||
     fail "mutation '$label' no longer applies to the prefix guard"
 
   set +e
   out="$(
-    env ODIN_ROOT="$URUQUIM_ODIN_ROOT" PATH="$URUQUIM_ODIN_ROOT:/usr/bin:/bin" \
-      timeout 120 "$URUQUIM_ODIN" test "$URUQUIM_ROOT/tests/m8-spool-sweep" \
-      "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
-      -out:"$URUQUIM_TMP/$replacement" 2>&1
+    env ODIN_ROOT="$DRUSE_ODIN_ROOT" PATH="$DRUSE_ODIN_ROOT:/usr/bin:/bin" \
+      timeout 120 "$DRUSE_ODIN" test "$DRUSE_ROOT/tests/m8-spool-sweep" \
+      "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+      -out:"$DRUSE_TMP/$replacement" 2>&1
   )"
   rc=$?
   set -e
 
-  git -C "$URUQUIM_ROOT" checkout -- web/internal/ingest/ingest.odin
+  git -C "$DRUSE_ROOT" checkout -- web/internal/ingest/ingest.odin
 
   test "$rc" -ne 0 ||
     fail "mutation '$label' SURVIVED: the M8 suite stayed green"

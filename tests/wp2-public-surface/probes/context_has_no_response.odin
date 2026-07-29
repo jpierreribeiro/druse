@@ -8,7 +8,7 @@
 // Expected diagnostic: 'ctx' of type '^Context' has no field 'response'
 package wp2_probe_context_response
 
-import web "uruquim:web"
+import web "druse:web"
 
 probe :: proc(ctx: ^web.Context) {
 	ctx.response = {}

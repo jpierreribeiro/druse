@@ -1,6 +1,6 @@
 // WP2 public-surface contract, from OUTSIDE the package.
 //
-// This package is an EXTERNAL consumer of `uruquim:web`. It proves that the
+// This package is an EXTERNAL consumer of `druse:web`. It proves that the
 // three symbols WP2 adds — `Request`, `Method`, `Header_View` — exist with the
 // exact ratified names, are actually exported, and compose as the spec writes
 // them (`knowledge-base/01-architecture-spec.md` §Request/Response ownership).
@@ -16,7 +16,7 @@
 package wp2_public_surface
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // --- Method: the ratified spelling is UPPERCASE ---
 

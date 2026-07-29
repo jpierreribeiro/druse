@@ -19,15 +19,15 @@ evidence), [`odin-fit-audit.md`](odin-fit-audit.md) (design fit),
 
 Recorded here because each one removes a choice or forces one. Sources in §5.
 
-### C-1 — HEAD is effectively mandatory, and 501 is a SHOULD Uruquim currently declines
+### C-1 — HEAD is effectively mandatory, and 501 is a SHOULD Druse currently declines
 
 RFC 9110 §9.1: *"All general-purpose servers MUST support the methods GET and
-HEAD. All other methods are OPTIONAL."* Uruquim registers GET, POST, PUT, PATCH
+HEAD. All other methods are OPTIONAL."* Druse registers GET, POST, PUT, PATCH
 and DELETE only, and WP9 deliberately disabled the backend's HEAD→GET behaviour.
 
 The same section splits the error cases: a method *unrecognized or not
 implemented* SHOULD get **501**; a method *recognized but not allowed for this
-resource* SHOULD get **405**. Uruquim collapses unknown methods into the 404/405
+resource* SHOULD get **405**. Druse collapses unknown methods into the 404/405
 path, which WP9 ratified deliberately (D7: the transport must not invent a
 status before the core sees the request).
 
@@ -52,7 +52,7 @@ So today any conformant instrumentation is **required to omit** `http.route`
 entirely and forbidden from falling back to the path. That means no per-route
 latency metrics and degraded span names.
 
-Uruquim already *has* the template — the App-owned `pattern` string, matched in
+Druse already *has* the template — the App-owned `pattern` string, matched in
 `web/dispatch_match.odin` — it simply never surfaces it. **Exposing the matched
 pattern as a borrowed string is the single smallest change that unlocks the
 entire observability story, and it costs nothing**: the pattern is already
@@ -60,7 +60,7 @@ App-owned and already viewed by `Route_Param.name`. This is a Phase-3/4 decision
 worth making early.
 
 Related: when the method is not recognised, the conventions expect
-`http.request.method_original` to carry the raw token. Uruquim exposes no
+`http.request.method_original` to carry the raw token. Druse exposes no
 `method_raw` publicly, so that attribute is unavailable to any future
 instrumentation. Worth recording, not worth fixing before there is a consumer.
 
@@ -76,7 +76,7 @@ server MUST read the entire request message body or close the connection after
 sending its response"* — otherwise leftover bytes are parsed as the next
 request.
 
-This is a **transport-layer contract**, and it interacts with Uruquim's
+This is a **transport-layer contract**, and it interacts with Druse's
 single-commit response guard: a 413 or 400 committed by the core must still
 result in drain-or-close at the transport. WP9's corpus covers the rejection;
 Phase 4 owns the connection-lifetime half. §9.6 also warns that closing without
@@ -112,16 +112,16 @@ Counter-datapoint from a standard library: Go 1.22's `ServeMux` deliberately did
 resolves ambiguity by **panicking at registration** on conflicting patterns.
 
 **Consequence for Phase 3: justify a router change by match semantics or by
-Uruquim's own measurements — never by unsourced performance folklore.** Any
+Druse's own measurements — never by unsourced performance folklore.** Any
 "linear scan is fine below N routes" claim in this project is engineering
 judgement and must be labelled as such.
 
-### C-6 — request-scoped state: both mainstream mechanisms are solving a problem Uruquim does not have
+### C-6 — request-scoped state: both mainstream mechanisms are solving a problem Druse does not have
 
 Go's `context.WithValue` costs one heap allocation per value plus a full
 `Request` copy per middleware, with O(depth) lookup. Rust's `http::Extensions`
 is a boxed `HashMap<TypeId, Box<dyn Any>>`. Both exist for type-erased,
-dynamically-keyed state crossing library boundaries — which Uruquim does not
+dynamically-keyed state crossing library boundaries — which Druse does not
 need. Struct fields in a request arena, which is what `Context_Internal` already
 is, dominate both. If extensibility is ever genuinely required, a small fixed
 `[N]{key, rawptr}` array in the arena beats both. This supports G-03 rather than
@@ -134,7 +134,7 @@ ergonomic `from_fn` boxes "the rest of the chain" per call, even though Tower's
 type-level `Layer` composition is in principle zero-cost. Go's `net/http` has no
 middleware type at all and gets post-`next` free on the machine stack.
 
-Uruquim's forced design (Phase 2, FINDING-B) — a cursor plus ordinary calls —
+Druse's forced design (Phase 2, FINDING-B) — a cursor plus ordinary calls —
 lands closest to Go's: post-`next` costs stack frames, not allocations. That is
 a genuine advantage and Phase 3's chain work must not surrender it.
 
@@ -150,7 +150,7 @@ core-library changes in ordinary monthly releases — `core:os` was replaced
 wholesale in `dev-2026-03`, with the old API retained only "until sometime in Q3
 of 2026", which is approximately now.
 
-**Uruquim is already ahead of the ecosystem here**: `odin-version.txt` pins a
+**Druse is already ahead of the ecosystem here**: `odin-version.txt` pins a
 release, a commit and an asset SHA-256, which is stronger than anything
 surveyed. Keep it, state it in the README, and put **no** package-manager
 integration on the roadmap. Budget one to two core-library migrations per year.
@@ -168,7 +168,7 @@ bound it. Representation decisions are conditioned on measurement.
 | # | Gate | Question | Output |
 |---|---|---|---|
 | RG-1 | Benchmark harness | What is the methodology? Recorded hardware, warm-up, route distribution, concurrency levels, p50/p95/p99, allocations, binary size, build time, peak and retained memory. **Plus semantic equivalence — see below** | a harness in the gate, plus a recorded Phase-1 baseline to regress against |
-| RG-2 | Router shootout | Pointer-based radix, index-based radix, hybrid, improved linear, **and class-bucketed linear** — measured on Uruquim's own workloads at 5, 50, 500 **and 5,000** routes | a representation chosen from data, with **the losing candidates and their numbers recorded** |
+| RG-2 | Router shootout | Pointer-based radix, index-based radix, hybrid, improved linear, **and class-bucketed linear** — measured on Druse's own workloads at 5, 50, 500 **and 5,000** routes | a representation chosen from data, with **the losing candidates and their numbers recorded** |
 | RG-3 | Allocation audit | Where does per-request allocation actually go? Includes audit A-8 (inbound headers built and never read), A-12 (static headers cloned) and A-13 (the `Header_Pair` ↔ `transport.Header` conversions) | a measured list, and a decision per item |
 | RG-4 | Arena policy | What happens to a request arena after an unusually large body? Retain, trim or release (risk R-16) | a policy with numbers behind it |
 
@@ -198,7 +198,7 @@ being re-derived by comparison order.
 The candidate arrives with its own disclaimer, and C-5 governs it exactly as it
 governs the others: **the bucketed design also scans linearly inside each
 bucket.** It is a hypothesis to measure, not a result to adopt. "A real,
-validated system does it this way" is not evidence about Uruquim's route
+validated system does it this way" is not evidence about Druse's route
 cardinalities, and this project chooses representations from its own numbers.
 
 Extend the cardinality sweep to 5,000 routes if the harness cost allows: the
@@ -240,7 +240,7 @@ the resolved budgets — request line, header block, body, response bytes,
 timeouts, arena policy — with every cross-limit relationship checked once and
 diagnosed at boot rather than at 3 a.m. under load. Keep it the smallest struct
 HTTP actually needs; do **not** import a general system-specification concept
-from a runtime that sizes shards, pools and rings, because Uruquim sizes none of
+from a runtime that sizes shards, pools and rings, because Druse sizes none of
 those.
 
 **P3-8 — a route/chain snapshot.** Compile the final table and the flattened
@@ -301,7 +301,7 @@ Three notes on why these are gates and not just tests.
 one every server eventually has: `stopping`, `draining` and `failed` as separate
 booleans, admitting combinations that were never intended and that no reviewer
 can enumerate. A small enum makes the impossible states unrepresentable, which
-is the same reasoning that already gave Uruquim a closed `Framework_Error`
+is the same reasoning that already gave Druse a closed `Framework_Error`
 instead of an `any`.
 
 **RG-P4-B — the reservation is the point.** The subtle failure is not running
@@ -335,7 +335,7 @@ needs to become public API.
 | P4-2 | Lifecycle: stop, shutdown with an absolute deadline, admission stop, exactly-once cleanup | audit A-5; there is no stop today. **Adds public surface — owner approval** |
 | P4-3 | Per-server state replacing the globals | ADR-018; prerequisite for two servers or any embedded use |
 | P4-4 | Connection lifetime: keep-alive, drain-or-close, staged close | C-3; the close obligation appears three times in RFC 9112 §6.3, and §9.6's staged close is what makes the client actually receive the 400 |
-| P4-5 | Limits: connections, queue depth, header count and size, request line, minimum ingress rate | the slowloris mitigation is a minimum ingress rate; OWASP names it and gives no numbers, so Uruquim must pick and justify its own |
+| P4-5 | Limits: connections, queue depth, header count and size, request line, minimum ingress rate | the slowloris mitigation is a minimum ingress rate; OWASP names it and gives no numbers, so Druse must pick and justify its own |
 | P4-6 | Deterministic load shedding | bounded admission before any adaptive controller (research item 11 stays after this) |
 | P4-7 | Trusted proxies and peer preservation | C-4; ADR-013 must be accepted first. Default to the peer address; trusted hops are explicit operator configuration; never echo `Forwarded` into a response |
 | P4-8 | CORS | C-5 in §5: five headers, with `*` **not** sufficient under credentials and **not** covering `Authorization`; preflight restricted to an ok status; `Vary: Origin` required for dynamic origins. **Reclassified 2026-07-21: core, Phase 5 WP60** (was "candidate for an optional package") |
@@ -409,9 +409,9 @@ Runs alongside the phases (roadmap M0 to M5), not after them.
 | Retire `planning/`, `experiments/`, knowledge base from the public tree | M5 | per the local cleanup plan's Stage 4 |
 | Issue triage and regression policy | M4 | |
 | Vendor maintenance policy | P4-15 | |
-| `uruquim dev` — watch and rebuild tool | M4 | added 2026-07-20. Separate track, see below |
+| `druse dev` — watch and rebuild tool | M4 | added 2026-07-20. Separate track, see below |
 
-### `uruquim dev` — a tool, deliberately outside the framework
+### `druse dev` — a tool, deliberately outside the framework
 
 Watch sources, debounce, run a configurable build/check, restart the child
 process, shut the tree down cleanly before killing it, exclude `.git` and
@@ -420,7 +420,7 @@ mode makes it useful to agents as well as to people.
 
 Three constraints make this a track rather than a work package:
 
-- **It must not import `uruquim:web`.** A development tool that links the
+- **It must not import `druse:web`.** A development tool that links the
   framework starts making decisions for the framework, and every one of them
   would land inside the ledger.
 - **It is not on the Phase-2 or Phase-3 critical path.** Productivity is a real
@@ -430,7 +430,7 @@ Three constraints make this a track rather than a work package:
   is not something such a runtime provides, and the reference study is explicit that this idea
   came from elsewhere. Recording that keeps the study's attribution honest.
 
-A companion `uruquim doctor` — printing the Odin version, the Uruquim commit,
+A companion `druse doctor` — printing the Odin version, the Druse commit,
 the backend, the effective limits and no secrets — is worth the same track: it
 makes a bug report reproducible without a conversation.
 
@@ -460,9 +460,9 @@ All accessed 2026-07-19.
   routes" claim in this project is engineering judgement, not citable.
 * **"Go's `net/http` has no middleware type"** is absence of evidence; no
   maintainer statement says it is deliberate.
-* **RFC 9110's 501 rule is a SHOULD, not a MUST** — Uruquim may deviate, but the
+* **RFC 9110's 501 rule is a SHOULD, not a MUST** — Druse may deviate, but the
   deviation must be recorded as a decision.
 * **OWASP is guidance, not a specification**, and its DoS sheet names techniques
-  without numbers. Uruquim must choose and justify its own limits.
+  without numbers. Druse must choose and justify its own limits.
 * No framework's self-published benchmarks were used as evidence about anything,
   and none should be.

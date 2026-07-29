@@ -9,7 +9,7 @@
 // framework had already responded.
 package wp5_probe_discard_query_int_or
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	ctx: web.Context

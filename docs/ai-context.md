@@ -1,4 +1,4 @@
-# Uruquim API Reference for Coding Agents
+# Druse API Reference for Coding Agents
 
 Paste this file into your agent's context (Cursor rules, CLAUDE.md, etc.).
 
@@ -9,7 +9,7 @@ must never be emitted.
 
 ## What works today
 
-Uruquim is a working HTTP framework: `web.serve` binds a port and answers real
+Druse is a working HTTP framework: `web.serve` binds a port and answers real
 requests, routing and extractors work, JSON goes in and out, and every error is
 a standardized JSON envelope.
 
@@ -457,7 +457,7 @@ fail-closed rather than run on a guess.
 - Handlers may run concurrently. Mutable application state and observer/logger
   sinks are application-owned and must synchronize themselves.
 
-`Limits` bounds Uruquim's own per-request working memory. It does **not** bound
+`Limits` bounds Druse's own per-request working memory. It does **not** bound
 connections, accept backlog or process memory; those belong to the transport and
 the operating system.
 
@@ -908,9 +908,9 @@ web.use(&app, web.logger)      // before the first route, like every use
 ```
 
 ```text
-uruquim: GET /orders/:id 200   method, REGISTERED PATTERN, committed status
-uruquim: GET - 404             a miss has no pattern: `-`, never the raw path
-uruquim: GET /silent -         nothing was committed while the logger watched
+druse: GET /orders/:id 200   method, REGISTERED PATTERN, committed status
+druse: GET - 404             a miss has no pattern: `-`, never the raw path
+druse: GET /silent -         nothing was committed while the logger watched
 ```
 
 It never logs the raw path, the query string, a header, a body byte, or a
@@ -1066,7 +1066,7 @@ The complete programs live in `examples/`. The smallest one:
 ```odin
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	app := web.app()

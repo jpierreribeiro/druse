@@ -10,7 +10,7 @@
 // recorder stores it, and every copy is made with it. `temp_allocator` is never
 // used for data a `Recorded_Response` returns.
 package web_testing
-// uruquim:file test-machinery
+// druse:file test-machinery
 
 import "core:mem"
 import "core:strings"

@@ -1,5 +1,5 @@
 // WP18 public surface contract — `Router`, `router` and `mount` as an
-// EXTERNAL consumer of `uruquim:web` sees them.
+// EXTERNAL consumer of `druse:web` sees them.
 //
 // The load-bearing property this suite pins: every existing `^App` procedure
 // — `use`, the five verbs, `destroy`, and even `test_request` — accepts a
@@ -12,12 +12,12 @@ package test_wp18_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 INTERNAL_ENVELOPE :: `{"error":{"code":"internal_error","message":"Internal server error"}}`
 
 // The WP17 quiet-logger idiom: tests that DELIBERATELY trigger a framework
-// diagnostic swallow the expected `uruquim:` Error line and forward the rest.
+// diagnostic swallow the expected `druse:` Error line and forward the rest.
 Quiet :: struct {
 	inner: log.Logger,
 }
@@ -30,7 +30,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

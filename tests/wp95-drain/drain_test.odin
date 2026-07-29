@@ -14,9 +14,9 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import ingest "uruquim:web/internal/ingest"
-import stream "uruquim:web/internal/stream"
-import transport "uruquim:web/internal/transport"
+import ingest "druse:web/internal/ingest"
+import stream "druse:web/internal/stream"
+import transport "druse:web/internal/transport"
 
 STREAMS :: 24
 
@@ -120,7 +120,7 @@ wp95_open_streams_terminate_within_the_drain_deadline :: proc(t: ^testing.T) {
 @(test)
 wp95_admission_refuses_new_spools_once_draining :: proc(t: ^testing.T) {
 	a: ingest.Admission
-	testing.expect(t, ingest.admission_init(&a, ingest.Spool_Config{dir = "/tmp/uruquim-wp95", max_concurrent = 4}))
+	testing.expect(t, ingest.admission_init(&a, ingest.Spool_Config{dir = "/tmp/druse-wp95", max_concurrent = 4}))
 	defer ingest.admission_destroy(&a)
 	// A slot is available before drain…
 	testing.expect_value(t, ingest.admit(&a), ingest.Ingest_Result.Ready)

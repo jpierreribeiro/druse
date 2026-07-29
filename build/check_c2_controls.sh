@@ -7,19 +7,19 @@
 # actually fire — proven on real (in-memory transport) traffic.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_RESP="$URUQUIM_ROOT/web/respond.odin"
-URUQUIM_SUITE="$URUQUIM_ROOT/tests/c2-response-surface/contract_test.odin"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_RESP="$DRUSE_ROOT/web/respond.odin"
+DRUSE_SUITE="$DRUSE_ROOT/tests/c2-response-surface/contract_test.odin"
 
 fail() { echo "C2-CONTROL-FAIL: $*" >&2; exit 1; }
 
-URUQUIM_ODIN="${URUQUIM_ODIN_BIN:-odin}"
-URUQUIM_ODIN_DIR="$(cd "$(dirname "$(readlink -f "$URUQUIM_ODIN")")" && pwd)"
+DRUSE_ODIN="${DRUSE_ODIN_BIN:-odin}"
+DRUSE_ODIN_DIR="$(cd "$(dirname "$(readlink -f "$DRUSE_ODIN")")" && pwd)"
 
 # 1. The two public procs exist with the ratified signatures.
-grep -qE '^set_header :: proc\(ctx: \^Context, name: string, value: string\) -> bool' "$URUQUIM_RESP" ||
+grep -qE '^set_header :: proc\(ctx: \^Context, name: string, value: string\) -> bool' "$DRUSE_RESP" ||
   fail "web.set_header is missing its ratified signature"
-grep -qE '^bytes :: proc\(ctx: \^Context, status: Status, content_type: string, data: \[\]u8\)' "$URUQUIM_RESP" ||
+grep -qE '^bytes :: proc\(ctx: \^Context, status: Status, content_type: string, data: \[\]u8\)' "$DRUSE_RESP" ||
   fail "web.bytes is missing its ratified signature"
 
 # 2. The injection guard exists and reserved names are refused.
@@ -36,19 +36,19 @@ grep -qE '^bytes :: proc\(ctx: \^Context, status: Status, content_type: string, 
 # behavioural evidence is `c2_set_header_refuses_every_control_byte`, which was
 # run with the widened check reverted and named each surviving byte; a grep
 # cannot do that job and this one no longer pretends to.
-grep -qE "if b < 0x20 \|\| b == 0x7f \{" "$URUQUIM_RESP" ||
+grep -qE "if b < 0x20 \|\| b == 0x7f \{" "$DRUSE_RESP" ||
   fail "the header control-byte injection guard is missing (RFC 9110 5.5: field content is SP / HTAB / VCHAR / obs-text)"
-grep -qE "if b == '\\\\t' \{" "$URUQUIM_RESP" ||
+grep -qE "if b == '\\\\t' \{" "$DRUSE_RESP" ||
   fail "the header control-byte guard no longer admits HTAB, which is legal OWS inside a field value"
-grep -q 'header_name_is_reserved' "$URUQUIM_RESP" ||
+grep -q 'header_name_is_reserved' "$DRUSE_RESP" ||
   fail "the reserved-header-name guard is missing"
 
 # 3. The RED test exists and passes on real (in-memory transport) traffic:
 #    set_header rides on the wire, injection/reserved are refused, bytes carries a
 #    typed binary body, a control-byte content type is a 500.
-test -f "$URUQUIM_SUITE" || fail "tests/c2-response-surface/contract_test.odin is missing"
-env ODIN_ROOT="$URUQUIM_ODIN_DIR" "$URUQUIM_ODIN" test "$URUQUIM_ROOT/tests/c2-response-surface" \
-  -collection:uruquim="$URUQUIM_ROOT" >/dev/null 2>&1 ||
+test -f "$DRUSE_SUITE" || fail "tests/c2-response-surface/contract_test.odin is missing"
+env ODIN_ROOT="$DRUSE_ODIN_DIR" "$DRUSE_ODIN" test "$DRUSE_ROOT/tests/c2-response-surface" \
+  -collection:druse="$DRUSE_ROOT" >/dev/null 2>&1 ||
   fail "the C2 response-surface suite did not pass"
 
 echo "C2 control: set_header + bytes wired (header on the wire, typed binary body); injection/reserved-name guards fire; suite green"

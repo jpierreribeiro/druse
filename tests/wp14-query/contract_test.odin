@@ -14,7 +14,7 @@ package test_wp14_query
 
 import "core:mem"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 Search :: struct {
 	q:    string,

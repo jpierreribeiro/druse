@@ -1,6 +1,6 @@
 # Error Responses
 
-Every error Uruquim produces is JSON, with one envelope shape:
+Every error Druse produces is JSON, with one envelope shape:
 
 ```json
 {"error": {"code": "...", "message": "...", "field": "..."}}
@@ -251,7 +251,7 @@ each logged first:
 
 ## Faults: what happens when a handler goes wrong
 
-There are two different failures here and they end very differently. Uruquim
+There are two different failures here and they end very differently. Druse
 guarantees one of them and, deliberately, does not contain the other.
 
 ### A handler that commits no response — GUARANTEED
@@ -316,7 +316,7 @@ behalf; and most real faults never reach a hook at all, because
 principle. A "recovery" default would therefore have been a claim the framework
 could not keep.
 
-**Run Uruquim under a supervisor** — systemd, a container restart policy, or
+**Run Druse under a supervisor** — systemd, a container restart policy, or
 equivalent. That is the intended deployment, not a workaround.
 
 Evidence for every statement in this section:

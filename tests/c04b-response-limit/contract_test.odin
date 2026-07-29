@@ -13,11 +13,11 @@ package test_c04b_response_limit
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // The quiet-logger idiom (WP17–WP20): this suite deliberately triggers a
 // framework diagnostic (the over-limit 500 logs at Error level), and the runner
-// records Error output as a failure, so the expected `uruquim:` line is
+// records Error output as a failure, so the expected `druse:` line is
 // swallowed and everything else forwarded.
 Quiet :: struct {
 	inner: log.Logger,
@@ -31,7 +31,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

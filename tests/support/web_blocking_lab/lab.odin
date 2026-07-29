@@ -8,7 +8,7 @@ import "core:strings"
 import "core:sync"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 Observation_Window :: 250 * time.Millisecond
 Baseline_Ceiling :: 25 * time.Millisecond

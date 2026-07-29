@@ -10,9 +10,9 @@ package test_wp87_body_lifecycle
 import "core:os"
 import "core:strings"
 import "core:testing"
-import ingest "uruquim:web/internal/ingest"
+import ingest "druse:web/internal/ingest"
 
-SPOOL_DIR :: "/tmp/uruquim-wp87-spool"
+SPOOL_DIR :: "/tmp/druse-wp87-spool"
 
 cfg :: proc() -> ingest.Spool_Config {
 	if os.make_directory(SPOOL_DIR) != nil && !os.exists(SPOOL_DIR) {
@@ -47,7 +47,7 @@ wp87_spool_file_is_generated_private_and_inside_the_designated_dir :: proc(t: ^t
 	testing.expect_value(t, ingest.begin(&a, &s), ingest.Ingest_Result.Ready)
 	defer _ = ingest.cancel(&s, .Cancelled_By_Drain)
 	// The corpus can only observe the contract surface: bytes are accepted
-	// and accounted. Path privacy (uruquim-spool- prefix, 0600, never the
+	// and accounted. Path privacy (druse-spool- prefix, 0600, never the
 	// client filename) is asserted by WP94's own suite against the real
 	// layout; here the accounting proves a real spool exists.
 	chunk := [512]u8{}

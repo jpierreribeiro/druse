@@ -4,8 +4,8 @@ import "core:net"
 import "core:fmt"
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/web_blocking_lab"
-import web "uruquim:web"
+import lab "druse:tests/support/web_blocking_lab"
+import web "druse:web"
 
 CONNECTIONS :: 3_000
 

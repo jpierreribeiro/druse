@@ -11,7 +11,7 @@ or frozen. Work packages continue at **WP85–WP101**.
 adopts the two-half structure Phase 6 shipped with (concurrency in core, data
 in Crystals). This plan is the **core half**, unchanged: WP85–WP101, streaming
 in both directions. The **Crystals half — composition** ships in
-`uruquim-crystals` against the Phase-6 core freeze and may run in parallel
+`druse-crystals` against the Phase-6 core freeze and may run in parallel
 with the core half:
 
 - an **`http_client`** Crystal: outbound HTTP/1.1 over `core:net` with a
@@ -782,7 +782,7 @@ distinct opt-in path, not a silent ownership change.
 
 ## 9. The honest product result
 
-After Phase 7, Uruquim is still a microframework. Ordinary users still see
+After Phase 7, Druse is still a microframework. Ordinary users still see
 app, route, extract, respond and serve; small bodies keep the Phase-5 path.
 Applications gain bounded long-lived responses, SSE and progressive output,
 while large-body applications gain an explicit spool/consumer path without RAM

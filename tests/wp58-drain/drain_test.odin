@@ -95,8 +95,8 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import lab "uruquim:tests/support/fault_lab"
-import web "uruquim:web"
+import lab "druse:tests/support/fault_lab"
+import web "druse:web"
 
 // Distinct from every other suite's ports. A shared port turns a scheduling
 // accident into a flaky failure, and this suite starts and stops several

@@ -9,7 +9,7 @@
 // ORDER RECORDING follows the WP17 harness exactly: top-level Handler
 // procedures write marks through `context.user_ptr` into a sink owned by each
 // test, and tests that DELIBERATELY trigger a framework diagnostic install the
-// capture logger — which captures `uruquim:` Error lines and FORWARDS
+// capture logger — which captures `druse:` Error lines and FORWARDS
 // everything else, because `testing.expect` reports through `context.logger`
 // and a swallow-everything logger makes a test unable to fail (the defect
 // WP17's mutation control 6 caught).
@@ -19,7 +19,7 @@ package web
 import "base:runtime"
 import "core:mem"
 import "core:testing"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // ---------------------------------------------------------------------------
 // Harness (the WP17 shape)
@@ -88,7 +88,7 @@ wp18_capture_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	sink := (^Wp18_Sink)(data)
-	if level == .Error && wp18_contains(text, "uruquim:") {
+	if level == .Error && wp18_contains(text, "druse:") {
 		for i in 0 ..< len(text) {
 			if sink.log_n < len(sink.log_buf) {
 				sink.log_buf[sink.log_n] = text[i]

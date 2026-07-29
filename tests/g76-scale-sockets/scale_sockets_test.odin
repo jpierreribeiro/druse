@@ -27,7 +27,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 SCALE_CONNS :: #config(SCALE_CONNS, 500)
 CHUNKS_PER_STREAM :: 3

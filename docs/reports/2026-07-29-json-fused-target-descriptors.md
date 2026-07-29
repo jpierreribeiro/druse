@@ -32,7 +32,7 @@ the allocation-failure and transport controls retain their prior taxonomy.
 The private rollback is:
 
 ```text
--define:URUQUIM_JSON_FUSED_TARGET_DESCRIPTORS=false
+-define:DRUSE_JSON_FUSED_TARGET_DESCRIPTORS=false
 ```
 
 It is a maintainer A/B control, not application configuration.
@@ -43,7 +43,7 @@ Machine: AWS c5.2xlarge, eight vCPUs. The server was pinned to CPUs 0-3 and
 `wrk` to CPUs 4-7. Each measured repetition used four generator threads,
 100 connections and ten seconds after a five-second warm-up. Both binaries
 were built from commit `cba117e` with the pinned Odin nightly; the control
-changed only `URUQUIM_JSON_FUSED_TARGET_DESCRIPTORS=false`.
+changed only `DRUSE_JSON_FUSED_TARGET_DESCRIPTORS=false`.
 
 First order (control, then candidate), ten repetitions:
 

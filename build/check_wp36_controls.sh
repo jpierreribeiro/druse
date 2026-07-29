@@ -28,36 +28,36 @@
 # exits 2. On-demand, like the WP16-WP37 controls — not a per-gate step.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP36-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W36_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W36_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W36_ODIN="$(command -v odin)"
+DRUSE_W36_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W36_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W36_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W36_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W36_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W36_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W36_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W36_ODIN"; then
-  echo "WP36 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W36_ODIN"; then
+  echo "WP36 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W36_TMP="$(mktemp -d -t uruquim-wp36-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W36_TMP"' EXIT
+DRUSE_W36_TMP="$(mktemp -d -t druse-wp36-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W36_TMP"' EXIT
 
 suite_tree() { # name
-  local t="$URUQUIM_W36_TMP/$1"
-  mkdir -p "$t/uruquim/web" "$t/suite"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/uruquim/web/"
-  cp -r "$URUQUIM_ROOT"/web/testing "$t/uruquim/web/"
-  cp -r "$URUQUIM_ROOT"/web/internal "$t/uruquim/web/"
-  cp -r "$URUQUIM_ROOT"/vendor "$t/uruquim/"
-  cp "$URUQUIM_ROOT"/tests/wp36-public-surface/*.odin "$t/suite/"
+  local t="$DRUSE_W36_TMP/$1"
+  mkdir -p "$t/druse/web" "$t/suite"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/druse/web/"
+  cp -r "$DRUSE_ROOT"/web/testing "$t/druse/web/"
+  cp -r "$DRUSE_ROOT"/web/internal "$t/druse/web/"
+  cp -r "$DRUSE_ROOT"/vendor "$t/druse/"
+  cp "$DRUSE_ROOT"/tests/wp36-public-surface/*.odin "$t/suite/"
   printf '%s' "$t"
 }
 
@@ -69,8 +69,8 @@ assert_mutated() { # label file before-hash
 }
 
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W36_ODIN" test "$1/suite" \
-    "-collection:uruquim=$1/uruquim" -out:"$URUQUIM_W36_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W36_ODIN" test "$1/suite" \
+    "-collection:druse=$1/druse" -out:"$DRUSE_W36_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 
@@ -100,8 +100,8 @@ CONFIGURABLE="test_wp36_public.wp36_a_lowered_body_cap_is_enforced_exactly,test_
 # lies, which is worse than no knob.
 T="$(suite_tree hardcoded)"
 assert_green_baseline "$T" "$CONFIGURABLE" "1: the cap is hard-coded again"
-H="$(md5sum "$T/uruquim/web/extract.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/extract.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/extract.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/extract.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -110,7 +110,7 @@ new = "	cap := BODY_LIMIT"
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "the cap is hard-coded again" "$T/uruquim/web/extract.odin" "$H"
+assert_mutated "the cap is hard-coded again" "$T/druse/web/extract.odin" "$H"
 must_go_red "$T" "$CONFIGURABLE" "1: the cap is hard-coded again -> the configurable-cap tests"
 
 # --- 2. the budget never reaches the request ---------------------------------
@@ -120,8 +120,8 @@ must_go_red "$T" "$CONFIGURABLE" "1: the cap is hard-coded again -> the configur
 # coincidence, and if the suite could not tell, the claim would be untested.
 T="$(suite_tree uncopied)"
 assert_green_baseline "$T" "$CONFIGURABLE" "2: the budget never reaches the request"
-H="$(md5sum "$T/uruquim/web/serve.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/serve.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/serve.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/serve.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -130,7 +130,7 @@ new = "	_ = a.private.limits"
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "the budget never reaches the request" "$T/uruquim/web/serve.odin" "$H"
+assert_mutated "the budget never reaches the request" "$T/druse/web/serve.odin" "$H"
 must_go_red "$T" "$CONFIGURABLE" "2: the budget never reaches the request -> the configurable-cap tests"
 
 # --- 3. the after-dispatch guard deleted -------------------------------------
@@ -139,8 +139,8 @@ must_go_red "$T" "$CONFIGURABLE" "2: the budget never reaches the request -> the
 NAMES="test_wp36_public.wp36_limits_after_the_first_dispatch_rejects_the_application"
 T="$(suite_tree unguarded)"
 assert_green_baseline "$T" "$NAMES" "3: the after-dispatch guard deleted"
-H="$(md5sum "$T/uruquim/web/limits.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/limits.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/limits.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/limits.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -154,7 +154,7 @@ new = """	_ = app_has_dispatched(a)"""
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "the after-dispatch guard deleted" "$T/uruquim/web/limits.odin" "$H"
+assert_mutated "the after-dispatch guard deleted" "$T/druse/web/limits.odin" "$H"
 must_go_red "$T" "$NAMES" "3: the after-dispatch guard deleted -> the rejection test"
 
 # --- 4. a constructor forgets the default ------------------------------------
@@ -177,8 +177,8 @@ must_go_red "$T" "$NAMES" "3: the after-dispatch guard deleted -> the rejection 
 NAMES="test_wp36_public.wp36_bare_gets_the_same_budget"
 T="$(suite_tree zero_default)"
 assert_green_baseline "$T" "$NAMES" "4: a constructor forgets the default"
-H="$(md5sum "$T/uruquim/web/app.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/app.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/app.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/app.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -187,14 +187,14 @@ new = "	return App{}"
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "a constructor forgets the default" "$T/uruquim/web/app.odin" "$H"
+assert_mutated "a constructor forgets the default" "$T/druse/web/app.odin" "$H"
 if ! run_selected "$T" "$NAMES" >/dev/null 2>&1; then
   fail "control '4a: the zero-budget safety net' went RED. A constructor that forgets the default must still SERVE, on the framework's defaults — not answer 413 to every body."
 fi
 echo "CONTROL 4a: a constructor forgets the default -> still GREEN, the safety net holds [positive control]"
 
-H="$(md5sum "$T/uruquim/web/extract.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/extract.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/extract.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/extract.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -203,7 +203,7 @@ new = "\tcap := ctx.private.limits.max_body"
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "the safety net removed too" "$T/uruquim/web/extract.odin" "$H"
+assert_mutated "the safety net removed too" "$T/druse/web/extract.odin" "$H"
 must_go_red "$T" "$NAMES" "4b: a forgetful constructor AND no safety net -> the bare() budget test"
 
 echo "PASS: all five WP36 mutation controls behaved as required"

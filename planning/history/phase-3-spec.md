@@ -27,7 +27,7 @@ nobody treats these as blockers a second time.
 
 ## The decision
 
-**Uruquim normalises nothing, and rejects the paths where the absence of
+**Druse normalises nothing, and rejects the paths where the absence of
 normalisation would be dangerous.** A path carrying a dot segment, an interior
 empty segment, or a percent-encoded slash is answered `400` and never reaches
 route matching. Everything else passes through byte-exact and undecoded, exactly
@@ -43,14 +43,14 @@ you do not control.
 The two rejected alternatives, and the reason each loses:
 
 * **Normalise (RFC 3986: decode, resolve dot segments, collapse slashes).**
-  Most ergonomic, most dangerous. It maximises the number of ways Uruquim's view
+  Most ergonomic, most dangerous. It maximises the number of ways Druse's view
   of a path can differ from the proxy's, and every such difference is a
   potential authorization bypass — the request the proxy authorised is not the
   request the framework routed.
 * **Ratify the absence and stay silent.** Safe in the sense that nothing is
   transformed: `/users/../admin` matches no pattern and becomes a `404`. But the
   disagreement with a normalising proxy stays **invisible**. The proxy sees
-  `/admin`, applies `/admin`'s policy, forwards `/users/../admin`, and Uruquim
+  `/admin`, applies `/admin`'s policy, forwards `/users/../admin`, and Druse
   answers 404 — or, with a differently-shaped route table, answers something
   else entirely. A 404 is not a diagnosis.
 

@@ -2,7 +2,7 @@ package main
 
 import "core:fmt"
 import "core:time"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 run_arm :: proc(port, lanes, blockers: int) -> (live: bool, health, baseline: time.Duration) {
 	s: lab.Server

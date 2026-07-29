@@ -11,7 +11,7 @@
 // never `core:testing`; the machinery ships in application binaries exactly like
 // `web/`, so it must not drag the test runner in.
 package web_testing
-// uruquim:file test-machinery
+// druse:file test-machinery
 
 // Request is the neutral, in-memory inbound request the facade hands to the
 // transport. `method` is the on-the-wire method TOKEN (e.g. "GET"); `path` is
@@ -20,7 +20,7 @@ package web_testing
 // the facade converts them into a framework `Request`/`Context` immediately.
 //
 // There is deliberately no `web.Method` and no `web.Request` in this struct:
-// naming either would require importing `uruquim:web` and would close the cycle.
+// naming either would require importing `druse:web` and would close the cycle.
 Request :: struct {
 	method: string,
 	path:   string,

@@ -12,7 +12,7 @@ package test_wp91_commit_security
 import "core:os"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 FIXTURE :: "tests/wp91-commit-security/fixture"
 

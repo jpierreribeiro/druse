@@ -9,7 +9,7 @@ package test_c2_response_surface
 
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(private = "file")
 has_header :: proc(res: web.Recorded_Response, line: string) -> bool {

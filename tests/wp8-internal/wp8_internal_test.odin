@@ -22,7 +22,7 @@ import "core:strings"
 import "core:testing"
 
 @(private = "file")
-WP8_LOG_MARKER :: "uruquim:"
+WP8_LOG_MARKER :: "druse:"
 
 @(private = "file")
 Wp8_Log :: struct {

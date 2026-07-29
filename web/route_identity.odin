@@ -28,7 +28,7 @@
 // and `ctx.request.path` is precisely the wrong substitute. The framework
 // already holds the value, so the cost is one procedure and no storage.
 package web
-// uruquim:file application
+// druse:file application
 
 // route returns the REGISTERED PATTERN this request matched — `"/users/:id"`,
 // never `"/users/42"` — or `""` when no route matched.

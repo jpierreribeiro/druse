@@ -8,7 +8,7 @@
 package test_wp87_stream_lifecycle
 
 import "core:testing"
-import stream "uruquim:web/internal/stream"
+import stream "druse:web/internal/stream"
 
 // A tiny forced capacity so refusal and reuse are exercised, not simulated.
 tiny :: proc() -> stream.Capacity {

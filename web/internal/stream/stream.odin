@@ -20,7 +20,7 @@
 //
 // Still not imported by `web` (that wiring is WP90); a buffered-only binary
 // links none of this, and no name here is a ledger candidate (WP101).
-package uruquim_internal_stream
+package druse_internal_stream
 
 import "core:mem"
 import "core:sync"

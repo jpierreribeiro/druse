@@ -1,6 +1,6 @@
 // WP31b public-surface contract — the path policy as a client meets it.
 //
-// The decision is `planning/phase-3-spec.md` §1: Uruquim normalises nothing,
+// The decision is `planning/phase-3-spec.md` §1: Druse normalises nothing,
 // and rejects the paths where the absence of normalisation would be dangerous.
 // This suite pins both halves — what is refused, and the much larger set that
 // is NOT, because a rejection rule that quietly grew would break applications
@@ -8,7 +8,7 @@
 package test_wp31_public
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(private = "file")
 fixture :: proc(a: ^web.App) {

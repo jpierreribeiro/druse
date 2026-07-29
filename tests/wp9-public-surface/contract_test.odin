@@ -6,11 +6,11 @@
 //
 // The harness (`tests/support/transport_conformance`) is a TEST package: it
 // imports `core:testing` and lives under `tests/`, so it cannot be reached from
-// `uruquim:web` at all. `Transport_Factory` is defined there, not in `web`.
+// `druse:web` at all. `Transport_Factory` is defined there, not in `web`.
 package wp9_public_surface
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // The ratified 34 symbols are still the whole surface an application can name.
 // WP9 adds nothing to it: every signature below is exactly what WP1-WP8 froze.

@@ -30,7 +30,7 @@ built on a streaming server: bytes arrive, the framework spools them to a
 temporary file, and the handler is handed a path. Every one of the seven
 questions follows from that spool.
 
-**Uruquim has no spool, and cannot acquire one without changing decisions this
+**Druse has no spool, and cannot acquire one without changing decisions this
 phase is forbidden to touch.** The request body arrives *already whole*:
 
 - The adapter reads the body into memory subject to `Limits.max_body`
@@ -91,7 +91,7 @@ learned where bytes came from would not.
 
 ## 4. The honest limitation, and where it gets written down
 
-**Uruquim cannot accept an upload larger than `max_body`.** The default is
+**Druse cannot accept an upload larger than `max_body`.** The default is
 4 MiB; raising it raises the memory one request can cost, because the body is
 held whole. There is no configuration that makes a 2 GB upload work, and there
 will not be one before streaming exists.

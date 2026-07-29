@@ -1,6 +1,6 @@
 package transport
 
-import ingest "uruquim:web/internal/ingest"
+import ingest "druse:web/internal/ingest"
 
 // Phase 7.5-C2 — the transport boundary's upload accessors.
 //

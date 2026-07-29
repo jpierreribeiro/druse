@@ -18,7 +18,7 @@ package web
 import "core:mem"
 import "core:slice"
 import "core:testing"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // ---------------------------------------------------------------------------
 // Harness

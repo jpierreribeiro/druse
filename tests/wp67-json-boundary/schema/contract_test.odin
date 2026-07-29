@@ -8,7 +8,7 @@ package wp67_json_schema
 
 import json "core:encoding/json"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 Create_User :: struct {
 	name: string `json:"name,required"`,

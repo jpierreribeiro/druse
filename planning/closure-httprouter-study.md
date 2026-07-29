@@ -9,7 +9,7 @@ exists" exercise of the same spirit as C-01 and C-02.
 
 ## 1. The value ranking, and why the corpus was the thing to take
 
-`httprouter` is **reference, not dependency**. Uruquim already has a private,
+`httprouter` is **reference, not dependency**. Druse already has a private,
 segment-oriented radix router: the WP29 benchmark fell from ~883 µs to ~1.5 µs
 at 5,000 routes and is near-constant from 5 to 5,000. So the question was never
 "should we adopt it" but "what is worth learning from it", and the honest
@@ -28,7 +28,7 @@ ranking is:
 ## 2. Step 1 — the corpus, and why it is a NEGATIVE corpus
 
 The obvious use of another router's tests is to check that you agree with it.
-That would be exactly wrong here. Uruquim differs from httprouter in three
+That would be exactly wrong here. Druse differs from httprouter in three
 places **deliberately**, each with a security or predictability argument, so the
 corpus runs to prove that **every difference is intentional and pinned**. A
 regression *toward* httprouter's behaviour must fail the build.
@@ -45,23 +45,23 @@ across a separator; Unicode routes resolving by bytes.
 **The three deliberate differences, now pinned:**
 
 1. **Precedence with backtracking.** httprouter *forbids* a static and a
-   parameter route at the same position. Uruquim accepts both — static wins,
+   parameter route at the same position. Druse accepts both — static wins,
    **with controlled backtracking**: `/users/me/settings` and
    `/users/:id/profile` coexist, and `/users/me/profile` must abandon the static
    branch and succeed on the parameter branch. **This is the test a literal port
    of httprouter's tree would fail**, which is exactly the alarm step 2 needs.
 2. **No automatic path correction.** httprouter answers 301 for a missing or
    extra trailing slash, and offers case-insensitive lookup and `CleanPath`.
-   Uruquim answers 404/400 and never rewrites: `/users` ≠ `/users/`, `/Users` ≠
+   Druse answers 404/400 and never rewrites: `/users` ≠ `/users/`, `/Users` ≠
    `/users`, and `..`, `.`, `//`, `%2e%2e`, `%2F` are refused *before* routing.
    The argument is not taste — **a normaliser that gets it wrong produces a path
    the check already approved**, while a rejection cannot.
-3. **No catch-all.** httprouter has `*filepath`. Uruquim's parameter is one
+3. **No catch-all.** httprouter has `*filepath`. Druse's parameter is one
    segment; multi-segment serving is a `mount`, which owns its prefix entirely
    and applies the static-file security rules. `/files/:name` must 404 for
    `/files/a/b/c` rather than capture it.
 
-**Where Uruquim does more, recorded so the comparison is honest in both
+**Where Druse does more, recorded so the comparison is honest in both
 directions:** automatic HEAD and OPTIONS, 405 with a frozen-order `Allow`,
 alloc-free per-request params, and fail-closed conflict diagnostics (a poisoned
 App, not a panic) for `/users/:id` beside `/users/:uid`.
@@ -71,7 +71,7 @@ App, not a panic) for `/users/:id` beside `/users/:uid`.
 Two of this file's assertions were **wrong when first written**, and both were
 wrong in the same direction: they had imported the *other* system's
 expectations. The `Allow` case asserted an alphabetical list including `HEAD`
-and `OPTIONS`; Uruquim's frozen order is `GET, POST, PUT, PATCH, DELETE`
+and `OPTIONS`; Druse's frozen order is `GET, POST, PUT, PATCH, DELETE`
 filtered to the registered methods. The conflict case used
 `/users/:id` + `/users/:uid/posts`, which are different positions and correctly
 *not* a conflict.
@@ -79,19 +79,19 @@ filtered to the registered methods. The conflict case used
 That is the characteristic risk of a comparative study, and it is worth stating
 rather than quietly fixing: **reading another system's tests makes its
 assumptions feel like defaults.** The corpus is only safe as a negative corpus
-because each case is written against Uruquim's own documented rule, not against
+because each case is written against Druse's own documented rule, not against
 a memory of how the other router behaves. The note stays in the test file.
 
 ---
 
 ## 3. Step 2 — the `radix_compact` experiment, deferred with a criterion
 
-The one cost Uruquim's router has never measured is **registration time and
+The one cost Druse's router has never measured is **registration time and
 memory**: a node plus a map per distinct segment. An httprouter-inspired
 compressed-radix competitor (`radix_compact` beside the current `radix_idx`)
 would measure it — registration per route, memory at 50 / 500 / 5,000 routes,
 node and map counts, teardown cost, lookup p50/p95, `Allow` build, and
-deep/shared-prefix behaviour — in Uruquim's own harness, under the same gate.
+deep/shared-prefix behaviour — in Druse's own harness, under the same gate.
 
 **Deferred, not dropped, and the criterion is explicit:** it is kept **only on
 material gain**, and it must pass §2's precedence-with-backtracking test

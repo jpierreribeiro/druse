@@ -33,7 +33,7 @@
 // reading them twice through two different decoders is the ambiguity ADR-012
 // closed.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:strings"
 

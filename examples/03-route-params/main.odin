@@ -1,11 +1,11 @@
-// Uruquim example 03 — path parameters and query strings.
+// Druse example 03 — path parameters and query strings.
 //
 // Everything about reading input from the URL: a `:param` segment, static
 // routes winning over parametric ones, and the three query extractors.
 //
 // Run it from the repository root:
 //
-//	odin run examples/03-route-params -collection:uruquim=.
+//	odin run examples/03-route-params -collection:druse=.
 //
 // Try it:
 //
@@ -18,7 +18,7 @@
 //	curl -i http://localhost:8080/users/abc               -> 400
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 Profile :: struct {
 	id:   int    `json:"id"`,

@@ -6,7 +6,7 @@
 // does not implement a second JSON grammar. Syntax and string decoding remain
 // owned by core:encoding/json.
 package web
-// uruquim:file application
+// druse:file application
 
 import json "core:encoding/json"
 import "core:mem"
@@ -48,7 +48,7 @@ import "core:strings"
 // dedicated-accept rollout discipline. Applications do not configure this:
 // the efficient path is the native default and the public API is unchanged.
 @(private)
-JSON_DIRECT_PREFLIGHT_PARSE :: #config(URUQUIM_JSON_DIRECT_PREFLIGHT_PARSE, true)
+JSON_DIRECT_PREFLIGHT_PARSE :: #config(DRUSE_JSON_DIRECT_PREFLIGHT_PARSE, true)
 
 // Experimental fused decode: after the strict parser and shape checker have
 // accepted a tree made only of the ordinary DTO subset (structs, slices,
@@ -61,7 +61,7 @@ JSON_DIRECT_PREFLIGHT_PARSE :: #config(URUQUIM_JSON_DIRECT_PREFLIGHT_PARSE, true
 // adoption floor. Keep a private rollback for one release while the stdlib
 // fallback remains the compatibility authority for the wider type surface.
 @(private)
-JSON_FUSED_TREE_DECODE :: #config(URUQUIM_JSON_FUSED_TREE_DECODE, true)
+JSON_FUSED_TREE_DECODE :: #config(DRUSE_JSON_FUSED_TREE_DECODE, true)
 
 // The fused decoder and its preceding shape walk used to resolve the same
 // struct key independently: validation scanned tags twice (known + unknown)
@@ -74,7 +74,7 @@ JSON_FUSED_TREE_DECODE :: #config(URUQUIM_JSON_FUSED_TREE_DECODE, true)
 // Keep the private rollback alongside JSON_FUSED_TREE_DECODE until the A/B
 // campaign has decided whether the integrated form clears the adoption floor.
 @(private)
-JSON_FUSED_TARGET_DESCRIPTORS :: #config(URUQUIM_JSON_FUSED_TARGET_DESCRIPTORS, true)
+JSON_FUSED_TARGET_DESCRIPTORS :: #config(DRUSE_JSON_FUSED_TARGET_DESCRIPTORS, true)
 
 @(private)
 JSON_FIELD_PATH_MAX :: ERROR_NAME_ESCAPED_MAX

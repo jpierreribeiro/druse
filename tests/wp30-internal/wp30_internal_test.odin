@@ -13,7 +13,7 @@
 // public half of the contract lives in `tests/wp30-public-surface/`, where an
 // application can only see the 500.
 //
-// The capture logger FORWARDS everything that is not a `uruquim:` Error line,
+// The capture logger FORWARDS everything that is not a `druse:` Error line,
 // because `testing.expect` reports through `context.logger` and a
 // swallow-everything logger makes a test unable to fail — the defect WP17's
 // mutation control 6 caught, and the reason this idiom is copied rather than
@@ -23,7 +23,7 @@ package web
 
 import "base:runtime"
 import "core:testing"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // ---------------------------------------------------------------------------
 // Harness (the WP18 shape)
@@ -62,7 +62,7 @@ wp30_capture_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	sink := (^Wp30_Sink)(data)
-	if level == .Error && wp30_contains(text, "uruquim:") {
+	if level == .Error && wp30_contains(text, "druse:") {
 		sink.log_lines += 1
 		for i in 0 ..< len(text) {
 			if sink.log_n < len(sink.log_buf) {

@@ -73,7 +73,7 @@ silêncio. O registro técnico é o `planning/phase-5-spec.md` §1.
 ## Decisões do dono (2026-07-21) — programa das Fases 6 a 8
 
 O dono pediu que o projeto deixe de apenas enumerar limitações e prepare as
-implementações que tornam o Uruquim um framework completo para aplicações
+implementações que tornam o Druse um framework completo para aplicações
 reais, preservando a filosofia do Odin e *The Joy of Programming*. O registro
 técnico normativo da próxima fase é `phase-6-spec.md`.
 

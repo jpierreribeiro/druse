@@ -8,12 +8,12 @@
 // The gate resolves each `fragment:` marker to a `fragment: <name>` comment in
 // this directory, so a documented fragment with no fixture fails the build.
 //
-// This is an ordinary external consumer of `uruquim:web`: it uses only the
+// This is an ordinary external consumer of `druse:web`: it uses only the
 // public surface, exactly like an application.
 package wp10_doc_fixtures
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 User :: struct {
 	id:   int    `json:"id"`,

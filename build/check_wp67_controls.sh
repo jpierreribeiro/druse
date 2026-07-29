@@ -6,6 +6,6 @@
 # stale expectations from the pre-implementation commit.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "WP67 control: RED corpus consumed; delegating to the WP68 state transition"
-exec bash "$URUQUIM_ROOT/build/check_wp68_controls.sh"
+exec bash "$DRUSE_ROOT/build/check_wp68_controls.sh"

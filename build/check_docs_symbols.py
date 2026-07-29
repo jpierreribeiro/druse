@@ -4,23 +4,23 @@
 A bare-name search is not enough: `pg.text` once passed because web/template
 defines an unrelated `text`. Each alias therefore resolves to its own directory.
 
-Most aliases live in the EXTENSION REPOSITORY (`uruquim-crystals`), which is a
+Most aliases live in the EXTENSION REPOSITORY (`druse-crystals`), which is a
 separate checkout. When it is not beside this one, `defs()` reads no files and
 every crystal symbol looks unknown -- 232 findings that say nothing about the
 documentation. So the corpus is located explicitly and its absence is reported
 as UNCHECKED rather than as failure, and never silently: a check that goes
 vacuous without saying so is worse than one that fails.
 
-Locate the extension repository with $URUQUIM_CRYSTALS, else a sibling
-directory. Set $URUQUIM_CRYSTALS_REQUIRED=1 where the checkout is guaranteed
+Locate the extension repository with $DRUSE_CRYSTALS, else a sibling
+directory. Set $DRUSE_CRYSTALS_REQUIRED=1 where the checkout is guaranteed
 (CI) so a missing corpus fails instead of skipping.
 
 Skipped: file names, text inside string literals (SQL query names look like
 symbols), and deliberate statements that a symbol does NOT exist.
 """
 import re,glob,os,sys
-CRY=os.environ.get('URUQUIM_CRYSTALS') or os.path.abspath('../uruquim-crystals')
-REQUIRED=os.environ.get('URUQUIM_CRYSTALS_REQUIRED')=='1'
+CRY=os.environ.get('DRUSE_CRYSTALS') or os.path.abspath('../druse-crystals')
+REQUIRED=os.environ.get('DRUSE_CRYSTALS_REQUIRED')=='1'
 ALIAS={'web':['web'],'pg':[CRY+'/db/postgres'],'session':[CRY+'/auth/session'],
  'api_key':[CRY+'/auth/api_key'],'password':[CRY+'/auth/password'],'csrf':[CRY+'/csrf'],
  'authorization':[CRY+'/authorization'],'config':[CRY+'/config'],'validate':[CRY+'/validate'],
@@ -64,9 +64,9 @@ if DEAD:
     n=sum(len(v) for v in unchecked.values())
     print(f"  UNCHECKED: {len(DEAD)} of {len(ALIAS)} packages are not on disk under {CRY}")
     print(f"  UNCHECKED: {n} symbol reference(s) in the guide were NOT verified: "+", ".join(f"{a}.*" for a in DEAD))
-    print("  UNCHECKED: check out uruquim-crystals beside this repository, or set $URUQUIM_CRYSTALS, to verify them")
+    print("  UNCHECKED: check out druse-crystals beside this repository, or set $DRUSE_CRYSTALS, to verify them")
 print("\n".join(bad) if bad else f"  every alias.symbol resolves in its own package ({len(LIVE)} package(s) checked)")
 if DEAD and REQUIRED:
-    print("  FAIL: $URUQUIM_CRYSTALS_REQUIRED=1 and the extension repository is missing")
+    print("  FAIL: $DRUSE_CRYSTALS_REQUIRED=1 and the extension repository is missing")
     sys.exit(1)
 sys.exit(1 if bad else 0)

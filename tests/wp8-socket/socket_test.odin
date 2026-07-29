@@ -21,8 +21,8 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
-import transport "uruquim:web/internal/transport"
+import web "druse:web"
+import transport "druse:web/internal/transport"
 
 // A small set of loopback ports to try, to dodge a busy one.
 @(private = "file")

@@ -5,7 +5,7 @@ import "base:runtime"
 
 import "core:sync"
 
-// THE WAKE INVARIANT (URUQUIM, transport audit T1) — this queue is only
+// THE WAKE INVARIANT (DRUSE, transport audit T1) — this queue is only
 // correct because of a rule that lives entirely outside it.
 //
 // `mpsc_enqueue` claims a slot with `atomic_add(&head)` and stores into it as

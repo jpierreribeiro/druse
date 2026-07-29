@@ -16,7 +16,7 @@
 package test_wp33_public
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // ONE SINK PER TEST, never one shared between two. The pinned runner runs tests
 // on eight threads by default, so a file-scope variable written by two handlers
@@ -62,10 +62,10 @@ wp33_three_parameters_are_captured_in_order :: proc(t: ^testing.T) {
 	captured_repo = ""
 	captured_number = 0
 
-	res := web.test_request(&app, .GET, "/orgs/acme/repos/uruquim/issues/42")
+	res := web.test_request(&app, .GET, "/orgs/acme/repos/druse/issues/42")
 	testing.expect_value(t, res.status, web.Status.No_Content)
 	testing.expect_value(t, captured_org, "acme")
-	testing.expect_value(t, captured_repo, "uruquim")
+	testing.expect_value(t, captured_repo, "druse")
 	testing.expect_value(t, captured_number, 42)
 }
 

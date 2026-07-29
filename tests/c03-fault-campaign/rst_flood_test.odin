@@ -29,7 +29,7 @@
 //
 //	(b) THE ACCEPT RE-ARM IS DELAYED BY 10 ms PER TRANSIENT FAILURE.
 //	    An RST that arrives before `accept` returns produces `ECONNABORTED`.
-//	    Patch 21 tolerates it by re-arming after `URUQUIM_ACCEPT_RETRY_DELAY`
+//	    Patch 21 tolerates it by re-arming after `DRUSE_ACCEPT_RETRY_DELAY`
 //	    (10 ms). Under a sustained flood most accepts can fail this way, so each
 //	    lane spends 10 ms not accepting per failure — an accept rate of roughly
 //	    100/s/lane, and the listen backlog fills behind it.
@@ -50,7 +50,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // The flood's own constants. The harness (Server, start_server, dial,
 // set_linger, stop_server) lives in `harness.odin`, shared with the other

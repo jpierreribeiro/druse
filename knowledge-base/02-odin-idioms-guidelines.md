@@ -1,4 +1,4 @@
-# Uruquim — Odin Idioms and Coding Guidelines
+# Druse — Odin Idioms and Coding Guidelines
 
 ## Status
 

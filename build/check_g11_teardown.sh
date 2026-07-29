@@ -28,17 +28,17 @@
 # and the gate would certify a property it never actually measured.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "G11-FAIL: $*" >&2
   exit 1
 }
 
-test -n "${URUQUIM_COMPILER:-}" ||
-  fail "URUQUIM_COMPILER is not set; run this through build/check.sh"
-test -x "$URUQUIM_COMPILER" || fail "compiler is not executable: $URUQUIM_COMPILER"
-URUQUIM_COMPILER_DIR="$(cd "$(dirname "$URUQUIM_COMPILER")" && pwd)"
+test -n "${DRUSE_COMPILER:-}" ||
+  fail "DRUSE_COMPILER is not set; run this through build/check.sh"
+test -x "$DRUSE_COMPILER" || fail "compiler is not executable: $DRUSE_COMPILER"
+DRUSE_COMPILER_DIR="$(cd "$(dirname "$DRUSE_COMPILER")" && pwd)"
 
 command -v nm >/dev/null 2>&1 ||
   fail "nm not found; the G-11 teardown assertion cannot be measured without it"
@@ -47,42 +47,42 @@ command -v nm >/dev/null 2>&1 ||
 # guardrail names, but the generic instantiations (`delete_dynamic_array` over
 # `Recorded`, `delete_slice` over `Header`) are linked by the same static edge
 # and are equally a shipped cost, so the assertion covers the whole package.
-URUQUIM_G11_PATTERN='web_testing|recorder_destroy'
+DRUSE_G11_PATTERN='web_testing|recorder_destroy'
 
-URUQUIM_G11_TMP="$(mktemp -d -t uruquim-g11-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_G11_TMP"' EXIT
+DRUSE_G11_TMP="$(mktemp -d -t druse-g11-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_G11_TMP"' EXIT
 
 # Each consumer gets its own tree with a real copy of the shipped package, so
 # what is measured is the package as it would actually ship.
-uruquim_g11_build() { # label main-source-file
+druse_g11_build() { # label main-source-file
   # Declared separately on purpose: within a single `local` statement bash does
   # not yet see the variables assigned to its left, so `tree` would expand
   # `$label` as empty and, under `set -u`, abort.
   local label="$1"
   local main_source="$2"
-  local tree="$URUQUIM_G11_TMP/$label"
+  local tree="$DRUSE_G11_TMP/$label"
   mkdir -p "$tree/app" "$tree/vendor"
-  cp -r "$URUQUIM_ROOT/web" "$tree/web"
+  cp -r "$DRUSE_ROOT/web" "$tree/web"
   # WP8: `web` imports web/internal/transport, which imports the vendored
   # backend, so a consumer tree must carry the vendor snapshot too.
-  cp -r "$URUQUIM_ROOT/vendor/odin-http" "$tree/vendor/odin-http"
+  cp -r "$DRUSE_ROOT/vendor/odin-http" "$tree/vendor/odin-http"
   cp "$main_source" "$tree/app/main.odin"
-  ( cd "$tree" && env ODIN_ROOT="$URUQUIM_COMPILER_DIR" \
-      PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
-      "$URUQUIM_COMPILER" build app "-collection:uruquim=$tree" -out:app.bin ) ||
+  ( cd "$tree" && env ODIN_ROOT="$DRUSE_COMPILER_DIR" \
+      PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+      "$DRUSE_COMPILER" build app "-collection:druse=$tree" -out:app.bin ) ||
     fail "the $label consumer did not build"
   printf '%s' "$tree/app.bin"
 }
 
-uruquim_g11_symbols() { # binary
-  nm "$1" 2>/dev/null | grep -cE "$URUQUIM_G11_PATTERN" || true
+druse_g11_symbols() { # binary
+  nm "$1" 2>/dev/null | grep -cE "$DRUSE_G11_PATTERN" || true
 }
 
 # --- NEGATIVE: never calls test_request -------------------------------------
-cat >"$URUQUIM_G11_TMP/never_tests.odin" <<'ODIN'
+cat >"$DRUSE_G11_TMP/never_tests.odin" <<'ODIN'
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	app := web.app()
@@ -91,22 +91,22 @@ main :: proc() {
 }
 ODIN
 
-URUQUIM_G11_NEG="$(uruquim_g11_build never-tests "$URUQUIM_G11_TMP/never_tests.odin")"
-URUQUIM_G11_NEG_COUNT="$(uruquim_g11_symbols "$URUQUIM_G11_NEG")"
-URUQUIM_G11_NEG_SIZE="$(stat -c%s "$URUQUIM_G11_NEG")"
+DRUSE_G11_NEG="$(druse_g11_build never-tests "$DRUSE_G11_TMP/never_tests.odin")"
+DRUSE_G11_NEG_COUNT="$(druse_g11_symbols "$DRUSE_G11_NEG")"
+DRUSE_G11_NEG_SIZE="$(stat -c%s "$DRUSE_G11_NEG")"
 
-if test "$URUQUIM_G11_NEG_COUNT" -ne 0; then
+if test "$DRUSE_G11_NEG_COUNT" -ne 0; then
   echo "--- web/testing symbols linked into an application that never tests ---" >&2
-  nm "$URUQUIM_G11_NEG" | grep -E "$URUQUIM_G11_PATTERN" | sed 's/^[0-9a-f]* //' >&2
-  fail "an application that never calls test_request links $URUQUIM_G11_NEG_COUNT web/testing symbol(s); the teardown must be registered lazily inside test_request so dead-code elimination removes it (planning/public-api-guardrails.md G-11)"
+  nm "$DRUSE_G11_NEG" | grep -E "$DRUSE_G11_PATTERN" | sed 's/^[0-9a-f]* //' >&2
+  fail "an application that never calls test_request links $DRUSE_G11_NEG_COUNT web/testing symbol(s); the teardown must be registered lazily inside test_request so dead-code elimination removes it (planning/public-api-guardrails.md G-11)"
 fi
 
 # --- POSITIVE control: does call test_request -------------------------------
-cat >"$URUQUIM_G11_TMP/does_test.odin" <<'ODIN'
+cat >"$DRUSE_G11_TMP/does_test.odin" <<'ODIN'
 package main
 
 import "core:fmt"
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	app := web.app()
@@ -116,12 +116,12 @@ main :: proc() {
 }
 ODIN
 
-URUQUIM_G11_POS="$(uruquim_g11_build does-test "$URUQUIM_G11_TMP/does_test.odin")"
-URUQUIM_G11_POS_COUNT="$(uruquim_g11_symbols "$URUQUIM_G11_POS")"
-URUQUIM_G11_POS_SIZE="$(stat -c%s "$URUQUIM_G11_POS")"
+DRUSE_G11_POS="$(druse_g11_build does-test "$DRUSE_G11_TMP/does_test.odin")"
+DRUSE_G11_POS_COUNT="$(druse_g11_symbols "$DRUSE_G11_POS")"
+DRUSE_G11_POS_SIZE="$(stat -c%s "$DRUSE_G11_POS")"
 
-if test "$URUQUIM_G11_POS_COUNT" -eq 0; then
-  fail "an application that DOES call test_request links no web/testing symbol either; the pattern /$URUQUIM_G11_PATTERN/ matches nothing, so the negative assertion above proved nothing"
+if test "$DRUSE_G11_POS_COUNT" -eq 0; then
+  fail "an application that DOES call test_request links no web/testing symbol either; the pattern /$DRUSE_G11_PATTERN/ matches nothing, so the negative assertion above proved nothing"
 fi
 
 # --- MUTATION: the gate must catch the regression it exists to prevent -------
@@ -131,13 +131,13 @@ fi
 # and confirm the teardown symbols come back. Without this, a future refactor
 # could make the elimination accidental (or make the negative case unbuildable)
 # and the gate would keep reporting PASS for the wrong reason.
-mkdir -p "$URUQUIM_G11_TMP/mutated" "$URUQUIM_G11_TMP/mutated/vendor"
-cp -r "$URUQUIM_ROOT/web" "$URUQUIM_G11_TMP/mutated/web"
-cp -r "$URUQUIM_ROOT/vendor/odin-http" "$URUQUIM_G11_TMP/mutated/vendor/odin-http"
-mkdir -p "$URUQUIM_G11_TMP/mutated/app"
-cp "$URUQUIM_G11_TMP/never_tests.odin" "$URUQUIM_G11_TMP/mutated/app/main.odin"
+mkdir -p "$DRUSE_G11_TMP/mutated" "$DRUSE_G11_TMP/mutated/vendor"
+cp -r "$DRUSE_ROOT/web" "$DRUSE_G11_TMP/mutated/web"
+cp -r "$DRUSE_ROOT/vendor/odin-http" "$DRUSE_G11_TMP/mutated/vendor/odin-http"
+mkdir -p "$DRUSE_G11_TMP/mutated/app"
+cp "$DRUSE_G11_TMP/never_tests.odin" "$DRUSE_G11_TMP/mutated/app/main.odin"
 
-python3 - "$URUQUIM_G11_TMP/mutated/web/app.odin" <<'PY'
+python3 - "$DRUSE_G11_TMP/mutated/web/app.odin" <<'PY'
 import re
 import sys
 
@@ -173,22 +173,22 @@ open(path, "w").write(
 )
 PY
 
-if ! ( cd "$URUQUIM_G11_TMP/mutated" && env ODIN_ROOT="$URUQUIM_COMPILER_DIR" \
-    PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
-    "$URUQUIM_COMPILER" build app "-collection:uruquim=$URUQUIM_G11_TMP/mutated" \
+if ! ( cd "$DRUSE_G11_TMP/mutated" && env ODIN_ROOT="$DRUSE_COMPILER_DIR" \
+    PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+    "$DRUSE_COMPILER" build app "-collection:druse=$DRUSE_G11_TMP/mutated" \
     -out:app.bin >/dev/null 2>&1 ); then
   fail "the mutated consumer did not build; the mutation check proved nothing"
 fi
 
-URUQUIM_G11_MUT_COUNT="$(uruquim_g11_symbols "$URUQUIM_G11_TMP/mutated/app.bin")"
-if test "$URUQUIM_G11_MUT_COUNT" -eq 0; then
+DRUSE_G11_MUT_COUNT="$(druse_g11_symbols "$DRUSE_G11_TMP/mutated/app.bin")"
+if test "$DRUSE_G11_MUT_COUNT" -eq 0; then
   fail "reinstating the static destroy -> testing.destroy edge did NOT relink the teardown; this gate is not measuring what it claims (planning/public-api-guardrails.md G-11)"
 fi
 
-echo "G-11: application that never tests  -> 0 web/testing symbols, $URUQUIM_G11_NEG_SIZE bytes"
-echo "G-11: application that does test    -> $URUQUIM_G11_POS_COUNT web/testing symbols, $URUQUIM_G11_POS_SIZE bytes"
-echo "G-11: static-edge mutation          -> $URUQUIM_G11_MUT_COUNT web/testing symbols (correctly rejected)"
+echo "G-11: application that never tests  -> 0 web/testing symbols, $DRUSE_G11_NEG_SIZE bytes"
+echo "G-11: application that does test    -> $DRUSE_G11_POS_COUNT web/testing symbols, $DRUSE_G11_POS_SIZE bytes"
+echo "G-11: static-edge mutation          -> $DRUSE_G11_MUT_COUNT web/testing symbols (correctly rejected)"
 echo "PASS: the test-support teardown is eliminated from applications that never test (G-11)"
 
-rm -rf "$URUQUIM_G11_TMP"
+rm -rf "$DRUSE_G11_TMP"
 trap - EXIT

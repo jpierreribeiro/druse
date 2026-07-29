@@ -1,5 +1,5 @@
 // WP17 public surface contract — `use` and `next` as an EXTERNAL consumer of
-// `uruquim:web` sees them.
+// `druse:web` sees them.
 //
 // Everything here is expressed with the ratified surface plus the two WP17
 // symbols, driven through `web.test_request`. The security-critical test is
@@ -17,10 +17,10 @@ package test_wp17_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // Tests that DELIBERATELY trigger a framework diagnostic (the ADR-019 poison
-// report, the driver 500) must swallow the expected `uruquim:` Error line:
+// report, the driver 500) must swallow the expected `druse:` Error line:
 // the pinned test runner records Error-level log output as a test failure
 // (the WP6/WP8 idiom). Everything else is forwarded to the runner's logger.
 Quiet :: struct {
@@ -35,7 +35,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

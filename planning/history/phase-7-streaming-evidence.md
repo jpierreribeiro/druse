@@ -77,7 +77,7 @@ only when the body is Ready, receiving an explicitly owned spool.
 **Controls, outcomes as pre-registered in `phase-7-spec.md` §4.2:** quota
 breach mid-body → typed result, file deleted; disconnect mid-body → typed
 result, file deleted, Handler never scheduled; files `0600` under generated
-`uruquim-spool-` names; success path verified byte-exact and cleaned.
+`druse-spool-` names; success path verified byte-exact and cleaned.
 
 ## 3. OQ-32, answered
 

@@ -1,10 +1,10 @@
-// Uruquim example 08 — the table stakes: static files, CORS and uploads.
+// Druse example 08 — the table stakes: static files, CORS and uploads.
 //
 // The three things a real application needs in its first week, and the three
 // Phase 5 moved into the core (ADR-034). Build and run it from the repository
 // root:
 //
-//	odin run examples/08-table-stakes -collection:uruquim=.
+//	odin run examples/08-table-stakes -collection:druse=.
 //
 // Then:
 //
@@ -15,7 +15,7 @@
 // ten seconds by default.
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	app := web.app()

@@ -1,7 +1,7 @@
 # Numeric contract (IEEE 754-2019)
 
 **Status: PROPOSED, 2026-07-23.** A normative numeric contract for the parts of
-Uruquim that decode and serialize numbers — the JSON boundary today, PostgreSQL
+Druse that decode and serialize numbers — the JSON boundary today, PostgreSQL
 decoding in the data Crystals later. Informed by IEEE 754-2019 (floating-point
 formats, operations, exceptions) and RFC 8259 §6 (JSON numbers exclude `NaN` and
 `Infinity`). This is **behaviour, tests and documentation**; it adds **no public
@@ -65,7 +65,7 @@ float answers 500 and never writes `NaN`/`Inf` to the wire.
 
 ## Deviations (documented, per the project's honesty rule)
 
-- Uruquim does **not** implement IEEE 754 arithmetic or exception flags — it is
+- Druse does **not** implement IEEE 754 arithmetic or exception flags — it is
   not a numerics library. It adopts only the **boundary** obligations: what may
   cross the JSON/DB wire, and what a narrowing conversion must refuse. The rest
   of 754 is `NAO_APLICAVEL`.

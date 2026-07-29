@@ -253,7 +253,7 @@ control does not freeze.**
   arrival time, so this claim is deliberately NOT about both transports — the
   first Phase-4 claim that is not, and it says so rather than implying parity it
   does not have.
-* **Implemented:** `vendor/odin-http/server.odin` (URUQUIM PATCH 6 — a periodic
+* **Implemented:** `vendor/odin-http/server.odin` (DRUSE PATCH 6 — a periodic
   per-thread sweep beside the existing date tick), `web/limits.odin`,
   `web/serve.odin` (boot derivation), `web/internal/transport/` (the neutral
   `i64` and its conversion).
@@ -280,7 +280,7 @@ control does not freeze.**
   WP47.**
 * **Scope:** the socket transport, per serving thread. `test_request` has no
   connections, so this claim is not about both transports and says so.
-* **Implemented:** `vendor/odin-http/server.odin` (URUQUIM PATCH 8 — the accept
+* **Implemented:** `vendor/odin-http/server.odin` (DRUSE PATCH 8 — the accept
   path and a per-thread refusal counter), `web/limits.odin` (the two fields and
   their boot validation), `web/serve.odin`, `web/internal/transport/`.
 * **Positive test:**
@@ -432,7 +432,7 @@ request ID all allocate zero.
 | response body size | the application | unbounded — you allocate it |
 | a handler's own allocations | the application | unbounded |
 
-**Therefore:** Uruquim bounds **its own per-request working memory**. It does
+**Therefore:** Druse bounds **its own per-request working memory**. It does
 not bound the server. Any sentence that says "bounded" without naming which
 perimeter is a sentence this ledger exists to prevent.
 

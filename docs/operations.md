@@ -1,4 +1,4 @@
-# Operating Uruquim
+# Operating Druse
 
 **Who this is for:** whoever has to deploy this and be woken up by it.
 
@@ -13,12 +13,12 @@ deployment guide that only lists features is a guide that gets someone paged.
 **Behind a reverse proxy, under a supervisor.** Both halves are load-bearing.
 
 ```
-    internet → reverse proxy (TLS) → Uruquim (HTTP) → your handlers
+    internet → reverse proxy (TLS) → Druse (HTTP) → your handlers
                                         ↑
                                    supervisor
 ```
 
-**Why a proxy.** Uruquim does not terminate TLS and will not: in-process TLS
+**Why a proxy.** Druse does not terminate TLS and will not: in-process TLS
 would import an enormous attack surface into a framework whose value is a small,
 frozen, gate-enforced one. The proxy holds the certificate, and it is also the
 thing that should assert HSTS — a framework behind it asserting HSTS on a
@@ -54,7 +54,7 @@ there will not be. **This is also how Gin is deployed in practice** — the
 difference is that this document writes the boundary down instead of leaving it
 folklore.
 
-**The canonical unit is `ops/deploy/uruquim.service`** — copy it, edit three
+**The canonical unit is `ops/deploy/druse.service`** — copy it, edit three
 values, `systemctl enable --now`. It encodes the whole mandatory topology in one
 place: `Restart=on-failure` (the recovery), `TimeoutStopSec` (the shutdown outer
 bound, kept longer than `max_drain_time`), `MemoryMax` (the C-04 cgroup bound),
@@ -82,7 +82,7 @@ could write from a signal handler. So let systemd capture the core:
 
 ```
 apt install systemd-coredump      # or your distro's equivalent
-coredumpctl gdb uruquim           # opens the last crash; `bt` shows the stack
+coredumpctl gdb druse           # opens the last crash; `bt` shows the stack
 ```
 
 The faulting handler is on the stack — the request that killed the process,
@@ -189,7 +189,7 @@ lock, atomics or a thread-safe service; immutable configuration does not.
 | total process memory | the OS — set a cgroup limit |
 | middleware chain **depth** | you; ~100k frames, and exceeding it is a **segfault, not a diagnostic** |
 
-**Uruquim bounds its own per-request working memory. It does not bound the
+**Druse bounds its own per-request working memory. It does not bound the
 server.** Any sentence that says "bounded" without naming which perimeter is a
 sentence this project's gate exists to prevent.
 
@@ -426,10 +426,10 @@ carries the header, it does not replay events.
 **Large uploads.** The buffered path (`web.body`, `form_file`, up to
 `max_body`) is unchanged and canonical. A bounded spool substrate for bodies
 larger than memory exists internally (fragmentation-correct multipart, generated
-`uruquim-spool-` files at `0600`, per-upload/process quotas, exactly-once
+`druse-spool-` files at `0600`, per-upload/process quotas, exactly-once
 cleanup) but has **no public upload API yet** — see §10. When it ships, temp
 files are deleted on every non-persisted path; the operator's only concern is
-crash remnants, which carry the `uruquim-spool-` prefix.
+crash remnants, which carry the `druse-spool-` prefix.
 
 **After first-byte commit**, framework 4xx/5xx responders cannot append a second
 envelope, and the adapter that carries this must be replaceable: every streaming

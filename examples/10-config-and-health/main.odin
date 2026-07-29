@@ -1,8 +1,8 @@
-// Uruquim example 10 — Config from the environment, health and readiness.
+// Druse example 10 — Config from the environment, health and readiness.
 //
 // A twelve-factor service reads its configuration from the ENVIRONMENT, not
 // from code, and exposes two distinct operational signals: liveness (is the
-// process up?) and readiness (should traffic be routed here?). Uruquim's core
+// process up?) and readiness (should traffic be routed here?). Druse's core
 // does neither for you — configuration is your `main`'s job, and the two probes
 // are ordinary handlers — but it gives you the pieces: `web.limits` takes the
 // values you loaded, and `web.is_draining` tells a readiness handler when a
@@ -10,7 +10,7 @@
 //
 // Build and run it from the repository root:
 //
-//	PORT=9000 MAX_HANDLERS=16 odin run examples/10-config-and-health -collection:uruquim=.
+//	PORT=9000 MAX_HANDLERS=16 odin run examples/10-config-and-health -collection:druse=.
 //
 // Then:
 //
@@ -22,7 +22,7 @@ import "base:runtime"
 import "core:os"
 import "core:strconv"
 import "core:sys/posix"
-import web "uruquim:web"
+import web "druse:web"
 
 app: web.App
 
@@ -51,7 +51,7 @@ main :: proc() {
 	defer web.destroy(&app)
 
 	// Configuration from the environment, with the framework's own defaults as
-	// the fallback. Nothing here is Uruquim-specific — it is ordinary code that
+	// the fallback. Nothing here is Druse-specific — it is ordinary code that
 	// hands resolved integers to `web.limits`.
 	budget := web.DEFAULT_LIMITS
 	budget.max_body        = env_int("MAX_BODY", budget.max_body)

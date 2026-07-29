@@ -21,7 +21,7 @@ ADR-028 (ACCEPTED 2026-07-20) decided request-scoped state **does not exist, and
 there will not be one**. The reasoning (C-6): Go's `context.WithValue` and Rust's
 `http::Extensions` exist for **type-erased, dynamically-keyed** state that crosses
 **library boundaries** — a need that arises when independent libraries must attach
-values to a request they do not own. Uruquim is a single, typed program with no
+values to a request they do not own. Druse is a single, typed program with no
 such boundary, so the dynamic-keying machinery would be complexity without a need,
 and `web.state` (one app-scoped typed value) plus "pass the value down or
 recompute it" was judged sufficient. The honest consequence was recorded: the

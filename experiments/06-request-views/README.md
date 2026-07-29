@@ -13,7 +13,7 @@ independent copy that survives the reuse.
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..
+odin run . -collection:druse=../..
 odin check .
 ```
 

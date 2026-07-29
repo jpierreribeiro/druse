@@ -17,7 +17,7 @@ package transport
 import "core:mem"
 // WP90b — the detached-stream capacity record crosses the boundary so tests
 // and (later) the core can bound the registry. One-way: stream imports nothing.
-import stream "uruquim:web/internal/stream"
+import stream "druse:web/internal/stream"
 
 // Header is a neutral name/value pair. Both are views over storage owned by the
 // caller for the duration of one exchange.

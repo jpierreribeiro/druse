@@ -53,7 +53,7 @@ wp22_capture_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Wp22_Capture)(data)
-	if strings.has_prefix(text, "uruquim: ") {
+	if strings.has_prefix(text, "druse: ") {
 		if level == .Info && record.count < WP22_LINES {
 			n := copy(record.lines[record.count][:], text)
 			record.lengths[record.count] = n
@@ -157,7 +157,7 @@ wp22_truncation_is_announced_in_the_line :: proc(t: ^testing.T) {
 		strings.has_suffix(line, " 200"),
 		"truncation must not swallow the status field",
 	)
-	testing.expect(t, strings.has_prefix(line, "uruquim: GET "), "the prefix survives truncation")
+	testing.expect(t, strings.has_prefix(line, "druse: GET "), "the prefix survives truncation")
 }
 
 @(test)
@@ -176,7 +176,7 @@ wp22_a_pattern_that_fits_is_not_marked :: proc(t: ^testing.T) {
 	_ = test_request(&a, .GET, "/inventory/AB-1234")
 
 	testing.expect_value(t, cap.count, 1)
-	testing.expect_value(t, wp22_captured(&cap, 0), "uruquim: GET /inventory/:sku 200")
+	testing.expect_value(t, wp22_captured(&cap, 0), "druse: GET /inventory/:sku 200")
 	testing.expect(
 		t,
 		!strings.contains(wp22_captured(&cap, 0), LOGGER_TRUNCATED),
@@ -216,7 +216,7 @@ wp22_control_bytes_are_escaped_in_hex :: proc(t: ^testing.T) {
 	_ = test_request(&a, .GET, "/tab\there")
 
 	testing.expect_value(t, cap.count, 1)
-	testing.expect_value(t, wp22_captured(&cap, 0), "uruquim: GET /tab\\x09here 200")
+	testing.expect_value(t, wp22_captured(&cap, 0), "druse: GET /tab\\x09here 200")
 }
 
 @(test)
@@ -248,7 +248,7 @@ wp22_truncation_never_splits_an_escape :: proc(t: ^testing.T) {
 
 	// Every backslash must begin a complete `\r` unit: a dangling trailing
 	// backslash is exactly the half-written escape this test exists to exclude.
-	body := line[len("uruquim: GET "):]
+	body := line[len("druse: GET "):]
 	cut := strings.index(body, LOGGER_TRUNCATED)
 	testing.expect(t, cut > 0, "this pattern must truncate")
 	// Every pattern begins with `/` — that one byte is the leading unit, and

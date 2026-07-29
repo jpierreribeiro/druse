@@ -1,4 +1,4 @@
-// Uruquim example 06 — the canonical authentication pattern, and what it costs.
+// Druse example 06 — the canonical authentication pattern, and what it costs.
 //
 // `require_auth` and `current_user` below are APPLICATION CODE. They are not
 // framework symbols and they are not going to become framework symbols: the
@@ -33,7 +33,7 @@
 //
 // Run it from the repository root:
 //
-//	odin run examples/06-authentication -collection:uruquim=.
+//	odin run examples/06-authentication -collection:druse=.
 //
 // Try it:
 //
@@ -43,7 +43,7 @@
 //	curl -i -H "Authorization: bearer  ada-token" .../me      -> 401 (two spaces)
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 // The application's OWN user type. The framework has no idea this exists, which
 // is exactly right.

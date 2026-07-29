@@ -4,28 +4,28 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-ODIN="${URUQUIM_ODIN_BIN:-}"
+ODIN="${DRUSE_ODIN_BIN:-}"
 if test -z "$ODIN" && command -v odin >/dev/null 2>&1; then ODIN="$(command -v odin)"; fi
-if test -z "$ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then ODIN=/tmp/uruquim-odin-toolchain/odin; fi
-if test -z "$ODIN"; then echo "EXP12 -> BLOCKED: no Odin toolchain (set URUQUIM_ODIN_BIN)." >&2; exit 2; fi
+if test -z "$ODIN" && test -x /tmp/druse-toolchain/odin; then ODIN=/tmp/druse-toolchain/odin; fi
+if test -z "$ODIN"; then echo "EXP12 -> BLOCKED: no Odin toolchain (set DRUSE_ODIN_BIN)." >&2; exit 2; fi
 
 CORES="$(nproc 2>/dev/null || echo 4)"
 REQUESTS=400
 CLIENTS=16
 
-TMP="$(mktemp -d -t uruquim-exp12-XXXXXXXX)"
+TMP="$(mktemp -d -t druse-exp12-XXXXXXXX)"
 trap 'rm -rf "$TMP"; pkill -f "exp12-arm" 2>/dev/null || true' EXIT
 
 # One arm = one copy of the tree with thread_count patched.
 build_arm() { # name threads port
   local name="$1" threads="$2"
   local t="$TMP/$name"
-  mkdir -p "$t/uruquim"
-  cp -r "$ROOT/web" "$ROOT/vendor" "$t/uruquim/"
+  mkdir -p "$t/druse"
+  cp -r "$ROOT/web" "$ROOT/vendor" "$t/druse/"
   mkdir -p "$t/consumer"
   cp "$ROOT/experiments/12-concurrency-arms/consumer/main.odin" "$t/consumer/"
 
-  python3 - "$t/uruquim/web/internal/transport/odin_http_adapter.odin" "$threads" <<'PY'
+  python3 - "$t/druse/web/internal/transport/odin_http_adapter.odin" "$threads" <<'PY'
 import sys
 p, n = sys.argv[1], sys.argv[2]
 s = open(p).read()
@@ -34,7 +34,7 @@ assert old in s, "thread_count anchor not found"
 open(p, 'w').write(s.replace(old, "\topts.thread_count = %s" % n, 1))
 PY
 
-  env -u ODIN_ROOT "$ODIN" build "$t/consumer" -collection:uruquim="$t/uruquim" \
+  env -u ODIN_ROOT "$ODIN" build "$t/consumer" -collection:druse="$t/druse" \
     -o:speed -out:"$TMP/exp12-arm-$name" >/dev/null 2>&1 ||
     { echo "EXP12: arm '$name' did not build" >&2; exit 1; }
   printf '%s' "$TMP/exp12-arm-$name"

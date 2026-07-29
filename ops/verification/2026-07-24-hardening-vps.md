@@ -2,8 +2,8 @@
 
 The record H-5 asks for: what was run on real hardware, what it found, and what
 remains owed with the exact procedure to run it. Nothing here touches the box's
-existing CI (`uruquim-ci` systemd unit), its docker `runner`, or the Caddy
-instance on 80/443/2019 — all work is confined to `/opt/uruquim-verify`.
+existing CI (`druse-ci` systemd unit), its docker `runner`, or the Caddy
+instance on 80/443/2019 — all work is confined to `/opt/druse-verify`.
 
 ## Environment
 
@@ -15,10 +15,10 @@ instance on 80/443/2019 — all work is confined to `/opt/uruquim-verify`.
 | Memory | 1636 MiB total, ~830–890 MiB available (shared with CI + Caddy) |
 | **`ulimit -l` (memlock)** | **8192 KiB (8 MiB)** — the constraint that matters below |
 | `ulimit -n` | 1024 |
-| Toolchain | `/opt/uruquim-odin/odin` `dev-2026-07-nightly:819fdc7` — **commit matches the repo pin** (`odin-version.txt` `commit=819fdc7`), reused read-only |
+| Toolchain | `/opt/druse/odin` `dev-2026-07-nightly:819fdc7` — **commit matches the repo pin** (`odin-version.txt` `commit=819fdc7`), reused read-only |
 | clang | 21.1.8 |
-| Repo | `/opt/uruquim-verify/repo`, branch `closure` @ the H-2 commit |
-| Already running (DO NOT TOUCH) | ssh(22), Caddy(80/443, admin 2019), a service on 8090, docker `runner` (CI), the `uruquim-ci` timer |
+| Repo | `/opt/druse-verify/repo`, branch `closure` @ the H-2 commit |
+| Already running (DO NOT TOUCH) | ssh(22), Caddy(80/443, admin 2019), a service on 8090, docker `runner` (CI), the `druse-ci` timer |
 
 ## H-2 — F-C03-2 reproduced AND diagnosed
 
@@ -49,7 +49,7 @@ failure with `ulimit -l 16` and running the patched build produced the intended
 diagnostic instead of a bare abort:
 
 ```
-server.odin(360:3) runtime assertion: uruquim: a Handler lane could not acquire
+server.odin(360:3) runtime assertion: druse: a Handler lane could not acquire
 its io_uring event loop (Allocation_Failed). This is typically RLIMIT_MEMLOCK
 (ulimit -l) or memory exhaustion — raise the locked-memory limit or lower
 max_handlers. (F-C03-2)
@@ -115,7 +115,7 @@ Running any of them appends a dated result block to this file.
   with H-2's diagnosis — this host is memory- and memlock-constrained — and it
   is why the full 500+/3,000 rounds belong on a **dedicated** box. The wire-path
   proof itself is green at 100 and 300 on the dev box (above). Nothing of the
-  host's own CI/Caddy was touched; only `/opt/uruquim-verify` processes were
+  host's own CI/Caddy was touched; only `/opt/druse-verify` processes were
   killed during cleanup.
 
 ## Real-socket streaming — `tests/g76-scale-sockets` (the wire path at scale)

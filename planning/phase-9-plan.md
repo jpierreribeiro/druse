@@ -3,7 +3,7 @@
 ## Context
 
 Numa campanha de otimização medida em AWS c5 (8 vCPU, não-burstable), provamos que o
-Uruquim pode competir com o Go net/http numa rota trivial (`GET /ping`), mas identificamos
+Druse pode competir com o Go net/http numa rota trivial (`GET /ping`), mas identificamos
 um gap real. O owner quer **≥ Go em todos os aspectos** (throughput, latência, CPU),
 autorizou a mudança arquitetural (projeto grande), e pediu para eu **estudar o netpoller do
 Go, aplicar as ideias, medir, e documentar esta etapa**.
@@ -40,7 +40,7 @@ tirar o accept da thread-lane** (accept dedicado). Isso é arquitetura, não pat
 
 **Até o v1 (sem nenhuma garantia, o teto de perf) perde em CPU pro Go: 382% vs 176%.** Logo
 o gap de CPU **não é a dança de accept** — é **syscalls por request**. Cada request no
-Uruquim faz recv one-shot (+re-arm), send, accept re-arm. O Go amortiza tudo isso.
+Druse faz recv one-shot (+re-arm), send, accept re-arm. O Go amortiza tudo isso.
 
 ## O estudo (o que aprendi das fontes primárias)
 
@@ -74,7 +74,7 @@ As duas metas restantes têm dois levers distintos:
 
 ## Fase 9 — Arquitetura de I/O e paridade de performance (WP114–WP121)
 
-Tratada como uma **Fase formal do projeto**, na convenção Uruquim: último WP foi WP113
+Tratada como uma **Fase formal do projeto**, na convenção Druse: último WP foi WP113
 (Fase 8); corretivos foram C1–C7. Esta é a **Fase 9**, WPs a partir de **WP114**. Cada WP
 segue o ritual: **Spec Gate** (contrato + evidência requerida) → implementação com RED test
 → **Test Gate** (todos os gates verdes + benchmark) → **Freeze** (medição no registro). Nenhum
@@ -87,7 +87,7 @@ DoD: PR aberto, suíte verde na c5, merge autorizado.
 ### WP115 — Provided-buffer ring no `core/sys/linux/uring` (infra, do zero)
 Implementar os stubs `unimplemented()`: `setup_buf_ring`/`provide_buffers` via
 `IORING_REGISTER_PBUF_RING`, e decodificação de `IORING_CQE_F_BUFFER`/`F_MORE`. Vendorizar o
-uring no Uruquim (não tocar o toolchain global). Spec Gate: contrato do buffer ring + prova de
+uring no Druse (não tocar o toolchain global). Spec Gate: contrato do buffer ring + prova de
 lifecycle (recicla, sem UAF). DoD: prototipo pinado registra e recicla buffers sob io_uring.
 
 ### WP116 — `recv_multishot` no `core/nbio`
@@ -157,6 +157,6 @@ refinam conforme executam.
 ## Regras de engajamento (as que nos trouxeram até aqui)
 - Medir antes de afirmar; refutar é resultado válido (V1, p29, submit-only morreram na
   medição — cada morte foi progresso).
-- Mudanças no toolchain (uring/nbio) são de dependência séria: vendorizar no Uruquim, não
+- Mudanças no toolchain (uring/nbio) são de dependência séria: vendorizar no Druse, não
   modificar o toolchain global; documentar cada patch.
 - Não prometer "≥ Go em CPU" antes de medir; entregar a verdade dos dados.

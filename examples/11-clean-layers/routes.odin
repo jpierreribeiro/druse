@@ -6,7 +6,7 @@ package main
 // expose?" opens one small file, and a reader answering "what does it own?"
 // opens another.
 
-import web "uruquim:web"
+import web "druse:web"
 
 register_routes :: proc(app: ^web.App) {
 	web.post(app, "/links", create_handler)

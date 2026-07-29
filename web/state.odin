@@ -14,7 +14,7 @@
 // ADR-028 amendment) reopened that under the Corrective Program's owner mandate,
 // on a narrow reading: ADR-028 was right to reject Go's `context.WithValue` and
 // Rust's `http::Extensions` — TYPE-ERASED, dynamically-keyed state crossing
-// library boundaries, which Uruquim does not have — but a SINGLE
+// library boundaries, which Druse does not have — but a SINGLE
 // application-declared TYPE per request, typeid-checked, is not that pattern. It
 // is the same `rawptr`+`typeid` discipline as `web.state`, applied per request,
 // which is what lets a middleware hand a handler a computed value (the measured
@@ -35,7 +35,7 @@
 // The untyped pointer is an implementation detail sealed between two typed
 // boundaries, and the `typeid` is what keeps the seal honest.
 package web
-// uruquim:file application
+// druse:file application
 
 // app_with_state creates an application with the same defaults as `app()` and
 // one typed value every handler can reach.
@@ -208,7 +208,7 @@ request_state :: proc(ctx: ^Context, $R: typeid) -> ^R {
 	} else {
 		assert(
 			ctx.private.request_state_type == typeid_of(R),
-			"uruquim: web.request_state was asked for a type other than the one first stored this request; a request holds exactly one typed value and every access must use that same type (ADR-028 amendment / C7).",
+			"druse: web.request_state was asked for a type other than the one first stored this request; a request holds exactly one typed value and every access must use that same type (ADR-028 amendment / C7).",
 		)
 	}
 	return (^R)(&ctx.private.request_state_buffer)

@@ -2,7 +2,7 @@ package wp71_auto
 
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/web_blocking_lab"
+import lab "druse:tests/support/web_blocking_lab"
 
 @(test)
 four_handler_capacity_keeps_new_health_connections_off_blocked_lanes :: proc(t: ^testing.T) {

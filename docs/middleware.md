@@ -122,9 +122,9 @@ web.get(&app, "/orders/:id", show_order)
 The line:
 
 ```
-uruquim: GET /orders/:id 200       a routed request
-uruquim: GET - 404                 a miss: no pattern exists, so none is shown
-uruquim: GET /silent -             nothing was committed while the logger watched
+druse: GET /orders/:id 200       a routed request
+druse: GET - 404                 a miss: no pattern exists, so none is shown
+druse: GET /silent -             nothing was committed while the logger watched
 ```
 
 Three fields, and the omissions are the design:
@@ -162,7 +162,7 @@ The line is composed in a fixed stack buffer. A route pattern too long for the
 field is cut on an escape boundary and marked:
 
 ```
-uruquim: GET /aaaa…aaa...[truncated] 200
+druse: GET /aaaa…aaa...[truncated] 200
 ```
 
 The status still follows the mark, so a truncated pattern never costs you the

@@ -15,9 +15,9 @@ package web
 import "core:log"
 import "core:strings"
 import "core:testing"
-import "uruquim:web/internal/transport"
+import "druse:web/internal/transport"
 
-// The `bare()` finalizer's 500 report is an EXPECTED Error-level `uruquim:` log
+// The `bare()` finalizer's 500 report is an EXPECTED Error-level `druse:` log
 // line, and the pinned test runner records Error output as a failure. This
 // swallows exactly those and forwards everything else — the WP8 idiom, reused
 // rather than reinvented.
@@ -35,7 +35,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

@@ -24,9 +24,9 @@
 // total for the life of the server, which is the shape every counter-scraping
 // system already knows how to difference.
 package web
-// uruquim:file application
+// druse:file application
 
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // refused_connections reports how many connections this process has refused for
 // admission (WP47's `Limits.max_connections`) since the server started.

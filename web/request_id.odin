@@ -39,7 +39,7 @@
 // `core:crypto` is not imported, both because a request ID must not be mistaken
 // for a secret and because WP6 measured what an import costs every application.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:sync"
 

@@ -9,7 +9,7 @@ import "core:testing"
 import "core:thread"
 import "core:time"
 import "core:net"
-import web "uruquim:web"
+import web "druse:web"
 
 write :: proc(dir, name, body: string) -> bool {
 	err := os.write_entire_file(
@@ -52,7 +52,7 @@ serve_thread :: proc() {
 m8_boot_sweep_removes_orphans_and_nothing_else :: proc(t: ^testing.T) {
 	dir, dir_err := os.make_directory_temp(
 		"",
-		"uruquim-m8-sweep-*",
+		"druse-m8-sweep-*",
 		context.temp_allocator,
 	)
 	testing.expect(t, dir_err == nil, "the test must own a real temporary directory")
@@ -62,8 +62,8 @@ m8_boot_sweep_removes_orphans_and_nothing_else :: proc(t: ^testing.T) {
 	defer os.remove_all(dir)
 
 	// Two orphans from an imagined crash, and two files that are NOT ours.
-	testing.expect(t, write(dir, "uruquim-spool-deadbeef", "partial upload"))
-	testing.expect(t, write(dir, "uruquim-spool-cafe1234", "another partial"))
+	testing.expect(t, write(dir, "druse-spool-deadbeef", "partial upload"))
+	testing.expect(t, write(dir, "druse-spool-cafe1234", "another partial"))
 	testing.expect(t, write(dir, "application-data.json", "the application put this here"))
 	testing.expect(t, write(dir, "notes.txt", "so is this"))
 
@@ -82,12 +82,12 @@ m8_boot_sweep_removes_orphans_and_nothing_else :: proc(t: ^testing.T) {
 	time.sleep(300 * time.Millisecond)
 
 	fmt.printf("\n[m8] after the server started:\n")
-	for n in ([?]string{"uruquim-spool-deadbeef", "uruquim-spool-cafe1234", "application-data.json", "notes.txt"}) {
+	for n in ([?]string{"druse-spool-deadbeef", "druse-spool-cafe1234", "application-data.json", "notes.txt"}) {
 		fmt.printf("[m8]   %-26s exists=%v\n", n, exists(dir, n))
 	}
 
-	testing.expect(t, !exists(dir, "uruquim-spool-deadbeef"), "an orphaned spool must be swept at boot")
-	testing.expect(t, !exists(dir, "uruquim-spool-cafe1234"), "every orphaned spool, not just the first")
+	testing.expect(t, !exists(dir, "druse-spool-deadbeef"), "an orphaned spool must be swept at boot")
+	testing.expect(t, !exists(dir, "druse-spool-cafe1234"), "every orphaned spool, not just the first")
 	testing.expect(
 		t,
 		exists(dir, "application-data.json"),

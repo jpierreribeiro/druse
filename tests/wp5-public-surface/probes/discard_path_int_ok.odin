@@ -12,7 +12,7 @@
 // proof.
 package wp5_probe_discard_path_int
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	ctx: web.Context

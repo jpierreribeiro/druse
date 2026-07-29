@@ -14,7 +14,7 @@
 // here is a public ledger candidate (names freeze at WP101). The parser that
 // feeds `append_chunk` for multipart is WP94's second component; this file is
 // the ownership/quota/cleanup substrate it and a raw-body consumer share.
-package uruquim_internal_ingest
+package druse_internal_ingest
 
 import "core:os"
 import "core:strconv"
@@ -41,7 +41,7 @@ Ingest_Result :: enum {
 DEFAULT_PER_UPLOAD_QUOTA :: i64(1) << 30 // 1 GiB
 DEFAULT_PROCESS_QUOTA :: i64(8) << 30 // 8 GiB
 DEFAULT_MEMORY_PREFIX :: 64 * 1024
-SPOOL_PREFIX :: "uruquim-spool-"
+SPOOL_PREFIX :: "druse-spool-"
 
 Spool_Config :: struct {
 	dir:               string,
@@ -192,7 +192,7 @@ admission_drain :: proc(a: ^Admission) {
 	sync.mutex_unlock(&a.mu)
 }
 
-// begin opens the spool file: a generated unpredictable `uruquim-spool-` name,
+// begin opens the spool file: a generated unpredictable `druse-spool-` name,
 // 0600, inside cfg.dir — never the client filename, never a silent /tmp.
 begin :: proc(a: ^Admission, s: ^Spool) -> Ingest_Result {
 	if !a.initialized {
@@ -208,7 +208,7 @@ begin :: proc(a: ^Admission, s: ^Spool) -> Ingest_Result {
 	f, err := os.open(path, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, os.perm_number(0o600))
 	if err != nil {
 		delete(path)
-		// URUQUIM (ingest audit F2) — RELEASE THE SLOT WE NEVER GOT TO USE.
+		// DRUSE (ingest audit F2) — RELEASE THE SLOT WE NEVER GOT TO USE.
 		// Every caller reserves with `admit` before calling `begin`, and the
 		// only release path is `cancel`, which reaches the admission through
 		// `s.admission` — a field this failure leaves unset. So an `os.open`

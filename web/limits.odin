@@ -40,11 +40,11 @@
 // the framework should own, because a slow handler is the application's own
 // time and killing its connection turns a slow page into a broken one.
 package web
-// uruquim:file application
+// druse:file application
 
 // Limits is the application's byte budget for one request.
 //
-// It bounds URUQUIM'S OWN per-request working memory. It does NOT bound the
+// It bounds DRUSE'S OWN per-request working memory. It does NOT bound the
 // server: connections, accept backlog, the number of inbound headers and total
 // process memory are the transport's and the operating system's, and no
 // document may say otherwise because this type exists.
