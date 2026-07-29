@@ -56,7 +56,7 @@ refused_connections :: proc() -> int
 ```
 
 `Server_Stats` carries `refused_connections`, `responses_sent`,
-`response_bytes`, `send_errors`, `write_deadline_aborts`, `lane_collisions`,
+`response_bytes`, `send_errors`, `write_deadline_aborts`, `handler_dwell_ns`,
 `stream_refused_full`, `stream_refused_budget` and `stream_aborted_slow`.
 
 Rising `write_deadline_aborts` means slow clients hitting

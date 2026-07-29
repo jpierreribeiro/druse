@@ -46,7 +46,11 @@ database becomes `null` in the JSON, and neither becomes `""` in between.
 
 ```odin
 create_note :: proc(ctx: ^web.Context) {
-	st := web.state(ctx, App_State)
+	st, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 
 	input: Create_Note
 	if !web.body(ctx, &input) {

@@ -1,9 +1,12 @@
 # The Druse guide
 
-This teaches you to build an application with Druse and Crystals. It is not the
-reference. The reference is `docs/canonical-patterns.md`, `docs/ai-context.md`
-and `druse-crystals/docs/crystals.md`, and this guide links into them instead
-of repeating them.
+This teaches you to build an application with Druse and Crystals.
+
+**It is not the reference.** To look up a signature, go to
+[`../reference/README.md`](../reference/README.md) — every symbol in the public
+ledger, generated from the ledger itself. `docs/canonical-patterns.md` holds the
+recommended form of each task, and `druse-crystals/docs/crystals.md` documents
+the Crystals.
 
 **Assumes:** you can program. It does not assume you know Odin, HTTP servers or
 manual memory management.
@@ -52,6 +55,7 @@ The page you want when you arrive with a question.
 | [Forms and redirects](03-subjects/forms-and-redirects.md) | Reading a form post, and why the answer is always a 303 |
 | [Cookies](03-subjects/cookies.md) | Reading, setting, and the one constructor for a session cookie |
 | [Limits and shutdown](03-subjects/limits-and-shutdown.md) | What bounds the server, what is off by default, how it stops |
+| [Backend vocabulary, mapped](03-subjects/backend-glossary.md) | The words you arrived with, where each lives here — and what this stack does not have |
 | [Project layout](03-subjects/project-layout.md) | How to arrange files once a service outgrows one screen — an indication, not a rule |
 | [Static files](05-recipes/serve-a-browser-app.md) | Serving a directory, CORS, security headers, real client IP |
 | [Testing](05-recipes/test-a-handler.md) | Running a request through real routing, without a socket |
@@ -86,6 +90,12 @@ One problem, one answer. These show the calls that matter, not a whole program
 | [Error responses](05-recipes/error-responses.md) | Which responder, and which errors you get free |
 | [Query parameters](05-recipes/read-a-query-parameter.md) | Four extractors, and what missing means to each |
 | [Who is the user](05-recipes/who-is-the-user.md) | The `who` helper, without corrupting the subject |
+| [Paginate a list](05-recipes/paginate-a-list.md) | Keyset over OFFSET, and why page 500 must cost what page 1 costs |
+| [Filter, sort and search](05-recipes/filter-sort-and-search.md) | Narrowing a list without opening an injection |
+| [Authorization and roles](05-recipes/authorization-and-roles.md) | Policies as procedures, RBAC, and why the reason never reaches the client |
+| [Store a password](05-recipes/store-a-password.md) | Hash, salt, rehash, and bounding work that is expensive on purpose |
+| [Soft delete and audit](05-recipes/soft-delete-and-audit.md) | Timestamps, deleted_at, and writing the audit row in the same transaction |
+| [Timeouts, retries, backoff](05-recipes/timeouts-retries-and-backoff.md) | What to retry, what to give up on, and what has no circuit breaker |
 | [Write a middleware](05-recipes/write-a-middleware.md) | Running code around a handler, and guarding a route |
 | [CSRF on a form](05-recipes/protect-a-form-with-csrf.md) | Issue, bind to the session, reject before anything changes |
 | [Rate limiting](05-recipes/rate-limit.md) | Which key to limit by, and why memory fails behind a balancer |
@@ -147,9 +157,9 @@ guide has not reached it yet.
 merely listed here. `build/check_docs_coverage.py` enforces that, and it
 ignores this file so a mention in the map cannot count as coverage.
 
-The reference remains the place to look up a signature. `docs/ai-context.md`
-is the complete list, and if a symbol is not there it does not exist — do not
-guess a name.
+To look up a signature, use [`../reference/README.md`](../reference/README.md).
+It is generated from the ledger, so it is the whole surface: if a symbol is not
+there, it does not exist — do not guess a name.
 
 **Crystals packages with no page.** 40 of 44 are covered. The four that are
 not: `apitest` and `preflight` (both test and deploy tooling, not application

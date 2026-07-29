@@ -73,6 +73,10 @@ nothing about vocabulary.
 Show the whole thing that compiles. A sample with `...` in the middle teaches a
 reader to guess.
 
+**A reference page is never written by hand.** `build/gen_reference.py` builds
+`docs/reference/` from `build/phase1-public-signatures.txt` and the doc comment
+above each declaration. Edit the source comment, not the page.
+
 **A cookbook page never contains typed code.** It carries extraction markers,
 and `build/gen_cookbook.py` inlines the program from a real example the build
 check compiles. `build/check_docs.sh` fails when a page has drifted from its
@@ -109,6 +113,11 @@ finishes teaches nothing.
 A subject page is the one a reader arrives at with a question — `routing.md`,
 `request.md`, `response.md`. Name it for the question, not for the packages it
 touches.
+
+The recipe cap was 80 and was raised to 90 once, deliberately, when three pages
+sat just above it and the only way down was cutting content rather than
+padding. A cap is a judgement, not a measurement; change it in the open when it
+stops serving the page, and never by exceeding it quietly.
 
 ## 8. What the reader is told about risk
 
