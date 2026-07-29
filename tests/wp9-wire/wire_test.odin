@@ -389,8 +389,9 @@ wp9_the_log_filter_cannot_swallow_an_assertion_failure :: proc(t: ^testing.T) {
 // Vendor patch 41 returns the connection's read buffer between requests once it
 // has grown past `RETAINED_BUF_MAX`, because one large POST otherwise left that
 // keep-alive connection holding a body-sized buffer for as long as the client
-// kept the socket open. Measured over 16 idle connections: +0.01 MB each for
-// 64-byte bodies, +6.49 MB each for 3 MiB bodies — about 2.1x the body, linear.
+// kept the socket open. The later counting-allocator attribution proves the
+// live allocation directly: four blocked 3 MiB bodies hold 16,138,240 bytes,
+// and response completion returns the live total exactly to baseline.
 //
 // THE RISK THE SHRINK CREATES is this test. `s.end` is the live prefix of
 // already-arrived bytes, which on a pipelined connection is the NEXT request.

@@ -161,16 +161,19 @@ scanner_destroy :: proc(s: ^Scanner) {
 // holding a body-sized buffer for as long as the client kept the socket open,
 // and `max_idle_time` defaults to 0, so nothing reaped it.
 //
-// MEASURED, 16 keep-alive connections left idle after ONE POST each:
+// The first RSS experiment, 16 keep-alive connections left idle after one POST
+// each, reported:
 //
 //	64-byte bodies    +0.01 MB per connection
 //	1 MiB bodies      +2.02 MB per connection
 //	3 MiB bodies      +6.49 MB per connection
 //
-// Linear at roughly 2.1x the body — the retained buffer plus the doubling
-// ladder below it, which the allocator keeps resident. At the shipped defaults
-// that is `max_connections` 1024 x 2.1 x `max_body` 4 MiB, about 8.6 GB, which
-// is not a budget a cgroup absorbs; it is one it gets killed by.
+// RSS alone could not distinguish live allocations from freed allocator pages,
+// so its old post-patch extrapolation was withdrawn. The follow-up counting
+// allocator does: four blocked 3 MiB bodies expose four live scanner buffers
+// totalling 16,138,240 bytes; after response completion this shrink returns the
+// live total exactly to baseline. With `delete(s.buf)` removed, all 16,138,240
+// bytes remain live and the permanent M9 control turns red.
 //
 // THE THRESHOLD IS THE POINT. Shrinking unconditionally would reallocate on
 // every request of every connection. `RETAINED_BUF_MAX` is well above the

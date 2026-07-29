@@ -1,6 +1,6 @@
-# M9 — per-connection retention, measured
+# M9 — request-buffer retention, measured and attributed
 
-Date: 2026-07-28. Host: 4 vCPU KVM, 15 GB RAM.
+Initial measurement: 2026-07-28. Attribution follow-up: 2026-07-29.
 Toolchain: the pinned `dev-2026-07-nightly:819fdc7`.
 
 ## What M9 claims
@@ -12,18 +12,17 @@ Toolchain: the pinned `dev-2026-07-nightly:819fdc7`.
 > means idle connections are never reaped. Known and measured (F-C04-1),
 > delegated to a cgroup.
 
-## One half of the mechanism does not survive reading the toolchain
+## One half of the proposed mechanism did not survive reading the toolchain
 
 `virtual.arena_free_all` on a `.Growing` arena frees every block **but the
 first** — `core/mem/virtual/arena.odin:224`, with upstream's own comment saying
 so. It retains one block, not "reserved blocks", so a large exchange whose
 allocations spilled into later blocks gives those back.
 
-The scanner half holds. `scanner_reset` does `remove_range(&s.buf, 0, start)`,
-which moves `len` and never the backing allocation, and the buffer is sized to
-the **body**: `_body_length` sets `max_token_size = ilen`. It also grows by
-**doubling**, so a 3 MiB body climbs 1 → 2 → 4 MiB and the ladder below the
-final buffer stays resident in the allocator.
+The scanner half held before patch 41. `scanner_reset` did
+`remove_range(&s.buf, 0, start)`, which moved `len` and never returned the
+backing allocation, and the buffer is sized to the **body**:
+`_body_length` sets `max_token_size = ilen`.
 
 ## Method
 
@@ -33,7 +32,7 @@ nothing. RSS from `/proc/self/statm` while they are still open. The control is
 the same connection count and request count with 64-byte bodies, so the only
 variable is body size.
 
-## Result
+## Initial RSS result
 
 | body per connection | retained per connection, before | after patch 41 |
 |---|---|---|
@@ -41,33 +40,71 @@ variable is body size.
 | 1 MiB | **2.02 MB** | **1.26 MB** |
 | 3 MiB | **6.49 MB** | **3.50 MB** |
 
-Linear in body size, at roughly **2.1× the body** before the patch and **1.17×**
-after.
+RSS was linear in body size, at roughly **2.1× the body** before the patch and
+**1.17×** after.
 
-## Verdict
+That was enough to identify and repair the live scanner buffer, but not enough
+to classify the post-patch remainder. RSS cannot distinguish an allocation
+that is still owned by a connection from pages an allocator has freed but has
+not returned to the kernel. Calling the remainder "one more allocation site"
+was therefore an inference, not a measurement.
 
-**Confirmed, and the arithmetic is worse than "delegated to a cgroup" implies.**
-At the shipped defaults — `max_connections` 1024, `max_body` 4 MiB — the
-pre-patch worst case is `1024 × 2.1 × 4 MiB ≈ 8.6 GB` of idle retention. That
-is not a budget a cgroup absorbs; it is one it kills the process over.
+## Attribution follow-up: counting the connection allocator
 
-Vendor patch 41 returns the read buffer between requests once it exceeds
-`RETAINED_BUF_MAX` (256 KiB), which is far above the request-line and header
-ceilings (8000 each) so ordinary traffic never reaches it and never pays a
-reallocation. **It removes 46% of the retention** and leaves the worst case at
-about 4.8 GB.
+The follow-up wraps the exact allocator captured as the backend
+`Server.conn_allocator`. Four keep-alive connections first serve a small
+request. They then send 3 MiB bodies to four handlers that block on a semaphore,
+so all scanner buffers are provably alive at the sample. The handlers are
+released, all four responses are read, and the same allocator is sampled after
+`scanner_reset`.
 
-## What this does NOT establish, stated rather than left implicit
+| sample | current live bytes | body-sized live allocations |
+|---|---:|---:|
+| warmed baseline | 229,418 | 0 |
+| four bodies blocked in handlers | 16,363,562 | 4 / 16,138,240 bytes |
+| responses completed | 229,418 | 0 |
 
-**The remaining ~1.17× is not attributed.** It is not the scanner buffer — that
-is now returned — and the arena keeps only its first block. It is one more
-allocation site of roughly body size, and this report does not say which. M9 is
-therefore **half closed**: the mechanism named in the finding is fixed and
-measured, and a second mechanism of comparable size is now visible and
-unexplained.
+The live total returns **exactly** to its warmed baseline. Between the baseline
+and final sample the allocator reports 32,272,696 bytes allocated and exactly
+32,272,696 bytes freed. The four large live entries during the blocked phase
+are all the scanner growth at `scanner.odin:343`.
 
-The honest next step is a counting allocator on the connection's allocator,
-not another guess.
+Temporary internal instrumentation measured the connection arena at the same
+time. For each 3 MiB request it had one 1 MiB-reserved block, only **4,040 bytes
+committed**, and 1,002 bytes used before cleanup; after `free_all`, the same
+block had 4,040 bytes committed and zero used. The arena is not the body-sized
+remainder.
+
+The corresponding RSS moved 9.75 → 26.75 → 11.55 MiB. The final RSS not being
+byte-for-byte identical to the first sample is allocator/process high-water
+and measurement noise; the connection allocator proves there is no live
+body-sized owner behind it.
+
+## Negative control
+
+The control removes `delete(s.buf)` from patch 41 in a temporary mutation. The
+same final sample then retains four allocations totalling **16,138,240 bytes**,
+the test fails both after-response assertions, and Odin's leak report locates
+all four at `scanner.odin:343`. The control therefore proves the counter sees
+the defect that the production branch removes.
+
+This is now permanent as `tests/m9-attribution` and
+`build/check_m9_controls.sh`, both run by the full gate.
+
+## Revised verdict
+
+**M9 is closed.** Patch 41 fixes a real live per-connection retention defect:
+before it, the scanner kept its largest body buffer for the lifetime of an idle
+keep-alive connection. After it, no body-sized allocation remains live on the
+connection allocator, and the connection arena commits only a few kilobytes for
+this path.
+
+The original post-patch estimate of roughly **4.8 GB** at shipped defaults is
+withdrawn. It multiplied an RSS remainder as though it were a second live
+per-connection allocation; the counting allocator shows that allocation does
+not exist. Large concurrent requests still have a transient memory cost and
+remain bounded by the ingress and connection/admission limits, but that is peak
+working memory, not idle retention.
 
 ## The risk the patch creates, and the control for it
 
