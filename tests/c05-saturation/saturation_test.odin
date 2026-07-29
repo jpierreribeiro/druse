@@ -1,12 +1,12 @@
-// C-05 — the combined-saturation lab: WHICH QUEUE SATURATES FIRST.
+// C-05 — the combined-saturation lab: HOW THE SERVER DEGRADES AND RECOVERS.
 //
 // THE QUESTION, and it is the architecture backlog's, not a new one: a request
 // passes through several bounded resources in series — the kernel's accept
 // backlog, the server's admission budget (`max_connections` minus
 // `reserved_conns`), a synchronous Handler lane, and process memory. Each has
-// its own limit and its own refusal. Under rising load **one of them binds
-// first**, and which one it is decides what an operator sees, what they should
-// tune, and whether the degradation is honest.
+// its own limit and its own refusal. Under dedicated accept, which refusal is
+// observed first in a particular run is scheduler-dependent: excess work may
+// be refused or may wait on a lane-owned socket until the client times out.
 //
 // Nobody had measured it. `planning/closure-readiness-matrix.md` records every
 // one of those resources with a limit and a saturation policy — that is C-02's
@@ -28,7 +28,7 @@
 // same one the C-03 RST-flood probe needed: an admission refusal accepts the
 // TCP connection and then closes it with nothing written, so a client that only
 // counts "errors" cannot tell it from a backlog drop. This suite counts them
-// apart, which is why it can name the binding constraint instead of guessing.
+// apart, which is why it can describe the degradation instead of guessing.
 //
 // WHAT IT DELIBERATELY DOES NOT DO: it is not a benchmark. The numbers it
 // prints are a RATIO between refusal kinds, not a throughput claim, and the
@@ -198,7 +198,7 @@ one_request :: proc(port: int) -> Outcome {
 	if n == 0 {
 		// Accepted, then closed with NOTHING written. This is the admission
 		// refusal's signature, and telling it apart from a backlog drop is the
-		// whole reason this suite can name a binding constraint.
+		// reason this suite can distinguish how saturation presented.
 		return .Admission_Refused
 	}
 	if n < 12 {
@@ -268,7 +268,7 @@ run_level :: proc(port: int, clients: int) -> Tally {
 }
 
 @(test)
-c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testing.T) {
+c05_combined_saturation_degrades_recovers_and_stops :: proc(t: ^testing.T) {
 	server: Server
 	if !start_server(&server) {
 		testing.expect(t, false, "no candidate port produced a working server")
@@ -292,7 +292,7 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	// clients driven — those are not the same number and differ by 2-3x once
 	// the ramp starts refusing.
 	total_served := 0
-	// Any refusal the design NAMES, of whichever kind bound first.
+	// Any refusal the design names, independent of which kind appears first.
 	total_refused := 0
 	// Clients that waited out CLIENT_PATIENCE without a reply. Under dedicated
 	// accept this is the COMMON face of saturation, not an anomaly: a request
@@ -300,8 +300,8 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	// as latency rather than as a 503. Counted separately because a bound that
 	// presents as queueing is still a bound.
 	total_timed_out := 0
-	first_refusal_kind := Outcome.Served
-	first_refusal_level := 0
+	first_observed_refusal_kind := Outcome.Served
+	first_observed_refusal_level := 0
 
 	for clients in LEVELS {
 		tally := run_level(server.port, clients)
@@ -327,21 +327,21 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 			tally[.Connect_Failed]
 		total_timed_out += tally[.Timed_Out]
 
-		// The FIRST level at which anything is refused names the binding
-		// constraint. A lane refusal counts whether or not it carried Retry-After
-		// — the header is an H-4 quality check on the refusal, not a fifth
-		// resource.
+		// Record the first OBSERVED refusal for diagnostics. This is explicitly
+		// not an architectural ordering assertion: dedicated accept, lane-owned
+		// socket queueing and client scheduling decide which visible refusal
+		// happens first in any one run.
 		lane_refused := tally[.Lane_Refused] + tally[.Lane_Refused_No_Retry]
-		if first_refusal_kind == .Served {
+		if first_observed_refusal_kind == .Served {
 			if tally[.Admission_Refused] > 0 {
-				first_refusal_kind = .Admission_Refused
-				first_refusal_level = clients
+				first_observed_refusal_kind = .Admission_Refused
+				first_observed_refusal_level = clients
 			} else if lane_refused > 0 {
-				first_refusal_kind = .Lane_Refused
-				first_refusal_level = clients
+				first_observed_refusal_kind = .Lane_Refused
+				first_observed_refusal_level = clients
 			} else if tally[.Connect_Failed] > 0 {
-				first_refusal_kind = .Connect_Failed
-				first_refusal_level = clients
+				first_observed_refusal_kind = .Connect_Failed
+				first_observed_refusal_level = clients
 			}
 		}
 		// Let the server return to rest between levels, so each level measures
@@ -349,13 +349,13 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		time.sleep(300 * time.Millisecond)
 	}
 
-	if first_refusal_kind == .Served {
+	if first_observed_refusal_kind == .Served {
 		fmt.printf("[c05] no resource bound at any level up to %d clients\n", LEVELS[len(LEVELS) - 1])
 	} else {
 		fmt.printf(
-			"[c05] FIRST BINDING CONSTRAINT: %v, at %d concurrent clients\n",
-			first_refusal_kind,
-			first_refusal_level,
+			"[c05] FIRST OBSERVED REFUSAL (scheduler-dependent): %v, at %d concurrent clients\n",
+			first_observed_refusal_kind,
+			first_observed_refusal_level,
 		)
 	}
 
@@ -411,11 +411,10 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		"the server did not serve a normal request after the ramp (got %v); saturation must be transient",
 		after,
 	)
-	// H-4 — every lane refusal must carry Retry-After. The ramp reliably produces
-	// 503s (the binding constraint), so this asserts a property over real
-	// refusals rather than forcing one: a 503 without the header tells the client
-	// nothing about when to come back, so it retries at once onto the same
-	// contended pool and collides again.
+	// H-4 — every observed lane refusal must carry Retry-After. A run may
+	// produce no 503 at all; when it does, a 503 without the header tells the
+	// client nothing about when to come back, so it retries at once onto the
+	// same contended pool and collides again.
 	fmt.printf(
 		"[c05] lane 503s: %d total, %d without Retry-After\n",
 		total_lane_503,
@@ -464,7 +463,7 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	if total_lane_503 == 0 {
 		fmt.printf(
 			"[c05] NOTE: no lane 503 occurred this run (the ramp bound on %v first), so the Retry-After property was NOT exercised — this run is not evidence for H-4\n",
-			first_refusal_kind,
+			first_observed_refusal_kind,
 		)
 	}
 	testing.expectf(

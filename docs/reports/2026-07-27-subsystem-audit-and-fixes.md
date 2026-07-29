@@ -180,7 +180,8 @@ not exist yet — see "Owed".
 
 ## Found and NOT fixed
 
-- **`lane_collisions` is dead in dedicated-accept mode.** Handlers run
+- **`lane_collisions` was misleading in dedicated-accept mode (resolved after
+  this audit).** Handlers run
   synchronously on the lane thread, so the event loop is blocked during dispatch
   and `handler_lane_enter` can essentially never return false; the adapter's
   503-on-collision path and the metric that counts it are effectively
@@ -189,7 +190,9 @@ not exist yet — see "Owed".
   handler is silent head-of-line queueing: no 503, no metric, only latency. This
   matters because production guidance names `lane_collisions` as a metric to
   monitor. Fixing it means deciding what the metric should mean now, which is a
-  design decision, not a repair.
+  design decision, not a repair. The owner subsequently chose to replace it
+  in-place with `handler_dwell_ns`; Campaign C and the public ledger now carry
+  that result.
 - **The `is_valid` pass on every JSON response.** Whether `T` can produce a
   non-finite float is a property of the type, so the check could be skipped for
   float-free DTOs. It cannot be written today: the gate needs a compile-time walk
@@ -206,9 +209,10 @@ not exist yet — see "Owed".
 Both were confirmed by running the pristine `61bec774` tree in a separate
 worktree:
 
-- **`tests/c05-saturation`** fails: *"the ramp produced no lane 503 at all"*,
-  with `lane_collisions=0`. This is the same finding as the dead metric above,
-  and the suite that would have caught it is red on main.
+- **`tests/c05-saturation`** failed at this audit point: *"the ramp produced no
+  lane 503 at all"*, with `lane_collisions=0`. It was subsequently rewritten
+  around `handler_dwell_ns` and current degradation/recovery invariants; its
+  control is green.
 - **`tests/wp90-deadlines`**, case `wp90_a_stalled_write_is_aborted_at_the_
   deadline`, fails both assertions.
 
@@ -246,8 +250,8 @@ is the case that actually failed.
 1. A stress harness for the transport races in finding 9 — lockstep
    connect/disconnect bursts against a saturated lane pool for the lost wakeup,
    and a connect-during-stop loop for the shutdown race.
-2. A decision on what `lane_collisions` should mean under dedicated accept, and
-   a green `c05-saturation` afterwards.
+2. ✅ Resolved after this report: `lane_collisions` was replaced by
+   `handler_dwell_ns`, and `c05-saturation` is green under its new control.
 3. `wp90-deadlines`' stalled-write case, red on main.
 4. `c03-fault-campaign` on a machine where it completes.
 5. Committed ping peers plus an orchestrator, before the README table is

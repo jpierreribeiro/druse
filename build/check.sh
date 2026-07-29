@@ -1230,7 +1230,7 @@ timeout 120 env URUQUIM_ODIN_BIN="$URUQUIM_COMPILER" \
 # what caught F-C05-1: an unbounded wait inside handler_lane_enter that wedged
 # shutdown in 4 runs out of 6, past every deadline. A lab that only ran on
 # demand would have let the regression back in.
-echo "--- C-05 combined saturation: which queue binds first, and does stop still return ---"
+echo "--- C-05 combined saturation: degradation, recovery, observability and bounded stop ---"
 timeout 240 env URUQUIM_COMPILER="$URUQUIM_COMPILER" \
   bash "$URUQUIM_ROOT/build/check_c05_controls.sh"
 

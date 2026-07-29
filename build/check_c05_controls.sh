@@ -6,8 +6,8 @@
 #   1. THE INSTRUMENT SURVIVES. The lab's whole value is that it tells the
 #      refusal kinds APART — a 503 (the Handler lane) from a connected-then-EOF
 #      (the admission budget) from a failed connect (the backlog). Collapse
-#      those into "error" and the suite can no longer name a binding constraint,
-#      which is the one thing it exists to do;
+#      those into "error" and the suite can no longer describe how saturation
+#      presented in that run;
 #   2. THE F-C05-1 FIX cannot be silently reverted: the accept-cancel wait stays
 #      bounded, and it still refuses to reattach on expiry;
 #   3. the measurement and the specification survive in the record — perimeter 7
@@ -48,10 +48,10 @@ test -f "$URUQUIM_SUITE" || fail "tests/c05-saturation/saturation_test.odin is m
 # --- 1. The instrument -------------------------------------------------------
 for URUQUIM_KIND in Served Lane_Refused Admission_Refused Connect_Failed Timed_Out Malformed; do
   grep -q "$URUQUIM_KIND" "$URUQUIM_SUITE" ||
-    fail "$(printf 'the saturation lab lost the outcome %s.\nThe six outcomes are the instrument: an admission refusal ACCEPTS the connection and then closes it unwritten, so a client that counts only "errors" cannot tell it from a backlog drop. Collapse them and the suite can no longer name which resource bound first.' "$URUQUIM_KIND")"
+    fail "$(printf 'the saturation lab lost the outcome %s.\nThe six outcomes are the instrument: an admission refusal ACCEPTS the connection and then closes it unwritten, so a client that counts only "errors" cannot tell it from a backlog drop. Collapse them and the suite can no longer distinguish how saturation presented in that run.' "$URUQUIM_KIND")"
 done
-grep -q 'FIRST BINDING CONSTRAINT' "$URUQUIM_SUITE" ||
-  fail "the lab no longer reports which resource bound first — that report IS the deliverable of perimeter 6"
+grep -q 'FIRST OBSERVED REFUSAL' "$URUQUIM_SUITE" ||
+  fail "the lab no longer reports the first observed refusal. It is diagnostic and scheduler-dependent, but losing it would hide which face saturation took in a run."
 grep -q 'total_malformed == 0' "$URUQUIM_SUITE" ||
   fail "the malformed-reply assertion is gone; under saturation every outcome must be one the design NAMES, and that assertion is the only thing checking it"
 
@@ -112,8 +112,10 @@ grep -q 'nbio.tick(0)' "$URUQUIM_SERVER" ||
 
 # --- 3. The measurement and the specification --------------------------------
 URUQUIM_FLAT="$(tr '\n' ' ' <"$URUQUIM_DOC" | tr -s ' ')"
-grep -qi 'binding constraint is the Handler lane' <<<"$URUQUIM_FLAT" ||
-  fail "the perimeter-6 finding is gone from the record. That the LANE binds first — and at four concurrent clients, far below the twenty-slot connection budget — is the result; without it an operator tunes max_connections, which is not the constraint."
+grep -qi 'scheduler-dependent' <<<"$URUQUIM_FLAT" ||
+  fail "the record again implies a deterministic first refusal. Ten current runs produced Lane_Refused first in 8 and Admission_Refused first in 2; the ordering must remain documented as scheduler-dependent."
+grep -qiE 'lanes.{0,8}(÷|/|divided by).{0,8}dwell' <<<"$URUQUIM_FLAT" ||
+  fail "the deterministic capacity rule is gone. Refusal ordering varies, but synchronous handler capacity remains lanes divided by mean dwell."
 grep -qi 'Server_Stats' <<<"$URUQUIM_FLAT" ||
   fail "the perimeter-7 API specification is gone. Shipping it was DEFERRED on the explicit condition that it is specified and handed forward; without the specification this is an unowned gap again."
 grep -qi 'aborted_slow' <<<"$URUQUIM_FLAT" ||
@@ -125,7 +127,7 @@ env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
   "-collection:uruquim=$URUQUIM_ROOT" -define:ODIN_TEST_THREADS=1 \
   "-out:$URUQUIM_TMP/c05"
 
-echo "c05: the six refusal outcomes stay distinguishable; the binding constraint is still reported"
+echo "c05: the six outcomes stay distinguishable; first observed refusal is reported without pretending its ordering is deterministic"
 echo "c05: the accept-cancel spin is GONE (PATCH 28) — the wedge is impossible by construction, not merely bounded (F-C05-1 superseded)"
 echo "c05: the perimeter-6 finding and the perimeter-7 Server_Stats specification are on record"
 echo "PASS: C-05 combined-saturation and write-observability controls"

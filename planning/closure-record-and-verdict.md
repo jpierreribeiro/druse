@@ -56,7 +56,7 @@ true:
 | every operation has a declared owner / capacity / deadline / cancellation | `planning/closure-async-op-inventory.md` — **23 operation-creating call sites × 10 questions**, census derived from the source | `check_c01_controls.sh` |
 | every framework-owned resource has limit / deadline / cancellation / saturation / metric / shutdown | `planning/closure-readiness-matrix.md` — **13 resources × 8 properties, no unanswered cell** | `check_readiness_matrix.sh` |
 | the fault space is enumerated rather than discovered | `planning/closure-fault-campaign.md` — **34 cells, 0 unanswered** | `check_c03_controls.sh` |
-| the combined saturation profile is known, and the write-observability gap is specified | `planning/closure-saturation-and-write-observability.md` — the **Handler lane binds first, at 4 concurrent clients** | `check_c05_controls.sh` |
+| the combined saturation profile is known, and the write-observability gap is specified | `planning/closure-saturation-and-write-observability.md` — first visible refusal is scheduler-dependent; stable capacity is **`lanes ÷ dwell`**, with connection slots bounding waiting/admission | `check_c05_controls.sh` |
 | the router's deliberate differences are pinned as a negative corpus | `planning/closure-httprouter-study.md` — 10 cases, BSD-3 notice gated | `check_c08_controls.sh` |
 | unbounded memory has a named, mandatory topology **with a measured sizing rule** | `planning/closure-response-size-and-memory.md` — `max_connections × largest response` | `check_c04_controls.sh` |
 | the delegated topology is **tested**, not only documented | `planning/closure-proxy-contract.md` | `check_c06_controls.sh` |
@@ -219,7 +219,7 @@ foundation where:
 - shutdown actually terminates in the three ways it previously did not;
 - the limitations list is one gated document rather than eleven prose lists, two
   of which were lying;
-- the saturation profile is known, and it is not the one the configuration
-  suggests: **the Handler lane binds first, at four concurrent clients**, while
-  the connection budget sits idle. An operator tuning `max_connections` is
-  tuning the wrong knob, and Phase 8's board will meet this immediately.
+- the saturation profile is known without claiming a scheduler invariant the
+  test cannot support: handler capacity is **`lanes ÷ dwell`**, connection slots
+  bound waiting/admission, and the first visible refusal may be either lane
+  saturation or admission pressure.

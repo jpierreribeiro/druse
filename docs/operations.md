@@ -322,11 +322,12 @@ web.use(&app, web.request_id)
   mean_dwell  = Δhandler_dwell_ns / Δresponses_sent
   ```
 
-  Utilization approaching 1 means the lane pool binds first; mean dwell says
+  Utilization approaching 1 means the lane pool is saturated; mean dwell says
   whether to raise `max_handlers` or shorten the handler. Do not read a flat
   latency graph as headroom — queueing on a busy lane is invisible there.
-  Capacity is `lanes ÷ mean handler dwell` (C-05 measured the Handler lane
-  binds first).
+  Capacity is `lanes ÷ mean handler dwell`. C-05 also showed that the first
+  visible refusal is scheduler-dependent, so do not infer a fixed resource
+  ordering from a single 503 or admission refusal.
 * **`observe`** receives a typed event for every framework-detected failure.
   It cannot change the response; it is for exporting to metrics or alerting.
 * **Key every metric on `web.route(ctx)`, never on `ctx.request.path`.** The
@@ -507,16 +508,17 @@ the topology those limitations make mandatory:
   legitimate client. They ship OFF because a framework-chosen number would reset
   real clients on upgrade; OFF is not a recommendation. Matrix row 5.
 * **Size `max_handlers` above your expected concurrency, and treat utilization as
-  the sizing signal.** C-05 measured that the Handler lane is the **first**
-  resource to bind — a synchronous handler holds its lane for its whole
+  the sizing signal.** A synchronous handler holds its lane for its whole
   duration. Under dedicated accept, contention does not answer 503 itself: a
   request contending for a busy lane queues silently on that lane's socket.
   Saturation therefore appears as **rising lane utilization**, which you read
   from `web.stats().handler_dwell_ns`: utilization approaching 1 means the lane
-  pool binds first; the acceptor still answers 503 + `Retry-After: 1` only when
+  pool is saturated; the acceptor still answers 503 + `Retry-After: 1` only when
   **every** lane is blocked. Capacity is roughly `lanes ÷ mean handler dwell`.
-  The knob is `max_handlers` — **not** `max_connections`, which only decides
-  how many clients get to wait. Matrix row 4.
+  `max_handlers` controls service capacity; `max_connections` bounds how many
+  clients can be admitted or left waiting. Ten repeated C-05 runs observed
+  either lane saturation or admission refusal first, so their ordering is not
+  an operational invariant. Matrix row 4.
 * **Tune the accept backlog** (`somaxconn`) — it is the kernel's, and the only
   place a connection can queue. Matrix row 11.
 * **One server per process**, and install your own `SIGTERM`/`SIGINT` handler

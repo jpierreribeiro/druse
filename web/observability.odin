@@ -54,7 +54,7 @@ refused_connections :: proc() -> int {
 // how many slow readers the write deadline cut off — and the three stream
 // counters that were maintained in the registry and reachable from no public
 // API, so a slow-consumer abort was counted and then unseeable. Campaign C adds
-// `handler_dwell_ns`: the framework's FIRST saturation point (C-05: lanes ÷
+// `handler_dwell_ns`: the framework's Handler-capacity signal (C-05: lanes ÷
 // dwell). The predecessor, `lane_collisions`, was MISNAMED rather than dead: its
 // lane-collision increment was unreachable under dedicated accept (WP119), but
 // the acceptor's saturation refusal also incremented it, so the number moved
@@ -81,8 +81,8 @@ Server_Stats :: struct {
 	response_bytes:        i64, // bytes reported on-the-wire for those sends
 	send_errors:           int, // sends that completed with an error
 	write_deadline_aborts: int, // connections the sweep aborted for a stalled write
-	// Handler saturation (Campaign C). The FIRST resource to bind (C-05: capacity
-	// is lanes / dwell). Under dedicated accept, a request that arrives at a
+	// Handler saturation (Campaign C). Capacity is lanes / dwell; the first
+	// visible refusal is scheduler-dependent. Under dedicated accept, a request that arrives at a
 	// busy lane queues on that lane's socket — no 503, no counter, only latency
 	// — so the old `lane_collisions` counter never saw the saturation its name
 	// described; what it did count was the acceptor's own refusals, which is a

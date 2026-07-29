@@ -483,10 +483,14 @@ Every latency measurement reproduced the original finding decisively. `web.app`,
 | p99 (c400) | **69 µs** (flat) | 2.77 ms | 8.3 ms |
 
 At c400 Uruquim's p99 is **~40× better than fasthttp and ~120× better than net/http**, and it
-stays **flat** from c100 to c400 while both competitors degrade an order of magnitude. This is the
-bounded-lane, no-queue model working as designed: it sheds excess load (the 503-on-collision
-counted by `web.stats().lane_collisions`, item 2) rather than queueing, which is precisely why
-latency does not degrade.
+stays **flat** from c100 to c400 while both competitors degrade an order of magnitude.
+
+**Later architecture note:** the explanation originally attached to those
+numbers — 503-on-collision counted by `lane_collisions` — was superseded by
+dedicated accept. Current connections are assigned to available lanes and may
+queue on a lane-owned socket; `lane_collisions` was retired in favour of
+`handler_dwell_ns`. The measurements above remain historical measurements, but
+they are not evidence for the removed counter or a deterministic refusal order.
 
 ### 4. The honest architectural trade, restated
 

@@ -264,8 +264,9 @@ medium workload:
 Eight lanes reduce refusal probability, but cost throughput and tail latency
 through oversubscription. This is not a free tuning recommendation. The native
 automatic policy remains CPU-derived; operators should use
-`web.stats().lane_collisions` and choose between load shedding and queueing for
-their workload.
+`web.stats().handler_dwell_ns` to derive lane utilization. The old
+`lane_collisions` field was retired after dedicated accept proved it counted
+acceptor refusals under the wrong name.
 
 Before the fused decoder, Uruquim's c400 median results were:
 

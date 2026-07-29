@@ -32,41 +32,46 @@ which resource refused it**:
 Telling the middle two apart is the whole instrument. An admission refusal
 accepts the TCP connection and then closes it unwritten, so a client that counts
 only "errors" cannot distinguish it from a backlog drop — the same distinction
-C-03's RST-flood probe needed, and the reason both suites can *name* a binding
-constraint instead of guessing at one.
+C-03's RST-flood probe needed, and the reason both suites can describe the
+degradation instead of collapsing every non-200 into one bucket.
 
-### The result
+### The result, re-measured after dedicated accept
 
-On an 8-core development box, representative run:
+The original record pinned one representative run as an architectural ordering:
+"the Handler lane binds first, at four." That conclusion did not survive the
+dedicated-accept architecture or repetition. Ten consecutive runs of the
+current tree on the local 4-vCPU host produced:
 
-| clients | served | 503 (lane) | admission | connect fail | timeout |
-|---|---|---|---|---|---|
-| 4 | 3 | **1** | 0 | 0 | 0 |
-| 12 | 8 | 4 | 0 | 0 | 0 |
-| 24 | 6 | 2 | **7** | 0 | 9 |
-| 48 | 9 | 3 | 0 | 0 | 36 |
+| Observation | Ten-run result |
+|---|---:|
+| first observed refusal `Lane_Refused` | 8 runs, first at level 12 |
+| first observed refusal `Admission_Refused` | 2 runs, first at level 24 |
+| first refusal at level 4 | **0 runs** |
+| served after the ramp | **10 / 10** |
+| shutdown returned | **10 / 10**, 500–584 ms |
+| malformed replies | **0** |
+| 503 without `Retry-After` | **0** |
+| served across the 88 driven clients | 28–34 |
+| client timeouts | 0–37 |
 
-**F-C05-2 — the binding constraint is the Handler lane, and it binds at four
-concurrent clients.** Not the connection budget, which has twenty slots and does
-not refuse anything until twenty-four clients; not the backlog, which never
-refused at all. With a synchronous handler occupying its lane for 40 ms, **one
-request in four is already refused with 503 at a concurrency of four.**
+**F-C05-2, corrected — the first visible refusal is scheduler-dependent.**
+Dedicated accept assigns work to available lanes; under excess concurrency,
+requests may wait on lane-owned sockets, meet the acceptor's all-lanes-blocked
+503, or reach the connection admission budget. Which of those becomes the
+first *observed refusal* is not a stable ordering and must not gate.
 
-That is worth stating plainly because it inverts the intuitive tuning move. An
-operator seeing 503s under load would reach for `max_connections` — and
-`max_connections` is not the constraint. The knob that matters is
-`max_handlers`, and behind it the handler's own dwell: **capacity is
-`lanes ÷ dwell`, and connection slots only decide how many clients get to wait.**
-The degradation is honest — every refusal is a refusal the design names, and
-`malformed` was zero at every level in every run — but "honest" is not the same
-as "expected", and this number belongs in the operations documentation rather
-than in a reader's mental model.
+What remains deterministic is the capacity model: synchronous handler service
+capacity is approximately **`lanes ÷ mean dwell`**; `max_connections` bounds how
+many accepted connections can exist and therefore how much waiting/admission
+pressure the process permits. Both settings matter, but they govern different
+resources. The gate consequently asserts the shape that is stable: the ramp
+really saturates, every reply is named and well formed, every observed 503 has
+`Retry-After`, dwell accounting moves with dispatched work, a healthy request
+is served afterwards, and shutdown returns.
 
-It also corrects something C-03 wrote. The B4 cell's note reasoned that the 503
-path was reachable only through a narrow race window inside
-`handler_lane_enter`'s spin. Under real concurrency that window is not narrow at
-all: it is the common case, because with N lanes and more than N concurrent
-requests, arriving requests routinely land on a lane already inside a handler.
+The raw ten-run log and summary are preserved in the local validation evidence
+directory with SHA-256 checksums. The test prints the first observed refusal as
+a diagnostic; it does not assert its kind or level.
 
 ### H-4 follow-ups (the operational corrections this measurement demanded)
 
@@ -75,22 +80,17 @@ requests, arriving requests routinely land on a lane already inside a handler.
    back invites an immediate retry onto the same contended pool, which collides
    again — the refusal creates the retry storm it was trying to shed. One second
    is the smallest honest hint (a synchronous handler's dwell is the thing being
-   waited out). The C-05 ramp asserts the property over real 503s:
-   `Lane_Refused_No_Retry` must be zero and `Lane_Refused` must be non-zero.
+   waited out). The C-05 ramp requires `Lane_Refused_No_Retry` to be zero and
+   explicitly reports when a particular run produced no 503, because that run
+   is then not evidence for this header property.
 
-2. **The lane pool has no queue and no work-stealing, deliberately, and this is
-   RECORDED AS A REFUSAL rather than a gap.** A request that lands on a busy lane
-   is refused, not queued and not moved to an idle lane. Queueing is the obvious
-   improvement and it is exactly what F-002 was: the `next_tick` deferral of a
-   dispatch, which was a use-after-free because everything the dispatch names —
-   `req`/`res` into `conn.loop`, the inbound views, the `Exchange` itself — lives
-   in the connection's temp arena, which `clean_request_loop` frees. **A queue is
-   sound only after that ownership changes** (the `Exchange` and its views would
-   have to outlive the connection teardown, refcounted or copied out). That is a
-   dedicated concurrency-architecture study, requested separately by the owner;
-   this WP only pins the current refusal and its reason so the `next_tick` UAF
-   cannot be reintroduced as a throughput "fix". Matrix row 4 carries the same
-   note.
+2. **There is no explicit application-dispatch queue or work stealing.**
+   Dedicated accept chooses an available least-loaded lane and bounds handoffs.
+   Once a connection is lane-owned, later bytes on it may wait behind that
+   lane's synchronous handler; that is socket queueing, not a copied `Exchange`
+   safe to move elsewhere. The old `next_tick` dispatch deferral remains
+   forbidden: it was a use-after-free because `req`, `res`, inbound views and
+   `Exchange` live in the connection arena that teardown frees.
 
 ---
 
@@ -219,7 +219,7 @@ stats :: proc() -> Server_Stats
 
 **Trigger to promote this from recommendation to requirement:** the first
 production deployment that runs detached streams. Slow-consumer aborts are the
-one failure this framework can perform silently, and §1's finding — that the
-lane binds first, at a concurrency far below the connection budget — means an
-operator will reach for these numbers sooner than the matrix's amber cell
-suggested.
+one failure this framework can perform silently. Section 1's stable capacity
+rule — handler service is `lanes ÷ dwell`, while connection slots bound waiting
+and admission — tells the operator how to interpret those numbers without
+pretending one refusal must always appear first.
