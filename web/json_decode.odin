@@ -1105,13 +1105,7 @@ body_json_preflight :: proc(
 	if issue.kind == .None &&
 	   fused_eligible {
 		request_arena_init(ctx)
-		switch json_tree_decode(
-			value,
-			dst,
-			info,
-			request_arena_allocator(ctx),
-			target_cache_ptr,
-		) {
+		switch json_tree_decode(value, dst, info, request_arena_allocator(ctx), target_cache_ptr) {
 		case .Success:
 			decoded^ = true
 		case .Unsupported:
