@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # WP88/WP89 — the stream registry and cross-lane delivery, under control.
 #
-# Three executable claims:
+# Four executable claims:
 #   1. the WP87 stream corpus is green UNEDITED (checked here by content
 #      hash of its test names — a dropped case cannot hide) and the WP88
 #      suite (ring wraparound, process budget, wake hook, concurrent
@@ -12,6 +12,9 @@
 #   3. the implementation keeps its boundary: `web` still imports no stream
 #      package (that wiring is WP90), and the stream package itself imports
 #      no backend and no `uruquim:web`.
+#   4. try_send releases its slot mutex exactly once before invoking the wake;
+#      a second unlock is undefined behaviour and makes the concurrent corpus
+#      spin forever instead of reporting a useful failure.
 set -euo pipefail
 
 URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -57,6 +60,23 @@ for URUQUIM_CASE in \
     fail "pre-registered corpus case dropped: $URUQUIM_CASE"
 done
 
+# Claim 1b preflight — validate the M2 lock shape BEFORE running the concurrent
+# suite. A duplicate unlock here previously made that suite consume CPUs until
+# an external timeout, so checking this after the suite is too late.
+URUQUIM_STREAM="$URUQUIM_ROOT/web/internal/stream/stream.odin"
+grep -q 'wp88_the_slot_wake_runs_outside_the_slot_lock' \
+  "$URUQUIM_ROOT/tests/wp88-stream-registry/registry_test.odin" ||
+  fail "the M2 control is gone: nothing now detects the slot wake being invoked under s.mu, which deadlocks the owner lane against a full nbio queue"
+if ! grep -Pzoq 'slot_user := s\.wake_user\s*\n\s*sync\.mutex_unlock\(&s\.mu\)' \
+  "$URUQUIM_STREAM"; then
+  fail "try_send no longer releases s.mu before invoking the slot wake (M2). A wake that reaches a full cross-thread nbio queue spins under this lock while the owner lane blocks on it — deadlock."
+fi
+if sed -n '/\/\/ 5\. wake the owner/,/\/\/ 6\. a closed typed result/p' \
+    "$URUQUIM_STREAM" |
+    grep -q 'sync\.mutex_unlock(&s\.mu)'; then
+  fail "try_send unlocks s.mu again after invoking the wake; the duplicate unlock corrupts mutex state and makes the concurrent WP89 corpus spin"
+fi
+
 # Claim 1b — both suites green on the real tree.
 env ODIN_ROOT="$URUQUIM_ODIN_ROOT" "$URUQUIM_ODIN" test \
   "$URUQUIM_ROOT/tests/wp87-stream-lifecycle" \
@@ -95,19 +115,6 @@ if grep -rnE '^[[:space:]]*import[[:space:]].*"uruquim:web/internal/stream"' \
 fi
 if grep -nE '"uruquim:(web|vendor)' "$URUQUIM_ROOT/web/internal/stream"/*.odin; then
   fail "the stream package imports web or the backend; it must stay executor-agnostic"
-fi
-
-# M2 — the wake must never be invoked under the slot lock. `nbio.exec` spins
-# waiting for a full cross-thread queue, and the owner lane can only drain that
-# queue by first returning from a pump that is blocked on this same mutex, so a
-# wake under the lock is a two-thread deadlock with no diagnostic. Both the
-# assertion and the unlock ordering it protects are pinned here.
-grep -q 'wp88_the_slot_wake_runs_outside_the_slot_lock' \
-  "$URUQUIM_ROOT/tests/wp88-stream-registry/registry_test.odin" ||
-  fail "the M2 control is gone: nothing now detects the slot wake being invoked under s.mu, which deadlocks the owner lane against a full nbio queue"
-if ! grep -Pzoq 'slot_user := s\.wake_user\s*\n\s*sync\.mutex_unlock\(&s\.mu\)' \
-  "$URUQUIM_ROOT/web/internal/stream/stream.odin"; then
-  fail "try_send no longer releases s.mu before invoking the slot wake (M2). A wake that reaches a full cross-thread nbio queue spins under this lock while the owner lane blocks on it — deadlock."
 fi
 
 echo "wp88: the WP87 stream corpus is green unedited, all 12 cases present"

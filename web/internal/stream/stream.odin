@@ -333,7 +333,6 @@ try_send :: proc(r: ^Registry, tok: Token, data: []u8) -> Send_Result {
 	} else if r.wake != nil {
 		r.wake(r.wake_user)
 	}
-	sync.mutex_unlock(&s.mu)
 	// 6. a closed typed result.
 	return .Sent
 }
