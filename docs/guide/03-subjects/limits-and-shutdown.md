@@ -36,7 +36,11 @@ proxy's timeouts in front.
 ## The ones already bounded
 
 `max_body` (4 MiB), `max_request_line`, `max_headers`, `max_connections`,
-`reserved_conns`, `max_drain_time`, `max_handlers`.
+`reserved_conns`, `max_drain_time`, `max_handlers`, `max_json_nodes`.
+
+`max_json_nodes` bounds the *structure* of a decoded body, not its size. A
+small body of deeply nested arrays costs far more to decode than its byte count
+suggests.
 
 `reserved_conns` is worth knowing: it holds capacity back so health checks and
 shutdown stay reachable when the server is saturated. Size your database pool

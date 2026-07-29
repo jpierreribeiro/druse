@@ -9,7 +9,7 @@
 
 ```odin
 app_with_state :: proc(state: ^$T) -> App
-state          :: proc(ctx: ^Context, $T: typeid) -> ^T
+state          :: proc(ctx: ^Context, $T: typeid) -> (value: ^T, ok: bool)
 ```
 
 ```odin
@@ -27,7 +27,11 @@ main :: proc() {
 }
 
 handler :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	// s.db, s.sessions
 }
 ```
@@ -35,9 +39,29 @@ handler :: proc(ctx: ^web.Context) {
 One value, not many. A new service is a new **field**, and that struct
 declaration is your entire service list.
 
-`web.state` asserts the type before it casts, so a wrong type aborts at the
-first request rather than reading the wrong bytes. `app_with_state` rejects a
-nil pointer.
+**Check `ok`.** It is `false` when no state was registered, or when the type
+does not match — and then `value` is `nil` and must not be dereferenced.
+
+The check is `typeid` equality, exactly. There is no subtyping walk and no
+"close enough": casting a `^Config` to a `^Database` because both are pointers
+is the defect this exists to prevent.
+
+**Why two values rather than an assert.** This used to return a bare `^T` and
+abort on failure. Odin has no recoverable panic, so one handler asking for the
+wrong type took down every in-flight request on every lane — a whole server
+stopped by a mistake confined to one route. It now reports and returns
+`(nil, false)`, and your application decides: answer `500` for that request and
+keep serving, or stop deliberately.
+
+The `ok` is **not** `#optional_ok`, deliberately. That would let every old call
+site keep compiling and silently receive `nil`, turning a loud abort into a
+segfault with no message. Both failures also log at Error level before
+returning, so ignoring `ok` still leaves you a sentence naming the mistake.
+
+There is no `Framework_Error` member for this. The framework answered the
+question it was asked; ignoring the answer is an application error.
+
+`app_with_state` rejects a nil pointer.
 
 **The state must outlive the application.** A local in `main` works because
 `main` blocks in `web.serve`. Build the application inside a helper that

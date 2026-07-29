@@ -37,13 +37,18 @@ main :: proc() {
 }
 
 greet :: proc(ctx: ^web.Context) {
-	s := web.state(ctx, App_State)
+	s, ok := web.state(ctx, App_State)
+	if !ok {
+		web.internal_error(ctx)
+		return
+	}
 	web.text(ctx, .OK, s.greeting)
 }
 ```
 
-`web.state` asserts the type before it casts. A wrong type aborts at the first
-request rather than reading the wrong bytes.
+`web.state` returns `(value, ok)`. `ok` is `false` when nothing was registered
+or the type does not match, and then `value` is `nil`. Check it — see
+[`../03-subjects/context-and-state.md`](../03-subjects/context-and-state.md).
 
 One value, not many. When you need a second service, add a field. That struct
 is your service list, and its declaration is the only place it exists.
