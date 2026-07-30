@@ -35,7 +35,12 @@ MATRIX="$ROOT/bench/application_matrix"
 ODIN_BIN="${DRUSE_ODIN_BIN:-odin}"
 SERVER_CPUS="${DRUSE_BENCH_SERVER_CPUS:-0-3}"
 LOAD_CPUS="${DRUSE_BENCH_LOAD_CPUS:-4-7}"
-PORT="${DRUSE_BENCH_PORT:-8080}"
+# Every server in this matrix binds a fixed port in its own source: Druse 8080,
+# every peer 8081. They are not configurable, and pretending otherwise is how a
+# runner reports "did not become ready" for a server that was running fine.
+DRUSE_PORT=8080
+PEER_PORT=8081
+PORT="$DRUSE_PORT"
 LANES="${DRUSE_BENCH_LANES:-4}"
 
 mkdir -p "$OUT"/{bin,runs}
@@ -84,7 +89,24 @@ fi
   echo "fastify_included=$have_fastify"
 } >"$OUT/manifest.txt"
 
+port_of() { # server-name -> the port its source binds
+  case "$1" in
+    druse) echo "$DRUSE_PORT" ;;
+    *)     echo "$PEER_PORT" ;;
+  esac
+}
+
 start_server() { # name -> writes $OUT/server.pid
+  PORT="$(port_of "$1")"
+  # REFUSE to start if the port is already held. Without this the readiness
+  # probe below is satisfied by SOMEBODY ELSE'S server: an orphan from a
+  # previous run answers /health, the run proceeds, and every number describes a
+  # process this script never started and is about to kill underneath itself.
+  # Not hypothetical — it happened on this file's first smoke, and the tell was
+  # conn_reused=0 with a p50 of nineteen seconds.
+  if ss -ltn 2>/dev/null | grep -q ":$PORT[[:space:]]"; then
+    fail "port $PORT is already in use; refusing to measure a server this script did not start"
+  fi
   case "$1" in
     druse)   taskset -c "$SERVER_CPUS" "$OUT/bin/druse" "$LANES" >"$OUT/runs/$1-server.log" 2>&1 & ;;
     nethttp|gin|fiber)
@@ -110,6 +132,14 @@ stop_server() {
   kill -KILL "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   rm -f "$OUT/server.pid"
+  # And wait for the socket to actually go away. A killed process releases its
+  # port asynchronously, so starting the next server immediately is how this
+  # script springs the orphan trap above on itself.
+  for _ in $(seq 1 100); do
+    ss -ltn 2>/dev/null | grep -q ":$PORT[[:space:]]" || return 0
+    sleep 0.1
+  done
+  fail "port $PORT is still held after stopping the server"
 }
 
 # endpoint name | path | method | payload
