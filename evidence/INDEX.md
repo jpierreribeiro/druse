@@ -48,6 +48,33 @@ Os diretórios extraídos são a cópia de trabalho dos resultados. Os arquivos 
 `archives/` são a segunda representação local, autocontida e verificada por
 hash. Nada listado aqui depende de `/tmp` ou de uma VPS continuar disponível.
 
+
+### Corridas por execução, fora do git
+
+Os arquivos por corrida das campanhas de 2026-07-30 **não estão no git**, e isso
+é deliberado. O que o repositório guarda de cada campanha é o que **audita a
+alegação** — `summary.txt`, `manifest.txt`, `SHA256SUMS`, `README.md` e
+`verdict.json`, 43 arquivos no total. Os 934 arquivos por corrida, que só servem
+para **recomputar**, ficam nos tarballs abaixo, com o hash registrado aqui.
+
+A regra vale para as próximas campanhas: um PR de campanha custava 46.088 linhas,
+das quais 40.405 eram JSON gerado por máquina. Com este corte, custa 7.764.
+
+| Campanha | Arquivo | SHA-256 |
+|---|---|---|
+| `2026-07-30-application-matrix` | `archives/2026-07-30-application-matrix-raw-runs.tar.gz` | `b8ce08fffda1fa3badc5154a062bc0069e4efaaa6ef2db4e3911610dcd1bcf5c` |
+| `2026-07-30-encode-profile` | `archives/2026-07-30-encode-profile-raw-runs.tar.gz` | `85d88ea078e4add117d74611ca71ddfb8eb58336dc6c7eceaa79f46af7d8e80e` |
+| `2026-07-30-encode-prototype` | `archives/2026-07-30-encode-prototype-raw-runs.tar.gz` | `cbd6868480b1feac35cf81f46334de11bbcfc0779e96840f2a66d652049e6bd5` |
+| `2026-07-30-host-cleanup` | `archives/2026-07-30-host-cleanup-raw-runs.tar.gz` | `89e6f3b2fccf8b93135b9f3f0fddd791d4d8fd8cbf8009ffc51db56f6d7c293a` |
+| `2026-07-30-json-knee` | `archives/2026-07-30-json-knee-raw-runs.tar.gz` | `5934dc4b361c0a2ab2b8cb8b4919d27786b29a9404c0b9f49165f559fde5c01d` |
+| `2026-07-30-own-marshal` | `archives/2026-07-30-own-marshal-raw-runs.tar.gz` | `91fa9c98e4dfc3f2df03ac3c0d165bb0d589848c8d20e039e03c9f8fc585887a` |
+| `2026-07-30-saturation-experiment` | `archives/2026-07-30-saturation-experiment-raw-runs.tar.gz` | `ce8fcbb6db59303024db501326926df3b15ca0b7af27ddbb9efd05b61d8bee27` |
+| `2026-07-30-six-framework-matrix` | `archives/2026-07-30-six-framework-matrix-raw-runs.tar.gz` | `a1e93920f573054a5bed62c62be154e7136bd7d01affedb078cd4b53978d8ac6` |
+
+Reproduzir é o caminho de recuperação, não reler o tarball: cada `manifest.txt`
+carrega o commit, o toolchain, o kernel, as taxas e o sha256 de cada binário
+medido.
+
 ## Revisões
 
 - Core usado no soak de 12 horas: `d2d3a972077135f9b12557c61d306f3fdd5c42fa`.
