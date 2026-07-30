@@ -98,6 +98,24 @@ without writing, because the response is already committed.
 
 Every `web.use` goes before every route. The build refuses the other order.
 
+**`web.logger` writes to `context.logger`, and Odin gives you none by default,**
+so on the program above it prints nothing. Druse does not import `core:log` —
+that would cost about 37 KiB in every binary, including the ones that never log
+— so installing a logger is the application's line to write:
+
+```odin
+import "core:log"
+
+main :: proc() {
+	context.logger = log.create_console_logger()
+	// ... the rest of main
+}
+```
+
+This is not only about request lines. **Every framework diagnostic goes the same
+way**, so without a logger a failure reports nowhere — including a `web.serve`
+that could not bind its port.
+
 ## Next steps
 
 - [`03-subjects/routing.md`](03-subjects/routing.md) — parameters, groups, and

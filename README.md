@@ -246,7 +246,11 @@ particular what the framework does and does not bound.
   and correlation IDs (`web.request_id`) with a tested trust policy.
 - One log line per request (`web.logger`) and a typed framework-error
   observer (`web.observe`) — each costs zero bytes in an application that
-  does not use it, proven by `nm` in the gate.
+  does not use it, proven by `nm` in the gate. **`web.logger` writes to
+  `context.logger`, and Odin installs none by default**, so an application that
+  wants those lines — or any framework diagnostic — assigns one in `main`.
+  Druse does not import `core:log` on your behalf: that would cost about 37 KiB
+  in every binary (`docs/middleware.md`).
 - Path and query extractors that respond with a standardized `400` on bad
   input, so handlers only check a bool and return.
 - JSON request bodies (`web.body`) with a fixed 4 MiB cap, decoded into a
