@@ -3,16 +3,139 @@
 All notable changes to Druse are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Versioning is **not** semantic yet, because **there has been no release**. No
-tag exists, and cutting one is an owner decision.
+Versioning is **pre-1.0 semantic**: while the MAJOR is `0`, a breaking change
+moves the MINOR. The series is `v0.9.0-pilot` and `v0.9.1-pilot`, both
+controlled pilots, then `v0.10.0` — the first release not marked a pilot.
 
-## [Unreleased]
+## [0.10.0] — 2026-07-30
 
-Phase 1 is complete and its public contracts are frozen. What "frozen" means,
-symbol by symbol with the evidence behind each, is in
-`planning/phase-1-freeze.md`. Phase 2 is frozen (`planning/phase-2-freeze.md`)
-and Phase 3 is under way; ledger growth in either is recorded as a numbered
-freeze amendment, never as a snapshot refresh.
+The first release under the name **Druse**, and the first that is not marked a
+pilot. 97 commits since `v0.9.1-pilot`. The public ledger is unchanged at 80
+application + 2 test-support symbols, but **three frozen shapes changed inside
+that count**, so read *Breaking* before upgrading.
+
+### Renamed
+
+- **The product is Druse.** The repository is `druse`, the Odin collection is
+  `druse:`, and the extension repository is `druse-crystals`. The documentation
+  had already been renamed by decision (`planning/documentation-program.md` §2);
+  this release closes the gap in the source, so `-collection:druse=` and
+  `import web "druse:web"` are true against a fresh checkout. Three effects an
+  upgrade must handle:
+  - **log prefix** — every `web.logger` line and every framework diagnostic now
+    begins `druse: `. Anything grepping the old prefix stops matching.
+  - **spool files** — the prefix is `druse-spool-`, and `enable_upload` sweeps
+    only its own prefix at boot. Orphans left by a previous version stay on
+    disk; remove them once, by hand.
+  - **build defines** — the knobs are `-define:DRUSE_*`. Odin does not reject an
+    unknown define, so a script still passing the old name loses the setting
+    silently rather than failing.
+
+### Breaking
+
+- **`web.state` returns `(value: ^T, ok: bool)`.** It used to return a bare
+  `^T`, which gave a handler no way to distinguish "the application has no state
+  of this type" from a valid pointer — the caller either trusted it or crashed.
+  Call sites take the pair and answer a missing state explicitly; the suites use
+  `state_ok` where a second `ok` would clash. Fault isolation was the point: a
+  handler that asks for the wrong type now gets a `false`, not a fault.
+- **`Limits` gains `max_response_bytes` and `max_json_nodes`.** Positional
+  initialisation of `Limits` no longer compiles as written; field-named
+  initialisation is unaffected. `DEFAULT_LIMITS` carries the new defaults.
+- **`Framework_Error` gains `Response_Too_Large`** and **`Server_Stats` gains
+  `saturation_refusals` and `handler_dwell_ns`.** An exhaustive `switch` over
+  the enum, or a positional `Server_Stats` literal, must be updated.
+
+### Added
+
+- **`Limits.max_json_nodes` bounds JSON structural cost**, default 100,000
+  values plus object keys, `0` disables. Two well-formed bodies *inside* the
+  4 MiB `max_body` measured **588 MB of RSS** and **1.6–2.1 s of one Handler
+  lane**: `max_body` bounds bytes, and bytes are not what decode cost scales
+  with. At the default those bodies cost 20 MB and 50 ms. A breach is `413`
+  with code `body_too_complex`, not `body_too_large` — a client that retries by
+  shrinking bytes has misread it.
+- **`Limits.max_response_bytes`** and the `Response_Too_Large` framework event,
+  so an oversized response is a bounded, observable refusal.
+- **Saturation refusal happens before HTTP dispatch**, counted in
+  `Server_Stats.saturation_refusals`, with `handler_dwell_ns` exposing how long
+  work waits for a lane.
+
+### Changed — performance
+
+- **Strict JSON request decoding is fused**, sharing field-target descriptors
+  across the decode instead of resolving each field by reflection. Measured on
+  AWS c5.2xlarge, order alternated, two blocks of six measurements per variant
+  plus two 30-second profiles:
+  - decode throughput **+15.63%**;
+  - peak RSS (HWM) **+1.08%**, against a pre-registered ceiling of +5%;
+  - median maximum RSS **+0.64%**;
+  - `reflect::struct_tag_lookup` frames **7,296 → 121** (**−98.34%**), and
+    `perf report` **15.20% → 0.26%** of cycles.
+- **`Allow` names `HEAD` and `OPTIONS`**, because the server answers them.
+  A GET-only route emitted `Allow: GET` while HEAD answered 200 and OPTIONS
+  answered 204, so the header described what an application had typed rather
+  than what the server does. The frozen order is
+  `GET, [HEAD,] POST, PUT, PATCH, DELETE, OPTIONS`.
+
+### Fixed
+
+- **Control bytes are refused in a header field line, in both directions** — a
+  request carrying one is answered 400, and `web.set_header` refuses a value
+  containing one. `X-Test: a\x01b` was previously answered 200 and echoed back
+  onto the wire.
+- **An absolute-form request target whose authority disagrees with `Host` is
+  refused**, rather than repaired. `OPTIONS *` is exempt.
+- **A stalled send is a write abort, not a slow request** (deadline
+  attribution), and `web.stream` after a committed response is refused.
+- **Allocation failure in the transport degrades instead of dying.**
+- **A duplicate stream-slot unlock is gone**, and the read buffer is returned
+  between requests on the scanner path.
+- **Orphaned upload spools are swept at server start**, not at first use.
+- **`If-None-Match` is parsed as a list and compared weakly**, per RFC 9110.
+- **A subsystem audit fixed seven defects with negative controls**, and several
+  suites that could not fail were repaired — including the raw-wire corpus,
+  where a case had been passing for the wrong reason.
+
+### Documented
+
+- **A teaching guide** (`docs/guide/`): concepts, build notes, subjects, rules,
+  recipes and a cookbook whose programs are extracted from compiling sources
+  rather than typed, plus `docs/STYLE.md` and `docs/GLOSSARY.md`. Every ledger
+  symbol is taught on a page, and the gate enforces it.
+- **A generated API reference** (`docs/reference/`), checked against the
+  compiler's own inventory.
+- The README, `planning/roadmap.md` and `planning/release-readiness.md` are
+  reconciled with the shipped state: the ledger is 80 + 2, phases 1–7 are
+  frozen, Phase 8 has a verdict, and releases exist.
+
+### Verification
+
+`build/check.sh` on the pinned toolchain (`dev-2026-07a`, commit `819fdc7`),
+plus a **12-hour mixed soak** on AWS c5.2xlarge — **running as this entry is
+written, started 2026-07-29T22:27:47Z, due 2026-07-30T10:28Z; its result
+replaces this sentence before the tag is cut** — driving `/health` 20/s, `/tiny`
+10,000/s, JSON encode 1,500/s, JSON decode 4,000/s, 64 KiB responses 150/s, a
+40 ms blocking handler 15/s, with RST and slow readers injected every fifth
+cycle. Criteria were pre-registered before the run: zero health transport
+errors, health p99 under 250 ms every cycle, at most 0.01% transport error
+elsewhere, no unexpected HTTP status, constant thread count, final FDs within
+baseline + 4, and RSS tail slope at most 1 MiB/h over the second half.
+
+**Where that evidence stops, stated rather than blurred.** The soak runs on
+`9b46a46`, the revision immediately before the rename. The tagged commit is the
+rename on top of it: verified by the full gate, not by its own 12-hour soak. The
+rename is a scripted substitution over 412 files that renames no public symbol
+and touches no control flow, and its three runtime-visible effects are the ones
+listed under *Renamed* above. Re-soaking the tag was considered and judged
+unnecessary; this paragraph is the record of that judgement.
+
+## Earlier changes, unsectioned
+
+Everything below accumulated under a single `[Unreleased]` heading, including
+the work the two pilot tags carried. It is kept verbatim rather than
+retro-assigned to versions after the fact: the boundaries were never recorded
+at the time, and inventing them now would be a guess dressed as a record.
 
 ### Changed
 
