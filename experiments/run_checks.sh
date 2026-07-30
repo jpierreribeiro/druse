@@ -46,6 +46,7 @@ check 07-middleware-chain     run  "middleware-chain"
 check 08-transport-boundary   run  "transport-boundary"
 check 09-test-transport       test "test-transport"
 check 10-handler-errors       test "handler-errors"
+check 25-marshal-parity       run  "marshal-parity"
 
 echo "--- optional-ok plain-result discard probe (expected compile failure) ---"
 DRUSE_OPTIONAL_OUTPUT="$(odin check "$HERE/04-optional-ok/probes/plain_discard.odin" -file $COLL 2>&1)"
