@@ -2810,3 +2810,83 @@ pass, and control 2 proves that path is still a real validation rather than a
 decorative branch. The flag is kept for one release, matching the
 dedicated-accept and `JSON_FUSED_*` rollouts; removing it later means deleting
 the `when`/`else` pair, control 2 and control 5 together.
+
+## Amendment 42 — WP-ENC2: a Druse-owned marshal walk behind a flag, no ledger growth
+
+**Date: 2026-07-30. Authority: the encode-path investigation of 2026-07-30.
+Ledger effect: none; application remains 80 and test-support remains 2.** Every
+symbol added is `@(private)`; `JSON_OWN_MARSHAL` is a `#config` an application
+cannot see. **Dependency effect: none** — `core:mem`, `core:reflect`,
+`core:strconv` and `core:strings` were already in the manifest.
+
+**What changes, and what does not.** `web/json_encode.odin` adds a marshal walk
+that writes through the measured quoted-string writer. It is **NOT adopted**:
+`DRUSE_JSON_OWN_MARSHAL` defaults to `false`, and no end-to-end number exists
+for it yet. `docs/reports/` carries no claim about it, deliberately.
+
+**Why it is a subset with a fallback rather than a replacement.** The shape is
+this package's own decoder, inverted: `web/json_decode.odin`'s
+`json_tree_type_supported` answers whether the fast path covers a type, and
+`false` means "fall back to the stdlib", never "reject the request".
+`json_own_supports` does the same, for the WHOLE type, **before a byte is
+written** — a fallback discovered three levels deep, after half a document is in
+the buffer, is not a fallback. The answer is cached per instantiation with
+`@(static)`, the mechanism Amendment 41's gate already relies on.
+
+**Three constraints shaped the design, and each was found by the gate rather
+than by foresight. That is what the gate is for, and it is worth recording:**
+
+1. **`base:runtime` is not in the manifest.** Covering `map`,
+   `Enumerated_Array` and `Fixed_Capacity_Dynamic_Array` needs
+   `runtime.map_cap`, `map_kvh_data_dynamic`, `map_cell_index_dynamic` and
+   `map_hash_is_valid`. Adding a frozen dependency for a path that is off by
+   default and unmeasured inverts this project's order, so those shapes are
+   **declined** and go to the stdlib.
+2. **`any` is banned from every line of `web/`** (G-03/ADR-011), by grep over
+   the whole package rather than over exported declarations —
+   `check_public_api.sh` rejected the first version for it. The stdlib
+   marshaller is written entirely in `any`, so this walk carries
+   `(data: rawptr, id: typeid)` and reads scalars through width-dispatched
+   casts, exactly as `web/json_decode.odin` already does on the way in.
+3. **The stdlib's emptiness flag is banned from `web/`** (AMEND-2), because the
+   rule decides on emptiness and would also drop a field legitimately named
+   `""`. The walk therefore **declines any struct whose `json:"…"` tag carries
+   flags at all**, without naming the flag: a comma in the tag sends the type to
+   the stdlib, which owns the rule. One implementation of it, not two.
+
+**Equivalence, and where each half is proven.** `tests/enc3-own-marshal` runs in
+the gate and makes two assertions per type: the coverage `json_own_supports`
+claims is **pinned in the test**, and where it claims coverage the bytes must
+equal `encoding_json.marshal`'s. The pinned boolean is the load-bearing half —
+the walk falls back for what it does not cover, and a fallback is correct by
+construction, so an output-only test would stay green while a widened coverage
+claim rotted. `experiments/25-marshal-parity` is the wider ratification: 36
+whole documents, the rejection set, and the shapes this file declines.
+
+It has already earned its keep. The first version of the walk accepted an enum
+in `json_own_supports` and declined it in `json_own_write`, because
+`reflect.type_info_base` resolves a NAMED type but leaves an enum an enum. The
+fallback would have hidden that as a silent loss of the fast path on every
+payload holding an enum. ENC3 turned it red.
+
+**The key/value escape asymmetry is reproduced, on purpose.** The stdlib writes
+object keys with `for_json = false` and string values with `for_json = true`, so
+the same U+0007 is spelled `\a` in a key and as a `\u`-escape in a value — and
+`\a` is not a JSON escape. `encoding_json.is_valid` does not apply escape rules
+inside keys and passes such a body. Both facts are measured in
+`experiments/25-marshal-parity`, not inferred. `tests/enc1-quoted-string` now
+proves BOTH spellings exhaustively — every rune and every byte, in each mode —
+and asserts they still differ, so the key path cannot be quietly "fixed" under a
+performance change. **Whether Druse should diverge from the stdlib here is a
+wire-behaviour decision that needs its own ADR**, and it is not taken here.
+
+**R-05 is untouched.** Nothing in the new path commits. A `false` from
+`json_own_write` discards the buffer and takes the stdlib path, which costs work
+and never correctness. The ownership contract is unchanged because the shape is:
+the stdlib marshaller also returns `b.buf[:]` from a Builder made with the same
+allocator, so `response_commit_owned` frees the same thing either way.
+
+**Rollback.** Delete `web/json_encode.odin` and `tests/enc3-own-marshal/`,
+remove the `when JSON_OWN_MARSHAL` block from `web/respond.odin` and the two
+ENC3 blocks from `build/check.sh`. Nothing else moves: the flag is off, so no
+shipped behaviour depends on any of it.

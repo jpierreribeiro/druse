@@ -14,6 +14,7 @@ package web
 import encoding_json "core:encoding/json"
 import "core:reflect"
 import "core:mem"
+import "core:strings"
 
 // The stdlib import is ALIASED because this package exports a procedure named
 // `json`. Without the alias the two collide — the same failure experiment 02
@@ -179,7 +180,45 @@ json :: proc(ctx: ^Context, status: Status, value: $T) {
 		return
 	}
 
-	data, err := encoding_json.marshal(value, {}, context.allocator)
+	data: []byte
+	err: encoding_json.Marshal_Error
+
+	// WP-ENC2. The Druse-owned walk, behind a build flag until an A/B says it
+	// earns the default. `json_own_supports` decides for the WHOLE type before
+	// a byte is written — a fallback discovered three levels deep, after half a
+	// document is in the buffer, is not a fallback — and the answer is cached
+	// per instantiation exactly as the validation gate's is.
+	//
+	// The ownership contract is unchanged because the shape is: the stdlib
+	// marshaller also hands back `b.buf[:]` from a Builder made with the same
+	// allocator, so `response_commit_owned` frees the same thing either way.
+	//
+	// R-05 is untouched. Nothing here commits; a `false` from `json_own_write`
+	// discards the buffer and takes the stdlib path, which costs work and never
+	// correctness.
+	when JSON_OWN_MARSHAL {
+		// 0 unknown, 1 the Druse walk, 2 the stdlib.
+		@(static) own: int
+		if own == 0 {
+			own = json_own_supports(T) ? 1 : 2
+		}
+		if own == 1 {
+			builder := strings.builder_make(context.allocator)
+			payload := value
+			if json_own_write(&builder, rawptr(&payload), T) {
+				if len(builder.buf) != 0 {
+					data = builder.buf[:]
+				}
+			} else {
+				strings.builder_destroy(&builder)
+				data, err = encoding_json.marshal(value, {}, context.allocator)
+			}
+		} else {
+			data, err = encoding_json.marshal(value, {}, context.allocator)
+		}
+	} else {
+		data, err = encoding_json.marshal(value, {}, context.allocator)
+	}
 
 	// NUM-001 (IEEE 754 boundary; RFC 8259 §6). The pinned marshaller writes a
 	// non-finite float — `NaN`, `+Inf`, `-Inf` — as a BARE token, which is not

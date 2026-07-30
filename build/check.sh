@@ -1663,6 +1663,37 @@ trap - EXIT
 test ! -d "$DRUSE_ENC1_TMP" || fail "the throwaway ENC1 test package was not removed"
 echo "PASS: ENC1 ran against the real sources; throwaway package removed"
 
+# ENC3 — the Druse-owned marshal walk. Two assertions per type: the coverage
+# `json_own_supports` claims is PINNED, and where it claims coverage the bytes
+# must equal the stdlib's. The pinned boolean is the load-bearing half: the walk
+# falls back for what it does not cover, and a fallback is correct by
+# construction, so an output-only test would stay green while a widened
+# coverage claim rotted.
+echo "--- ENC3 own marshal walk: pinned coverage + byte parity (odin test) ---"
+DRUSE_ENC3_TMP="$(mktemp -d -t druse-enc3-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_ENC3_TMP"' EXIT
+cp "$DRUSE_ROOT"/web/*.odin "$DRUSE_ENC3_TMP/"
+cp "$DRUSE_ROOT"/tests/enc3-own-marshal/*.odin "$DRUSE_ENC3_TMP/"
+timeout 180 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ENC3_TMP" \
+  "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_BIN_TMP/enc3-own-marshal" ||
+  fail "the ENC3 own-marshal suite did not pass within the timeout"
+rm -rf "$DRUSE_ENC3_TMP"
+trap - EXIT
+test ! -d "$DRUSE_ENC3_TMP" || fail "the throwaway ENC3 test package was not removed"
+echo "PASS: ENC3 ran against the real sources; throwaway package removed"
+
+# The own-marshal path is a build-time rollback in the other direction: it is
+# OFF by default, so the state that needs proving is the one that is not
+# compiled by every other step. The public contract must be identical in both.
+echo "--- WP6 public surface under -define:DRUSE_JSON_OWN_MARSHAL=true ---"
+timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/wp6-public-surface" \
+  "-collection:druse=$DRUSE_ROOT" -define:DRUSE_JSON_OWN_MARSHAL=true \
+  -out:"$DRUSE_BIN_TMP/wp6-own-marshal" ||
+  fail "the WP6 contract does not hold with the Druse-owned marshal walk enabled"
+echo "PASS: the public response contract is identical with the own marshal walk on"
+
 # The gate leaves NO artifact in the working tree.
 rm -rf "$DRUSE_BIN_TMP"
 if find "$DRUSE_ROOT" -maxdepth 1 -type f -name 'druse-*' -print -quit | grep -q .; then
