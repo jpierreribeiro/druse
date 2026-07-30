@@ -33,7 +33,7 @@ package web
 import "base:runtime"
 import "core:mem"
 import "core:testing"
-import "uruquim:web/internal/transport"
+import "druse:web/internal/transport"
 
 // A tracking allocator installed on `context.allocator` only.
 //

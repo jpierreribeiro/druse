@@ -27,35 +27,35 @@
 # split WP16 used).
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP17-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W17_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W17_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W17_ODIN="$(command -v odin)"
+DRUSE_W17_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W17_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W17_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W17_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W17_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W17_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W17_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W17_ODIN"; then
-  echo "WP17 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W17_ODIN"; then
+  echo "WP17 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W17_TMP="$(mktemp -d -t uruquim-wp17-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W17_TMP"' EXIT
+DRUSE_W17_TMP="$(mktemp -d -t druse-wp17-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W17_TMP"' EXIT
 
 # One throwaway internal package per control: the real web/ sources plus the
 # real WP17 internal tests, exactly as build/check.sh assembles them.
 internal_tree() { # name
-  local t="$URUQUIM_W17_TMP/$1"
+  local t="$DRUSE_W17_TMP/$1"
   mkdir -p "$t"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/"
-  cp "$URUQUIM_ROOT"/tests/wp17-internal/*.odin "$t/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/"
+  cp "$DRUSE_ROOT"/tests/wp17-internal/*.odin "$t/"
   printf '%s' "$t"
 }
 
@@ -67,8 +67,8 @@ assert_mutated() { # label file before-hash
 }
 
 run_selected() { # tree test-names -> stdout+stderr; returns odin test's exit
-  env -u ODIN_ROOT "$URUQUIM_W17_ODIN" test "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W17_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W17_ODIN" test "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W17_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 

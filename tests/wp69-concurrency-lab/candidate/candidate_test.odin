@@ -2,7 +2,7 @@ package wp69_candidate
 
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 @(test)
 four_lanes_keep_health_live_with_three_blocked_handlers :: proc(t: ^testing.T) {

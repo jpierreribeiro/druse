@@ -1,6 +1,6 @@
 # Transport Conformance
 
-How Uruquim proves that a transport is correct, and what "correct" means for
+How Druse proves that a transport is correct, and what "correct" means for
 each of the three layers. Written for whoever adds the second adapter — the
 future official `core:net/http` one — because the rule is that **every real
 transport passes the same corpus**.

@@ -6,7 +6,7 @@ below is approved; signatures are born from WP86 evidence and freeze only in
 WP101.
 
 **Entry snapshot:** Phase 6 is frozen — the concurrency half in this repository
-anchored at `f51fc127`, the data half in `uruquim-crystals` — and the corrective
+anchored at `f51fc127`, the data half in `druse-crystals` — and the corrective
 Phase 6.5 ran after it (core PRs #103–#111). The live ledger is **63
 application + 2 test-support = 65**: Phase 6 added no symbol and Phase 6.5
 added exactly one (`web.is_draining`, ADR-040, Phase-1-freeze Amendment 27).
@@ -174,7 +174,7 @@ space. Blocking send-until-space is a non-goal, permanently.
 | in-memory prefix/field bytes | 64 KiB per upload | fields and part headers stay bounded in memory; exceeding refuses the request |
 | per-upload spool quota | 1 GiB | mid-body breach cancels the spool, deletes the file, answers with a typed terminal result |
 | process-wide spool quota | 8 GiB | checked throughout ingestion, not only at admission |
-| temp directory | application-designated, required for opt-in; no silent `/tmp` default | files `0600`, unpredictable generated names with the `uruquim-spool-` prefix, never the client filename |
+| temp directory | application-designated, required for opt-in; no silent `/tmp` default | files `0600`, unpredictable generated names with the `druse-spool-` prefix, never the client filename |
 | cleanup deadline | request teardown; at drain, `max_drain_time` bounds cancellation of active spools | non-persisted files are removed on every path: success, refusal, disconnect, disk-full, shutdown |
 
 **Pre-registered outcomes.** Disk-full and filesystem errors are typed
@@ -182,7 +182,7 @@ terminal results and delete the partial spool; the wire mapping is decided by
 WP93 evidence, never a silent 200 or a hang. Mid-upload client disconnect
 cancels the spool and deletes the file. Shutdown cancels active spools within
 `max_drain_time` with exactly-once cleanup. Crash remnants are the documented
-operator concern the `uruquim-spool-` prefix exists for: the core never scans
+operator concern the `druse-spool-` prefix exists for: the core never scans
 directories at boot (the no-boot-side-effect rule from ADR-036 territory
 holds). Explicit persistence transfer is the only path that leaves a file, and
 it renames the file out of the spool namespace.
@@ -237,7 +237,7 @@ do not replace ordinary Handlers").
 Reproduced from `sync-async-evaluation.md` §1; every Phase-7 document uses
 these terms:
 
-| Layer | Current Uruquim | Meaning |
+| Layer | Current Druse | Meaning |
 |---|---|---|
 | connection I/O | asynchronous/non-blocking | `core:nbio` waits for socket readiness without one Handler/thread per idle connection |
 | application Handler | synchronous | one ordinary procedure runs until it returns |
@@ -284,7 +284,7 @@ recorded here because Phase 7 owns the last plan refresh before WP102 runs.
 
 Per the owner decision of 2026-07-22 (recorded in `decisoes-do-dono.md`,
 merged in PR #102), Phase 7 mirrors Phase 6's two-half structure. This spec is
-the core half's gate; the **composition half** ships in `uruquim-crystals`
+the core half's gate; the **composition half** ships in `druse-crystals`
 against the frozen Phase-6 core (`f51fc127`) and may run in parallel:
 
 - **`http_client`** — outbound HTTP/1.1 over `core:net`: bounded connection
@@ -328,7 +328,7 @@ investigative step is recorded: prove which proc emits the send under
 `web.serve` with an observable close keyed on a field set at the top of
 `response_send_got_body`; check for a second `response.odin` instance; inspect
 the adapter's `write_response`/`respond`. Known trap: a test importing
-`uruquim:vendor/odin-http` directly reads a **different package instance**
+`druse:vendor/odin-http` directly reads a **different package instance**
 than `web` uses — measure behaviour, never counters.
 
 WP90 rewrites exactly this vendored transport path for incremental writes, so

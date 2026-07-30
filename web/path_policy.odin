@@ -1,10 +1,10 @@
 package web
-// uruquim:file application
+// druse:file application
 
 // WP31b — the path policy: REJECT, do not transform.
 //
 // The decision is `planning/phase-3-spec.md` §1, accepted by the owner on
-// 2026-07-20. Uruquim normalises nothing, and rejects the paths where the
+// 2026-07-20. Druse normalises nothing, and rejects the paths where the
 // absence of normalisation would be dangerous.
 //
 // WHY REJECT RATHER THAN NORMALISE. Path normalisation is where

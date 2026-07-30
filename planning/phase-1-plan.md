@@ -25,7 +25,7 @@ runs on the pinned toolchain.
 - **API.** none.
 - **Tests first.** `build/check_test.sh` verifies the release/commit/digest
   pin, accepts the real compiler, observes 10/10 prototypes through the
-  `uruquim` collection mapping, and rejects a divergent compiler. It does not
+  `druse` collection mapping, and rejects a divergent compiler. It does not
   check `web/`, which belongs to WP1.
 - **Min impl.** pin + verification-only checker + tracked pre-push hook; VPS
   timer fetches a public branch, archives a clean commit, and runs the checker
@@ -100,7 +100,7 @@ runs on the pinned toolchain.
   application + 2 test-support.
 - **Dependency direction (ratified in WP3).** One-way only:
   `web` (facade) → `web/testing` (machinery) → neutral internal/boundary
-  types. `web/testing` MUST NOT import `uruquim:web` — the back-edge is a
+  types. `web/testing` MUST NOT import `druse:web` — the back-edge is a
   compile-time import cycle (`Cyclic importation of 'testing'`, ratified by the
   pinned-toolchain C1/C2/C5 probes). The facade converts `App`, `Method` and the
   captured response across the boundary; the machinery names no `web` type.
@@ -158,7 +158,7 @@ runs on the pinned toolchain.
   The original plan said `web/internal/dispatch/*.odin`. **Refuted by the
   language, not by preference:** in Odin a subdirectory is a separate package,
   and the dispatcher must name `App`, `Handler`, `Context`, `Method` and the
-  internal `Response`. A subpackage would need to import `uruquim:web`, which
+  internal `Response`. A subpackage would need to import `druse:web`, which
   WP3 already ratified as a compile cycle (probe C5,
   `Cyclic importation of 'web_testing'`); the alternatives are duplicating the
   types, a `rawptr` bridge, or a frozen internal ABI — all forbidden. The files
@@ -402,7 +402,7 @@ runs on the pinned toolchain.
     `web/internal/memory/`.** The plan proposed a `web/internal/memory/`
     subpackage. In Odin a subdirectory is a SEPARATE package, and the arena
     machinery must reach `Context_Internal` and the private report — so a
-    subpackage would have to import `uruquim:web` (the back-edge WP3 ratified as
+    subpackage would have to import `druse:web` (the back-edge WP3 ratified as
     a compile cycle, probe C5) or expose an importable auxiliary surface. This
     is the same refutation WP4 recorded for the dispatcher. The machinery is
     therefore a top-level package-private file, and `build/check_public_api.sh`
@@ -507,7 +507,7 @@ runs on the pinned toolchain.
   - **D6 — minimal deterministic execution.** `thread_count = 1` and
     `redirect_head_to_get = false` at the Phase-1 bootstrap. HEAD/OPTIONS gain
     no public method member; the backend router is not used — a single catch-all
-    handler feeds the Uruquim dispatcher. `serve` validates the port (1..65535),
+    handler feeds the Druse dispatcher. `serve` validates the port (1..65535),
     logs and returns without binding on an invalid port or a bind/listen error,
     logs startup only after a successful bind, blocks while serving, and stops
     cleanly via the backend's shutdown. A private idempotent stop exists for

@@ -32,33 +32,33 @@
 # it did not run.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP23-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W23_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W23_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W23_ODIN="$(command -v odin)"
+DRUSE_W23_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W23_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W23_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W23_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W23_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W23_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W23_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W23_ODIN"; then
-  echo "WP23 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W23_ODIN"; then
+  echo "WP23 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W23_TMP="$(mktemp -d -t uruquim-wp23-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W23_TMP"' EXIT
+DRUSE_W23_TMP="$(mktemp -d -t druse-wp23-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W23_TMP"' EXIT
 
 internal_tree() { # name
-  local t="$URUQUIM_W23_TMP/$1"
+  local t="$DRUSE_W23_TMP/$1"
   mkdir -p "$t"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/"
-  cp "$URUQUIM_ROOT"/tests/wp23-internal/*.odin "$t/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/"
+  cp "$DRUSE_ROOT"/tests/wp23-internal/*.odin "$t/"
   printf '%s' "$t"
 }
 
@@ -70,8 +70,8 @@ assert_mutated() { # label file before-hash
 }
 
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W23_ODIN" test "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W23_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W23_ODIN" test "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W23_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 
@@ -254,8 +254,8 @@ T="$(internal_tree positive)"
 NAMES="web.wp23_the_header_is_emitted_exactly_once,web.wp23_without_the_middleware_no_header_is_added,web.wp23_bare_adds_no_header_either"
 assert_green_baseline "$T" "$NAMES" "7: positive control"
 
-if ! OUT="$(env -u ODIN_ROOT "$URUQUIM_W23_ODIN" test "$URUQUIM_ROOT/tests/wp23-public-surface" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W23_TMP/pos" \
+if ! OUT="$(env -u ODIN_ROOT "$DRUSE_W23_ODIN" test "$DRUSE_ROOT/tests/wp23-public-surface" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W23_TMP/pos" \
     "-define:ODIN_TEST_NAMES=test_wp23_public.wp23_public_a_valid_inbound_id_is_honoured,test_wp23_public.wp23_public_is_opt_in" 2>&1)"; then
   echo "$OUT" >&2
   fail "POSITIVE control failed: a well-formed inbound ID is no longer honoured, or the middleware is no longer opt-in. An implementation that rejects everything passes controls 1-3 while destroying correlation"

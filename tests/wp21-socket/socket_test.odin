@@ -20,7 +20,7 @@
 //      and then degrades is the failure mode this excludes.
 //
 // The serve thread is given an EXPLICIT context carrying a quiet logger: the
-// framework emits one Error-level `uruquim:` diagnostic per finalized fault,
+// framework emits one Error-level `druse:` diagnostic per finalized fault,
 // and the test runner treats an Error line as a failure. Non-framework lines
 // are still forwarded, so a genuine failure can still be reported.
 //
@@ -36,8 +36,8 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
-import transport "uruquim:web/internal/transport"
+import web "druse:web"
+import transport "druse:web/internal/transport"
 
 // A port set disjoint from the WP8/WP9/WP17/WP20 candidates.
 @(private = "file")
@@ -61,7 +61,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

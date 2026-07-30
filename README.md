@@ -1,4 +1,4 @@
-# Uruquim
+# Druse
 
 *A web framework for the Joy of Programming.*
 
@@ -11,7 +11,7 @@ productive, and predictable — for humans and for AI coding agents. No code
 generator, no mandatory CLI, no heavy metaprogramming: ergonomics come from
 extractors and canonical helpers.
 
-Uruquim is built on three equally important commitments:
+Druse is built on three equally important commitments:
 
 ```text
 Performance
@@ -35,7 +35,7 @@ The target experience:
 ```odin
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 User :: struct {
 	id:   int    `json:"id"`,
@@ -70,27 +70,27 @@ keep-alive.
 
 AWS c5.2xlarge (8 vCPU), Linux 6.17; server pinned to CPUs 0–3 and
 `wrk -t4` pinned to CPUs 4–7. Peer values are the median of three consecutive
-10-second runs; the corrected Uruquim default is a five-run median. Uruquim used Odin
+10-second runs; the corrected Druse default is a five-run median. Druse used Odin
 `dev-2026-07-nightly:819fdc7`, `-o:speed`, four Handler lanes, and the
 default dedicated-accept path.
 
 | framework/runtime | c100 req/s | c100 p99 | c400 req/s | c400 p99 |
 |---|---:|---:|---:|---:|
 | fasthttp 1.72 / Go 1.26.5 | 282,625 | 1.12 ms | 292,457 | 2.59 ms |
-| **Uruquim / Odin** | **259,233** | **0.646 ms** | **282,426** | **2.38 ms** |
+| **Druse / Odin** | **259,233** | **0.646 ms** | **282,426** | **2.38 ms** |
 | Axum 0.8.9 / Rust 1.97.1 | 250,214 | 0.706 ms | 269,230 | 2.69 ms |
 | Go `net/http` 1.26.5 | 151,226 | 2.54 ms | 150,419 | 7.98 ms |
 | Gin 1.12 / Go 1.26.5 | 148,958 | 2.69 ms | 149,931 | 8.49 ms |
 | Fastify 5.10 / Node 26.5 | 122,769 | 2.00 ms | 123,183 | 3.85 ms |
 
-In this workload Uruquim delivered 91.7% of fasthttp at c100 and 96.6% at
+In this workload Druse delivered 91.7% of fasthttp at c100 and 96.6% at
 c400, while its measured p99 was lower. The build command, raw methodology,
 syscall count, fault evidence, and limitations are in the
 [dedicated-accept report](docs/reports/2026-07-25-dedicated-accept-throughput.md);
-the Uruquim application is in
+the Druse application is in
 [`bench/framework_ping`](bench/framework_ping/README.md).
 
-**Reproducibility, stated plainly.** Only the Uruquim server of this table is
+**Reproducibility, stated plainly.** Only the Druse server of this table is
 committed. `bench/framework_ping/` holds no fasthttp, Axum, `net/http`, Gin or
 Fastify `/ping` peer, no orchestration script pins each peer's worker count or
 CPU affinity, and no raw `wrk` output is kept — nothing in the repository
@@ -98,7 +98,7 @@ invokes `wrk` at all. The peer numbers above therefore cannot be regenerated
 from this checkout, and their toolchain versions do not match the lockfiles that
 back the application matrix (`bench/application_matrix/`, which pins Fastify
 5.8.5 / Node 25.1.0 / Go 1.26.1). Two further caveats belong with the latency
-column: the peer medians are over three runs against Uruquim's five, with no
+column: the peer medians are over three runs against Druse's five, with no
 variance reported, and every figure is closed-loop `wrk` at each server's own
 attained throughput — `--latency` prints a histogram, it does not correct for
 coordinated omission, so these p99s mix service time with queueing and are not
@@ -120,8 +120,8 @@ an explicit advanced surface when needed.
 
 The future Odin `core:net/http` (expected to build on `core:nbio`) is the
 desired canonical transport backend if and when its real API is available and
-validated. Uruquim initially uses `laytan/odin-http` strictly behind an
-internal adapter. No public Uruquim API exposes transport types, so migration
+validated. Druse initially uses `laytan/odin-http` strictly behind an
+internal adapter. No public Druse API exposes transport types, so migration
 is confined to the adapter and conformance work; its difficulty is not assumed.
 
 ## Repository layout
@@ -276,7 +276,7 @@ observable contracts hold.
 **Never, and named just as honestly**
 
 - Panic recovery. Odin has no recoverable panic, so a faulting handler aborts
-  the process and Uruquim expects to run under a supervisor (ADR-020). The
+  the process and Druse expects to run under a supervisor (ADR-020). The
   guarantee it *does* make is narrower and real: a handler that commits no
   response is finalized to a standardized 500, identically in tests and over a
   socket. `docs/errors.md` documents both halves.
@@ -297,7 +297,7 @@ Stated honestly rather than implied:
 - **Tested: Linux x86-64 only.** macOS, Windows and other architectures are
   **untested** today — they may work, and nobody has proven it.
 - **The toolchain pin is part of the contract.** Odin ships monthly `dev-`
-  releases with breaking changes and no package manager, so Uruquim pins one
+  releases with breaking changes and no package manager, so Druse pins one
   release, one commit and one asset checksum in
   [`odin-version.txt`](odin-version.txt), and the gate refuses any other
   compiler. Re-pinning is a deliberate, recorded change — not an upgrade that
@@ -330,7 +330,7 @@ known-limitations section that does not flatter the framework.
 
 ## Licence, security and contributing
 
-Uruquim is [MIT licensed](LICENSE).
+Druse is [MIT licensed](LICENSE).
 
 It parses HTTP from untrusted clients, so it has a real attack surface. If you
 find a security problem, please report it privately — [`SECURITY.md`](SECURITY.md)
@@ -345,9 +345,9 @@ Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md). There has been
 no release: no tag exists, and cutting one is the owner's decision. What happens
 next is planned in [`planning/roadmap.md`](planning/roadmap.md).
 
-**Consuming Uruquim.** Odin has no package manager
+**Consuming Druse.** Odin has no package manager
 [by design](https://odin-lang.org/docs/faq/), so vendor the `web/` directory or
-add this repository as a submodule, and build with `-collection:uruquim=<path>`.
+add this repository as a submodule, and build with `-collection:druse=<path>`.
 The Odin toolchain version is part of the contract — the pinned release, commit
 and asset checksum are in `odin-version.txt`.
 

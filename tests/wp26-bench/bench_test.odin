@@ -30,8 +30,8 @@ package test_wp26_bench
 
 import "core:mem"
 import "core:testing"
-import bench "uruquim:tests/support/bench"
-import web "uruquim:web"
+import bench "druse:tests/support/bench"
+import web "druse:web"
 
 // ---------------------------------------------------------------------------
 // The instrument's own arithmetic.

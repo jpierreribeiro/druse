@@ -1,4 +1,4 @@
-# Contributing to Uruquim
+# Contributing to Druse
 
 Two things about this project will surprise you, so they come first.
 
@@ -37,14 +37,14 @@ transport behaviour. Open an issue describing the problem — not the API you wa
 
 ## Setting up
 
-Uruquim pins one Odin toolchain. The pinned release, commit and asset checksum
+Druse pins one Odin toolchain. The pinned release, commit and asset checksum
 are in `odin-version.txt`, and `ops/ci/install-odin.sh` installs and verifies it.
 Odin has no package manager by design, so there is nothing else to install.
 
 Run the full gate before you push:
 
 ```sh
-env -u ODIN_ROOT URUQUIM_ODIN_BIN=/path/to/odin bash build/check.sh
+env -u ODIN_ROOT DRUSE_ODIN_BIN=/path/to/odin bash build/check.sh
 ```
 
 Expect `PASS=10 FAIL=0 SKIP=0` and `PASS: Phase 1 freeze gate`. It takes about

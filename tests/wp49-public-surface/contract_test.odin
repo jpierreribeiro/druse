@@ -15,7 +15,7 @@ package test_wp49_public
 
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(private = "file")
 ok_handler :: proc(ctx: ^web.Context) {

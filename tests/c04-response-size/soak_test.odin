@@ -1,39 +1,31 @@
-// C-04 — response size and memory retention, measured.
+// C-04 — response size, arena reclamation and process RSS high-water.
 //
-// THE TWO OPEN PERIMETERS this suite exists to answer
+// THE TWO PERIMETERS this suite was created to answer
 // (`planning/production-readiness-closure.md` §4):
 //
-//	2. Unbounded response size and its arena impact — ⚠ OPEN
-//	3. Memory retention after large responses (soak) — ⚠ OPEN
+//	2. Unbounded response size and its arena impact — ADR-045 now bounds it
+//	3. Memory after large responses — attribution corrected; long soak owed
 //
-// Both were open because nobody had a number. The matrix (C-02, row 8) records
-// the per-connection arena as "no limit directly, retention unmeasured", and a
-// cell that says "unmeasured" is an invitation, not an answer.
-//
-// WHAT THE ARENA ACTUALLY DOES, which is the hypothesis under test. Each
-// connection owns a growing `virtual.Arena`. `clean_request_loop` ends every
-// request with `free_all` on it — and `free_all` on an arena RESETS the offset
-// while KEEPING the reserved blocks, because that is what an arena is for. So a
-// keep-alive connection that once served a large response is predicted to hold
-// that memory for its whole life, even while serving tiny responses afterwards.
-// With `max_connections` at its default of 1024, the worst case is
-// 1024 x (largest response that connection ever served) — a number no
-// configuration bounds, because ADR-014 buffers responses whole and the core
-// caps what a client may SEND (`max_body`) but not what a handler may BUILD.
+// Both were open because nobody had a number. The original interpretation of
+// this suite said a growing `virtual.Arena` kept all of its blocks after
+// `free_all`. That is false for the pinned toolchain: it deallocates every
+// growing block except the initial 1 MiB reservation and resets usage to zero.
+// The direct arena test below gates that semantic, while the socket phase
+// measures the different quantity an operator sees: process RSS high-water.
 //
 // THE MEASUREMENT is deliberately two-phase, because a single RSS reading
 // cannot tell retention from a leak:
 //
-//	phase 1  N keep-alive connections, one BIG response each   -> the retention
-//	phase 2  the same connections, many SMALL requests each    -> the leak test
+//	phase 1  N keep-alive connections, one BIG response each   -> RSS high-water
+//	phase 2  the same connections, many SMALL requests each    -> RSS stability
 //
-// Retention is expected and is reported as a number. GROWTH during phase 2 is
-// the defect: if RSS keeps climbing while the same connections serve small
-// responses, something is not being reclaimed per request, and that is a leak
-// no arena reset excuses.
+// RSS cannot identify a live owner. Growth during phase 2 would reveal
+// accumulation under this workload, but a stable RSS is not proof that every
+// allocator has returned pages to the kernel.
 package test_c04_response_size
 
 import "core:fmt"
+import virtual "core:mem/virtual"
 import "core:net"
 import "core:os"
 import "core:strconv"
@@ -42,7 +34,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 CANDIDATE_PORTS :: [?]int{55031, 55357, 55625, 55901}
 
@@ -51,18 +43,16 @@ CANDIDATE_PORTS :: [?]int{55031, 55357, 55625, 55901}
 BIG_BYTES :: 4 * 1024 * 1024
 SMALL_BYTES :: 512
 
-// The keep-alive connections held across both phases. Each one is an
-// independent arena, which is the point: retention is PER CONNECTION.
+// The keep-alive connections held across both phases.
 CONNS :: 8
 
-// Small requests per connection in phase 2. Enough that a per-request leak of
-// even a few kilobytes would be visible against the retention baseline.
+// Small requests per connection in phase 2. Enough that accumulating a few
+// kilobytes per request would be visible against the phase-1 RSS high-water.
 SMALL_ROUNDS :: 200
 
-// The leak threshold. Phase 2 reuses arenas that already hold BIG_BYTES, so a
-// correct implementation should grow by approximately nothing; 2 MiB is
-// generous room for allocator bookkeeping and test-side buffers, and is still
-// far below the ~1.6 MiB per connection a 200-round leak of 1 KiB would cost.
+// The RSS-stability threshold. A correct implementation should grow by
+// approximately nothing while serving the small phase; 2 MiB leaves room for
+// allocator bookkeeping and test-side buffers.
 LEAK_THRESHOLD_BYTES :: 2 * 1024 * 1024
 
 Server :: struct {
@@ -201,7 +191,7 @@ read_one_response :: proc(sock: net.TCP_Socket, scratch: []u8) -> bool {
 }
 
 @(test)
-c04_arena_retention_is_per_connection_and_bounded_by_no_setting :: proc(t: ^testing.T) {
+c04_rss_high_water_stabilizes_across_small_keepalive_responses :: proc(t: ^testing.T) {
 	server: Server
 	if !start_server(&server) {
 		testing.expect(t, false, "no candidate port produced a working server")
@@ -234,7 +224,7 @@ c04_arena_retention_is_per_connection_and_bounded_by_no_setting :: proc(t: ^test
 
 	baseline := rss_bytes()
 
-	// --- phase 1: one BIG response per connection -> the retention ----------
+	// --- phase 1: one BIG response per connection -> RSS high-water ----------
 	big_req := "GET /big HTTP/1.1\r\nHost: localhost\r\n\r\n"
 	served_big := 0
 	for i in 0 ..< CONNS {
@@ -280,7 +270,7 @@ c04_arena_retention_is_per_connection_and_bounded_by_no_setting :: proc(t: ^test
 	}
 	g_server = nil
 
-	retained := after_big - baseline
+	peak_growth := after_big - baseline
 	grew := after_small - after_big
 	fmt.printf(
 		"[c04] conns=%d big=%d(%d served) small_rounds=%d(%d served)\n",
@@ -298,9 +288,9 @@ c04_arena_retention_is_per_connection_and_bounded_by_no_setting :: proc(t: ^test
 		f64(after_close) / 1048576.0,
 	)
 	fmt.printf(
-		"[c04] retention after big = %.1fMiB (%.2f x the %.1fMiB served) | growth over %d small responses = %.2fMiB\n",
-		f64(retained) / 1048576.0,
-		f64(retained) / f64(served_big * BIG_BYTES) if served_big > 0 else 0,
+		"[c04] RSS growth after big = %.1fMiB (%.2f x the %.1fMiB served) | growth over %d small responses = %.2fMiB\n",
+		f64(peak_growth) / 1048576.0,
+		f64(peak_growth) / f64(served_big * BIG_BYTES) if served_big > 0 else 0,
 		f64(served_big * BIG_BYTES) / 1048576.0,
 		served_small,
 		f64(grew) / 1048576.0,
@@ -310,7 +300,7 @@ c04_arena_retention_is_per_connection_and_bounded_by_no_setting :: proc(t: ^test
 	testing.expectf(
 		t,
 		served_big == CONNS,
-		"only %d of %d big responses were served; the retention figure would be about the client",
+		"only %d of %d big responses were served; the RSS figure would be about the client",
 		served_big,
 		CONNS,
 	)
@@ -321,17 +311,58 @@ c04_arena_retention_is_per_connection_and_bounded_by_no_setting :: proc(t: ^test
 		served_small,
 		CONNS * SMALL_ROUNDS,
 	)
-	// THE ASSERTION IS ABOUT PHASE 2 ONLY. Retention is reported, not asserted:
-	// it is the documented consequence of an arena, and pinning it would pin an
-	// implementation detail. What must hold is that serving thousands of small
-	// responses on arenas that already grew costs approximately nothing more —
-	// anything else is a per-request leak.
+	// THE ASSERTION IS ABOUT PHASE 2 ONLY. The phase-1 RSS delta is reported, not
+	// attributed: RSS cannot distinguish live allocations from allocator pages
+	// already freed but not returned to the kernel. What must hold is that this
+	// workload does not continue accumulating RSS across small requests.
 	testing.expectf(
 		t,
 		grew < LEAK_THRESHOLD_BYTES,
-		"RSS grew %.2fMiB while serving %d small responses on already-grown arenas; the per-request reclaim is leaking (threshold %.1fMiB)",
+		"RSS grew %.2fMiB while serving %d small responses after the large-response phase; memory is accumulating under this workload (threshold %.1fMiB)",
 		f64(grew) / 1048576.0,
 		served_small,
 		f64(LEAK_THRESHOLD_BYTES) / 1048576.0,
+	)
+}
+
+// The semantic the old C-04 explanation got wrong. A growing arena does not
+// retain its oversize blocks across free_all: only its first reservation
+// survives. build/check_c04_controls.sh removes this call in a copied mutant
+// and requires the assertions to turn red.
+@(test)
+c04_growing_arena_free_all_releases_oversize_blocks :: proc(t: ^testing.T) {
+	arena: virtual.Arena
+	err := virtual.arena_init_growing(&arena)
+	testing.expectf(t, err == nil, "arena init failed: %v", err)
+	if err != nil {
+		return
+	}
+	defer virtual.arena_destroy(&arena)
+
+	first := arena.curr_block
+	_, alloc_err := virtual.arena_alloc(&arena, BIG_BYTES, 16)
+	testing.expectf(t, alloc_err == nil, "arena allocation failed: %v", alloc_err)
+	if alloc_err != nil {
+		return
+	}
+
+	before_blocks := 0
+	for block := arena.curr_block; block != nil; block = block.prev {
+		before_blocks += 1
+	}
+	testing.expectf(t, before_blocks > 1, "positive control failed: oversize allocation used only %d block", before_blocks)
+
+	virtual.arena_free_all(&arena)
+
+	after_blocks := 0
+	for block := arena.curr_block; block != nil; block = block.prev {
+		after_blocks += 1
+	}
+	testing.expectf(
+		t,
+		after_blocks == 1 && arena.curr_block == first && arena.total_used == 0,
+		"arena_free_all retained oversize blocks: blocks=%d used=%d",
+		after_blocks,
+		arena.total_used,
 	)
 }

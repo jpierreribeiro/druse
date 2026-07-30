@@ -10,7 +10,7 @@
 //
 // WHY THIS TEST EXISTS SEPARATELY FROM `wp63_a_boundary_like_string_inside_
 // content_is_safe`. That case sends content that MENTIONS the boundary
-// (`mentions ----uruquim9zX inline`) but never prefixes it with `\r\n--`, so the
+// (`mentions ----druse9zX inline`) but never prefixes it with `\r\n--`, so the
 // first `\r\n--` in the body is still the real delimiter and the old parser
 // handled it. It passes with and without the fix — it does not cover this
 // defect. This one puts the literal four-byte sequence inside the content, which
@@ -22,9 +22,9 @@ package test_multipart_content
 
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
-BOUNDARY :: "----uruquimF6"
+BOUNDARY :: "----druseF6"
 CONTENT_TYPE_LINE :: "Content-Type: multipart/form-data; boundary=" + BOUNDARY
 
 captured_title: string

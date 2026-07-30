@@ -12,11 +12,11 @@
 // machinery never names a `web` type, so `web -> web/testing` stays one-way (the
 // back-edge is a compile cycle, ratified as probe C5).
 package web
-// uruquim:file test-support
+// druse:file test-support
 
 import "core:strings"
-import transport "uruquim:web/internal/transport"
-import testing "uruquim:web/testing"
+import transport "druse:web/internal/transport"
+import testing "druse:web/testing"
 
 // Recorded_Response is the read-only result of `web.test_request`.
 //

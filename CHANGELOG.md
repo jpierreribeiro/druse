@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Uruquim are recorded here.
+All notable changes to Druse are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning is **not** semantic yet, because **there has been no release**. No
@@ -129,7 +129,7 @@ freeze amendment, never as a snapshot refresh.
   an unfinished-work comment asking for a timeout. Real deadlines are surgery
   inside the event loop, not a field, so `Limits` ships without them: adding a
   field later is an amendment, while shipping one that silently does nothing
-  would be a lie with a version number on it. **No document claims Uruquim has
+  would be a lie with a version number on it. **No document claims Druse has
   configurable timeouts.**
   The derivation was **measured**, as the plan required, and the measurement
   does not distinguish the two shapes: a boot-resolved budget and a
@@ -174,7 +174,7 @@ freeze amendment, never as a snapshot refresh.
   **There is no request-scoped state, and there will not be one** (ADR-028,
   option 1, ACCEPTED). C-6 found that Go's `context.WithValue` and Rust's
   `http::Extensions` exist for type-erased, dynamically-keyed state crossing
-  library boundaries — which Uruquim does not have — so the finding *supports*
+  library boundaries — which Druse does not have — so the finding *supports*
   G-03. The consequence is recorded rather than softened: the canonical auth
   pattern's revalidation cost stands until an ADR decides otherwise.
 
@@ -235,7 +235,7 @@ freeze amendment, never as a snapshot refresh.
   **capacity ledger** states what is fixed, dynamic at registration, bounded
   per request, and — stated plainly — what remains **unbounded or delegated to
   the transport**: concurrent connections, accept backlog, inbound header
-  counts and sizes, and read/write timeouts. Uruquim bounds its own per-request
+  counts and sizes, and read/write timeouts. Druse bounds its own per-request
   working memory; **it does not bound the server**, and no document may claim
   otherwise.
   Freezing the claims found two that did not survive contact: the middleware
@@ -282,7 +282,7 @@ freeze amendment, never as a snapshot refresh.
   `web.bare()`, in default *and* `-o:speed` builds, repeatably, and carrying no
   detail about the request. A handler that **faults** — panic, failed
   assertion, out-of-bounds index, nil dereference, divide-by-zero — **aborts
-  the process**; run Uruquim under a supervisor.
+  the process**; run Druse under a supervisor.
 - **`recovery` will never exist** (ADR-020). Odin has no recoverable panic:
   `context` is an implicit by-value parameter, so `web.app()` cannot install a
   fault hook on its caller's behalf, and `bounds_check_error` is
@@ -432,5 +432,5 @@ Deliberate, documented, and each assigned to a later phase in
 - `HEAD` and `OPTIONS` are not supported;
 - panics abort the process — Odin has no recoverable panic.
 
-Uruquim is usable for building and testing a JSON API. It is **not** hardened
+Druse is usable for building and testing a JSON API. It is **not** hardened
 for unattended production exposure, and this changelog does not claim otherwise.

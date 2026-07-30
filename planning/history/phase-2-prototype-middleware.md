@@ -3,7 +3,7 @@
 **Type: PROTOTYPE. No production file was modified. This document is the only
 repository output.**
 
-Toolchain: `/tmp/uruquim-odin-toolchain/odin`, version
+Toolchain: `/tmp/druse-toolchain/odin`, version
 `dev-2026-07-nightly:819fdc7` — the pin in `odin-version.txt`. Every command
 below was run with `env -u ODIN_ROOT` so that the pinned distribution resolves
 its own `core`.
@@ -106,8 +106,8 @@ The additions to the copied files, in full:
 ```
 cd /tmp/wp12-probe && rm -rf runall && mkdir runall \
   && cp root_mw/web/*.odin runall/ && cp tests/*.odin runall/
-env -u ODIN_ROOT /tmp/uruquim-odin-toolchain/odin test /tmp/wp12-probe/runall \
-  -collection:uruquim=/tmp/wp12-probe/root_mw \
+env -u ODIN_ROOT /tmp/druse-toolchain/odin test /tmp/wp12-probe/runall \
+  -collection:druse=/tmp/wp12-probe/root_mw \
   -out:/tmp/wp12-probe/out/runall -define:ODIN_TEST_THREADS=1
 ```
 
@@ -287,7 +287,7 @@ P7  neither next nor respond  : S   status=Internal_Server_Error
 with the framework log line:
 
 ```
-uruquim: a handler returned without producing a response; the driver is sending
+druse: a handler returned without producing a response; the driver is sending
 500. A handler must call a web.* responder, or the route is a bare() miss.
 ```
 
@@ -422,8 +422,8 @@ stay live while the rest of the chain runs.
 ### Command
 
 ```
-env -u ODIN_ROOT /tmp/uruquim-odin-toolchain/odin build /tmp/wp12-probe/p10 \
-  -collection:uruquim=/tmp/wp12-probe/root_mw -out:/tmp/wp12-probe/out/p10
+env -u ODIN_ROOT /tmp/druse-toolchain/odin build /tmp/wp12-probe/p10 \
+  -collection:druse=/tmp/wp12-probe/root_mw -out:/tmp/wp12-probe/out/p10
 for n in 1 8 64 512 4096; do /tmp/wp12-probe/out/p10 $n; done
 ```
 
@@ -512,10 +512,10 @@ production.
 ### Command
 
 ```
-env -u ODIN_ROOT /tmp/uruquim-odin-toolchain/odin build /tmp/wp12-probe/p11 \
-  -collection:uruquim=/tmp/wp12-probe/root_base -out:/tmp/wp12-probe/out/p11-base
-env -u ODIN_ROOT /tmp/uruquim-odin-toolchain/odin build /tmp/wp12-probe/p11 \
-  -collection:uruquim=/tmp/wp12-probe/root_mwc  -out:/tmp/wp12-probe/out/p11-mwc
+env -u ODIN_ROOT /tmp/druse-toolchain/odin build /tmp/wp12-probe/p11 \
+  -collection:druse=/tmp/wp12-probe/root_base -out:/tmp/wp12-probe/out/p11-base
+env -u ODIN_ROOT /tmp/druse-toolchain/odin build /tmp/wp12-probe/p11 \
+  -collection:druse=/tmp/wp12-probe/root_mwc  -out:/tmp/wp12-probe/out/p11-mwc
 stat -c '%s  %n' out/p11-base out/p11-mwc
 size out/p11-base out/p11-mwc
 ```
@@ -571,7 +571,7 @@ App has no middleware would remove most of this, at the cost of a branch in
 dispatch.
 
 This is a G-11 human-review item, as the plan requires. It is small, but it is
-not zero, and the owner should decide whether ~1.8 KiB on every Uruquim binary
+not zero, and the owner should decide whether ~1.8 KiB on every Druse binary
 is acceptable rent for a feature many applications will not use.
 
 ---
@@ -582,9 +582,9 @@ is acceptable rent for a feature many applications will not use.
 
 ```
 for ex in 01-hello-world 02-json-api 03-route-params; do
-  env -u ODIN_ROOT /tmp/uruquim-odin-toolchain/odin build \
-    /tmp/uruquim-wp12/examples/$ex \
-    -collection:uruquim=/tmp/wp12-probe/root_mwc -out:/tmp/wp12-probe/out/ex-$ex
+  env -u ODIN_ROOT /tmp/druse-toolchain/odin build \
+    /tmp/druse-wp12/examples/$ex \
+    -collection:druse=/tmp/wp12-probe/root_mwc -out:/tmp/wp12-probe/out/ex-$ex
 done
 ```
 
@@ -723,7 +723,7 @@ first to prove the checks are real.
 
 ```
 env -u ODIN_ROOT odin check /tmp/wp12-probe/d121/z_control.odin -file \
-  -collection:uruquim=/tmp/wp12-probe/root_mwc -no-entry-point
+  -collection:druse=/tmp/wp12-probe/root_mwc -no-entry-point
 ```
 
 ```
@@ -889,8 +889,8 @@ web.get(&app, "/admin/keys", admin_keys)     // is protected.
 ```
 
 ```
-env -u ODIN_ROOT /tmp/uruquim-odin-toolchain/odin run /tmp/wp12-probe/d125 \
-  -collection:uruquim=/tmp/wp12-probe/root_mwc -out:/tmp/wp12-probe/out/d125
+env -u ODIN_ROOT /tmp/druse-toolchain/odin run /tmp/wp12-probe/d125 \
+  -collection:druse=/tmp/wp12-probe/root_mwc -out:/tmp/wp12-probe/out/d125
 ```
 
 ```

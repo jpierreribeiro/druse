@@ -2,7 +2,7 @@ package wp69_saturation
 
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 @(test)
 full_lane_saturation_is_the_explicit_boundary :: proc(t: ^testing.T) {

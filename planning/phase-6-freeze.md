@@ -80,7 +80,7 @@ taxonomy with `invalid_json`, `invalid_field` (with a bounded field path) and
 
 The SQL-first data stack ships entirely as Crystals depending one-way on this
 frozen core surface; CE-E3 holds — no Crystal adds, widens or changes a core
-symbol. It is frozen in `uruquim-crystals` at `docs/phase-6-freeze.md`: a
+symbol. It is frozen in `druse-crystals` at `docs/phase-6-freeze.md`: a
 six-package, 125-symbol public ledger delivering PostgreSQL over libpq (bounded
 pool, server-confirmed cancellation, explicit transactions, fail-closed
 decoding), a fail-closed migration runner that never runs at server boot,
@@ -118,4 +118,4 @@ and transactions pass against a pinned disposable server; the migration tool is
 fail-closed and never runs at web-server boot; the reference application
 demonstrates the full contract; the core `62 + 2` ledger is frozen literally and
 the Crystals public ledger is frozen in its own repository; every limitation and
-non-delivery is recorded; and the complete existing Uruquim gate remains green.
+non-delivery is recorded; and the complete existing Druse gate remains green.

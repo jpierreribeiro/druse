@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
-	"uruquim-bench/application-matrix-go/workload"
+	"druse-bench/application-matrix-go/workload"
 )
 
 func main() {

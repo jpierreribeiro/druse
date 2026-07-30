@@ -47,7 +47,7 @@
 // are what every real call site passes. Cloning them would add an allocation
 // and a teardown to a path that has neither.
 package web
-// uruquim:file application
+// druse:file application
 
 // The number of exact origins one application may list. A bound rather than a
 // dynamic array for the reason every other capacity here is bounded: this is

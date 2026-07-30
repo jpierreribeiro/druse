@@ -44,6 +44,11 @@ old name does not appear in any file the guide produces.**
 | collection `uruquim:` | collection `druse:` | the Odin collection of the core |
 | collection `crystals:` | collection `crystals:` | **unchanged** — it never carried the old name |
 
+The old name may still be written in exactly three kinds of place, where it is
+the subject rather than the product: this table, the forbidden-names line in
+`GLOSSARY.md`, and a migration note that says what an upgrade must change.
+Nowhere else.
+
 Two approved prose terms, one meaning each. `GLOSSARY.md` fixes them in W0:
 
 - **Druse** — the core framework. Repository `druse`, collection `druse:`.
@@ -54,31 +59,35 @@ Two approved prose terms, one meaning each. `GLOSSARY.md` fixes them in W0:
 text. Do not write `Druse core`, `the Druse framework` or `the Crystals
 library` — the two approved terms already carry those meanings.
 
-### The documentation is renamed first. The source follows.
+### The documentation was renamed first. The source has now followed.
 
-The rename applies to the documentation now. The source keeps the old name
-until the repositories are renamed, which is a separate change:
+The documentation was renamed while the source still carried the old name. That
+gap is closed: the source rename landed in the `v0.10.0` release commit, across
+the whole core tree.
 
-| Tree | `.odin` files with `uruquim` | build / CI scripts |
-|---|---|---|
-| `druse` (core) | 202 | 61 |
-| `druse-crystals` | 60 | 9 |
+| Tree | `.odin` files renamed | build / CI scripts renamed | other files |
+|---|---|---|---|
+| `druse` (core) | 214 | 74 | 123 |
+| `druse-crystals` | not this repository | — | — |
 
-No work package waits for that change. The guide is written in the target
-vocabulary throughout, because the guide is what the new name is for.
+The collection is `druse:` in the source, so the guide's `-collection:druse=`
+and `import web "druse:web"` are now literally true against a fresh checkout.
+The transitional caveat in `guide/README.md` — which told the reader to
+substitute the old collection name — is deleted, as this section required.
 
-One mechanical detail crosses the boundary: the collection flag. The guide
-writes `-collection:druse=...` and `import web "druse:web"`. Against today's
-tree the flag is still `-collection:uruquim=...`. That is **one line, declared
-once**, in `guide/README.md`:
+Three named consequences of the source rename, none of them cosmetic:
 
-> The collection is named `druse` from the repository rename onward. If your
-> checkout still builds with `-collection:uruquim=`, use that name in the flag
-> and in every `import`. Nothing else on this page changes.
+- the log prefix on every `web.logger` line and every framework diagnostic is
+  `druse: `, not the old name;
+- spool files are created and swept under the `druse-spool-` prefix, so a
+  process that upgrades across this release does not sweep orphans left by the
+  previous one (`docs/operations.md` §upload spooling);
+- the build defines are `DRUSE_*`, so any script passing the old
+  `-define:URUQUIM_*` name silently loses its setting rather than failing.
 
-Do not repeat that note in any other file. A caveat repeated in forty files is
-how a rename half-lands. The note is deleted when the source rename lands, and
-§8's gate rule makes its removal detectable.
+`druse-crystals` is a separate repository and keeps its own rename; the
+`api_key.DEFAULT_PREFIX` and `examples/session` items in
+`docs/guide/FIXES-WANTED.md` are its work, not this release's.
 
 ---
 
@@ -109,7 +118,7 @@ What is missing or stale — **this is the work**:
 | No build-along for the async half | `jobs`, `mail`, `storage/s3`, `api_key`, `idempotency`, `sse` have no narrative anywhere |
 | `crystals/docs/migrations.md` names `migrate adopt` | that command does not exist; it is `schema adopt` (entry #16) |
 | Vendoring is one flag in a README | a plain clone into `vendor/` produces an embedded repo that does not track (entry #23) |
-| The whole corpus names the product `uruquim` | the product is `druse` (§2) — the existing reference is renamed by the code rename, not by this program |
+| ~~The whole corpus names the product by its old name~~ **closed** | the code rename landed in `v0.10.0`; the corpus, the source and the collection all say `druse` (§2) |
 
 ---
 
@@ -256,7 +265,7 @@ In this order. The agent may not write a line before finishing this list.
 5. `crystals/examples/notes/` and `druse-miniature/cmd/` — working code. The
    build-alongs narrate these, they do not invent new programs.
 
-Every one of these still names the product `uruquim` until the code rename
+Every one of these still names the product `druse` until the code rename
 lands. Read them for content. Write the new name (§2).
 
 ---
@@ -408,12 +417,12 @@ All four run in the same gate as the code.
 
 **One of them needs a second checkout.** `build/check_docs_symbols.py` resolves
 each `alias.symbol` against the directory that alias imports, and 28 of the 29
-aliases live in `uruquim-crystals` (§2). Where that repository is not beside
+aliases live in `druse-crystals` (§2). Where that repository is not beside
 this one, the checker cannot read a single definition, so every crystal symbol
 looks unknown — 232 findings that say nothing about the documentation. It
 therefore reports those aliases as `UNCHECKED`, by name and by count, and
-passes on the packages it can actually see. Point it with `$URUQUIM_CRYSTALS`;
-set `$URUQUIM_CRYSTALS_REQUIRED=1` wherever the checkout is guaranteed, so a
+passes on the packages it can actually see. Point it with `$DRUSE_CRYSTALS`;
+set `$DRUSE_CRYSTALS_REQUIRED=1` wherever the checkout is guaranteed, so a
 missing corpus fails there instead of skipping. A check that goes vacuous
 without saying so is worse than one that fails.
 
@@ -461,7 +470,7 @@ it.
 - **Never invent API.** Grep the source for every symbol before writing it. The
   ledger's first four entries are all guessed names that were wrong.
 - **Never write a command you have not run.**
-- **Write `druse`, never `uruquim` (§2).** The one exception is the collection
+- **Write `druse`, never `druse` (§2).** The one exception is the collection
   note in `guide/README.md`. Do not add a second one.
 - **Do not rewrite `canonical-patterns.md`, `ai-context.md`, or
   `crystals.md`.** Harvest and link. Duplicated reference is guaranteed to

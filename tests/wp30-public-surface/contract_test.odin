@@ -17,9 +17,9 @@ package test_wp30_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
-// The rejection is an EXPECTED Error-level `uruquim:` line, and the pinned test
+// The rejection is an EXPECTED Error-level `druse:` line, and the pinned test
 // runner records Error output as a failure. This swallows exactly those and
 // forwards everything else — the WP8 idiom, reused rather than reinvented.
 @(private = "file")
@@ -36,7 +36,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {
@@ -210,7 +210,7 @@ wp30_distinct_multi_parameter_routes_still_serve :: proc(t: ^testing.T) {
 
 	testing.expect_value(
 		t,
-		web.test_request(&app, .GET, "/orgs/acme/repos/uruquim").status,
+		web.test_request(&app, .GET, "/orgs/acme/repos/druse").status,
 		web.Status.OK,
 	)
 	testing.expect_value(

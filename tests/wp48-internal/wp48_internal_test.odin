@@ -25,7 +25,7 @@
 package web
 
 import "core:testing"
-import "uruquim:web/internal/transport"
+import "druse:web/internal/transport"
 
 @(private = "file")
 report_ip :: proc(ctx: ^Context) {

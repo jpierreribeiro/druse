@@ -33,18 +33,18 @@
 //	    it, and one loose enough not to break anything protects nothing. It
 //	    needs an argument, so it needs an API, so it is not this package.
 //
-//	Strict-Transport-Security — meaningful only over TLS, which Uruquim
+//	Strict-Transport-Security — meaningful only over TLS, which Druse
 //	    deliberately does not terminate (ADR: reverse-proxy termination is the
 //	    supported deployment). The proxy that holds the certificate is the
 //	    thing that should assert HSTS; a framework behind it asserting HSTS on
 //	    a cleartext hop is asserting something it cannot know.
 //
-//	Cookie attributes — Uruquim sets no cookies and has no cookie API, so
+//	Cookie attributes — Druse sets no cookies and has no cookie API, so
 //	    there is nothing to secure. `Secure`/`HttpOnly`/`SameSite` arrive with
 //	    a cookie API or not at all, and inventing one to have somewhere to put
 //	    them would be the accretion this project refuses.
 package web
-// uruquim:file application
+// druse:file application
 
 @(private)
 SECURE_CONTENT_TYPE_OPTIONS_NAME :: "X-Content-Type-Options"

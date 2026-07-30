@@ -20,8 +20,8 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import stream "uruquim:web/internal/stream"
-import transport "uruquim:web/internal/transport"
+import stream "druse:web/internal/stream"
+import transport "druse:web/internal/transport"
 
 Lab :: struct {
 	ready:      sync.Sema,

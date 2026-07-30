@@ -2,7 +2,7 @@
 
 **Status: FROZEN, 2026-07-23, under the ADR-029 delegation.** The streaming
 half is frozen in this repository; the composition half's SSE Crystal is frozen
-in `uruquim-crystals`. Nothing was left uncommitted, and nothing was left
+in `druse-crystals`. Nothing was left uncommitted, and nothing was left
 undecided without its reason written down. A failed Phase 7 would have left
 Phase 6 usable and recorded streaming as not delivered; this one delivers the
 detached response-streaming contract publicly and records honestly the one
@@ -110,7 +110,7 @@ unchanged from the plan:
 
 - **The public large-body upload API is deferred.** The substrate is complete
   and tested — a fragmentation-correct streaming multipart parser, the bounded
-  spool with generated `uruquim-spool-` files at `0600`, per-upload and process
+  spool with generated `druse-spool-` files at `0600`, per-upload and process
   quotas, exactly-once cleanup, admission below lane capacity — but the public
   contract that wires it into the request path (the inbound pause/resume socket
   reads) is not shipped. Large uploads remain buffered under `max_body`. This is
@@ -132,9 +132,9 @@ unchanged from the plan:
 
 ## 6. The composition half (Crystals)
 
-SSE ships as `crystals:web/sse`, frozen in `uruquim-crystals` against this
+SSE ships as `crystals:web/sse`, frozen in `druse-crystals` against this
 core: `open`/`send`/`comment`/`last_event_id`/`Event`/`Send_Result`/
-`MAX_EVENT_BYTES`, importing only `uruquim:web` — no core internals, no backend.
+`MAX_EVENT_BYTES`, importing only `druse:web` — no core internals, no backend.
 It proves the core streaming abstraction supports a real protocol with no
 privileged access (G7-7). The `http_client` and `metrics` Crystals named in the
 composition-half plan remain future Crystals-repo work; they do not depend on
@@ -164,10 +164,10 @@ every exit gate passes with the two deferrals recorded above named, not hidden;
 the buffered path is byte-identical (G7-10); a buffered-only server links no
 streaming code (G7-8); SSE proves the abstraction from outside the core (G7-7);
 the vendored streaming hooks are BRIDGE work with a declared exit; the inherited
-write-deadline bug and F4/F5/F6/F9 are closed; and the complete existing Uruquim
+write-deadline bug and F4/F5/F6/F9 are closed; and the complete existing Druse
 gate remains green.
 
-After Phase 7, Uruquim is still a microframework. Ordinary users still see app,
+After Phase 7, Druse is still a microframework. Ordinary users still see app,
 route, extract, respond and serve; small bodies keep the buffered path.
 Applications that want them gain bounded long-lived responses and SSE, without
 learning their concepts or paying their executable-code cost.

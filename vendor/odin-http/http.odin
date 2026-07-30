@@ -18,7 +18,7 @@ Requestline_Error :: enum {
 
 Requestline :: struct {
 	method:  Method,
-	// URUQUIM PATCH (WP9 D7): the ORIGINAL method token, preserved so an
+	// DRUSE PATCH (WP9 D7): the ORIGINAL method token, preserved so an
 	// unrecognized-but-valid method reaches the application unchanged rather
 	// than being discarded with a 501. See VENDOR.md.
 	method_raw: string,
@@ -45,7 +45,7 @@ requestline_parse :: proc(s: string, allocator := context.temp_allocator) -> (li
 	raw_method := s[:next_space]
 	line.method, ok = method_parse(raw_method)
 	if !ok {
-		// URUQUIM PATCH (WP9 D7): a valid but unrecognized method is NOT a
+		// DRUSE PATCH (WP9 D7): a valid but unrecognized method is NOT a
 		// server-side 501. It is handed on as `.Unknown` with its original
 		// token, so the application's dispatcher applies its own 404/405
 		// policy. See VENDOR.md.
@@ -138,7 +138,7 @@ Method :: enum {
 	Connect,
 	Options,
 	Trace,
-	// URUQUIM PATCH (WP9 D7): a valid but unrecognized method token must reach
+	// DRUSE PATCH (WP9 D7): a valid but unrecognized method token must reach
 	// the application's dispatcher instead of being answered 501 by the server.
 	// See VENDOR.md.
 	Unknown,
@@ -155,7 +155,7 @@ method_parse :: proc(m: string) -> (method: Method, ok: bool) #no_bounds_check {
 	// PERF: I assume this is faster than a map with this amount of items.
 
 	for r in Method {
-		// URUQUIM PATCH (WP9 D7): `Unknown` carries an empty string and must not
+		// DRUSE PATCH (WP9 D7): `Unknown` carries an empty string and must not
 		// be matched by lookup; it is assigned deliberately in requestline_parse.
 		if r == .Unknown { continue }
 		if _method_strings[r] == m {
@@ -166,7 +166,7 @@ method_parse :: proc(m: string) -> (method: Method, ok: bool) #no_bounds_check {
 	return nil, false
 }
 
-// URUQUIM PATCH 38 (audit H1) — a field line carrying a control byte is
+// DRUSE PATCH 38 (audit H1) — a field line carrying a control byte is
 // refused, not stored.
 //
 // RFC 9110 §5.5 defines a field value as `*( SP / HTAB / VCHAR / obs-text )`:
@@ -207,14 +207,14 @@ header_line_has_control :: proc(line: string) -> bool {
 
 // Parses the header and adds it to the headers if valid. The given string is copied.
 header_parse :: proc(headers: ^Headers, line: string, allocator := context.temp_allocator) -> (key: string, ok: bool) {
-	// URUQUIM PATCH 38 (audit H1) — refuse control bytes before anything is
+	// DRUSE PATCH 38 (audit H1) — refuse control bytes before anything is
 	// lowercased, cloned or merged. `ok = false` is answered 400 by the server
 	// loop (server.odin, `on_header_line`), which is the refusal RFC 9110 §5.5
 	// requires.
 	if header_line_has_control(line) {
 		return
 	}
-	// URUQUIM PATCH 18 (F14) — reject obsolete line folding, both forms. RFC
+	// DRUSE PATCH 18 (F14) — reject obsolete line folding, both forms. RFC
 	// 7230 obs-fold is CRLF followed by a space OR a horizontal tab; the
 	// original check caught only the space. A tab-prefixed continuation line
 	// otherwise parses as its own header here while an obs-fold-normalizing
@@ -247,7 +247,7 @@ header_parse :: proc(headers: ^Headers, line: string, allocator := context.temp_
 	// field-values or a single Content-Length header field having an
 	// invalid value, then the message framing is invalid and the
 	// recipient MUST treat it as an unrecoverable error.
-	// URUQUIM PATCH (WP9 D2): ANY repeated Content-Length is rejected, even when
+	// DRUSE PATCH (WP9 D2): ANY repeated Content-Length is rejected, even when
 	// the values are identical. Upstream allowed an exact duplicate through and
 	// then merged it into "2, 2" by the comma rule below, which is an ambiguous
 	// framing. Refusing is simpler and safer than normalizing. See VENDOR.md.
@@ -452,7 +452,7 @@ write_padded_int :: proc(w: io.Writer, i: int) -> io.Error {
 
 @(private)
 write_escaped_newlines :: proc(w: io.Writer, v: string) -> io.Error {
-	// URUQUIM PATCH 17 (F12) — escape the carriage return as well as the line
+	// DRUSE PATCH 17 (F12) — escape the carriage return as well as the line
 	// feed. This is the only sanitization point before header values and cookie
 	// fields reach the socket; escaping only `\n` let a lone `\r` through, which
 	// a CR-tolerant downstream parser can treat as a line terminator and use to

@@ -3,7 +3,7 @@ package wp71_admission
 import "core:net"
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/web_blocking_lab"
+import lab "druse:tests/support/web_blocking_lab"
 
 @(test)
 connection_budget_is_server_wide_not_multiplied_by_handler_lanes :: proc(t: ^testing.T) {

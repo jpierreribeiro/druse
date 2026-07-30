@@ -43,7 +43,7 @@ The proposed phase is **viable now**, with one important distinction.
 | Item | Verdict | Why |
 |---|---|---|
 | Honest JSON errors and field paths | **Viable** | Framework-level work, independent of transport and database. The exact decoder mechanism is selected by a RED corpus, not assumed. |
-| Concurrent synchronous handlers | **Viable, gated** | The vendored server already supports multiple event-loop threads. Uruquim must remove its own shared-state races and prove liveness before exposing the mode. |
+| Concurrent synchronous handlers | **Viable, gated** | The vendored server already supports multiple event-loop threads. Druse must remove its own shared-state races and prove liveness before exposing the mode. |
 | PostgreSQL driver, bounded pool and transactions | **Viable, gated** | Odin implementations demonstrate protocol viability. WP74 chooses reuse, extraction, `libpq` or a local implementation by evidence. No arm is assumed free. |
 | Safe migration runner | **Viable** | It is a separate deploy tool and does not depend on the HTTP scheduler. |
 | Optional SQL/schema checker | **Viable** | It runs in development/CI and need not generate runtime code. |
@@ -324,9 +324,9 @@ linked into Hello World. Phase 6 inherits it:
 
 The relevant Tina documents were reviewed as architectural evidence, especially
 `01-arquitetura-do-runtime.md`, `02-memoria-ownership-e-backpressure.md`,
-`03-io-scheduler-e-lifecycle.md`, `08-comparacao-com-uruquim.md`,
+`03-io-scheduler-e-lifecycle.md`, `08-comparacao-com-druse.md`,
 `09-propostas-para-o-planejamento.md`, `10-limitacoes-e-questoes-abertas.md`
-and `11-impacto-no-roadmap-do-uruquim.md`.
+and `11-impacto-no-roadmap-do-druse.md`.
 
 Tina proves useful facts:
 
@@ -338,9 +338,9 @@ Tina proves useful facts:
   benchmark;
 - transport and framework can cooperate without sharing a public API.
 
-It does **not** prove that Uruquim should adopt Tina, its isolates, scheduler,
+It does **not** prove that Druse should adopt Tina, its isolates, scheduler,
 Grand Arena, message protocol, recovery model or HTTP server. The Tina dossier
-itself requires each borrowed idea to begin with a demonstrated Uruquim
+itself requires each borrowed idea to begin with a demonstrated Druse
 problem and a differentiating RED test. This plan follows that rule.
 
 The multi-lane design is therefore not “copy Tina”. It is the smallest current
@@ -616,7 +616,7 @@ is refused and the phase returns to the owner before database integration.
 Refresh the stale ecosystem plan and discharge ADR-032's first-package rule by
 shipping the smallest `crystals:web/health` Route Crystal. It proves:
 
-- a Crystal depends one-way on a pinned Uruquim core revision;
+- a Crystal depends one-way on a pinned Druse core revision;
 - the core build and public ledger do not depend on Crystals;
 - package ownership, versioning, support and release metadata exist;
 - a Crystal has its own public ledger, examples and gate;
@@ -1024,7 +1024,7 @@ Database/validation Crystals never enter the core ledger.
 The exact commands are fixed in WP66 after Phase 5 freezes, but the required
 layers are already known:
 
-1. existing full Uruquim gate on the pinned Odin toolchain;
+1. existing full Druse gate on the pinned Odin toolchain;
 2. public-surface and example gates;
 3. deterministic concurrency lab with explicit seeds;
 4. thread sanitizer or the strongest supported equivalent;
@@ -1083,7 +1083,7 @@ database pool or migration command that lies about its guarantees would be.
 
 At the end of Phase 6, a user should be able to build an ordinary PostgreSQL
 API in Odin with the same conceptual ease expected from a mature web
-framework, while retaining Uruquim's differentiators:
+framework, while retaining Druse's differentiators:
 
 - memory and ownership are visible;
 - capacities are bounded;

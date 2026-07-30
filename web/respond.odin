@@ -9,7 +9,7 @@
 // released by `response_destroy`, which the response driver calls after the
 // response has been captured or written. See `web/response.odin`.
 package web
-// uruquim:file application
+// druse:file application
 
 import encoding_json "core:encoding/json"
 import "core:mem"

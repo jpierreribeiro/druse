@@ -20,7 +20,7 @@ package web
 import "core:log"
 import "core:strings"
 import "core:testing"
-import "uruquim:web/internal/transport"
+import "druse:web/internal/transport"
 
 APP_ORIGIN :: "https://app.example.com"
 
@@ -38,7 +38,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

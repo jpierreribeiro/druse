@@ -19,8 +19,8 @@ content.
 |---|---|---|
 | **E8-1** Phase 6 frozen (PG runtime, migrations, reference app) | ✅ | crystals `main` `36db55c`: `docs/phase-6-freeze.md` **FROZEN**; `db/postgres`, `db/migrate`, `examples/notes` (WP83) present and gated |
 | **E8-2** Phase 7 frozen (streams, SSE, large-body ingest, transfer slice) | ✅ | core `closure`: `web.stream`/spool/`web.enable_upload`; crystals `web/sse` (WP97) on main |
-| **E8-3** Pinned consumption for core + every Crystal; no branch-relative hidden dependency | ◑ **decided below (§2)** | app pins **fixed commit SHAs** — core `closure` HEAD and crystals `main` `36db55c` — via the `uruquim`/`crystals` collections. A fixed SHA is not a branch-relative dependency |
-| **E8-4** Deployment target, reverse proxy, supervisor, **dedicated PostgreSQL** | ⚠️ **prerequisite for WP103** | VPS `45.32.215.234` has Caddy (proxy) + systemd (supervisor); **PostgreSQL is NOT installed/running** (inactive, no container, no `:5432`). Provisioning a dedicated instance is the first WP103 task, isolated under `/opt/uruquim-verify` conventions, never touching the CI/Caddy already there |
+| **E8-3** Pinned consumption for core + every Crystal; no branch-relative hidden dependency | ◑ **decided below (§2)** | app pins **fixed commit SHAs** — core `closure` HEAD and crystals `main` `36db55c` — via the `druse`/`crystals` collections. A fixed SHA is not a branch-relative dependency |
+| **E8-4** Deployment target, reverse proxy, supervisor, **dedicated PostgreSQL** | ⚠️ **prerequisite for WP103** | VPS `45.32.215.234` has Caddy (proxy) + systemd (supervisor); **PostgreSQL is NOT installed/running** (inactive, no container, no `:5432`). Provisioning a dedicated instance is the first WP103 task, isolated under `/opt/druse-verify` conventions, never touching the CI/Caddy already there |
 | **E8-5** Security/retention scope written before real user data; synthetic default | ✅ **this doc §5** | — |
 | **E8-6** Observability distinguishes route/query/pool/stream/failure without PII | ✅ | core `web.observe`/`Framework_Event`, `web.stats()` (Hardening H-3), `web.refused_connections()`; crystals `metrics` + `db/postgres` pool stats |
 | **E8-7** Composition Crystals frozen (`http_client` w/ fail-closed TLS, `metrics`) + BOM has no unclassified/ABERTO-without-trigger item | ✅ **VERIFIED** | crystals `main`: `http_client` (20 symbols, TLS corpus vs real `s_server` peers), `web/metrics` (install/routes, WP20 redaction by construction, test green against the CURRENT core), `docs/phase-7.5-composition-freeze.md` **FROZEN**. BOM: every row classified; every ABERTO carries a trigger (verified row by row) |
@@ -41,10 +41,10 @@ exceptions**, and makes **no core-repository relative import**. The owner's
 directive restates the fork: *third repo or under `examples/` — WP102 decides;
 never put application code in the frozen core.*
 
-**Decision: a separate repository — `uruquim-board`.** Rationale, and the
+**Decision: a separate repository — `druse-board`.** Rationale, and the
 alternative refused:
 
-- An app under `examples/` inside a framework repo can reach `uruquim:web`
+- An app under `examples/` inside a framework repo can reach `druse:web`
   through the collection **as a sibling of the source it imports**, so a slip
   into a relative/internal import would compile. That silently defeats the one
   thing proof-by-use exists to prove: that the framework composes through its
@@ -58,7 +58,7 @@ alternative refused:
 
 The repo is created in **WP103**, not here. It pins:
 
-- `uruquim` collection → the core `closure` HEAD commit (production-ready:
+- `druse` collection → the core `closure` HEAD commit (production-ready:
   Closure C-01..C-08 + Hardening H-1..H-5, full gate green bar the environmental
   wp41 flake). *Clean release step, owner's call: merge `closure` → core `main`
   and pin the merge; either way the pin is a fixed SHA.*
@@ -158,7 +158,7 @@ review (plan §8 non-goal). Concretely:
 client ──TLS──▶ Caddy (reverse proxy, proxy_buffering off, XFF)
                   │  http, keep-alive
                   ▼
-              uruquim-board  (systemd: Restart=always, TimeoutStopSec > max_drain_time)
+              druse-board  (systemd: Restart=always, TimeoutStopSec > max_drain_time)
                   │  bounded pool (crystals db/postgres)
                   ▼
               PostgreSQL  (dedicated instance; migrations run as a deploy STEP, never on boot)
@@ -169,9 +169,10 @@ client ──TLS──▶ Caddy (reverse proxy, proxy_buffering off, XFF)
 - Supervisor: **systemd**, `Restart=always`, `TimeoutStopSec` set above the
   app's `max_drain_time` so the framework drain runs before the kill (the
   Hardening H-4 rule; matches `docs/operations.md`).
-- Memory: a cgroup sized by the C-04 rule (`max_connections × largest response`);
-  large downloads use the spool/stream path so they do not pay the retention.
-- PostgreSQL: a dedicated instance, isolated under `/opt/uruquim-verify` on the
+- Memory: a cgroup sized from the corrected C-04 concurrent response campaign;
+  large downloads use the spool/stream path so memory scales with the bounded
+  stream window rather than total output length.
+- PostgreSQL: a dedicated instance, isolated under `/opt/druse-verify` on the
   VPS, provisioned in WP103; **the server never migrates on boot** — migrations
   are a separate, checksum-guarded deploy step (crystals `db/migrate`).
 - The first deploy serves a **boring health page** before any domain feature, to
@@ -247,7 +248,7 @@ exception (plan §2).
 
 1. Provision the dedicated PostgreSQL on the VPS (E8-4), isolated, never
    touching the CI/Caddy already running.
-2. Create the `uruquim-board` repository pinning the two SHAs (§2, E8-3).
+2. Create the `druse-board` repository pinning the two SHAs (§2, E8-3).
 3. Explicit config load + validation; `application_init`/`destroy` owning the
    pool and services in one typed `App_State` (the `examples/notes` canonical
    shape, extended); migrations as a deploy step; a boring health page as the

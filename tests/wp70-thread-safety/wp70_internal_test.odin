@@ -4,7 +4,7 @@ import "core:sort"
 import "core:sync"
 import "core:testing"
 import "core:thread"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 WP70_THREADS :: 8
 WP70_IDS_PER_THREAD :: 512

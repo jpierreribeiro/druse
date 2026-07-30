@@ -10,7 +10,7 @@ package test_wp88_stream_registry
 import "core:sync"
 import "core:thread"
 import "core:testing"
-import stream "uruquim:web/internal/stream"
+import stream "druse:web/internal/stream"
 
 @(private)
 wake_count: int // atomic

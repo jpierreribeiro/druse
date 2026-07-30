@@ -1,11 +1,11 @@
 [Unit]
-Description=Run the Uruquim verification gate every five minutes
+Description=Run the Druse verification gate every five minutes
 
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=5min
 Persistent=true
-Unit=uruquim-ci.service
+Unit=druse-ci.service
 
 [Install]
 WantedBy=timers.target

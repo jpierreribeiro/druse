@@ -19,7 +19,7 @@ package test_m6_allocation_failure
 import "core:mem"
 import "core:mem/virtual"
 import "core:testing"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // Fails the Nth and every later allocation, delegating the rest.
 Failing :: struct {

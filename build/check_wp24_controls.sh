@@ -23,28 +23,28 @@
 # the documentation entirely, and control 1 by having no examples at all.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP24-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W24_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W24_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W24_ODIN="$(command -v odin)"
+DRUSE_W24_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W24_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W24_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W24_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W24_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W24_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W24_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W24_ODIN"; then
-  echo "WP24 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W24_ODIN"; then
+  echo "WP24 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
-URUQUIM_W24_ODIN_DIR="$(cd "$(dirname "$URUQUIM_W24_ODIN")" && pwd)"
+DRUSE_W24_ODIN_DIR="$(cd "$(dirname "$DRUSE_W24_ODIN")" && pwd)"
 
-URUQUIM_W24_TMP="$(mktemp -d -t uruquim-wp24-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W24_TMP"' EXIT
+DRUSE_W24_TMP="$(mktemp -d -t druse-wp24-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W24_TMP"' EXIT
 
 assert_mutated() { # label file before-hash
   local after
@@ -56,17 +56,17 @@ assert_mutated() { # label file before-hash
 # A full tree copy, because the docs gate and the examples gate both read the
 # repository root rather than a package directory.
 tree_copy() { # name
-  local t="$URUQUIM_W24_TMP/$1"
+  local t="$DRUSE_W24_TMP/$1"
   mkdir -p "$t"
-  cp -r "$URUQUIM_ROOT/build" "$t/build"
-  cp -r "$URUQUIM_ROOT/docs" "$t/docs"
-  cp -r "$URUQUIM_ROOT/examples" "$t/examples"
-  cp -r "$URUQUIM_ROOT/web" "$t/web"
-  cp -r "$URUQUIM_ROOT/planning" "$t/planning"
-  cp -r "$URUQUIM_ROOT/tests" "$t/tests"
-  cp -r "$URUQUIM_ROOT/vendor" "$t/vendor"
-  cp "$URUQUIM_ROOT/README.md" "$t/README.md"
-  cp "$URUQUIM_ROOT/CHANGELOG.md" "$t/CHANGELOG.md"
+  cp -r "$DRUSE_ROOT/build" "$t/build"
+  cp -r "$DRUSE_ROOT/docs" "$t/docs"
+  cp -r "$DRUSE_ROOT/examples" "$t/examples"
+  cp -r "$DRUSE_ROOT/web" "$t/web"
+  cp -r "$DRUSE_ROOT/planning" "$t/planning"
+  cp -r "$DRUSE_ROOT/tests" "$t/tests"
+  cp -r "$DRUSE_ROOT/vendor" "$t/vendor"
+  cp "$DRUSE_ROOT/README.md" "$t/README.md"
+  cp "$DRUSE_ROOT/CHANGELOG.md" "$t/CHANGELOG.md"
   printf '%s' "$t"
 }
 
@@ -119,14 +119,14 @@ echo "CONTROL 1: a user_data bag -> REJECTED by the gate as required"
 #
 # It is a BEHAVIOURAL probe: the mis-ordered program must answer 500 to the
 # protected route rather than serving it.
-mkdir -p "$URUQUIM_W24_TMP/misordered/app" "$URUQUIM_W24_TMP/misordered/vendor"
-cp -r "$URUQUIM_ROOT/web" "$URUQUIM_W24_TMP/misordered/web"
-cp -r "$URUQUIM_ROOT/vendor/odin-http" "$URUQUIM_W24_TMP/misordered/vendor/odin-http"
-cat >"$URUQUIM_W24_TMP/misordered/app/main.odin" <<'ODIN'
+mkdir -p "$DRUSE_W24_TMP/misordered/app" "$DRUSE_W24_TMP/misordered/vendor"
+cp -r "$DRUSE_ROOT/web" "$DRUSE_W24_TMP/misordered/web"
+cp -r "$DRUSE_ROOT/vendor/odin-http" "$DRUSE_W24_TMP/misordered/vendor/odin-http"
+cat >"$DRUSE_W24_TMP/misordered/app/main.odin" <<'ODIN'
 package main
 
 import "core:os"
-import web "uruquim:web"
+import web "druse:web"
 
 // The D-12.5 shape: a protected route registered BEFORE its guard.
 deny :: proc(ctx: ^web.Context) {
@@ -161,14 +161,14 @@ main :: proc() {
 	os.exit(code)
 }
 ODIN
-( cd "$URUQUIM_W24_TMP/misordered" && env ODIN_ROOT="$URUQUIM_W24_ODIN_DIR" \
-    PATH="$URUQUIM_W24_ODIN_DIR:/usr/bin:/bin" \
-    "$URUQUIM_W24_ODIN" build app "-collection:uruquim=$URUQUIM_W24_TMP/misordered" \
+( cd "$DRUSE_W24_TMP/misordered" && env ODIN_ROOT="$DRUSE_W24_ODIN_DIR" \
+    PATH="$DRUSE_W24_ODIN_DIR:/usr/bin:/bin" \
+    "$DRUSE_W24_ODIN" build app "-collection:druse=$DRUSE_W24_TMP/misordered" \
     -out:misordered.bin >/dev/null 2>&1 ) ||
   fail "BROKEN PROBE (2: mis-ordered use): the probe program did not build"
 
 # The diagnostic it prints is EXPECTED, so stderr is captured rather than shown.
-if ! "$URUQUIM_W24_TMP/misordered/misordered.bin" >/dev/null 2>&1; then
+if ! "$DRUSE_W24_TMP/misordered/misordered.bin" >/dev/null 2>&1; then
   case $? in
     1) fail "control '2: use after the protected route' SERVED the route; the D-12.5 authentication bypass is back" ;;
     2) fail "control '2: use after the protected route' answered something other than 500" ;;
@@ -237,17 +237,17 @@ must_reject_docs "$T" "5: the single-server constraint deleted" "single-server|R
 T="$(tree_copy positive)"
 bash "$T/build/check_docs.sh" >/dev/null 2>&1 ||
   fail "POSITIVE control failed: the docs gate does not pass on the real tree"
-env URUQUIM_COMPILER="$URUQUIM_W24_ODIN" bash "$T/build/check_examples.sh" >/dev/null 2>&1 ||
+env DRUSE_COMPILER="$DRUSE_W24_ODIN" bash "$T/build/check_examples.sh" >/dev/null 2>&1 ||
   fail "POSITIVE control failed: the seven examples do not build"
 
-for URUQUIM_NAME in 04-middleware 05-route-groups 06-authentication; do
-  test -f "$URUQUIM_ROOT/examples/$URUQUIM_NAME/main.odin" ||
-    fail "POSITIVE control failed: examples/$URUQUIM_NAME is missing"
+for DRUSE_NAME in 04-middleware 05-route-groups 06-authentication; do
+  test -f "$DRUSE_ROOT/examples/$DRUSE_NAME/main.odin" ||
+    fail "POSITIVE control failed: examples/$DRUSE_NAME is missing"
 done
 
 # The auth example must teach the revalidation COST, not hide it. A future edit
 # that quietly drops the warning turns an honest example into a misleading one.
-grep -qiE 'REVALIDATES|revalidat' "$URUQUIM_ROOT/examples/06-authentication/main.odin" ||
+grep -qiE 'REVALIDATES|revalidat' "$DRUSE_ROOT/examples/06-authentication/main.odin" ||
   fail "POSITIVE control failed: example 06 no longer states that current_user revalidates the token"
 
 echo "CONTROL 6: docs gate green, seven examples build, example 06 still states its cost -> GREEN as required [positive control]"

@@ -1,9 +1,9 @@
-# Upgrading Uruquim
+# Upgrading Druse
 
-**Who this is for:** whoever pins Uruquim in a real application and has to move
+**Who this is for:** whoever pins Druse in a real application and has to move
 it forward without discovering a silent behaviour change in production.
 
-Uruquim has **not cut a public release or a version tag yet** (the roadmap holds
+Druse has **not cut a public release or a version tag yet** (the roadmap holds
 tags until milestone M2). Until then, you consume it by pinning a commit, and
 this document tells you how to move that pin safely.
 
@@ -13,17 +13,17 @@ Odin has no package manager, so a dependency is a **vendored or submodule'd
 copy pinned to a commit**, wired in with a collection:
 
 ```
-odin build your-app -collection:uruquim=path/to/uruquim
+odin build your-app -collection:druse=path/to/druse
 ```
 
 Two things are part of the contract, not just the source:
 
-- **The core commit** — the exact `uruquim` revision you built against.
-- **The Odin toolchain commit** — Uruquim pins one nightly in
+- **The core commit** — the exact `druse` revision you built against.
+- **The Odin toolchain commit** — Druse pins one nightly in
   `odin-version.txt`, and its gate refuses any other. Your build should use the
-  same toolchain, because Uruquim's guarantees are only measured against it.
+  same toolchain, because Druse's guarantees are only measured against it.
 
-Record both in your own build, the way Uruquim records its own.
+Record both in your own build, the way Druse records its own.
 
 ## What is frozen, and what that buys you
 
@@ -51,7 +51,7 @@ forward:
    `X-Forwarded-For` (from the leftmost entry to walking from the right), which
    changes the value your rate limits and audit logs see. A break like that is
    named in its ADR with its reversibility; it is never a quiet edit.
-3. Rebuild with Uruquim's pinned toolchain and **run your own tests** — the
+3. Rebuild with Druse's pinned toolchain and **run your own tests** — the
    in-memory `web.test_request` path (see the Quick Start) exercises your
    handlers without a socket, so a behaviour change surfaces in your suite
    rather than in production.
@@ -71,7 +71,7 @@ forward:
 
 ## Before you ship an upgrade
 
-The same checklist Uruquim applies to itself is a good one for you: toolchain
+The same checklist Druse applies to itself is a good one for you: toolchain
 pinned, your gate green, your handlers' behaviour unchanged under
 `web.test_request`, the freeze/ADR amendments between pins read, and any named
 compatibility break understood and accounted for. A move that clears those is a

@@ -11,7 +11,7 @@
 package test_wp50_public
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // Pinned by assignment. Note the shape: no arguments and an integer result —
 // it is a COUNT, not a metrics abstraction, and a framework that exported one

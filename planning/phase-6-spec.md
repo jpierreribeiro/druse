@@ -16,7 +16,7 @@ records why.
 ## 1. Product decision
 
 Phase 6 makes an ordinary, production-minded PostgreSQL application possible
-without changing the common Uruquim programming model:
+without changing the common Druse programming model:
 
 ```text
 app → route → extract → service/SQL → respond → serve
@@ -345,7 +345,7 @@ Phase 6 freezes only when:
   pagination, transaction, migration, cancellation and health liveness;
 - cost, ownership and public ledgers are frozen literally;
 - every limitation and non-delivery is recorded;
-- the complete existing Uruquim gate remains green.
+- the complete existing Druse gate remains green.
 
 The expected result is still a microframework: `web` stays small and ordinary,
 while first-party Crystals make the common data-backed application complete.

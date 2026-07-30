@@ -1,4 +1,4 @@
-# Uruquim roadmap — Phases 2 to 8 and the release track
+# Druse roadmap — Phases 2 to 8 and the release track
 
 Living document. Written after the Phase-1 freeze (`a7d2e9e`) from the evidence
 in [`post-phase1-audit.md`](post-phase1-audit.md) and
@@ -16,7 +16,7 @@ frozen merely because the program names a capability.
 *(Updated 2026-07-21, after the Phase-5 freeze.)*
 
 Phases 1–5 are complete and frozen at `6b6edbc`: **62 application symbols + 2
-test-support symbols**. Uruquim now has indexed routing, middleware, typed
+test-support symbols**. Druse now has indexed routing, middleware, typed
 application state, configurable limits, production lifecycle, proxy-aware
 operation, deadlines, observability, drain, CORS, static files and bounded
 in-memory multipart. The full gate protects public signatures, claims,

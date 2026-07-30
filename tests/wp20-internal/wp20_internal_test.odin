@@ -8,7 +8,7 @@
 // arrangement).
 //
 // Every test here DELIBERATELY triggers a framework diagnostic, so each
-// installs the capture logger — which captures `uruquim:` Error lines and
+// installs the capture logger — which captures `druse:` Error lines and
 // FORWARDS everything else, because `testing.expect` reports through
 // `context.logger` and a swallow-everything logger makes a test unable to
 // fail (the defect WP17's mutation control 6 caught).
@@ -18,7 +18,7 @@ package web
 import "base:runtime"
 import "core:mem"
 import "core:testing"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -80,7 +80,7 @@ wp20_capture_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	sink := (^Wp20_Sink)(data)
-	if level == .Error && wp20_contains(text, "uruquim:") {
+	if level == .Error && wp20_contains(text, "druse:") {
 		for i in 0 ..< len(text) {
 			if sink.log_n < len(sink.log_buf) {
 				sink.log_buf[sink.log_n] = text[i]
@@ -453,7 +453,7 @@ wp20_no_observer_behaves_exactly_as_before :: proc(t: ^testing.T) {
 	testing.expect_value(t, string(ctx.private.response.body), ERROR_BODY_INTERNAL)
 	testing.expect(
 		t,
-		wp20_contains(wp20_logged(&sink), "uruquim:"),
+		wp20_contains(wp20_logged(&sink), "druse:"),
 		"the framework diagnostic must still be logged when no observer is registered",
 	)
 

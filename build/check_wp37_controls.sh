@@ -24,27 +24,27 @@
 # and exits 2. On-demand, like the WP16-WP30 controls — not a per-gate step.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP37-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W37_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W37_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W37_ODIN="$(command -v odin)"
+DRUSE_W37_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W37_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W37_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W37_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W37_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W37_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W37_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W37_ODIN"; then
-  echo "WP37 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W37_ODIN"; then
+  echo "WP37 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W37_TMP="$(mktemp -d -t uruquim-wp37-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W37_TMP"' EXIT
+DRUSE_W37_TMP="$(mktemp -d -t druse-wp37-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W37_TMP"' EXIT
 
 assert_mutated() { # label file before-hash
   local after
@@ -56,19 +56,19 @@ assert_mutated() { # label file before-hash
 # --- the suite half -----------------------------------------------------------
 
 suite_tree() { # name
-  local t="$URUQUIM_W37_TMP/$1"
-  mkdir -p "$t/uruquim/web" "$t/suite"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/uruquim/web/"
-  cp -r "$URUQUIM_ROOT"/web/testing "$t/uruquim/web/"
-  cp -r "$URUQUIM_ROOT"/web/internal "$t/uruquim/web/"
-  cp -r "$URUQUIM_ROOT"/vendor "$t/uruquim/"
-  cp "$URUQUIM_ROOT"/tests/wp37-public-surface/*.odin "$t/suite/"
+  local t="$DRUSE_W37_TMP/$1"
+  mkdir -p "$t/druse/web" "$t/suite"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/druse/web/"
+  cp -r "$DRUSE_ROOT"/web/testing "$t/druse/web/"
+  cp -r "$DRUSE_ROOT"/web/internal "$t/druse/web/"
+  cp -r "$DRUSE_ROOT"/vendor "$t/druse/"
+  cp "$DRUSE_ROOT"/tests/wp37-public-surface/*.odin "$t/suite/"
   printf '%s' "$t"
 }
 
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W37_ODIN" test "$1/suite" \
-    "-collection:uruquim=$1/uruquim" -out:"$URUQUIM_W37_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W37_ODIN" test "$1/suite" \
+    "-collection:druse=$1/druse" -out:"$DRUSE_W37_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 
@@ -85,7 +85,7 @@ write_probe() { # tree kind
       cat >"$1/probe/main.odin" <<'PROBE'
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 Registered :: struct {
 	n: int,
@@ -117,7 +117,7 @@ PROBE
       cat >"$1/probe/main.odin" <<'PROBE'
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 Anything :: struct {
 	n: int,
@@ -144,9 +144,9 @@ PROBE
 }
 
 probe_exit() { # tree
-  local bin="$URUQUIM_W37_TMP/probe-bin"
-  env -u ODIN_ROOT "$URUQUIM_W37_ODIN" build "$1/probe" \
-    "-collection:uruquim=$1/uruquim" -out:"$bin" >/dev/null 2>&1 ||
+  local bin="$DRUSE_W37_TMP/probe-bin"
+  env -u ODIN_ROOT "$DRUSE_W37_ODIN" build "$1/probe" \
+    "-collection:druse=$1/druse" -out:"$bin" >/dev/null 2>&1 ||
     fail "BROKEN PROBE: the subprocess program did not compile"
   set +e
   "$bin" >/dev/null 2>&1
@@ -163,8 +163,8 @@ T="$(suite_tree nil_accepted)"
 OUT="$(run_selected "$T" "$NAMES")" || { echo "$OUT" >&2; fail "BROKEN PROBE (1): the selected test is not green BEFORE the mutation"; }
 grep -qE 'Finished [1-9][0-9]* tests?' <<<"$OUT" ||
   { echo "$OUT" >&2; fail "BROKEN PROBE (1): the selection ran no test"; }
-H="$(md5sum "$T/uruquim/web/state.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/state.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/state.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/state.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -173,7 +173,7 @@ new = """	if false {"""
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "nil accepted" "$T/uruquim/web/state.odin" "$H"
+assert_mutated "nil accepted" "$T/druse/web/state.odin" "$H"
 if run_selected "$T" "$NAMES" >/dev/null 2>&1; then
   fail "control '1: nil-state rejection deleted' stayed GREEN; the suite does not catch this defect"
 fi
@@ -208,8 +208,8 @@ OUT="$(run_selected "$T" "$NAMES")" ||
   { echo "$OUT" >&2; fail "BROKEN PROBE (2): the selected test is not green BEFORE the mutation"; }
 grep -qE 'Finished [1-9][0-9]* tests?' <<<"$OUT" ||
   { echo "$OUT" >&2; fail "BROKEN PROBE (2): the selection ran no test"; }
-H="$(md5sum "$T/uruquim/web/state.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/state.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/state.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/state.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -218,7 +218,7 @@ new = """	if false {"""
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
-assert_mutated "type check deleted" "$T/uruquim/web/state.odin" "$H"
+assert_mutated "type check deleted" "$T/druse/web/state.odin" "$H"
 if run_selected "$T" "$NAMES" >/dev/null 2>&1; then
   fail "control '2: type check deleted' stayed GREEN; a handler asking for a type other than the registered one was handed the registered pointer reinterpreted, and the suite did not notice"
 fi
@@ -229,8 +229,8 @@ NAMES="test_wp37_public.wp37_state_on_an_app_without_state_is_refused_and_surviv
 T="$(suite_tree no_state)"
 OUT="$(run_selected "$T" "$NAMES")" ||
   { echo "$OUT" >&2; fail "BROKEN PROBE (3): the selected test is not green BEFORE the mutation"; }
-H="$(md5sum "$T/uruquim/web/state.odin" | cut -d' ' -f1)"
-python3 - "$T/uruquim/web/state.odin" <<'PYEOF'
+H="$(md5sum "$T/druse/web/state.odin" | cut -d' ' -f1)"
+python3 - "$T/druse/web/state.odin" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -239,7 +239,7 @@ for old in ("""	if ctx.private.state == nil {""", """	if ctx.private.state_type 
     s = s.replace(old, """	if false {""", 1)
 open(p, 'w').write(s)
 PYEOF
-assert_mutated "both checks deleted" "$T/uruquim/web/state.odin" "$H"
+assert_mutated "both checks deleted" "$T/druse/web/state.odin" "$H"
 if run_selected "$T" "$NAMES" >/dev/null 2>&1; then
   fail "control '3: both checks deleted' stayed GREEN; web.state reported ok on an application that registered no state at all"
 fi

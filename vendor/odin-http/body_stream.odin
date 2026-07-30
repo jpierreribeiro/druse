@@ -1,6 +1,6 @@
 package http
 
-// URUQUIM PATCH 23 (WP7.5-C1) — BRIDGE. Streaming inbound body.
+// DRUSE PATCH 23 (WP7.5-C1) — BRIDGE. Streaming inbound body.
 //
 // The upstream `body` (body.odin) materializes the WHOLE request body before it
 // calls back: a Content-Length body is one `scan_num_bytes` token the size of
@@ -89,7 +89,7 @@ body_stream :: proc(
 	s.on_chunk = on_chunk
 	s.on_done = on_done
 
-	// URUQUIM PATCH 37 (audit H3) — the shared predicate; see request.odin.
+	// DRUSE PATCH 37 (audit H3) — the shared predicate; see request.odin.
 	enc, ok := headers_get_unsafe(req.headers, "transfer-encoding")
 	is_chunked := false
 	if ok {

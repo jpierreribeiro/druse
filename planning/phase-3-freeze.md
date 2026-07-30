@@ -114,7 +114,7 @@ the backend before the core sees the request.
 a pattern declaring more is invalid at registration, never matches, and never
 contributes to an `Allow` value.
 
-**The word "bounded" is still gated.** Configurable limits bound Uruquim's own
+**The word "bounded" is still gated.** Configurable limits bound Druse's own
 per-request working memory. They do not bound connections, accept backlog,
 inbound header count or process memory, and `check_phase2_freeze.sh` still fails
 any document that says the framework as a whole is bounded.
@@ -260,7 +260,7 @@ Recorded so a later reader does not mistake absence for oversight:
   unfinished-work comment asking for one. Real deadlines are surgery inside the
   event loop. Adding a field later is an amendment; shipping one that silently
   does nothing would be worse than not shipping it. **No document claims
-  Uruquim has configurable timeouts.**
+  Druse has configurable timeouts.**
 * **No request-scoped typed state.** ADR-028 option 1, accepted. The canonical
   auth pattern's revalidation cost is permanent until an ADR decides otherwise,
   and `check_examples.sh` rejects a comment that schedules its removal.

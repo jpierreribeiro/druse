@@ -6,13 +6,13 @@ public feature, reopen ADR-011, or change the Phase-1 scope.
 
 ## Purpose
 
-Uruquim should remain small because each public concept earns its place, not
+Druse should remain small because each public concept earns its place, not
 because the repository happens to be young. Convenience requests must not
 silently create aliases, a god context, transport leakage, hidden ownership,
 or a kitchen-sink `App`.
 
 The project is not branded or designed as “anti-Gin.” Gin, Echo, Gjallarhorn,
-and other frameworks are comparative evidence only. Positive Uruquim
+and other frameworks are comparative evidence only. Positive Druse
 principles remain authoritative: one canonical path, explicit ownership,
 typed boundaries, transport isolation, and predictable behavior for humans
 and coding agents.
@@ -30,7 +30,7 @@ rejected.
 ### G-02 — Framework types stop at the HTTP boundary
 
 Handlers and typed HTTP extraction procedures may accept `^web.Context`.
-Domain services, repositories, and business rules must not import `uruquim:web`
+Domain services, repositories, and business rules must not import `druse:web`
 or accept framework request/response/context types. They receive application
 DTOs and return application-domain types.
 
@@ -111,7 +111,7 @@ the application API would let the two grow against each other under one number.
 lands: the application ledger is exactly 32; the test-support ledger is exactly
 2 (`Recorded_Response`, `test_request`); their exported union is exactly 34,
 with no other symbol. The facade lives in package `web` (`web/test_support.odin`);
-the machinery lives in `web/testing` and imports neither `uruquim:web` (cycle)
+the machinery lives in `web/testing` and imports neither `druse:web` (cycle)
 nor `core:testing`. Documentation presents the application inventory and a
 separate "Testing" section, states the `Recorded_Response` lifetime and the
 absence of sockets/ports/transport types, and promises no direct import of
@@ -172,7 +172,7 @@ assert it", closing the WP3 READY_WITH_BLOCKER.
 |---|---|
 | WP1 | exact exported-symbol inventory; no aliases, future surfaces, untyped context fields, or transport types |
 | WP2 | view invalidation/copy tests; single commit; Context shape assertion |
-| WP3 | dual-ledger surface (32 application + 2 test-support = 34); committed one-way/cycle probes; `web/testing` imports neither `uruquim:web` nor `core:testing`; unused-facade binary/init measurement; two-response lifetime and destroy cleanup (G-11) |
+| WP3 | dual-ledger surface (32 application + 2 test-support = 34); committed one-way/cycle probes; `web/testing` imports neither `druse:web` nor `core:testing`; unused-facade binary/init measurement; two-response lifetime and destroy cleanup (G-11) |
 | WP5 | extractor errors commit once; canonical examples return immediately; plain result forces `ok` capture |
 | WP6 | exact responder delegation; marshal logging; no partial/double response; private typed error path |
 | WP8 | adapter dependency inventory; backend-type export scan; core remains usable through test transport |

@@ -3,9 +3,9 @@
 // This file declares application construction and teardown. It installs no
 // default policy, allocates nothing, and builds no router.
 package web
-// uruquim:file application
+// druse:file application
 
-import testing "uruquim:web/testing"
+import testing "druse:web/testing"
 
 // App owns the application's resources.
 //

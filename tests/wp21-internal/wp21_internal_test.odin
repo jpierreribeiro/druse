@@ -30,10 +30,10 @@ package web
 import "core:log"
 import "core:strings"
 import "core:testing"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 @(private = "file")
-WP21_LOG_MARKER :: "uruquim:"
+WP21_LOG_MARKER :: "druse:"
 
 @(private = "file")
 Wp21_Log :: struct {

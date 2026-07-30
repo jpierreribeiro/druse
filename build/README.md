@@ -4,7 +4,7 @@ WP0 pins the Phase-1 compiler in `odin-version.txt` and exposes one local/CI
 entry point:
 
 ```bash
-env URUQUIM_ODIN_BIN=/tmp/uruquim-odin-toolchain/odin bash build/check.sh
+env DRUSE_ODIN_BIN=/tmp/druse-toolchain/odin bash build/check.sh
 ```
 
 `build/check.sh` is verification-only. It checks commit `819fdc7`, confirms

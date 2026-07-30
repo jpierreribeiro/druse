@@ -11,7 +11,7 @@ Phase 8 is intentionally not another infrastructure feature phase.
 > passing packages.
 
 The application lives in a separate repository. It depends only on released or
-pinned public Uruquim and Crystals contracts. It receives no friend imports,
+pinned public Druse and Crystals contracts. It receives no friend imports,
 test-only privileges or core exceptions.
 
 ---
@@ -356,7 +356,7 @@ Perform at least five forward migrations, including:
 - index creation with its transaction mode declared;
 - application versions overlapping during a deploy.
 
-Re-pin at least one Odin/Uruquim/Crystal revision through the documented
+Re-pin at least one Odin/Druse/Crystal revision through the documented
 upgrade path. Run the complete system against the official `core:net/http`
 adapter if available and eligible; otherwise execute the adapter readiness
 checklist and record the external blocker without inventing compatibility.
@@ -470,7 +470,7 @@ if the seven tests in `phases-6-8-program.md` still hold.
 
 Success does not prove every web application. It proves one demanding,
 multi-user, data-backed system with bounded streaming can be built, evolved and
-operated through public Uruquim contracts — and that the framework remains
+operated through public Druse contracts — and that the framework remains
 pleasant when its independently designed parts meet.
 
 That is the missing evidence between “excellent tests” and “excellent

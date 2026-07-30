@@ -25,7 +25,7 @@
 // compile-time diagnostics stay in the log, so no request byte can reach an
 // observer through a formatted line either.
 package web
-// uruquim:file application
+// druse:file application
 
 // Framework_Event is the one closed event a framework-detected failure
 // produces. It is passed to the observer BY VALUE.

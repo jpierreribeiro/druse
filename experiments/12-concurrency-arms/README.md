@@ -13,7 +13,7 @@ inconclusive prototype means single-threaded.**
 ## What the arms actually are
 
 The vendored server already supports both. `Server_Opts.thread_count` defaults
-to the core count, and **Uruquim's adapter forces it to 1** today
+to the core count, and **Druse's adapter forces it to 1** today
 (`web/internal/transport/odin_http_adapter.odin`). So this is not a build; it is
 a one-line change, which is exactly why it needed measuring rather than
 guessing — a cheap change is the kind that gets made without evidence.

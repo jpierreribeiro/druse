@@ -10,7 +10,7 @@
 // decision. Wiring the public responders onto this primitive is WP6; automatic
 // 404/405/501 belongs to WP4/WP9.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:mem"
 

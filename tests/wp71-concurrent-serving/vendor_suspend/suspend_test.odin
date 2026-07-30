@@ -2,7 +2,7 @@ package wp71_vendor_suspend
 
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 @(test)
 blocked_handler_lane_never_owns_the_dedicated_accept :: proc(t: ^testing.T) {

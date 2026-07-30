@@ -1,4 +1,4 @@
-// Uruquim example 07 — typed application state.
+// Druse example 07 — typed application state.
 //
 // A real service has things it needs everywhere and creates once: a database
 // pool, a configuration struct, a template cache. `web.app_with_state` attaches
@@ -31,7 +31,7 @@
 //
 // Run it from the repository root:
 //
-//	odin run examples/07-app-state -collection:uruquim=.
+//	odin run examples/07-app-state -collection:druse=.
 //
 // Try it:
 //
@@ -41,7 +41,7 @@
 package main
 
 import "core:sync"
-import web "uruquim:web"
+import web "druse:web"
 
 // The one value every handler needs. An ordinary struct: the framework does not
 // require an interface, a registration macro or a particular field.

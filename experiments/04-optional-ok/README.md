@@ -13,7 +13,7 @@ check `ok`", precisely because `#optional_ok` makes silent-drop *possible*.
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..
+odin run . -collection:druse=../..
 odin check .
 ```
 

@@ -19,7 +19,7 @@
 // package is where that cost becomes purposeful: these two procedures are the
 // readers.
 package web
-// uruquim:file application
+// druse:file application
 
 // header returns the EFFECTIVE request header named `name`.
 //

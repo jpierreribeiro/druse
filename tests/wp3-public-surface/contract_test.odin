@@ -1,6 +1,6 @@
 // WP3 public-surface contract, from OUTSIDE the package (probe C4).
 //
-// This package is an EXTERNAL consumer of `uruquim:web`. It proves that the two
+// This package is an EXTERNAL consumer of `druse:web`. It proves that the two
 // symbols WP3 adds — `test_request` and `Recorded_Response` — exist with the
 // exact ratified names, are actually exported by package `web` (not
 // `web/testing`), and compose as the ratified WP3 contract specifies.
@@ -35,10 +35,10 @@ package wp3_public_surface
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // Wp3_Log_Filter drops the framework's own Error-level diagnostics (they begin
-// with "uruquim:") and forwards everything else. `odin test` counts any Error
+// with "druse:") and forwards everything else. `odin test` counts any Error
 // record as a failure, so a test that deliberately drives a bare() miss — which
 // the WP8 driver finalizes to a logged 500 — installs this to keep the runner
 // honest without hiding real failures. Declared on the caller's stack, so it
@@ -55,7 +55,7 @@ wp3_filter_proc :: proc(
 	location := #caller_location,
 ) {
 	filter := (^Wp3_Log_Filter)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if filter.inner.procedure != nil {

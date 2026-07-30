@@ -1,10 +1,10 @@
-// Uruquim example 01 — Hello World.
+// Druse example 01 — Hello World.
 //
-// The smallest complete Uruquim program: one route, one response, one server.
+// The smallest complete Druse program: one route, one response, one server.
 //
 // Build and run it from the repository root:
 //
-//	odin run examples/01-hello-world -collection:uruquim=.
+//	odin run examples/01-hello-world -collection:druse=.
 //
 // Then, in another terminal:
 //
@@ -14,7 +14,7 @@
 // Press Ctrl+C to stop the server.
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	// `app()` creates the application with the Phase-1 defaults: a standardized

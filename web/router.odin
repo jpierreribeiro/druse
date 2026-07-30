@@ -21,7 +21,7 @@
 // `^Router` is expected) is a compile error, so `mount` stays Router-only; and
 // `odin doc` renders the using-field fully, so the freeze snapshot pins it.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:strings"
 

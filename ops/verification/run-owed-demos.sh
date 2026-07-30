@@ -13,7 +13,7 @@ set -euo pipefail
 
 MODE="${1:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ODIN="${URUQUIM_ODIN_BIN:-/opt/uruquim-odin/odin}"
+ODIN="${DRUSE_ODIN_BIN:-/opt/druse/odin}"
 ODIN_ROOT_DIR="$(cd "$(dirname "$ODIN")" && pwd)"
 export ODIN_ROOT="$ODIN_ROOT_DIR"
 
@@ -30,8 +30,8 @@ case "$MODE" in
     while [ "$(date +%s)" -lt "$end" ]; do
       n=$(( n + 1 ))
       "$ODIN" test "$ROOT/tests/c04-response-size" \
-        -collection:uruquim="$ROOT" -define:ODIN_TEST_THREADS=1 \
-        -out:/tmp/uruquim-soak >/dev/null 2>&1 || echo "[soak] iteration $n FAILED"
+        -collection:druse="$ROOT" -define:ODIN_TEST_THREADS=1 \
+        -out:/tmp/druse-soak >/dev/null 2>&1 || echo "[soak] iteration $n FAILED"
       free -m | awk -v i="$n" '/Mem:/{print "[soak] iter "i" avail_mb="$7" used_mb="$3}'
     done
     echo "[soak] $n iterations over ${SECS}s"
@@ -42,8 +42,8 @@ case "$MODE" in
     ulimit -n 8192 2>/dev/null || true
     echo "[scale] real-socket streaming at ${CONNS} connections (nofile=$(ulimit -n))"
     "$ODIN" test "$ROOT/tests/g76-scale-sockets" \
-      -collection:uruquim="$ROOT" -define:ODIN_TEST_THREADS=1 \
-      -define:SCALE_CONNS="$CONNS" -out:/tmp/uruquim-scale 2>&1 | grep -E "\[g76\]|successful|failed"
+      -collection:druse="$ROOT" -define:ODIN_TEST_THREADS=1 \
+      -define:SCALE_CONNS="$CONNS" -out:/tmp/druse-scale 2>&1 | grep -E "\[g76\]|successful|failed"
     ;;
 
   nginx)

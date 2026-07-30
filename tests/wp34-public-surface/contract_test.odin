@@ -22,11 +22,11 @@ package test_wp34_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // One test deliberately provokes a framework diagnostic, and the pinned runner
 // records any Error-level line as a failure. This swallows exactly the
-// `uruquim:` Error lines and FORWARDS everything else — `testing.expect`
+// `druse:` Error lines and FORWARDS everything else — `testing.expect`
 // reports through `context.logger`, so a swallow-everything logger would make
 // the test unable to fail (the defect WP17's mutation control 6 caught).
 @(private = "file")
@@ -43,7 +43,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {
@@ -140,7 +140,7 @@ wp34_a_multi_parameter_route_reports_every_parameter_by_name :: proc(t: ^testing
 	defer web.destroy(&app)
 	web.get(&app, "/orgs/:org/repos/:repo", capture)
 
-	web.test_request(&app, .GET, "/orgs/acme/repos/uruquim")
+	web.test_request(&app, .GET, "/orgs/acme/repos/druse")
 	testing.expect_value(t, sink.route, "/orgs/:org/repos/:repo")
 }
 

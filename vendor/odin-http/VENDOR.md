@@ -1,7 +1,7 @@
 # Vendored dependency — laytan/odin-http (server root package)
 
 This directory is a **minimal snapshot** of the root server package of
-`laytan/odin-http`, used by the Uruquim bootstrap transport adapter
+`laytan/odin-http`, used by the Druse bootstrap transport adapter
 (`web/internal/transport/`) and by nothing else. No application imports it.
 
 ## Provenance
@@ -74,10 +74,10 @@ and one by WP7.5-C1 (streaming inbound body): the read-side twin of WP90's
 detached-stream pump, delivering a request body one bounded window at a time.
 All are minimal and fix a security issue, an upstream defect,
 a lifecycle defect or a capacity the server had no way to bound. Each is marked
-in source with `URUQUIM PATCH`, recorded below, and covered by executable
+in source with `DRUSE PATCH`, recorded below, and covered by executable
 evidence that failed before it. There are no opportunistic edits.
 
-The classification is mixed. Some patches encode Uruquim's deliberately
+The classification is mixed. Some patches encode Druse's deliberately
 stricter framing, capacity and shutdown policy; seven fix upstream lifecycle,
 parsing or keep-alive defects. The distinction is recorded per row because it
 decides whether a re-vendor carries a policy or expects a fix to disappear.
@@ -107,6 +107,7 @@ decides whether a re-vendor carries a policy or expects a fix to disappear.
 | 21 | `server.odin` (`on_accept`) | Tolerate transient accept errors: log, re-arm accept after a short delay, count CONSECUTIVE failures per lane and panic only past a persistence limit. | **UNAUTHENTICATED REMOTE CRASH (F9).** Upstream panics the whole process on any accept error, and `ECONNABORTED`/`EINTR` are ordinary events a peer can cause at will. The failure limit keeps a permanently dead listener fatal rather than a silent outage. |
 | 22 | `response.odin` (`stream_prepare`, `stream_finish`, `stream_abort`) | Three BRIDGE hooks for the detached-stream adapter: commit status/headers with chunked framing and hand the buffered heading bytes to the adapter's owner-lane pump; end the request cycle after the terminating chunk; abort without flushing on a mid-stream error. | **BRIDGE (WP90b).** The pump, framing and registry interplay live in the adapter; the backend contributes only what is private to it (the heading writer, `clean_request_loop`, `connection_abort`). Keep-alive across a detached stream is deliberately not offered. Deletable with the adapter; the official `core:net/http` adapter must expose equivalent commit/chunk/cancel capabilities before it can replace this bridge. |
 | 23 | `body_stream.odin` (new local file: `body_stream`, `scan_stream_window`, `scan_buffer_cap`) and `scanner.odin` (`Scanner.stream_compact`, `scanner_scan` compaction, `scanner_reset`) | Streaming inbound body: deliver a request body to a consumer one bounded window at a time — Content-Length windowed, chunked per-chunk — reclaiming the consumed buffer prefix so a body of any size costs one window, not its length. A synchronous non-blocking sink returns `.Continue`/`.Stop`; a `.Stop` (early refusal, quota breach, drain) halts the read by never arming the next recv. Re-applies every framing guard the buffered path earned (F3 chunk-size, WP9-D2/F10 Content-Length, WP9-D3 chunk CRLF). **BRIDGE.** | **BRIDGE (WP7.5-C1).** The read-side twin of patch 22: the large-body opt-in (`web/internal/ingest`) needs the body streamed, not materialized. The buffered `body` (body.odin) is untouched — the new path is off unless `body_stream` sets `stream_compact`. Held by the `tests/wp7_5-c1-inbound-stream` corpus (reassembly, bounded buffer, early stop, chunked, over-cap refusal). Deletable with the adapter; the official `core:net/http` adapter must expose an equivalent incremental body reader before it can replace this bridge. |
+| 24 | `server.odin` (`accept_refuse_handler_saturation`, `Server.refused_saturation_total`) | All-Handler-lanes-active is refused by closing the accepted socket without writing HTTP; the distinct refusal is counted. **BRIDGE.** | The dedicated acceptor has not parsed or associated an HTTP request. Its old raw 503 reached Go `net/http` as an unsolicited response on an idle channel. The deterministic C-05 barrier requires eight transport refusals, zero pre-request HTTP replies and an exact counter delta; restoring the raw response makes the mutant red. |
 
 Patch 5 also adds a tenth entry to `_method_strings` and makes `method_parse`
 skip the new member, so the existing `for r in Method` lookup (which indexes
@@ -114,7 +115,7 @@ that array under `#no_bounds_check`) stays in bounds.
 
 Every other line is byte-for-byte upstream.
 
-To update to a newer upstream commit, re-apply the twenty-three patches above (they are
+To update to a newer upstream commit, re-apply the twenty-four patches above (they are
 small and each is commented at its site) and re-run the WP9 raw-wire corpus,
 which is what proves they are still needed and still sufficient.
 
@@ -132,7 +133,7 @@ this cost is not.
 
 To move to a different upstream commit: re-copy the root `.odin` files, the
 `LICENSE` and `mod.pkg` from a fresh checkout at the new commit, re-apply the
-twenty-three patches listed above, update the provenance table, and re-run the full
+twenty-four patches listed above, update the provenance table, and re-run the full
 gate — including the WP9 raw-wire corpus, which is what proves the patches are
 still necessary and still sufficient. Do not make unrelated edits to these
 files.

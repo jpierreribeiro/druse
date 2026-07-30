@@ -5,7 +5,7 @@
 // handler running after a 400 was already committed.
 package wp5_probe_discard_query_int
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	ctx: web.Context

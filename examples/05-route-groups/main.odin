@@ -1,4 +1,4 @@
-// Uruquim example 05 — organising routes with `web.Router` and `web.mount`.
+// Druse example 05 — organising routes with `web.Router` and `web.mount`.
 //
 // A `Router` collects routes under a prefix, with its own middleware, and
 // `mount` attaches the whole thing to an application. There is no `web.group`
@@ -11,7 +11,7 @@
 //
 // Run it from the repository root:
 //
-//	odin run examples/05-route-groups -collection:uruquim=.
+//	odin run examples/05-route-groups -collection:druse=.
 //
 // Try it:
 //
@@ -22,7 +22,7 @@
 //	curl -i -H "X-Api-Key: secret" http://localhost:8080/reports/daily -> 403
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 Item :: struct {
 	id:   int    `json:"id"`,

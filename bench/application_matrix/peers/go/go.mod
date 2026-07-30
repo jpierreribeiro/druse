@@ -1,4 +1,4 @@
-module uruquim-bench/application-matrix-go
+module druse-bench/application-matrix-go
 
 go 1.26
 

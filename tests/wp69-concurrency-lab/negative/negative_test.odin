@@ -2,7 +2,7 @@ package wp69_negative
 
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 @(test)
 one_lane_is_the_required_negative_control :: proc(t: ^testing.T) {

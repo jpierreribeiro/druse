@@ -168,7 +168,7 @@ agent stops and records the finding instead of proceeding.**
 | **WP50** | Redaction policy is the spec half and lands **first**; observability keys on the route pattern, never the raw path; drop policy observable. | Separating redaction from observability invites shipping them in the wrong order. Phase 1's "nothing reaches a log line" property is preserved deliberately, not by accident. |
 | **WP56 freeze** | Delegated to the gate, WP38-style: freeze if and only if every gate is green, every ledger amended, seeds and soak results recorded. Any breach stops and goes to the owner. | Same reasoning as WP38: criteria met and refused is ceremony; criteria breached and passed is a lie. |
 | **Read and write deadlines (ADR-031, as amended)** | **The REQUIREMENT is fixed; the MECHANISM is WP46's to choose, after WP41.** Deadlines are the framework's problem and not the proxy's — but which mechanism (upstream to `odin-http`, a carried vendored patch, or the transport WP42/WP43 leaves behind) is decided with the fault lab's evidence in hand. **Upstream is attempted first; a carried patch is the fallback.** Until it ships, direct exposure without a proxy is not a supported deployment, and WP55 says so. | Byte budgets cannot reach slowloris — the request never gets large, only slow — and a proxy's timeout cannot bound the framework's own in-flight work, which is what WP44 needs a clock for. But the first draft of this row fixed the mechanism *before* the lab existed to say how the server behaves under a slow client, which inverts this project's method. Code we do not own is code we do not maintain; and per-connection timers have cancellation semantics the concurrency decision changes, so building them first means building them twice. |
-| **WP42 concurrency — THE OPEN ONE** | **Not pre-resolved, deliberately.** Whether `serve` stays single-threaded by construction is the phase's architectural decision (audit A-4, A-14), and deciding it today, without prototypes, would be taste wearing a delegation. What is written instead is the **procedure**: prototype both arms — the current single-threaded event loop, and a threaded model — measure both under WP53's workloads (including slow-client and slow-writer), and decide by **ADR-030** with the losing arm's numbers recorded. Two constraints bind whichever wins: fail-closed (no shared-mutable `App` state without a guard equivalent to the existing poison mechanism), and the Phase-3 decision that registration after `serve` begins is rejected — WP42 inherits that, it does not reopen it. | C-5's lesson generalises: "real systems use threads" is not evidence about Uruquim's workloads. The mission's tie-breaker applies only after the measurements. |
+| **WP42 concurrency — THE OPEN ONE** | **Not pre-resolved, deliberately.** Whether `serve` stays single-threaded by construction is the phase's architectural decision (audit A-4, A-14), and deciding it today, without prototypes, would be taste wearing a delegation. What is written instead is the **procedure**: prototype both arms — the current single-threaded event loop, and a threaded model — measure both under WP53's workloads (including slow-client and slow-writer), and decide by **ADR-030** with the losing arm's numbers recorded. Two constraints bind whichever wins: fail-closed (no shared-mutable `App` state without a guard equivalent to the existing poison mechanism), and the Phase-3 decision that registration after `serve` begins is rejected — WP42 inherits that, it does not reopen it. | C-5's lesson generalises: "real systems use threads" is not evidence about Druse's workloads. The mission's tie-breaker applies only after the measurements. |
 
 **WP42 stays open, and the delegation does not change that.** ADR-029 hands over
 *approvals*; it does not manufacture *evidence*. Deciding the concurrency model
@@ -415,7 +415,7 @@ struct, because every symbol is a promise.
 
 ### WP45 — Connection lifetime: keep-alive, drain-or-close, staged close
 
-**DONE, 2026-07-21 — URUQUIM PATCH 7, two new phases in `tests/wp41-fault`.
+**DONE, 2026-07-21 — DRUSE PATCH 7, two new phases in `tests/wp41-fault`.
 Zero public symbols.**
 
 **IT FOUND THAT KEEP-ALIVE WAS BROKEN FOR EVERY GET**, which is most traffic.
@@ -437,7 +437,7 @@ HTTP/1.1 promised persistence. Measured before the patch: request one answered,
 request two met an orderly close. After: three sequential requests, three 200s.
 
 **This is the fourth upstream bug among seven carried patches**, and the
-plainest — it has nothing to do with Uruquim's policies and breaks persistent
+plainest — it has nothing to do with Druse's policies and breaks persistent
 connections for anyone building on that server. Offered upstream under WP51.
 
 **FOR ADR-033, which WP44 reopened:** this patch is one line in one procedure.
@@ -455,7 +455,7 @@ behaviour, but behind spec-recorded RFC obligations rather than taste.
 ### WP46 — Limits: connections, queue depth, headers, minimum ingress rate
 
 **PARTIALLY DONE, 2026-07-21 — the READ DEADLINE ships.**
-`Limits.max_request_time` (default 30 s), URUQUIM PATCH 6 in the vendored
+`Limits.max_request_time` (default 30 s), DRUSE PATCH 6 in the vendored
 server, Amendment 13, claim-ledger row C-11, capacity-ledger row amended.
 **Zero new symbols — a field, not a name.**
 
@@ -512,7 +512,7 @@ default, once shipped, is a promise about traffic.
 
 ### WP47 — Deterministic load shedding
 
-**DONE, 2026-07-21 — URUQUIM PATCH 8, `Limits.max_connections` and
+**DONE, 2026-07-21 — DRUSE PATCH 8, `Limits.max_connections` and
 `Limits.reserved_conns`, Amendment 15, claim-ledger row C-12, capacity rows R-1
 and R-2 amended. Zero new symbols — two fields.**
 
@@ -653,7 +653,7 @@ Read against upstream `main` on 2026-07-21:
 * **Patch 1's bug appears STILL PRESENT** — `_body_length` still parses
   `Content-Length` with `strconv.parse_int` and guards only with
   `max_length > -1 && ilen > max_length`, which a negative value passes. That is
-  a remote process kill in a general-purpose HTTP server, not a Uruquim-specific
+  a remote process kill in a general-purpose HTTP server, not a Druse-specific
   concern, and it is the one worth reporting upstream.
 
 **The evidence rule is the load-bearing part**, and the gate protects it because
@@ -753,7 +753,7 @@ vendored server owns per-connection arenas and a per-thread temp allocator, and
 `web.serve` hands it a `Config`, not an allocator. A tracking allocator over
 that path means either patching the vendored allocator plumbing — **precisely
 the uncontained kind of patch WP44 hit, and what ADR-033 is reopened over** — or
-measuring only the part Uruquim already owns, which WP27 and WP35 measured
+measuring only the part Druse already owns, which WP27 and WP35 measured
 twice.
 
 **This is the same finding arriving a third time:** what this project can
@@ -790,7 +790,7 @@ limitation rather than only that it is one.
 **DOCS.** How to deploy — reverse-proxy TLS termination as the documented
 topology (§2b) — what to bound, what to monitor, what is **not** hardened, and
 the supervisor expectation stated for operators (ADR-020: a faulting handler
-aborts the process; that is the contract, not a bug). Points at `uruquim
+aborts the process; that is the contract, not a bug). Points at `druse
 doctor` on the product track. **Rollback: HIGH.**
 
 ### WP56 — Phase-4 freeze
@@ -811,7 +811,7 @@ WP49 inserted a block; WP25's control targeted a row WP47 had bounded; WP41's
 count was two and WP45 made it three. That is the healthy failure mode, and it
 only shows up if somebody re-runs them.
 
-**ONE MATTER GOES TO THE OWNER: ADR-033 is OPEN.** Whether Uruquim eventually
+**ONE MATTER GOES TO THE OWNER: ADR-033 is OPEN.** Whether Druse eventually
 owns the HTTP/1.1 connection layer is now backed by three independent findings —
 WP44's drain, WP46's containment result and WP54's allocator seam — all stopping
 at the same place. It is the largest question the project has.
@@ -834,7 +834,7 @@ needs a definition, or it becomes a licence to build everything.
 That is the standard this phase is held to, and by it the current tree has
 exactly three:
 
-1. **No deadline of any kind.** The capacity ledger says Uruquim bounds its own
+1. **No deadline of any kind.** The capacity ledger says Druse bounds its own
    per-request working memory; it bounds the *bytes* and not the *time*, and a
    slow client walks through the byte budget untouched. → ADR-031, WP46.
 2. **No way to stop.** `web.serve` blocks until the process ends, so the only
@@ -877,7 +877,7 @@ worth promising.
   declined.
 * **Rewriting the HTTP server** — R-T3, rejected and staying rejected **as a
   rewrite**. ADR-033 asks a narrower question with evidence attached: whether
-  Uruquim eventually owns the HTTP/1.1 connection layer over `core:nbio` as a
+  Druse eventually owns the HTTP/1.1 connection layer over `core:nbio` as a
   SECOND ADAPTER behind the ADR-009 boundary, gated on the conformance matrix.
   That is not a rewrite and not a big-bang replacement, and it is decided at
   WP41 or not at all.
@@ -905,7 +905,7 @@ full: **reference, never architecture; never a dependency; never committed;
 never cited as evidence; its absence never blocks.** Phase 4 is where the
 dossier is at its most useful — a runtime that supervises faults for a living
 has answered these questions explicitly — and at its most dangerous, because
-its answers are sized for a runtime Uruquim is not.
+its answers are sized for a runtime Druse is not.
 
 | Work package | Read | What is in there |
 |---|---|---|

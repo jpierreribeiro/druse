@@ -1,7 +1,7 @@
 # C-02 — The resource × property matrix
 
 **Status: LIVE GATE (Closure, WP C-02).** This file is the **single canonical
-list of what the Uruquim core does and does not bound.** Every other document
+list of what the Druse core does and does not bound.** Every other document
 points here rather than restating it; `build/check_readiness_matrix.sh` fails
 when a row loses a cell, when a `web.Limits` field has no row, or when the
 documents that used to keep their own lists start keeping them again.
@@ -59,13 +59,13 @@ Classification vocabulary (§3 of `production-readiness-closure.md`):
 | # | Resource | Limit | Deadline | Cancellation | Saturation policy | Metric | Shutdown | Class |
 |---|---|---|---|---|---|---|---|---|
 | 1 | Connection (accepted socket) | `max_connections`, default **1024** | none as a connection; `max_idle_time` bounds the gap between requests, **default OFF** | `connection_close` (shutdown(Send) + 500 ms + close; **immediate when the peer has already gone and no send was in flight** — patch 25) or `connection_abort` (SO_LINGER 0 → RST) | refuse: the accepted socket is closed at once above `max_connections - reserved_conns` (default 1008); never queued. **The slot is released at teardown, so the close path's duration is part of the admission budget** — C-03 §2 | `web.refused_connections()` — **the only public counter in the core** | drained: `.New`/`.Idle`/`.Pending` closed immediately, `.Active` **and `.Will_Close`** force-closed once `max_drain_time` expires (patch 26 / F-C03-1 — `.Will_Close` was omitted, and the drain then never ended) | OK |
-| 2 | Listening socket / `accept` | one outstanding accept per lane (WP71); the backlog itself is the kernel's | none — it blocks until a client arrives, by design | `nbio.remove(td.accept)` at shutdown | kernel backlog; `.Insufficient_Resources` re-arms after 1 s (guarded, vendored patch 24 / F-C01-1) | none exposed; consecutive failures are counted per lane and **128 in a row is fatal** rather than a silent outage | cancelled at shutdown | OK |
+| 2 | Listening socket / `accept` | one outstanding accept on the dedicated shared acceptor; handoffs to Handler lanes are bounded at two per lane; the backlog itself is the kernel's | none — it blocks until a client arrives, by design | acceptor stops re-arming once shutdown wins; late accept CQEs are closed | kernel backlog; `.Insufficient_Resources` re-arms after 1 s (guarded, vendored patch 24 / F-C01-1); when every lane is unavailable the acceptor closes the accepted socket without writing HTTP | `web.stats().saturation_refusals`; consecutive accept failures are counted internally and **128 in a row is fatal** rather than a silent outage | acceptor drains before lane event loops are released (patch 33 lifecycle) | OK |
 | 3 | Request read (request line, headers, buffered body) | `max_request_line` **8000**, `max_headers` **8000**, `max_body` **4 MiB** | `max_request_time` **30 s, ON by default** | `nbio.remove(scanner.pending_recv)` | close the connection | none exposed; the resulting status reaches the typed `Framework_Event` observer | cancelled per connection; **the deadline itself stops being enforced once `closing` is set — F-C01-2** | OK |
-| 4 | Handler execution (one lane) | `max_handlers`, default 0 = automatic (adapter resolves to [4, 32] by core count; explicit values bounded at 256) | **none — the application's own** | **not preemptible.** Odin has no recoverable panic and no preemption; a handler runs to return | lane contention answers **503 + `Retry-After: 1`** (F-002 fix + H-4); admission for that lane is suspended while it runs. **NO queue and NO work-stealing between lanes** — a 503 is refusal on collision, not on the pool being full, and can arrive with lanes idle. Queueing is deliberately REFUSED: the F-002 use-after-free was exactly a deferred dispatch (`next_tick`), unsound because everything the dispatch names (`req`/`res`, inbound views, the `Exchange`) lives in the connection arena that teardown frees; a queue is safe only after changing that ownership, which is future work. **Measured (C-05): this is the FIRST resource to bind — capacity is `lanes ÷ dwell`; `max_connections` only decides how many clients get to wait** | **`web.stats().lane_collisions`** — the 503-on-busy-lane count (item 2), the sizing signal for the first bound to saturate; previously unexposed | a running handler is not interrupted; `max_drain_time` bounds the *transport*, not the handler. **The supervisor's kill is the outer bound** | LIMITATION — mandatory topology: a supervisor with a kill timeout |
+| 4 | Handler execution (one lane) | `max_handlers`, default 0 = automatic (adapter resolves to [4, 32] by core count; explicit values bounded at 256) | **none — the application's own** | **not preemptible.** Odin has no recoverable panic and no preemption; a handler runs to return | dedicated accept assigns new connections to an available least-loaded lane; once lane-owned, work may wait on that socket behind a synchronous handler. There is **no explicit application-dispatch queue and no work stealing**: the old deferred `next_tick` dispatch was a use-after-free because `req`/`res`, inbound views and `Exchange` live in the connection arena. When every lane is unavailable, the acceptor refuses at the transport boundary before parsing HTTP. **Measured (C-05): service capacity is `lanes ÷ dwell`; whether Handler saturation or the connection admission budget is the first visible refusal is scheduler-dependent** | **`web.stats().handler_dwell_ns`** measures dispatched Handler time; `web.stats().saturation_refusals` counts the acceptor boundary. The old `lane_collisions` metric was retired because it mixed those resources under the wrong name | a running handler is not interrupted; `max_drain_time` bounds the *transport*, not the handler. **The supervisor's kill is the outer bound** | LIMITATION — mandatory topology: a supervisor with a kill timeout |
 | 5 | Response write (buffered) | `max_response_bytes`, **default 0 = off** (ADR-045); a strictly larger built body is replaced with a 500 before copy-out | `max_write_time`, **default OFF** | `nbio.remove(conn.pending_send)` | the connection and its buffer are retained for as long as the client chooses; RST at the deadline when one is set | **`web.stats()`** — `responses_sent`, `response_bytes`, `send_errors`, `write_deadline_aborts` (Closure H-3) | cancelled at close; **deadline not enforced during drain — F-C01-2** | OK — per-response bound SHIPPED (ADR-045); aggregate still delegated to cgroup (C-04); metric SHIPPED (H-3) |
 | 6 | Detached response stream | per-stream event and byte caps + a process-wide byte budget (`web/internal/stream` registry) | `max_write_time` per send, or the pre-registered **30 s** default when unset — a stream is bounded whether tuned or not | `stream.close` + `retire`; an externally-initiated end reaches it through the connection teardown hook | `Full` refusal — the bounded queue refuses, never waits and never drops silently | `refused_stream_full`, `refused_budget_full`, `aborted_slow` — **now reachable through `web.stats()` (Closure H-3)** | `drain_begin` wakes every owner, the terminator follows the last queued event, bounded by `max_drain_time` (WP95) | OK — metric shipped (H-3) |
 | 7 | Spool ingest (opt-in large-body upload) | per-upload quota + the configured spool directory; opt-in, default off | the request deadline (`max_request_time`) | `upload_cancel` at driver teardown — exactly once, idempotent | admission refuse; refuses new spools once draining (WP95) | none exposed | admission stops at drain; a spooled file is deleted at teardown unless `upload_persist` moved it | LIMITATION — no metric; the substrate is opt-in |
-| 8 | Per-connection arena (`virtual.Arena`, growing) | **none directly** — it grows to the largest request or response the connection has held, so it is bounded by `max_body` on the read side and by nothing on the write side | n/a | n/a — freed wholesale at teardown | process memory. **Measured (C-04): a connection retains ~1.0× the largest response it ever served, persisting at ~0.75× while it serves small ones. Worst case `max_connections × largest response` — 1024× at the defaults** | **none exposed**; retention is measured by `tests/c04-response-size`, not reported by the framework | destroyed in `connection_teardown`; **leaked if the drain deadline expires with the close still outstanding — F-C01-4** | LIMITATION — **delegated to a cgroup, with a measured sizing rule** (C-04); no per-request leak (F-C04-2) |
+| 8 | Per-connection arena (`virtual.Arena`, growing) | no direct byte limit; `free_all` runs after a completed response and deallocates every oversize block, retaining only the initial 1 MiB reservation with usage reset to zero | n/a | n/a — request cleanup calls `free_all`; teardown destroys the remaining first block | **Measured (corrected C-04):** one 4 MiB response transiently used 25,167,567 arena bytes across seven blocks; after send completion the arena had one 1 MiB reservation, 4,040 bytes committed and zero used. Process RSS nevertheless stayed above baseline, so RSS high-water is not a live arena-owner measurement | none exposed; the semantic and RSS shape are gated by `tests/c04-response-size` | oversized blocks are released after each completed response; the arena is destroyed in `connection_teardown`; **leaked if the drain deadline expires with the close still outstanding — F-C01-4** | LIMITATION — transient/in-flight aggregate and allocator high-water are **delegated to a cgroup sized from a representative concurrent campaign** (C-04) |
 | 9 | Static file read | `Static_Options.max_file_size`, default **8 MiB**; a larger file is answered 404 | **none** | **none — the read is synchronous** (`os.read_entire_file_from_path`) | it **blocks its handler lane** for the duration of the read, and the file is buffered whole (ADR-014) | none | not interruptible: it is inside the handler, so row 4's answer applies | LIMITATION — sized by `max_file_size`; **FUTURE:** an async read needs the F-C01-6 handles first |
 | 10 | Periodic lane timers (Date cache 1 s, deadline sweep 250 ms) | two per lane, fixed | their own period | **none — the handles are dropped**; they self-terminate by not rescheduling once `closing` is set | n/a | none | the final drain waits up to one period for the outstanding timeout — **measured at 991 ms** (C-01 P1) | LIMITATION — bounded by the period, declared in the C-01 inventory |
 | 11 | Accept backlog | the kernel's (`listen` backlog, `somaxconn`) | kernel | kernel | SYN drop | external (`ss -lnt` Recv-Q) | the listening socket is closed by `serve` after every lane returns | LIMITATION — **delegated to the kernel**, mandatory topology: tune `somaxconn` |
@@ -84,14 +84,14 @@ owns it.
    0 = off.** A strictly larger built body is replaced with the standardized 500
    (`Framework_Error.Response_Too_Large`) on the shared path before copy-out, so
    an out-of-memory that would kill every in-flight request becomes one typed
-   failure. **Measured (C-04): a connection retains ~1.0× the largest response
-   it ever served, and still holds ~0.75× of it after 1,600 subsequent small
-   responses — the footprint is per-connection and outlives the request**, so a
-   per-response bound is what caps the retention. The AGGREGATE across
-   `max_connections` — worst case `max_connections × largest response`, 1024× at
-   the defaults — remains *DELEGATED to a memory cgroup*, with the sizing rule in
-   `planning/closure-response-size-and-memory.md`. Two guards, two scopes: the
-   limit bounds one response, the cgroup bounds the process.
+   failure. **Corrected C-04 attribution:** completed responses release their
+   oversize arena blocks; the earlier ~1.0× “retained per connection” claim was
+   RSS high-water misattributed to a live owner. A 4 MiB response did transiently
+   use about 25.2 MiB of arena space, and an in-flight send keeps its completed
+   buffer until it finishes. There is no universal multiplier: the AGGREGATE is
+   *DELEGATED to a memory cgroup* sized from a representative concurrent
+   campaign. Two guards, two scopes: the limit bounds one response body, the
+   measured cgroup bounds the process.
 2. **The write and idle deadlines default OFF.** `max_write_time` and
    `max_idle_time` exist and work; they ship disabled because a
    framework-chosen number would reset real slow clients on upgrade. *Enable
@@ -106,17 +106,18 @@ owns it.
    entry stands as written because the *scope* limitation is real even with the
    bound restored.
 4. **Write-side observability — SHIPPED (Closure H-3).** `web.stats()` returns
-   a `Server_Stats` of eight running totals: `responses_sent`, `response_bytes`,
+   a `Server_Stats` of ten running totals, including distinct
+   `refused_connections` and `saturation_refusals`, plus `responses_sent`, `response_bytes`,
    `send_errors`, `write_deadline_aborts`, and the three stream counters that
    were maintained in the registry and reachable from no public API. An operator
    can now see slow-consumer aborts. The twelve-file ledger amendment that
    deferred it was done under H-3.
-5. **Arena retention after large responses** is now measured (entry 1), and
-   there is **no per-request leak** — 1,600 small responses on already-grown
-   arenas cost negative RSS in all three runs. What remains owed is the
-   *hours-long* soak, which only a quiet machine can give; it is recorded
-   alongside the 3,000 real-socket SSE round, the project's other undemonstrated
-   scale claim. *Owner: C-04, deferred with a named obligation.*
+5. **Large-response arena reclamation** is now attributed (entry 1): oversize
+   blocks are released after send completion. The 1,600-small-response phase
+   showed no continuing RSS growth in the short local workload, but that is not
+   a universal leak proof. A concurrent buffered-response matrix and the
+   *hours-long* mixed-size soak remain owed; the latter is recorded beside the
+   3,000-real-socket SSE round. *Owner: C-04, named VPS obligations.*
 6. **A blocking handler is not preemptible and a faulting one aborts the
    process.** Both are by construction (Odin has no recoverable panic). The
    supervisor is the outer bound. *Owner: the mandatory topology — C-06.*

@@ -28,9 +28,9 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import lab "uruquim:tests/support/fault_lab"
-import web "uruquim:web"
-import transport "uruquim:web/internal/transport"
+import lab "druse:tests/support/fault_lab"
+import web "druse:web"
+import transport "druse:web/internal/transport"
 
 // Distinct from the WP9 corpus's ports: these suites can run in one session and
 // a shared port turns a scheduling accident into a flaky failure.
@@ -119,7 +119,7 @@ wait_until_accepting :: proc(port: int) -> bool {
 
 // The framework's own Error-level lines are expected here — a fault lab
 // provokes diagnostics on purpose — and the pinned runner treats any Error line
-// as a failure. Swallow exactly `uruquim:` Error lines and forward the rest, or
+// as a failure. Swallow exactly `druse:` Error lines and forward the rest, or
 // `testing.expect` cannot report (the WP17 control-6 lesson).
 Log_Filter :: struct {
 	inner: log.Logger,
@@ -133,7 +133,7 @@ filter_proc :: proc(
 	location := #caller_location,
 ) {
 	f := (^Log_Filter)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if f.inner.procedure != nil {

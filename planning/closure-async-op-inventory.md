@@ -257,10 +257,10 @@ arena destroyed and its `Connection` freed, and the `read` completion would then
 write `op.read.read` bytes into a freed response buffer. That is the WP58
 use-after-free, a third time, on a third path.
 
-**It cannot happen today.** `web.static` — Uruquim's only file-serving surface —
+**It cannot happen today.** `web.static` — Druse's only file-serving surface —
 does not use it: `web/static.odin` reads with the synchronous
 `os.read_entire_file_from_path` and stats with `os.lstat`. `respond_file` is
-reachable from no Uruquim code path.
+reachable from no Druse code path.
 
 **Why it is recorded rather than deleted.** The honest options are to delete the
 dead chain or to declare it, and declaring it is worth more: the trigger is what

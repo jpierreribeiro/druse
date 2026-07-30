@@ -20,7 +20,7 @@ updated at every measurement. All numbers were measured on a dedicated AWS c5-cl
 
 ## Why this phase exists
 
-A measured optimization campaign proved Uruquim can compete with Go net/http on a trivial
+A measured optimization campaign proved Druse can compete with Go net/http on a trivial
 route, and found a real, addressable gap. The owner's goal: **≥ Go on every axis** (throughput,
 latency, CPU), keeping the WP71 guarantee — building I/O infrastructure from scratch if needed.
 
@@ -86,7 +86,7 @@ thread** — a dedicated accept path. That is architecture, not a patch. → WP1
 ## Why CPU is the hardest axis (measured fact)
 
 **Even v1 — no guarantee, the perf ceiling — loses on CPU to Go: 382% vs 176%.** So the CPU
-gap is **not** the accept dance; it is **syscalls per request**. Each Uruquim request does a
+gap is **not** the accept dance; it is **syscalls per request**. Each Druse request does a
 one-shot recv (+re-arm), a send, and an accept re-arm. Go amortizes all of it via the
 edge-triggered netpoller. Our lever is multishot recv + provided buffers (fewer syscalls/req).
 Honest caveat: matching a 15-year-old netpoller on CPU is ambitious — we measure, not promise.
@@ -112,7 +112,7 @@ The WP breakdown and definitions of done live in the phase plan
 | WP117b | scanner uses nbio multishot (odin-http) | — | — | — | — | — | next; target: CPU → 176% (needs c5) |
 | WP118 | multishot accept (prep + proof) | — | — | — | — | ✅ unit | **DONE** — 1 SQE accepts N conns, F_MORE proven; test GREEN |
 | WP119 | dedicated accept path | — | — | — | — | — | target: ≥ 241k + guarantee |
-| WP121 | Phase 9 final | **292k** (~90% of fasthttp) | **~1ms** (3x better than fasthttp) | 4 cores | — | ✅ | MEASURED: Uruquim competes with fasthttp (Go's ceiling) on throughput, WINS on latency |
+| WP121 | Phase 9 final | **292k** (~90% of fasthttp) | **~1ms** (3x better than fasthttp) | 4 cores | — | ✅ | MEASURED: Druse competes with fasthttp (Go's ceiling) on throughput, WINS on latency |
 
 ## MEASURED VERDICT on multishot recv (c5, 2026-07-25) — the tese was REFUTED for HTTP
 
@@ -169,14 +169,14 @@ since its bottleneck is the accept dance, not recv.
 
 - Measure before claiming; refuting is a valid result (v1, p29, submit-only all died in
   measurement — each death was progress).
-- Toolchain changes (uring/nbio) are a serious dependency move: **vendor into Uruquim**, never
+- Toolchain changes (uring/nbio) are a serious dependency move: **vendor into Druse**, never
   modify the global toolchain; document each patch and its upstream-ability.
 - Never promise "≥ Go on CPU" before measuring; ship the truth of the data.
 
 ## CPU diagnosis — research × our real code (WP122+, the next lever)
 
 External research (Go netpoller / fasthttp / nginx / picohttpparser / httparse) cross-checked
-against the Uruquim hot path. The research's top CPU levers map DIRECTLY onto what our code
+against the Druse hot path. The research's top CPU levers map DIRECTLY onto what our code
 does today — confirmed by reading `vendor/odin-http`:
 
 ### Suspect #1 (highest confidence) — per-header allocation + a hash map per request
@@ -283,13 +283,13 @@ Built a fasthttp server (Go's zero-alloc ceiling) and benchmarked head-to-head:
 
 | | req/s (single-box, noisy) | p50 | p99 (c100) | p99 (c400) |
 |---|---|---|---|---|
-| **Uruquim (p28)** | ~120k | **56µs** | **118µs** | **134µs** |
+| **Druse (p28)** | ~120k | **56µs** | **118µs** | **134µs** |
 | fasthttp | ~290–307k | 167µs | 860µs | 11ms |
 | Go net/http | ~200k | 292µs | 2.57ms | 18.6ms |
 
-**LATENCY: Uruquim beats fasthttp — the Go ceiling — decisively and consistently across every
+**LATENCY: Druse beats fasthttp — the Go ceiling — decisively and consistently across every
 session:** p50 3× better, p99 7× better at c100, and **~80× better under load (134µs vs 11ms at
-c400)**. Uruquim's latency is flat under load; fasthttp/net-http degrade badly. This is an
+c400)**. Druse's latency is flat under load; fasthttp/net-http degrade badly. This is an
 elite, robust result.
 
 **THROUGHPUT is NOT reliably measurable single-box.** The server and the wrk generator fight for
@@ -308,7 +308,7 @@ throughput number in this doc is indicative at best; the latency numbers are rob
 are relative and measured at the same instant.
 
 ### Honest standing
-- **Latency: Uruquim > fasthttp > net/http.** World-class, robust. ✅
+- **Latency: Druse > fasthttp > net/http.** World-class, robust. ✅
 - **Throughput: unknown vs fasthttp** until the 2-box benchmark; single-box says nbio may not
   scale across threads (worth confirming — it would be the real lever, replacing the refuted
   WP119/multishot/header-map hypotheses).
@@ -344,7 +344,7 @@ wrk's connection pattern — concentrates onto one socket/core). fasthttp scales
 scheduler spreads accepted connections across cores regardless of how they arrived.
 
 **THIS is the real throughput lever** — not multishot, not the header map, not the accept dance
-(all refuted). Uruquim's per-core throughput is competitive (~34-40k/core isolated, and its
+(all refuted). Druse's per-core throughput is competitive (~34-40k/core isolated, and its
 LATENCY beats fasthttp), but it runs on effectively ONE core. Fix connection distribution across
 cores and throughput could rise toward N×. The open question for the next cycle: WHY doesn't the
 reuseport hash spread (loopback artifact? bind order? needs SO_ATTACH_REUSEPORT_[CE]BPF
@@ -363,7 +363,7 @@ generator on 4-7, distributed load, 2 stable rounds:
 
 | server (4 cores) | req/s | p99 |
 |---|---|---|
-| **Uruquim (framework, on main)** | **292k** ⚠️ | **~1ms** |
+| **Druse (framework, on main)** | **292k** ⚠️ | **~1ms** |
 | fasthttp (Go's zero-alloc ceiling) | 326k | ~2.9ms |
 | Go net/http | ~200k | ~2.5ms |
 
@@ -371,13 +371,13 @@ generator on 4-7, distributed load, 2 stable rounds:
 > section at the end). The framework measures ~79–141k on 4 cores; 292k appears to be the
 > `echo_rp` reuseport prototype, not `web.app`. The latency column stands.
 
-**Uruquim does ~90% of fasthttp's throughput (292k vs 326k) AND ~3× better p99 latency
+**Druse does ~90% of fasthttp's throughput (292k vs 326k) AND ~3× better p99 latency
 (~1ms vs 2.9ms) — and under light load its p99 is ~118µs, ~7-80× better.** ⚠️ *The throughput half
 of this sentence is the disputed claim; the latency half reproduced.* It beats net/http on
 every axis.
 
 ### The honest scorecard vs the Go ceiling (fasthttp)
-- **Latency: Uruquim WINS** (p99 ~1ms vs 2.9ms under load; ~118µs vs 860µs light). World-class. ✅ reproduced.
+- **Latency: Druse WINS** (p99 ~1ms vs 2.9ms under load; ~118µs vs 860µs light). World-class. ✅ reproduced.
 - **Throughput: ~90% of fasthttp** ⚠️ **DISPUTED** — re-measurement puts the *framework* at 29–52%
   of fasthttp on 4 cores; see the end-of-file correction. The per-core cause is iowait, not cores.
 - **Correctness/safety, io_uring infra, memory model:** built and measured across Phase 9.
@@ -387,7 +387,7 @@ pg fail-fast (already worked), multishot recv (no HTTP win), header map (~5%), a
 (WP119 refuted), "nbio doesn't scale" (loopback artifact). Each refutation avoided a costly
 rewrite. The framework was already excellent; the work was proving WHERE it stands, honestly.
 
-**Phase 9 outcome: Uruquim is a world-class-latency HTTP framework whose throughput competes with
+**Phase 9 outcome: Druse is a world-class-latency HTTP framework whose throughput competes with
 the Go ceiling.** Remaining upside (the ~11%/core throughput gap vs fasthttp) is a real but
 minor optimization target, not a structural flaw. p28 — already on main — delivers this.
 
@@ -411,8 +411,8 @@ loopback IPs `127.0.0.{1..4}` to vary the 4-tuple, the setup the original 292k i
 
 | server (4 cores, `/ping`) | c100 req/s | c400 req/s | vs fasthttp |
 |---|---|---|---|
-| **Uruquim framework — auto lanes (4)** | ~80k | ~78k | **29%** |
-| **Uruquim framework — `max_handlers=32`** | ~116k | ~115k | **42%** |
+| **Druse framework — auto lanes (4)** | ~80k | ~78k | **29%** |
+| **Druse framework — `max_handlers=32`** | ~116k | ~115k | **42%** |
 | **fasthttp** (zero-alloc Go ceiling) | ~274k | ~290k | 100% |
 | **Go net/http** | ~162k | ~162k | 59% |
 
@@ -431,7 +431,7 @@ spread connections"). **Per-core `mpstat` under distributed load refutes that fo
 
 | | core 0 | core 1 | core 2 | core 3 | dominant time |
 |---|---|---|---|---|---|
-| **Uruquim framework** | 100% | 100% | 100% | 100% | **%iowait ≈ 49% per core** (usr ≈20, sys ≈26) |
+| **Druse framework** | 100% | 100% | 100% | 100% | **%iowait ≈ 49% per core** (usr ≈20, sys ≈26) |
 | **fasthttp** | 100% | 100% | 100% | 100% | **%iowait = 0%** (usr ≈40, sys ≈37, soft ≈22) |
 
 Both saturate all four cores (`%idle = 0` for both). The difference is *what* the cores do. A
@@ -441,11 +441,11 @@ time with an outstanding I/O*, NOT busy-waiting):
 | | usr | sys | **iowait** | soft | idle | rps |
 |---|---|---|---|---|---|---|
 | **fasthttp** | 40 | 37 | **0** | **22** | 0 | 274k |
-| **Uruquim (COOP_TASKRUN, on main)** | 24 | 37 | **28** | **11** | 0 | 79k |
+| **Druse (COOP_TASKRUN, on main)** | 24 | 37 | **28** | **11** | 0 | 79k |
 
 The tell is the **iowait/softirq pair**: fasthttp has **0% iowait and 22% softirq** — its
 epoll-edge-triggered netpoller never blocks and processes network softirq (packets) continuously.
-Uruquim has **28% iowait and 11% softirq** — the event loop **blocks in `io_uring_enter`**
+Druse has **28% iowait and 11% softirq** — the event loop **blocks in `io_uring_enter`**
 (`nbio` submits with `wait_nr=1`, `vendor/nbio/impl_linux.odin`) waiting for the next completion,
 and consequently pushes **half the packets/s**. The ceiling is not "too few cores" (idle=0, all
 four used) — it is the **blocking submit/complete loop pattern**, which leaves the CPU parked in
@@ -460,7 +460,7 @@ the enter syscall instead of processing the next request.
 - **`IORING_ENTER_NO_IOWAIT`** (Linux 6.15) would only **relabel** the iowait as idle in
   accounting; it adds no throughput, and is absent from the pinned Odin toolchain's enter flags.
 - **NAPI busy-poll** (`IORING_REGISTER_NAPI`) targets *latency* (RTT 55→38µs in upstream tests);
-  Uruquim's latency is already 44µs — not our problem, not our lever.
+  Druse's latency is already 44µs — not our problem, not our lever.
 - **multishot recv** was benched at the **`echo_multishot` prototype** level and showed no HTTP
   win — but the framework's request reader (`vendor/odin-http/scanner.odin`) still does
   **single-shot `recv_poly`**. Wiring multishot recv + a provided-buffer ring **into the scanner**
@@ -476,25 +476,29 @@ tested and refuted. It belongs to a future perf WP with a two-box benchmark, not
 
 Every latency measurement reproduced the original finding decisively. `web.app`, 4 lanes, `/ping`:
 
-| | Uruquim (4-lane) | fasthttp | Go net/http |
+| | Druse (4-lane) | fasthttp | Go net/http |
 |---|---|---|---|
 | p50 (c100) | **44 µs** | 332 µs | 567 µs |
 | p99 (c100) | **67 µs** | 1.15 ms | 2.49 ms |
 | p99 (c400) | **69 µs** (flat) | 2.77 ms | 8.3 ms |
 
-At c400 Uruquim's p99 is **~40× better than fasthttp and ~120× better than net/http**, and it
-stays **flat** from c100 to c400 while both competitors degrade an order of magnitude. This is the
-bounded-lane, no-queue model working as designed: it sheds excess load (the 503-on-collision
-counted by `web.stats().lane_collisions`, item 2) rather than queueing, which is precisely why
-latency does not degrade.
+At c400 Druse's p99 is **~40× better than fasthttp and ~120× better than net/http**, and it
+stays **flat** from c100 to c400 while both competitors degrade an order of magnitude.
+
+**Later architecture note:** the explanation originally attached to those
+numbers — 503-on-collision counted by `lane_collisions` — was superseded by
+dedicated accept. Current connections are assigned to available lanes and may
+queue on a lane-owned socket; `lane_collisions` was retired in favour of
+`handler_dwell_ns`. The measurements above remain historical measurements, but
+they are not evidence for the removed counter or a deterministic refusal order.
 
 ### 4. The honest architectural trade, restated
 
-Uruquim's synchronous bounded-lane model trades **peak throughput** for **flat, world-class
+Druse's synchronous bounded-lane model trades **peak throughput** for **flat, world-class
 latency**. Its throughput is `lanes ÷ per-request-latency` and, on 4 cores, is additionally capped
 by the ~50% io_uring iowait. fasthttp's async goroutine model has no lane bound and no iowait, so
 it wins raw throughput; it pays in tail latency under load. For a p99-SLA web service the trade
-favours Uruquim; for a maximum-RPS proxy it favours fasthttp.
+favours Druse; for a maximum-RPS proxy it favours fasthttp.
 
 ### 5. What is still owed (unchanged from the original study, and now sharper)
 
@@ -517,7 +521,7 @@ accept-cancel/re-arm from the request hot path without weakening the guarantee.
 
 On the same c5 one-box topology, with release (`-o:speed`) builds:
 
-| load | Uruquim dedicated accept | fasthttp | Uruquim p99 | fasthttp p99 |
+| load | Druse dedicated accept | fasthttp | Druse p99 | fasthttp p99 |
 |---|---:|---:|---:|---:|
 | c100 | 261k req/s | 283k req/s | 622 µs | 1.12 ms |
 | c400 | 286k req/s | 292k req/s | 2.11 ms | 2.59 ms |

@@ -189,7 +189,7 @@ a substitute by reaching into the view.
 ```odin
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	app := web.app()
@@ -402,7 +402,7 @@ health :: proc(ctx: ^web.Context) {
 Handlers take `^web.Context` and return nothing. They respond via helpers.
 Payloads are typed structs — there is no untyped object literal.
 
-The missing return value is deliberate: Uruquim does not use Echo-style
+The missing return value is deliberate: Druse does not use Echo-style
 generic error propagation. Odin allows returned results to be ignored, and a
 result would make the canonical extractor `return` more ceremonial. Internal
 framework failures still pass through one private typed path for consistent
@@ -669,7 +669,7 @@ be worse than one that refuses to start.
   lock/atomics or put it behind a thread-safe service. Set `max_handlers = 1`
   only when intentional single-Handler compatibility is the desired contract.
 
-`Limits` bounds Uruquim's **own per-request working memory**. It does not bound
+`Limits` bounds Druse's **own per-request working memory**. It does not bound
 connections, accept backlog, inbound header count or process memory — those are
 the transport's and the operating system's, and no document may say the
 framework is "bounded" because this type exists.

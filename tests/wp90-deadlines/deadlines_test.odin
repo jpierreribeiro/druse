@@ -15,7 +15,7 @@ import "core:strings"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // The body a HEALTHY reader drains end to end. It only has to be big enough to
 // take more than one write; it is deliberately NOT the stall size, because a

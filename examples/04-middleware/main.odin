@@ -1,4 +1,4 @@
-// Uruquim example 04 — middleware: ordering, short-circuiting, and the two
+// Druse example 04 — middleware: ordering, short-circuiting, and the two
 // built-ins.
 //
 // Middleware is an ORDINARY HANDLER. There is no `Middleware` type, no
@@ -13,7 +13,7 @@
 //
 // Run it from the repository root:
 //
-//	odin run examples/04-middleware -collection:uruquim=.
+//	odin run examples/04-middleware -collection:druse=.
 //
 // Try it:
 //
@@ -23,7 +23,7 @@
 //	curl -i http://localhost:8080/nope         -> 404, and STILL a log line
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 Message :: struct {
 	message: string `json:"message"`,

@@ -1,6 +1,6 @@
 // WP4 public-surface contract, from OUTSIDE the package.
 //
-// This package is an EXTERNAL consumer of `uruquim:web`. It proves the part of
+// This package is an EXTERNAL consumer of `druse:web`. It proves the part of
 // the WP4 contract an application can actually observe, through the ratified
 // public surface only:
 //
@@ -32,10 +32,10 @@ package wp4_public_surface
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // Wp4_Log_Filter wraps the runner's logger to drop the framework's own
-// Error-level diagnostics (they begin with "uruquim:") and forward everything
+// Error-level diagnostics (they begin with "druse:") and forward everything
 // else. `odin test` counts any Error record as a failure, so a test that
 // deliberately drives a path the framework logs on — a bare() miss finalized to
 // 500 — installs this to keep the runner honest without hiding real failures.
@@ -57,7 +57,7 @@ wp4_filter_proc :: proc(
 	location := #caller_location,
 ) {
 	filter := (^Wp4_Log_Filter)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if filter.inner.procedure != nil {

@@ -9,9 +9,9 @@
 package test_wp87_buffered_oracle
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
-BOUNDARY :: "----uruquim-wp87"
+BOUNDARY :: "----druse-wp87"
 
 @(private = "file")
 CONTENT_TYPE_LINE :: "Content-Type: multipart/form-data; boundary=" + BOUNDARY

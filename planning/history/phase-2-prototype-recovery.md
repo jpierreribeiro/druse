@@ -3,7 +3,7 @@
 **Type: PROTOTYPE. Output: a recommendation with measured evidence.**
 **Status: complete. Requires owner approval — a scope amendment is proposed.**
 
-Toolchain: `env -u ODIN_ROOT /tmp/uruquim-odin-toolchain/odin`, version
+Toolchain: `env -u ODIN_ROOT /tmp/druse-toolchain/odin`, version
 `dev-2026-07-nightly:819fdc7` (the pinned commit).
 Prototype workspace: `/tmp/wp13-probe/`. Nothing in `web/` or `build/` was
 changed; every patched build used a **copy** of the real sources, the same
@@ -24,7 +24,7 @@ copied into each procedure and an assignment made inside `app()` dies when
 not merely hard; three independent parts of the sentence are false.
 
 The recommendation is **R-b**: recovery is redefined as the driver guarantee
-Uruquim already ships and already tests, plus documentation that says plainly
+Druse already ships and already tests, plus documentation that says plainly
 that a faulting handler aborts the process. The exact amendment text for
 `knowledge-base/03-development-phases.md` is in section 9.
 
@@ -41,7 +41,7 @@ Every candidate is measured against this. A handler that panics, driven through
 package main
 
 import "core:os"
-import "uruquim:web"
+import "druse:web"
 
 boom :: proc(ctx: ^web.Context) {
 	panic("handler exploded")
@@ -64,7 +64,7 @@ Command and verbatim output:
 
 ```
 $ odin build /tmp/wp13-probe/baseline \
-    -collection:uruquim=/home/jp/Desktop/uruquim-odin -out:baseline.bin
+    -collection:druse=/home/jp/Desktop/druse -out:baseline.bin
 $ ./baseline.bin
 before request
 /tmp/wp13-probe/baseline/main.odin(8:2) panic: handler exploded
@@ -774,7 +774,7 @@ the same exit code, leaking nothing, because the process ends). R-c destroys it.
 
 ## 11. Recommendation
 
-**Adopt R-b.** Redefine recovery as the driver guarantee Uruquim already ships
+**Adopt R-b.** Redefine recovery as the driver guarantee Druse already ships
 and already tests, and document plainly that a faulting handler aborts the
 process. Do **not** export a `recovery` symbol. Amend the phases doc as in
 section 12.
@@ -803,7 +803,7 @@ different fault sites in two build modes, for **432 bytes**, with **zero** leake
 memory, **zero** new `fmt`/`log` symbols, **byte-identical** behaviour on the
 healthy path, **byte-identical** behaviour under `test_request`, and the **same**
 exit code 132 that a supervisor already watches for. It costs less than a single
-route entry. Choosing R-b means that every panicking handler in every Uruquim
+route entry. Choosing R-b means that every panicking handler in every Druse
 application drops the connection with no response at all, so the client sees
 `curl: (52) Empty reply from server` and cannot tell a server bug from a network
 failure, a load-balancer timeout, or a hostile reset. Retries will hammer the
@@ -853,7 +853,7 @@ Three edits, all inside `## Phase 2 — Middleware and Groups`.
   one that returns early on an error branch — is finalized by the response
   driver to a logged, standardized `internal_error` 500, identically under
   `web.serve` and `web.test_request`. A handler that *faults* aborts the
-  process; the documentation says so plainly, and Uruquim is expected to run
+  process; the documentation says so plainly, and Druse is expected to run
   under a supervisor. A last-gasp responder that writes a 500 to the in-flight
   socket before aborting is feasible and cheap, and is deferred to Phase 4 —
   it is not middleware and cannot be a default of `app()`.
@@ -923,9 +923,9 @@ Everything is under `/tmp/wp13-probe/`. Nothing in the repository was modified.
 Build command shape used throughout:
 
 ```
-env -u ODIN_ROOT ODIN_ROOT=/tmp/uruquim-odin-toolchain \
-  /tmp/uruquim-odin-toolchain/odin build <dir> \
-  -collection:uruquim=<root> -out:<bin>
+env -u ODIN_ROOT ODIN_ROOT=/tmp/druse-toolchain \
+  /tmp/druse-toolchain/odin build <dir> \
+  -collection:druse=<root> -out:<bin>
 ```
 
 Patched trees (`uru/`, `uru_ra/`, `uru_rc/`) are copies of `web/` and `vendor/`

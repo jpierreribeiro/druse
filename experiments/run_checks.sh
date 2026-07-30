@@ -11,7 +11,7 @@ set -u
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-COLL="-collection:uruquim=$ROOT"
+COLL="-collection:druse=$ROOT"
 PASS=0; FAIL=0; SKIP=0
 
 need_odin() {
@@ -48,13 +48,13 @@ check 09-test-transport       test "test-transport"
 check 10-handler-errors       test "handler-errors"
 
 echo "--- optional-ok plain-result discard probe (expected compile failure) ---"
-URUQUIM_OPTIONAL_OUTPUT="$(odin check "$HERE/04-optional-ok/probes/plain_discard.odin" -file $COLL 2>&1)"
-URUQUIM_OPTIONAL_EXIT=$?
-if test "$URUQUIM_OPTIONAL_EXIT" -ne 0 && \
-   grep -q "Assignment count mismatch" <<<"$URUQUIM_OPTIONAL_OUTPUT"; then
+DRUSE_OPTIONAL_OUTPUT="$(odin check "$HERE/04-optional-ok/probes/plain_discard.odin" -file $COLL 2>&1)"
+DRUSE_OPTIONAL_EXIT=$?
+if test "$DRUSE_OPTIONAL_EXIT" -ne 0 && \
+   grep -q "Assignment count mismatch" <<<"$DRUSE_OPTIONAL_OUTPUT"; then
   echo "PASS: plain extractor forces capture of ok"
 else
-  echo "$URUQUIM_OPTIONAL_OUTPUT"
+  echo "$DRUSE_OPTIONAL_OUTPUT"
   echo "FAIL: plain extractor discard diagnostic changed"
   FAIL=$((FAIL+1))
 fi
@@ -68,13 +68,13 @@ else
 fi
 
 echo "--- handler-errors bare-return probe (expected compile failure) ---"
-URUQUIM_PROBE_OUTPUT="$(odin check "$HERE/10-handler-errors/probes/bare_return.odin" -file $COLL 2>&1)"
-URUQUIM_PROBE_EXIT=$?
-if test "$URUQUIM_PROBE_EXIT" -ne 0 && \
-   grep -q "Expected 1 return values, got 0" <<<"$URUQUIM_PROBE_OUTPUT"; then
+DRUSE_PROBE_OUTPUT="$(odin check "$HERE/10-handler-errors/probes/bare_return.odin" -file $COLL 2>&1)"
+DRUSE_PROBE_EXIT=$?
+if test "$DRUSE_PROBE_EXIT" -ne 0 && \
+   grep -q "Expected 1 return values, got 0" <<<"$DRUSE_PROBE_OUTPUT"; then
   echo "PASS: bare return rejected with expected diagnostic"
 else
-  echo "$URUQUIM_PROBE_OUTPUT"
+  echo "$DRUSE_PROBE_OUTPUT"
   echo "FAIL: bare-return diagnostic changed"
   FAIL=$((FAIL+1))
 fi

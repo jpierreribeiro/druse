@@ -11,7 +11,7 @@ import "core:net"
 Scan_Callback :: #type proc(user_data: rawptr, token: string, err: bufio.Scanner_Error)
 Split_Proc    :: #type proc(split_data: rawptr, data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: bufio.Scanner_Error, final_token: bool)
 
-// URUQUIM PATCH 34 (HTTP audit F2) — REQUIRE CRLF; REJECT A BARE LF OR CR.
+// DRUSE PATCH 34 (HTTP audit F2) — REQUIRE CRLF; REJECT A BARE LF OR CR.
 //
 // This delegated to `bufio.scan_lines`, which terminates a line on a bare `\n`
 // and merely strips an optional trailing `\r`. The request line and every header
@@ -96,7 +96,7 @@ Scanner :: struct /* #no_copy */ {
 	user_data:                    rawptr,
 	callback:                     Scan_Callback,
 
-	// URUQUIM PATCH 9 (WP59) — BRIDGE. The outstanding `recv`, kept so it can be
+	// DRUSE PATCH 9 (WP59) — BRIDGE. The outstanding `recv`, kept so it can be
 	// cancelled.
 	//
 	// Upstream discards the `^nbio.Operation` that `recv_poly` returns (see
@@ -120,7 +120,7 @@ Scanner :: struct /* #no_copy */ {
 	// when `core:net/http` lands.
 	pending_recv:                 ^nbio.Operation,
 
-	// URUQUIM PATCH 23 (WP7.5-C1) — BRIDGE. Streaming-body buffer reclamation.
+	// DRUSE PATCH 23 (WP7.5-C1) — BRIDGE. Streaming-body buffer reclamation.
 	//
 	// Upstream never compacts `buf`: `start` advances as tokens are consumed but
 	// the buffer only ever grows (see the `// TODO: write over the part of the
@@ -152,7 +152,7 @@ scanner_destroy :: proc(s: ^Scanner) {
 	delete(s.buf)
 }
 
-// URUQUIM PATCH 41 (audit M9) — the read buffer is RETURNED between requests
+// DRUSE PATCH 41 (audit M9) — the read buffer is RETURNED between requests
 // once it has grown past what ordinary traffic needs.
 //
 // `remove_range` moves `len` and never touches the backing allocation, and the
@@ -161,16 +161,19 @@ scanner_destroy :: proc(s: ^Scanner) {
 // holding a body-sized buffer for as long as the client kept the socket open,
 // and `max_idle_time` defaults to 0, so nothing reaped it.
 //
-// MEASURED, 16 keep-alive connections left idle after ONE POST each:
+// The first RSS experiment, 16 keep-alive connections left idle after one POST
+// each, reported:
 //
 //	64-byte bodies    +0.01 MB per connection
 //	1 MiB bodies      +2.02 MB per connection
 //	3 MiB bodies      +6.49 MB per connection
 //
-// Linear at roughly 2.1x the body — the retained buffer plus the doubling
-// ladder below it, which the allocator keeps resident. At the shipped defaults
-// that is `max_connections` 1024 x 2.1 x `max_body` 4 MiB, about 8.6 GB, which
-// is not a budget a cgroup absorbs; it is one it gets killed by.
+// RSS alone could not distinguish live allocations from freed allocator pages,
+// so its old post-patch extrapolation was withdrawn. The follow-up counting
+// allocator does: four blocked 3 MiB bodies expose four live scanner buffers
+// totalling 16,138,240 bytes; after response completion this shrink returns the
+// live total exactly to baseline. With `delete(s.buf)` removed, all 16,138,240
+// bytes remain live and the permanent M9 control turns red.
 //
 // THE THRESHOLD IS THE POINT. Shrinking unconditionally would reallocate on
 // every request of every connection. `RETAINED_BUF_MAX` is well above the
@@ -189,7 +192,7 @@ scanner_reset :: proc(s: ^Scanner) {
 	s.end   -= s.start
 	s.start  = 0
 
-	// URUQUIM PATCH 41 (audit M9). Only when nothing is pending: `s.end` is the
+	// DRUSE PATCH 41 (audit M9). Only when nothing is pending: `s.end` is the
 	// live prefix a pipelined follow-up request may already occupy, and
 	// discarding it would drop a request that has arrived.
 	if len(s.buf) > RETAINED_BUF_MAX && s.end == 0 {
@@ -215,7 +218,7 @@ scanner_reset :: proc(s: ^Scanner) {
 	s.could_be_too_short           = false
 	s.user_data                    = nil
 	s.callback                     = nil
-	// URUQUIM PATCH 23 (WP7.5-C1) — BRIDGE. A reused connection scans the next
+	// DRUSE PATCH 23 (WP7.5-C1) — BRIDGE. A reused connection scans the next
 	// request's headers on the buffered path; the streaming flag must not leak.
 	s.stream_compact               = false
 }
@@ -298,7 +301,7 @@ scanner_scan :: proc(
 
 	could_be_too_short := false
 
-	// URUQUIM PATCH 23 (WP7.5-C1) — BRIDGE. Reclaim the consumed prefix before
+	// DRUSE PATCH 23 (WP7.5-C1) — BRIDGE. Reclaim the consumed prefix before
 	// deciding whether the buffer must grow, so a streamed body of any size costs
 	// one window of buffer rather than its full length. Only on the streaming
 	// path (`stream_compact`); the buffered path never sets it and is unchanged.
@@ -351,7 +354,7 @@ scanner_scan :: proc(
 	s.could_be_too_short = could_be_too_short
 
 	assert_has_td()
-	// URUQUIM PATCH 9 (WP59) — BRIDGE. Keep the handle; see `pending_recv`.
+	// DRUSE PATCH 9 (WP59) — BRIDGE. Keep the handle; see `pending_recv`.
 	s.pending_recv = nbio.recv_poly(
 		s.connection.socket,
 		{s.buf[s.end:len(s.buf)]},
@@ -361,7 +364,7 @@ scanner_scan :: proc(
 }
 
 scanner_on_read :: proc(op: ^nbio.Operation, s: ^Scanner) {
-	// URUQUIM PATCH 9 (WP59) — BRIDGE. The operation has fired, so the handle is
+	// DRUSE PATCH 9 (WP59) — BRIDGE. The operation has fired, so the handle is
 	// dead: `nbio.remove` on an operation whose callback has run is itself a use
 	// after free, and the library says so. Cleared FIRST, before any early
 	// return below can skip it.
@@ -375,7 +378,7 @@ scanner_on_read :: proc(op: ^nbio.Operation, s: ^Scanner) {
 		#partial switch op.recv.err.(net.TCP_Recv_Error) {
 		case .Connection_Closed, .Invalid_Argument:
 			// EBADF (bad file descriptor) happens when OS closes socket.
-			// URUQUIM PATCH 25 (Closure C-03) — the peer is gone. Recorded on
+			// DRUSE PATCH 25 (Closure C-03) — the peer is gone. Recorded on
 			// the connection so `connection_close` can skip a politeness delay
 			// owed to nobody; see the long note there.
 			s.connection.peer_gone = true
@@ -389,7 +392,7 @@ scanner_on_read :: proc(op: ^nbio.Operation, s: ^Scanner) {
 
 	// When n == 0, connection is closed or buffer is of length 0.
 	if op.recv.received == 0 {
-		// URUQUIM PATCH 25 (Closure C-03) — an orderly FIN is equally final for
+		// DRUSE PATCH 25 (Closure C-03) — an orderly FIN is equally final for
 		// the read side; no further byte can arrive.
 		s.connection.peer_gone = true
 		s._err = .EOF

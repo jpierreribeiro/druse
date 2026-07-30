@@ -1,7 +1,7 @@
 package web
-// uruquim:file application
+// druse:file application
 
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // Phase 7.5-C2 — the public opt-in large-body upload API.
 //
@@ -26,7 +26,7 @@ import transport "uruquim:web/internal/transport"
 Upload_Config :: struct {
 	// The directory spools are written into. **It is owned by exactly ONE
 	// server instance** (audit M8), and that is a contract rather than a
-	// preference: `enable_upload` SWEEPS leftover `uruquim-spool-` files out of
+	// preference: `enable_upload` SWEEPS leftover `druse-spool-` files out of
 	// it at boot, because a crash or a `kill -9` leaves partials behind and
 	// nothing else ever removes them — they accumulate across restarts until a
 	// disk fills.
@@ -36,7 +36,7 @@ Upload_Config :: struct {
 	// abandoned one: an mtime threshold races a slow upload, and file locks are
 	// not in the pinned core. Give each instance its own directory.
 	//
-	// Only the framework's own `uruquim-spool-` prefix is swept; anything else
+	// Only the framework's own `druse-spool-` prefix is swept; anything else
 	// in the directory is left alone.
 	dir:               string,
 	per_upload_quota:  i64,

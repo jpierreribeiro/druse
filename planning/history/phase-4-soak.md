@@ -50,7 +50,7 @@ vendored server owns per-connection arenas and a per-thread temp allocator, and
 `web.serve` hands it a `Config`, not an allocator. Installing a tracking
 allocator over that path means either patching the vendored allocator plumbing —
 **which is precisely the uncontained kind of patch WP44 hit and ADR-033 is
-reopened over** — or measuring only the part Uruquim already owns, which WP27
+reopened over** — or measuring only the part Druse already owns, which WP27
 and WP35 have measured twice.
 
 **So the finding is the same one, arriving a third time:** what this project can

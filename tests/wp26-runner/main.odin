@@ -22,7 +22,7 @@ package wp26_runner
 
 import "core:fmt"
 import "core:os"
-import bench "uruquim:tests/support/bench"
+import bench "druse:tests/support/bench"
 
 // The cardinality sweep. RG-2 requires 5, 50, 500 and 5,000 routes, because
 // the only property a tree representation uniquely owns is SCALING — a sweep

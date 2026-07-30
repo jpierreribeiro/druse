@@ -11,9 +11,9 @@ package test_wp63_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
-// The ADR-012 diagnostic is an EXPECTED Error-level `uruquim:` line, and the
+// The ADR-012 diagnostic is an EXPECTED Error-level `druse:` line, and the
 // pinned runner records Error output as a failure. The WP8 idiom, reused.
 @(private = "file")
 Quiet :: struct {
@@ -29,7 +29,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {
@@ -48,7 +48,7 @@ quiet_logger :: proc(record: ^Quiet) -> log.Logger {
 	}
 }
 
-BOUNDARY :: "----uruquim9zX"
+BOUNDARY :: "----druse9zX"
 
 @(private = "file")
 CONTENT_TYPE_LINE :: "Content-Type: multipart/form-data; boundary=" + BOUNDARY

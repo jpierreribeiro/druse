@@ -45,7 +45,7 @@ shipped enforcement aborts with RST) plus the send-cancellation memory-safety
 fix. G6.5-2 is satisfied by `tests/wp90-deadlines` on the raw wire; ADR-039 is
 ACCEPTED. Original scope kept below for the record:
 Add `max_write_time` and `max_idle_time` to `Limits` (0 = disabled). Enforce in
-the vendored backend's deadline sweep as **BRIDGE** patches (mark `URUQUIM PATCH`,
+the vendored backend's deadline sweep as **BRIDGE** patches (mark `DRUSE PATCH`,
 update `planning/vendor-policy.md` row count + `build/check_vendor_policy.sh` +
 `VENDOR.md`). Add raw-wire corpus cases: a stalled write and an idle keep-alive
 are each closed at their deadline. Additive public `Limits` fields → pay the

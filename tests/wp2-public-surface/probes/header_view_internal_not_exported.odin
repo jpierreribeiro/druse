@@ -6,7 +6,7 @@
 // Expected diagnostic: 'Header_View_Internal' is not exported by 'web'
 package wp2_probe_header_view_internal
 
-import web "uruquim:web"
+import web "druse:web"
 
 probe :: proc() {
 	v: web.Header_View_Internal

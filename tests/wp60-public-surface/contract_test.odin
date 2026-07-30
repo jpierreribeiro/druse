@@ -18,9 +18,9 @@ package test_wp60_public
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
-// The fail-closed diagnostics are EXPECTED Error-level `uruquim:` log lines,
+// The fail-closed diagnostics are EXPECTED Error-level `druse:` log lines,
 // and the pinned test runner records Error output as a failure. This swallows
 // exactly those and forwards everything else — the WP8 idiom, reused rather
 // than reinvented.
@@ -38,7 +38,7 @@ quiet_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Quiet)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if record.inner.procedure != nil {

@@ -1,7 +1,7 @@
 package wp69_repeatability
 
 import "core:testing"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 @(test)
 startup_and_teardown_are_repeatable :: proc(t: ^testing.T) {

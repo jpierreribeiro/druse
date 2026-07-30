@@ -5,7 +5,7 @@
 // program the concept BUDGET applies to, and Phase 2 measured it at 23.
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 Item :: struct {
 	id:   int `json:"id"`,

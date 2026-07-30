@@ -25,7 +25,7 @@ package bench_support
 
 import "core:fmt"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // The status every benchmark handler commits.
 //

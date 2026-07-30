@@ -1,4 +1,4 @@
-# Uruquim API Reference for Coding Agents
+# Druse API Reference for Coding Agents
 
 Paste this file into your agent's context (Cursor rules, CLAUDE.md, etc.).
 
@@ -9,7 +9,7 @@ must never be emitted.
 
 ## What works today
 
-Uruquim is a working HTTP framework: `web.serve` binds a port and answers real
+Druse is a working HTTP framework: `web.serve` binds a port and answers real
 requests, routing and extractors work, JSON goes in and out, and every error is
 a standardized JSON envelope.
 
@@ -173,8 +173,11 @@ status, the request ID and its own counts, and never a path, header, body or
 parameter.** Key your metrics on `web.route(ctx)`, never on
 `ctx.request.path`.
 
-`web.stats()` returns a `Server_Stats` — nine running totals for the send and
-saturation sides, which `refused_connections` did not cover: `responses_sent`,
+`web.stats()` returns a `Server_Stats` — ten running totals for admission,
+saturation and sending. `refused_connections` counts the `max_connections`
+budget; `saturation_refusals` counts sockets closed by the dedicated acceptor
+when every Handler lane is active, before any HTTP request is parsed. The
+remaining fields are `responses_sent`,
 `response_bytes` (on the wire), `send_errors`, `write_deadline_aborts`,
 `handler_dwell_ns`, and the three detached-stream counters `stream_refused_full`,
 `stream_refused_budget`, `stream_aborted_slow` (previously reachable from no
@@ -187,7 +190,9 @@ It replaced `lane_collisions`, which dedicated accept made misleading rather
 than dead — handlers run synchronously on the lane thread, so the
 503-on-collision path is unreachable, and the only increments the counter still
 received came from the acceptor's saturation refusals while real lane saturation
-presented as silent queueing. `handler_dwell_ns` is a running total of
+presented as silent queueing. The acceptor refusal now has the honest
+`saturation_refusals` name and is a transport refusal, never a pre-request 503.
+`handler_dwell_ns` is a running total of
 time inside dispatched handlers: difference it over an interval for
 utilization (Δdwell / (lanes × Δwall)) and for mean dwell against
 `responses_sent`. A rising utilization says: raise `max_handlers`, shorten the
@@ -420,11 +425,13 @@ fail-closed rather than run on a guess.
   may BUILD. A committed body strictly larger than the limit is replaced with
   the standardized **500** before it reaches the wire — never truncated — and
   reported as `Framework_Error.Response_Too_Large`. Responses are buffered whole
-  (ADR-014) and retained per connection, so an unbounded one is an
-  out-of-memory that kills every in-flight request; the limit converts that into
-  one typed 500. It measures the body the framework built, so a HEAD is bounded
-  by what it allocated. Stream large output with `web.stream` instead of raising
-  it. Enforced on the shared path, so a test and a socket agree (413-for-request,
+  (ADR-014), and construction plus an in-flight send can hold multiple
+  body-sized allocations; the limit converts an over-budget response into one
+  typed 500. Completed responses release oversize connection-arena blocks, but
+  aggregate memory and allocator RSS still need a measured cgroup. It measures
+  the body the framework built, so a HEAD is bounded by what it allocated.
+  Stream large output with `web.stream` instead of raising it. Enforced on the
+  shared path, so a test and a socket agree (413-for-request,
   500-for-response, both by construction).
 - **`max_idle_time` bounds the quiet gap between keep-alive requests**, in
   nanoseconds, `0` = off (the default). The clock stops the moment the next
@@ -450,7 +457,7 @@ fail-closed rather than run on a guess.
 - Handlers may run concurrently. Mutable application state and observer/logger
   sinks are application-owned and must synchronize themselves.
 
-`Limits` bounds Uruquim's own per-request working memory. It does **not** bound
+`Limits` bounds Druse's own per-request working memory. It does **not** bound
 connections, accept backlog or process memory; those belong to the transport and
 the operating system.
 
@@ -901,9 +908,9 @@ web.use(&app, web.logger)      // before the first route, like every use
 ```
 
 ```text
-uruquim: GET /orders/:id 200   method, REGISTERED PATTERN, committed status
-uruquim: GET - 404             a miss has no pattern: `-`, never the raw path
-uruquim: GET /silent -         nothing was committed while the logger watched
+druse: GET /orders/:id 200   method, REGISTERED PATTERN, committed status
+druse: GET - 404             a miss has no pattern: `-`, never the raw path
+druse: GET /silent -         nothing was committed while the logger watched
 ```
 
 It never logs the raw path, the query string, a header, a body byte, or a
@@ -1059,7 +1066,7 @@ The complete programs live in `examples/`. The smallest one:
 ```odin
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 main :: proc() {
 	app := web.app()

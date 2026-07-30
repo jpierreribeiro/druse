@@ -14,7 +14,7 @@ operate on caller storage and see no copies.
 
 **Command.**
 ```bash
-odin run . -collection:uruquim=../..     # or: odin build . && ./api_shape
+odin run . -collection:druse=../..     # or: odin build . && ./api_shape
 odin check .
 ```
 

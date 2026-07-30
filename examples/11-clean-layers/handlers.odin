@@ -6,7 +6,7 @@ package main
 // status. It contains no rules of its own: everything it could decide, the
 // service already decided.
 
-import web "uruquim:web"
+import web "druse:web"
 
 create_handler :: proc(ctx: ^web.Context) {
 	st, ok := web.state(ctx, App_State)

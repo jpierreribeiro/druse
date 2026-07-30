@@ -55,13 +55,15 @@ stats :: proc() -> Server_Stats
 refused_connections :: proc() -> int
 ```
 
-`Server_Stats` carries `refused_connections`, `responses_sent`,
+`Server_Stats` carries `refused_connections`, `saturation_refusals`, `responses_sent`,
 `response_bytes`, `send_errors`, `write_deadline_aborts`, `handler_dwell_ns`,
 `stream_refused_full`, `stream_refused_budget` and `stream_aborted_slow`.
 
-Rising `write_deadline_aborts` means slow clients hitting
-`Limits.max_write_time`; rising `refused_connections` means you are at
-`max_connections`.
+Rising `write_deadline_aborts` means slow clients hitting `Limits.max_write_time`;
+rising `refused_connections` means you are at `max_connections`. Divide the
+interval's `Δhandler_dwell_ns` by `(max_handlers × wall time)` for utilization.
+Rising `saturation_refusals` means every Handler lane was active and the
+dedicated acceptor closed newly accepted sockets before parsing HTTP.
 
 ## Draining
 

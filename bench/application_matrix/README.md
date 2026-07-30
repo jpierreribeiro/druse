@@ -12,15 +12,15 @@ This harness separates costs that `/ping` cannot:
 | `POST /json/medium/decode` | same strict nested decode, 204 response |
 | `GET /api/users/42?verbose=1` | param/query extraction, request ID, three middleware frames, typed request state, JSON encode |
 
-The optional Uruquim argument fixes `web.Limits.max_handlers`. The four-core
+The optional Druse argument fixes `web.Limits.max_handlers`. The four-core
 reference build and run are:
 
-    odin build bench/application_matrix/uruquim \
-      -collection:uruquim=. \
+    odin build bench/application_matrix/druse \
+      -collection:druse=. \
       -o:speed \
-      -out:/tmp/uruquim-application-matrix
+      -out:/tmp/druse-application-matrix
 
-    taskset -c 0-3 /tmp/uruquim-application-matrix 4
+    taskset -c 0-3 /tmp/druse-application-matrix 4
 
 Examples:
 
@@ -39,20 +39,26 @@ Before recording performance, verify every endpoint's status, media type and
 body. Performance runs use `-o:speed`; debug builds are correctness controls,
 not product measurements.
 
-Uruquim's efficient strict JSON paths are native defaults; applications do not
+Druse's efficient strict JSON paths are native defaults; applications do not
 need runtime configuration. For framework-maintainer rollback/A-B only:
 
-    odin build bench/application_matrix/uruquim \
-      -collection:uruquim=. \
+    odin build bench/application_matrix/druse \
+      -collection:druse=. \
       -o:speed \
-      -define:URUQUIM_JSON_DIRECT_PREFLIGHT_PARSE=false \
-      -out:/tmp/uruquim-json-validator-control
+      -define:DRUSE_JSON_DIRECT_PREFLIGHT_PARSE=false \
+      -out:/tmp/druse-json-validator-control
 
-    odin build bench/application_matrix/uruquim \
-      -collection:uruquim=. \
+    odin build bench/application_matrix/druse \
+      -collection:druse=. \
       -o:speed \
-      -define:URUQUIM_JSON_FUSED_TREE_DECODE=false \
-      -out:/tmp/uruquim-json-stdlib-control
+      -define:DRUSE_JSON_FUSED_TREE_DECODE=false \
+      -out:/tmp/druse-json-stdlib-control
+
+    odin build bench/application_matrix/druse \
+      -collection:druse=. \
+      -o:speed \
+      -define:DRUSE_JSON_FUSED_TARGET_DESCRIPTORS=false \
+      -out:/tmp/druse-json-target-control
 
 Do not restart an io_uring server between every short `wrk` repetition. On the
 reference VPS, rapid process churn temporarily caused bind/start failures and
@@ -62,7 +68,7 @@ for both blocks.
 
 To isolate decode from response serialization:
 
-    URUQUIM_BENCH_PATH=/json/medium/decode \
+    DRUSE_BENCH_PATH=/json/medium/decode \
       taskset -c 4-7 wrk -t4 -c100 -d10s --latency \
       -s bench/application_matrix/wrk/post_medium.lua \
       http://127.0.0.1:8080
@@ -83,9 +89,9 @@ Their lockfiles are part of the instrument:
 Build the Go peers:
 
     cd bench/application_matrix/peers/go
-    go build -buildvcs=false -trimpath -o /tmp/uruquim-peer-nethttp ./cmd/nethttp
-    go build -buildvcs=false -trimpath -o /tmp/uruquim-peer-gin ./cmd/gin
-    go build -buildvcs=false -trimpath -o /tmp/uruquim-peer-fiber ./cmd/fiber
+    go build -buildvcs=false -trimpath -o /tmp/druse-peer-nethttp ./cmd/nethttp
+    go build -buildvcs=false -trimpath -o /tmp/druse-peer-gin ./cmd/gin
+    go build -buildvcs=false -trimpath -o /tmp/druse-peer-fiber ./cmd/fiber
 
 Build Axum:
 
@@ -100,9 +106,11 @@ Install Fastify:
 The Go harness rejects unknown fields and trailing JSON values but, like the Go
 stdlib, accepts duplicate object keys. Axum uses Serde
 `deny_unknown_fields` and rejects duplicate fields. Fastify uses a strict body
-schema but JSON.parse accepts the last duplicate. Uruquim's stable contract is
+schema but JSON.parse accepts the last duplicate. Druse's stable contract is
 stricter than the Go/Fastify cases, so benchmark tables must carry this note.
 
 The measured 2026-07-25 one-box study, including medians, error rates, profile,
 soak and the two-box publication caveat, is in
 `docs/reports/2026-07-25-json-application-performance.md`.
+The integrated fused-target follow-up is recorded in
+`docs/reports/2026-07-29-json-fused-target-descriptors.md`.

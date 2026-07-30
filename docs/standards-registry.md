@@ -1,12 +1,12 @@
 # Standards registry
 
-**Status: PROPOSED, 2026-07-23.** The external standards Uruquim adopts, the
+**Status: PROPOSED, 2026-07-23.** The external standards Druse adopts, the
 scope of each adoption, and where the evidence lives. The honest framing:
 
-> Uruquim defines selected contracts informed by IEEE, ISO/IEC/IEEE, IETF and W3C
+> Druse defines selected contracts informed by IEEE, ISO/IEC/IEEE, IETF and W3C
 > standards, with explicit test evidence and documented deviations.
 
-Uruquim does **not** claim "IEEE compliant" or "POSIX compliant." It adopts the
+Druse does **not** claim "IEEE compliant" or "POSIX compliant." It adopts the
 *contracts* it can verify, names the *deviations* it takes, and points every
 adoption at *executable evidence*. A conformance seal without evidence would be
 the exact ceremony this project refuses.
@@ -31,7 +31,7 @@ the exact ceremony this project refuses.
 
 ## Requirement traceability (ISO/IEC/IEEE 29148, light)
 
-Uruquim already has the pieces 29148 asks for — normative `SHALL`/`MUST` prose, a
+Druse already has the pieces 29148 asks for — normative `SHALL`/`MUST` prose, a
 frozen public **claim ledger**, **ADRs**, per-WP **gate controls** and **negative
 controls**. Rather than bolt a second, parallel `REQ-XXXX` bureaucracy on top of
 that (which would create two sources of truth), the adoption is a **traceability

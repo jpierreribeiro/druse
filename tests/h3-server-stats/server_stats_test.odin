@@ -17,7 +17,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 CANDIDATE_PORTS :: [?]int{55043, 55369, 55637, 55913}
 
@@ -109,6 +109,7 @@ h3_stats_count_real_responses_and_are_zero_without_a_server :: proc(t: ^testing.
 	pre := web.stats()
 	testing.expect_value(t, pre.responses_sent, 0)
 	testing.expect_value(t, pre.response_bytes, i64(0))
+	testing.expect_value(t, pre.saturation_refusals, 0)
 
 	server: Server
 	if !start_server(&server) {

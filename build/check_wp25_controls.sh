@@ -22,15 +22,15 @@
 # actually appear.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP25-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W25_TMP="$(mktemp -d -t uruquim-wp25-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W25_TMP"' EXIT
+DRUSE_W25_TMP="$(mktemp -d -t druse-wp25-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W25_TMP"' EXIT
 
 assert_mutated() { # label file before-hash
   local after
@@ -40,19 +40,19 @@ assert_mutated() { # label file before-hash
 }
 
 tree_copy() { # name
-  local t="$URUQUIM_W25_TMP/$1"
+  local t="$DRUSE_W25_TMP/$1"
   mkdir -p "$t"
-  cp -r "$URUQUIM_ROOT/build" "$t/build"
-  cp -r "$URUQUIM_ROOT/docs" "$t/docs"
-  cp -r "$URUQUIM_ROOT/planning" "$t/planning"
+  cp -r "$DRUSE_ROOT/build" "$t/build"
+  cp -r "$DRUSE_ROOT/docs" "$t/docs"
+  cp -r "$DRUSE_ROOT/planning" "$t/planning"
   # `web/` and `tests/` come along because the freeze document CITES them, and
   # the gate resolves every citation — a copy without them would fail for a
   # reason that has nothing to do with the mutation under test.
-  cp -r "$URUQUIM_ROOT/web" "$t/web"
-  cp -r "$URUQUIM_ROOT/tests" "$t/tests"
-  cp -r "$URUQUIM_ROOT/examples" "$t/examples"
-  cp "$URUQUIM_ROOT/README.md" "$t/README.md"
-  cp "$URUQUIM_ROOT/CHANGELOG.md" "$t/CHANGELOG.md"
+  cp -r "$DRUSE_ROOT/web" "$t/web"
+  cp -r "$DRUSE_ROOT/tests" "$t/tests"
+  cp -r "$DRUSE_ROOT/examples" "$t/examples"
+  cp "$DRUSE_ROOT/README.md" "$t/README.md"
+  cp "$DRUSE_ROOT/CHANGELOG.md" "$t/CHANGELOG.md"
   printf '%s' "$t"
 }
 
@@ -72,15 +72,15 @@ must_reject() { # tree label expected-pattern
   echo "CONTROL $2 -> REJECTED by the freeze gate as required"
 }
 
-URUQUIM_FREEZE_DOC="planning/phase-2-freeze.md"
+DRUSE_FREEZE_DOC="planning/phase-2-freeze.md"
 
 # --- 1. a claim loses its negative control -----------------------------------
 # The single most important assertion in this work package. A claim with a
 # positive test and no negative control is a promise nobody has tried to break.
 T="$(tree_copy nocontrol)"
 assert_freeze_green "$T" "1: negative control removed"
-H="$(md5sum "$T/$URUQUIM_FREEZE_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_FREEZE_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_FREEZE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_FREEZE_DOC" <<'PYEOF'
 import re, sys
 p = sys.argv[1]
 s = open(p).read()
@@ -90,15 +90,15 @@ m = re.search(r"\* \*\*Negative control:\*\*.*?(?=\n\* \*\*)", s, re.S)
 assert m, "pattern not found"
 open(p, 'w').write(s[:m.start()] + s[m.end():])
 PYEOF
-assert_mutated "negative control removed" "$T/$URUQUIM_FREEZE_DOC" "$H"
+assert_mutated "negative control removed" "$T/$DRUSE_FREEZE_DOC" "$H"
 must_reject "$T" "1: a claim loses its negative control" "negative control|does not freeze"
 
 # --- 2. a claim loses its stated non-guarantee -------------------------------
 # The column that stops a true claim from being read as a bigger one.
 T="$(tree_copy noscope)"
 assert_freeze_green "$T" "2: non-guarantee removed"
-H="$(md5sum "$T/$URUQUIM_FREEZE_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_FREEZE_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_FREEZE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_FREEZE_DOC" <<'PYEOF'
 import re, sys
 p = sys.argv[1]
 s = open(p).read()
@@ -106,7 +106,7 @@ m = re.search(r"\* \*\*Does NOT guarantee:\*\*.*?(?=\n\n|\n### |\n## )", s, re.S
 assert m, "pattern not found"
 open(p, 'w').write(s[:m.start()] + s[m.end():])
 PYEOF
-assert_mutated "non-guarantee removed" "$T/$URUQUIM_FREEZE_DOC" "$H"
+assert_mutated "non-guarantee removed" "$T/$DRUSE_FREEZE_DOC" "$H"
 must_reject "$T" "2: a claim loses its stated non-guarantee" "Does NOT guarantee|does not freeze"
 
 # --- 3. the unbounded column is emptied --------------------------------------
@@ -115,8 +115,8 @@ must_reject "$T" "2: a claim loses its stated non-guarantee" "Does NOT guarantee
 # whole server.
 T="$(tree_copy nounbounded)"
 assert_freeze_green "$T" "3: unbounded rows deleted"
-H="$(md5sum "$T/$URUQUIM_FREEZE_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_FREEZE_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_FREEZE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_FREEZE_DOC" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -132,7 +132,7 @@ i = s.index(old)
 j = s.index("\n", i) + 1
 open(p, 'w').write(s[:i] + s[j:])
 PYEOF
-assert_mutated "unbounded rows deleted" "$T/$URUQUIM_FREEZE_DOC" "$H"
+assert_mutated "unbounded rows deleted" "$T/$DRUSE_FREEZE_DOC" "$H"
 must_reject "$T" "3: an unbounded row is deleted" "unbounded"
 
 # --- 4. "the framework is bounded" appears in a shipped document -------------
@@ -147,7 +147,7 @@ p = sys.argv[1]
 s = open(p).read()
 old = "## Costs, stated plainly\n"
 assert old in s, "pattern not found"
-new = old + "\nUruquim is fully bounded: memory use cannot grow without limit.\n"
+new = old + "\nDruse is fully bounded: memory use cannot grow without limit.\n"
 open(p, 'w').write(s.replace(old, new, 1))
 PYEOF
 assert_mutated "global bounded claim" "$T/docs/middleware.md" "$H"
@@ -158,8 +158,8 @@ must_reject "$T" "4: a document claims the framework as a whole is bounded" "bou
 # drops the framing turns an honest report into a flattering one.
 T="$(tree_copy nofinding)"
 assert_freeze_green "$T" "5: usage-lab finding softened"
-H="$(md5sum "$T/$URUQUIM_FREEZE_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_FREEZE_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_FREEZE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_FREEZE_DOC" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -167,7 +167,7 @@ old = "**The finding, stated as a finding.**"
 assert old in s, "pattern not found"
 open(p, 'w').write(s.replace(old, "**A note on concept counts.**", 1))
 PYEOF
-assert_mutated "usage-lab finding softened" "$T/$URUQUIM_FREEZE_DOC" "$H"
+assert_mutated "usage-lab finding softened" "$T/$DRUSE_FREEZE_DOC" "$H"
 must_reject "$T" "5: the usage-laboratory finding is softened" "finding"
 
 # --- 6. the recorded Phase-2 total is restated -------------------------------
@@ -181,8 +181,8 @@ must_reject "$T" "5: the usage-laboratory finding is softened" "finding"
 # must provoke is.
 T="$(tree_copy drift)"
 assert_freeze_green "$T" "6: ledger drift"
-H="$(md5sum "$T/$URUQUIM_FREEZE_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_FREEZE_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_FREEZE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_FREEZE_DOC" <<'PYEOF'
 import re, sys
 p = sys.argv[1]
 s = open(p).read()
@@ -191,7 +191,7 @@ assert m, "pattern not found"
 wrong = "| application | 32 | +%s | **%d** |" % (m.group(1), int(m.group(2)) + 1)
 open(p, 'w').write(s[:m.start()] + wrong + s[m.end():])
 PYEOF
-assert_mutated "ledger drift" "$T/$URUQUIM_FREEZE_DOC" "$H"
+assert_mutated "ledger drift" "$T/$DRUSE_FREEZE_DOC" "$H"
 must_reject "$T" "6: the recorded Phase-2 total is restated" "records the ledger Phase 2 froze"
 
 # --- 6b. the delta is edited but the total is not (WP34) ---------------------
@@ -200,8 +200,8 @@ must_reject "$T" "6: the recorded Phase-2 total is restated" "records the ledger
 # adding up. A table that does not survive its own arithmetic is not evidence.
 T="$(tree_copy arithmetic)"
 assert_freeze_green "$T" "6b: broken arithmetic"
-H="$(md5sum "$T/$URUQUIM_FREEZE_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_FREEZE_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_FREEZE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_FREEZE_DOC" <<'PYEOF'
 import re, sys
 p = sys.argv[1]
 s = open(p).read()
@@ -210,32 +210,32 @@ assert m, "pattern not found"
 wrong = "| application | 32 | +%d | **%s** |" % (int(m.group(1)) - 1, m.group(2))
 open(p, 'w').write(s[:m.start()] + wrong + s[m.end():])
 PYEOF
-assert_mutated "broken arithmetic" "$T/$URUQUIM_FREEZE_DOC" "$H"
+assert_mutated "broken arithmetic" "$T/$DRUSE_FREEZE_DOC" "$H"
 must_reject "$T" "6b: the delta no longer adds up to the total" "arithmetic does not hold"
 
 # --- 7. POSITIVE control -----------------------------------------------------
 # Controls 1-6 are all satisfied by deleting the freeze document. This is the
 # half that requires the real thing to be there, to pass, and to be backed by a
 # mutation suite that still rejects everything it rejected before.
-bash "$URUQUIM_ROOT/build/check_phase2_freeze.sh" >/dev/null 2>&1 ||
+bash "$DRUSE_ROOT/build/check_phase2_freeze.sh" >/dev/null 2>&1 ||
   fail "POSITIVE control failed: the real tree does not pass the Phase-2 freeze gate"
 
 # Every claim in the ledger names a control script; each one must exist and be
 # syntactically valid, or the ledger cites evidence that cannot run.
-for URUQUIM_SUITE in wp3_mutations wp16_controls wp17_controls wp18_controls \
+for DRUSE_SUITE in wp3_mutations wp16_controls wp17_controls wp18_controls \
   wp19_controls wp20_controls wp21_controls wp22_controls wp23_controls \
   wp24_controls; do
-  test -f "$URUQUIM_ROOT/build/check_$URUQUIM_SUITE.sh" ||
-    fail "POSITIVE control failed: build/check_$URUQUIM_SUITE.sh is cited by the freeze but does not exist"
-  bash -n "$URUQUIM_ROOT/build/check_$URUQUIM_SUITE.sh" ||
-    fail "POSITIVE control failed: build/check_$URUQUIM_SUITE.sh is not valid shell"
+  test -f "$DRUSE_ROOT/build/check_$DRUSE_SUITE.sh" ||
+    fail "POSITIVE control failed: build/check_$DRUSE_SUITE.sh is cited by the freeze but does not exist"
+  bash -n "$DRUSE_ROOT/build/check_$DRUSE_SUITE.sh" ||
+    fail "POSITIVE control failed: build/check_$DRUSE_SUITE.sh is not valid shell"
 done
 
 # And the three ledgers must be non-trivial. A gate that passes on an empty
 # table would be a gate that proves nothing.
-URUQUIM_CLAIM_COUNT="$(grep -cE '^### C-[0-9]+' "$URUQUIM_ROOT/$URUQUIM_FREEZE_DOC" || true)"
-test "$URUQUIM_CLAIM_COUNT" -ge 5 ||
-  fail "POSITIVE control failed: the claim ledger holds only $URUQUIM_CLAIM_COUNT claims"
-echo "CONTROL 7: the real tree freezes, $URUQUIM_CLAIM_COUNT claims recorded, all 10 cited mutation suites present -> GREEN as required [positive control]"
+DRUSE_CLAIM_COUNT="$(grep -cE '^### C-[0-9]+' "$DRUSE_ROOT/$DRUSE_FREEZE_DOC" || true)"
+test "$DRUSE_CLAIM_COUNT" -ge 5 ||
+  fail "POSITIVE control failed: the claim ledger holds only $DRUSE_CLAIM_COUNT claims"
+echo "CONTROL 7: the real tree freezes, $DRUSE_CLAIM_COUNT claims recorded, all 10 cited mutation suites present -> GREEN as required [positive control]"
 
 echo "PASS: all seven WP25 freeze controls behaved as required"

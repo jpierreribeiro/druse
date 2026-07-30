@@ -3,7 +3,7 @@
 // This file declares the canonical request context and the canonical handler
 // type. It contains no request parsing, no response state, and no dispatch.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:mem"
 

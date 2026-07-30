@@ -19,33 +19,33 @@
 # and exits 2. On-demand, like the WP16/WP17 controls — not a per-gate step.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP18-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W18_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W18_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W18_ODIN="$(command -v odin)"
+DRUSE_W18_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W18_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W18_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W18_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W18_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W18_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W18_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W18_ODIN"; then
-  echo "WP18 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W18_ODIN"; then
+  echo "WP18 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W18_TMP="$(mktemp -d -t uruquim-wp18-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W18_TMP"' EXIT
+DRUSE_W18_TMP="$(mktemp -d -t druse-wp18-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W18_TMP"' EXIT
 
 internal_tree() { # name
-  local t="$URUQUIM_W18_TMP/$1"
+  local t="$DRUSE_W18_TMP/$1"
   mkdir -p "$t"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/"
-  cp "$URUQUIM_ROOT"/tests/wp18-internal/*.odin "$t/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/"
+  cp "$DRUSE_ROOT"/tests/wp18-internal/*.odin "$t/"
   printf '%s' "$t"
 }
 
@@ -57,8 +57,8 @@ assert_mutated() { # label file before-hash
 }
 
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W18_ODIN" test "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W18_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W18_ODIN" test "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W18_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 

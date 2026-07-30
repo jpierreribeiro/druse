@@ -1,7 +1,7 @@
 package wp71_validation
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 @(private)
 ok :: proc(ctx: ^web.Context) {web.no_content(ctx)}

@@ -26,7 +26,7 @@ supports no claim about larger ones.
 **Controls** (per phase-7-spec.md §4.2, outcomes pre-registered): quota breach
 mid-body cancels and deletes (`Quota_Exceeded`, no file remains); mid-body
 disconnect cancels and deletes (`Disconnected`, Handler never scheduled);
-spool files are `0600` under a generated `uruquim-spool-` name; success-path
+spool files are `0600` under a generated `druse-spool-` name; success-path
 content is verified byte-exact then removed.
 
 **Decision recorded.** The productive arm is **bounded spool = F's loop under

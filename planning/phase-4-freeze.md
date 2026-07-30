@@ -197,6 +197,6 @@ defect and its fix, not a number from a 138% band.
 * [x] Everything not delivered is recorded with its reason (§5).
 
 **One matter goes to the owner rather than being decided here: ADR-033 is
-OPEN.** Whether Uruquim eventually owns the HTTP/1.1 connection layer is now
+OPEN.** Whether Druse eventually owns the HTTP/1.1 connection layer is now
 backed by three independent findings, and it is the largest question the project
 has. A release or a tag remains a reserved matter as it always was.

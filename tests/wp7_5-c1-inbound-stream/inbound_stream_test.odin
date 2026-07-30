@@ -28,7 +28,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import http "uruquim:vendor/odin-http"
+import http "druse:vendor/odin-http"
 
 WINDOW :: 16 * 1024
 BODY :: 2 * 1024 * 1024 // >> WINDOW: 128 windows

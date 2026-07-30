@@ -13,7 +13,7 @@
 // conceptual and unfrozen, and doing the dispatch in the facade is exactly what
 // lets this package stay neutral (it never has to name a `web` type).
 package web_testing
-// uruquim:file test-machinery
+// druse:file test-machinery
 
 import "core:mem"
 

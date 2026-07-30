@@ -13,18 +13,18 @@
 # repository root.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_EXAMPLES="$URUQUIM_ROOT/examples"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_EXAMPLES="$DRUSE_ROOT/examples"
 
 fail() {
   echo "EXAMPLES-FAIL: $*" >&2
   exit 1
 }
 
-test -n "${URUQUIM_COMPILER:-}" ||
-  fail "URUQUIM_COMPILER is not set; run this through build/check.sh"
-test -x "$URUQUIM_COMPILER" || fail "compiler is not executable: $URUQUIM_COMPILER"
-URUQUIM_COMPILER_DIR="$(cd "$(dirname "$URUQUIM_COMPILER")" && pwd)"
+test -n "${DRUSE_COMPILER:-}" ||
+  fail "DRUSE_COMPILER is not set; run this through build/check.sh"
+test -x "$DRUSE_COMPILER" || fail "compiler is not executable: $DRUSE_COMPILER"
+DRUSE_COMPILER_DIR="$(cd "$(dirname "$DRUSE_COMPILER")" && pwd)"
 
 # ---------------------------------------------------------------------------
 # 1. The example set is EXACT.
@@ -34,7 +34,7 @@ URUQUIM_COMPILER_DIR="$(cd "$(dirname "$URUQUIM_COMPILER")" && pwd)"
 # examples are exactly these three directories, and the gate names them so a
 # deleted or renamed example is a failure rather than a silent gap.
 # ---------------------------------------------------------------------------
-URUQUIM_EXPECTED_EXAMPLES="01-hello-world
+DRUSE_EXPECTED_EXAMPLES="01-hello-world
 02-json-api
 03-route-params
 04-middleware
@@ -46,13 +46,13 @@ URUQUIM_EXPECTED_EXAMPLES="01-hello-world
 10-config-and-health
 11-clean-layers"
 
-test -d "$URUQUIM_EXAMPLES" || fail "examples/ does not exist"
+test -d "$DRUSE_EXAMPLES" || fail "examples/ does not exist"
 
-for URUQUIM_NAME in $URUQUIM_EXPECTED_EXAMPLES; do
-  test -d "$URUQUIM_EXAMPLES/$URUQUIM_NAME" ||
-    fail "examples/$URUQUIM_NAME/ is missing; the examples are a contract (WP10 D3, extended by WP24 and WP37)"
-  test -f "$URUQUIM_EXAMPLES/$URUQUIM_NAME/main.odin" ||
-    fail "examples/$URUQUIM_NAME/main.odin is missing; each example is a self-contained program"
+for DRUSE_NAME in $DRUSE_EXPECTED_EXAMPLES; do
+  test -d "$DRUSE_EXAMPLES/$DRUSE_NAME" ||
+    fail "examples/$DRUSE_NAME/ is missing; the examples are a contract (WP10 D3, extended by WP24 and WP37)"
+  test -f "$DRUSE_EXAMPLES/$DRUSE_NAME/main.odin" ||
+    fail "examples/$DRUSE_NAME/main.odin is missing; each example is a self-contained program"
 done
 
 # ---------------------------------------------------------------------------
@@ -62,12 +62,12 @@ done
 # must never take, and would quietly make the "34 symbols are enough" claim
 # false.
 # ---------------------------------------------------------------------------
-for URUQUIM_NAME in $URUQUIM_EXPECTED_EXAMPLES; do
-  URUQUIM_SRC="$URUQUIM_EXAMPLES/$URUQUIM_NAME/main.odin"
-  URUQUIM_CODE="$(sed -E 's://.*$::' "$URUQUIM_SRC")"
+for DRUSE_NAME in $DRUSE_EXPECTED_EXAMPLES; do
+  DRUSE_SRC="$DRUSE_EXAMPLES/$DRUSE_NAME/main.odin"
+  DRUSE_CODE="$(sed -E 's://.*$::' "$DRUSE_SRC")"
 
-  if grep -nE '"uruquim:web/testing"|"uruquim:web/internal|"uruquim:vendor' <<<"$URUQUIM_CODE"; then
-    fail "examples/$URUQUIM_NAME imports test machinery, an internal package, or the backend"
+  if grep -nE '"druse:web/testing"|"druse:web/internal|"druse:vendor' <<<"$DRUSE_CODE"; then
+    fail "examples/$DRUSE_NAME imports test machinery, an internal package, or the backend"
   fi
 
   # Future-phase vocabulary must not appear in a Phase-1 example (AMEND-4).
@@ -81,11 +81,11 @@ for URUQUIM_NAME in $URUQUIM_EXPECTED_EXAMPLES; do
   # RATIFIED application symbol in the ledger, so banning it here refused an
   # example the surface allows. The rest stay: `web.group` is refused forever
   # (ADR-024) and the others are not in the ledger.
-  for URUQUIM_FUTURE in 'web\.group' \
+  for DRUSE_FUTURE in 'web\.group' \
     'web\.serve_with' 'web\.serve_transport' 'web\.body_limit' \
     'web\.redirect' 'web\.conflict'; do
-    if grep -nE "$URUQUIM_FUTURE" <<<"$URUQUIM_CODE"; then
-      fail "examples/$URUQUIM_NAME uses future-phase API matching /$URUQUIM_FUTURE/ (AMEND-4)"
+    if grep -nE "$DRUSE_FUTURE" <<<"$DRUSE_CODE"; then
+      fail "examples/$DRUSE_NAME uses future-phase API matching /$DRUSE_FUTURE/ (AMEND-4)"
     fi
   done
 
@@ -102,59 +102,59 @@ for URUQUIM_NAME in $URUQUIM_EXPECTED_EXAMPLES; do
   # scanned too, for the one thing that actually went wrong: a promise that a
   # named future capability WILL arrive. Naming a thing to deny it stays legal;
   # scheduling it does not.
-  URUQUIM_COMMENTS="$(grep -oE '//.*$' "$URUQUIM_SRC" || true)"
-  if grep -nEi '(phase [3-5]|later phase|a future phase) (will|is going to|adds|brings|makes)' <<<"$URUQUIM_COMMENTS"; then
-    fail "examples/$URUQUIM_NAME PROMISES a future capability in a comment (G-08). State a cost as permanent until an ADR decides otherwise; do not schedule features in teaching text."
+  DRUSE_COMMENTS="$(grep -oE '//.*$' "$DRUSE_SRC" || true)"
+  if grep -nEi '(phase [3-5]|later phase|a future phase) (will|is going to|adds|brings|makes)' <<<"$DRUSE_COMMENTS"; then
+    fail "examples/$DRUSE_NAME PROMISES a future capability in a comment (G-08). State a cost as permanent until an ADR decides otherwise; do not schedule features in teaching text."
   fi
-  if grep -nEi 'until then|for now,? (this|the) (cost|limitation)' <<<"$URUQUIM_COMMENTS"; then
-    fail "examples/$URUQUIM_NAME implies a limitation is temporary ('until then'). If no ADR has decided the fix, say the cost is permanent until one does (G-08)."
+  if grep -nEi 'until then|for now,? (this|the) (cost|limitation)' <<<"$DRUSE_COMMENTS"; then
+    fail "examples/$DRUSE_NAME implies a limitation is temporary ('until then'). If no ADR has decided the fix, say the cost is permanent until one does (G-08)."
   fi
 
   # The canonical call-site rules the examples exist to teach.
-  if grep -nE 'or_else[[:space:]]*\{' <<<"$URUQUIM_CODE"; then
-    fail "examples/$URUQUIM_NAME uses an 'or_else { ... }' block, which is not valid Odin"
+  if grep -nE 'or_else[[:space:]]*\{' <<<"$DRUSE_CODE"; then
+    fail "examples/$DRUSE_NAME uses an 'or_else { ... }' block, which is not valid Odin"
   fi
-  if grep -nE 'web\.(ok|created|json)\([^,]+,[[:space:]]*&' <<<"$URUQUIM_CODE"; then
-    fail "examples/$URUQUIM_NAME passes a POINTER payload; Phase-1 payloads are values (ADR-003)"
+  if grep -nE 'web\.(ok|created|json)\([^,]+,[[:space:]]*&' <<<"$DRUSE_CODE"; then
+    fail "examples/$DRUSE_NAME passes a POINTER payload; Phase-1 payloads are values (ADR-003)"
   fi
-  if grep -nE '\.(Get|Post|Put|Patch|Delete)\b' <<<"$URUQUIM_CODE"; then
-    fail "examples/$URUQUIM_NAME uses a mixed-case method member; Method members are UPPERCASE"
+  if grep -nE '\.(Get|Post|Put|Patch|Delete)\b' <<<"$DRUSE_CODE"; then
+    fail "examples/$DRUSE_NAME uses a mixed-case method member; Method members are UPPERCASE"
   fi
-  grep -qE '^package main$' <<<"$URUQUIM_CODE" ||
-    fail "examples/$URUQUIM_NAME is not 'package main'"
-  grep -qE 'web\.destroy\(&app\)' <<<"$URUQUIM_CODE" ||
-    fail "examples/$URUQUIM_NAME never destroys its App"
+  grep -qE '^package main$' <<<"$DRUSE_CODE" ||
+    fail "examples/$DRUSE_NAME is not 'package main'"
+  grep -qE 'web\.destroy\(&app\)' <<<"$DRUSE_CODE" ||
+    fail "examples/$DRUSE_NAME never destroys its App"
 done
 
 # ---------------------------------------------------------------------------
 # 3. Compile each example. Binaries live in a temp directory only.
 # ---------------------------------------------------------------------------
-URUQUIM_BIN_TMP="$(mktemp -d -t uruquim-examples-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_BIN_TMP"' EXIT
+DRUSE_BIN_TMP="$(mktemp -d -t druse-examples-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_BIN_TMP"' EXIT
 
-for URUQUIM_NAME in $URUQUIM_EXPECTED_EXAMPLES; do
-  echo "--- example: $URUQUIM_NAME (odin build) ---"
-  env ODIN_ROOT="$URUQUIM_COMPILER_DIR" PATH="$URUQUIM_COMPILER_DIR:/usr/bin:/bin" \
-    "$URUQUIM_COMPILER" build "$URUQUIM_EXAMPLES/$URUQUIM_NAME" \
-    "-collection:uruquim=$URUQUIM_ROOT" \
-    -out:"$URUQUIM_BIN_TMP/$URUQUIM_NAME" ||
-    fail "examples/$URUQUIM_NAME did not compile"
+for DRUSE_NAME in $DRUSE_EXPECTED_EXAMPLES; do
+  echo "--- example: $DRUSE_NAME (odin build) ---"
+  env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+    "$DRUSE_COMPILER" build "$DRUSE_EXAMPLES/$DRUSE_NAME" \
+    "-collection:druse=$DRUSE_ROOT" \
+    -out:"$DRUSE_BIN_TMP/$DRUSE_NAME" ||
+    fail "examples/$DRUSE_NAME did not compile"
 done
 
-URUQUIM_TOTAL=0
-for URUQUIM_NAME in $URUQUIM_EXPECTED_EXAMPLES; do
-  URUQUIM_SIZE="$(stat -c%s "$URUQUIM_BIN_TMP/$URUQUIM_NAME")"
-  URUQUIM_TOTAL=$((URUQUIM_TOTAL + URUQUIM_SIZE))
-  echo "example $URUQUIM_NAME -> $URUQUIM_SIZE bytes"
+DRUSE_TOTAL=0
+for DRUSE_NAME in $DRUSE_EXPECTED_EXAMPLES; do
+  DRUSE_SIZE="$(stat -c%s "$DRUSE_BIN_TMP/$DRUSE_NAME")"
+  DRUSE_TOTAL=$((DRUSE_TOTAL + DRUSE_SIZE))
+  echo "example $DRUSE_NAME -> $DRUSE_SIZE bytes"
 done
-echo "examples total: $URUQUIM_TOTAL bytes (built in $URUQUIM_BIN_TMP, removed on exit)"
+echo "examples total: $DRUSE_TOTAL bytes (built in $DRUSE_BIN_TMP, removed on exit)"
 
 # 4. No example binary may be left in the working tree.
-if find "$URUQUIM_EXAMPLES" -type f -perm -u+x ! -name '*.odin' ! -name '*.md' -print -quit | grep -q .; then
+if find "$DRUSE_EXAMPLES" -type f -perm -u+x ! -name '*.odin' ! -name '*.md' -print -quit | grep -q .; then
   fail "an executable was left inside examples/; example binaries belong in a temp directory"
 fi
 
-rm -rf "$URUQUIM_BIN_TMP"
+rm -rf "$DRUSE_BIN_TMP"
 trap - EXIT
 
 echo "PASS: the examples compile and use only the public surface"

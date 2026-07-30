@@ -2,7 +2,7 @@ package wp71_one
 
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/web_blocking_lab"
+import lab "druse:tests/support/web_blocking_lab"
 
 @(test)
 one_is_an_explicit_single_handler_compatibility_mode :: proc(t: ^testing.T) {

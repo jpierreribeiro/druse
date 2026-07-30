@@ -29,7 +29,7 @@ import "core:time"
 CHUNK_BYTES  :: 64 * 1024
 CHUNK_COUNT  :: 128 // 8 MiB
 QUOTA_BYTES  :: 4 * 1024 * 1024
-SPOOL_DIR    :: "/tmp/uruquim-wp86-ingest"
+SPOOL_DIR    :: "/tmp/druse-wp86-ingest"
 
 Ingest_Result :: enum {
 	Ready,
@@ -49,12 +49,12 @@ spool_path :: proc(name: string) -> string {
 		return ""
 	}
 	switch name {
-	case "e": return SPOOL_DIR + "/uruquim-spool-arm-e"
-	case "f": return SPOOL_DIR + "/uruquim-spool-arm-f"
-	case "g": return SPOOL_DIR + "/uruquim-spool-arm-g"
-	case "h": return SPOOL_DIR + "/uruquim-spool-arm-h"
-	case "q": return SPOOL_DIR + "/uruquim-spool-quota"
-	case "d": return SPOOL_DIR + "/uruquim-spool-disc"
+	case "e": return SPOOL_DIR + "/druse-spool-arm-e"
+	case "f": return SPOOL_DIR + "/druse-spool-arm-f"
+	case "g": return SPOOL_DIR + "/druse-spool-arm-g"
+	case "h": return SPOOL_DIR + "/druse-spool-arm-h"
+	case "q": return SPOOL_DIR + "/druse-spool-quota"
+	case "d": return SPOOL_DIR + "/druse-spool-disc"
 	}
 	return ""
 }

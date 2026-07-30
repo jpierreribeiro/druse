@@ -20,7 +20,7 @@ import "core:strings"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 MAX_BODY :: 4 * 1024
 QUOTA :: 32 * 1024

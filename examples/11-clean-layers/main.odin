@@ -1,4 +1,4 @@
-// Uruquim example 11 — layered layout, in one small service.
+// Druse example 11 — layered layout, in one small service.
 //
 // A URL shortener. The point is not the shortener; it is that each file answers
 // one question, and the dependencies point one way:
@@ -20,7 +20,7 @@
 //
 // Run it from the repository root:
 //
-//	odin run examples/11-clean-layers -collection:uruquim=.
+//	odin run examples/11-clean-layers -collection:druse=.
 //
 // Try it:
 //
@@ -30,7 +30,7 @@
 //	curl -i localhost:8080/go/odin
 package main
 
-import web "uruquim:web"
+import web "druse:web"
 
 App_State :: struct {
 	store: Store,

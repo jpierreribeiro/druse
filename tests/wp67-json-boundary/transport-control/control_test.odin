@@ -11,8 +11,8 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
-import transport "uruquim:web/internal/transport"
+import web "druse:web"
+import transport "druse:web/internal/transport"
 
 Input :: struct {
 	age: int `json:"age"`,
@@ -38,7 +38,7 @@ filter_log :: proc(
 	location := #caller_location,
 ) {
 	f := (^Log_Filter)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		return
 	}
 	if f.inner.procedure != nil {

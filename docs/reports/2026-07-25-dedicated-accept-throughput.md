@@ -45,13 +45,13 @@ A/B below shows the cost is bounded and does not change the throughput class.
 This run deliberately does not claim to satisfy Phase 0's two-box gate. It is
 the best available validation on the one box the owner supplied.
 
-## Uruquim result
+## Druse result
 
 The original adoption comparison used the then-current bound of eight and is
 retained here as historical evidence. Values are medians of three consecutive
 10-second runs:
 
-| load | Uruquim req/s | fasthttp 1.72 req/s | ratio | Uruquim p50 | Uruquim p99 | fasthttp p99 |
+| load | Druse req/s | fasthttp 1.72 req/s | ratio | Druse p50 | Druse p99 | fasthttp p99 |
 |---|---:|---:|---:|---:|---:|---:|
 | c100 | 261,274 | 282,625 | **92.5%** | 353 µs | 622 µs | 1.12 ms |
 | c400 | 285,736 | 292,457 | **97.7%** | 1.33 ms | 2.11 ms | 2.59 ms |
@@ -72,7 +72,7 @@ These are the medians from the same c5, affinity and `wrk` procedure:
 | framework/runtime | c100 req/s | c100 p99 | c400 req/s | c400 p99 |
 |---|---:|---:|---:|---:|
 | fasthttp 1.72 / Go 1.26.5 | 282,625 | 1.12 ms | 292,457 | 2.59 ms |
-| **Uruquim / Odin pinned nightly** | **259,233** | **0.646 ms** | **282,426** | **2.38 ms** |
+| **Druse / Odin pinned nightly** | **259,233** | **0.646 ms** | **282,426** | **2.38 ms** |
 | Axum 0.8.9 / Rust 1.97.1 | 250,214 | 0.706 ms | 269,230 | 2.69 ms |
 | Go `net/http` 1.26.5 | 151,226 | 2.54 ms | 150,419 | 7.98 ms |
 | Gin 1.12 / Go 1.26.5 | 148,958 | 2.69 ms | 149,931 | 8.49 ms |
@@ -86,7 +86,7 @@ This table isolates the minimum HTTP transport path. It does not support a
 general claim about JSON, parameter extraction, middleware, bodies, streaming,
 TLS, connection churn, memory use, or application work. In particular,
 fasthttp is a server engine rather than a batteries-included router, while Gin,
-Axum, Fastify, and Uruquim expose different feature sets.
+Axum, Fastify, and Druse expose different feature sets.
 
 ## What changed
 
@@ -187,7 +187,7 @@ test.
 |---|---|
 | throughput at least 90% of fasthttp | **PASS** — 91.7% c100, 96.6% c400 |
 | p99 at most 50% of fasthttp | **MISS** — 57.7% at c100; 91.9% at c400 |
-| Uruquim c400/c100 p99 growth below 2× | **MISS** — about 3.7× |
+| Druse c400/c100 p99 growth below 2× | **MISS** — about 3.7× |
 | complete gate green | **PASS** |
 | two-box real-NIC validation | **PENDING** |
 

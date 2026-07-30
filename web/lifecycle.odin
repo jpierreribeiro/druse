@@ -34,10 +34,10 @@
 // decision, on its own schedule — so `is_draining` exposes exactly one bit for
 // it and nothing else: no state enum, no counters, no `Draining → Serving`.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:sync"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // stop asks the running server to stop serving.
 //

@@ -2,7 +2,7 @@ package main
 
 import "core:os"
 import "core:strconv"
-import web "uruquim:web"
+import web "druse:web"
 
 Small_Document :: struct {
 	id:     int    `json:"id"`,

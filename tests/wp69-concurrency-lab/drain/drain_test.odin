@@ -2,7 +2,7 @@ package wp69_drain
 
 import "core:testing"
 import "core:time"
-import lab "uruquim:tests/support/blocking_lab"
+import lab "druse:tests/support/blocking_lab"
 
 @(test)
 arbitrary_blocking_code_is_not_preempted_by_drain :: proc(t: ^testing.T) {

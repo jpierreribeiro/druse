@@ -26,7 +26,7 @@
 // files stay a matcher (build/check_public_api.sh §9e pins that layout), and
 // Phase 3 can replace the route table without touching the chain machinery.
 package web
-// uruquim:file application
+// druse:file application
 
 // use registers `middleware` to run, in registration order, around EVERY
 // dispatch — routed requests and 404/405 misses alike (ADR-023).

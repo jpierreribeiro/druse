@@ -3,13 +3,13 @@
 ## Verdict
 
 The transport is not the limiting component for ordinary small application
-work. On the same four server cores, Uruquim is faster than Go `net/http`, Gin
+work. On the same four server cores, Druse is faster than Go `net/http`, Gin
 and Fastify for fixed text, small JSON, small strict decode+encode, and a routed
 request with middleware. Its p99 is also lower than those peers in those
 workloads.
 
 The material deficiency was a different and narrower one: strict decoding of a
-nested document. Uruquim's preflight built a `json.Value` tree, walked it with
+nested document. Druse's preflight built a `json.Value` tree, walked it with
 RTTI to classify shape/unknown/range failures, and then tokenized the same bytes
 again in the typed stdlib unmarshaller.
 
@@ -20,7 +20,7 @@ throughput by **48.03%** and the medium round trip by **25.44%** against its
 immediate control. Wider types retain the stdlib fallback. The public API and
 strict error taxonomy do not change.
 
-Uruquim still does **not** lead large-document JSON: Axum remains about 4x
+Druse still does **not** lead large-document JSON: Axum remains about 4x
 faster in decode-only goodput. These are loopback CPU/application-path numbers,
 not real-NIC throughput claims for the project README.
 
@@ -29,12 +29,12 @@ not real-NIC throughput claims for the project README.
 - AWS `c5.2xlarge`, 8 vCPU, Linux `6.17.0-1017-aws`
 - one-box loopback: server pinned to CPUs `0-3`, `wrk` pinned to CPUs `4-7`
 - `wrk 4.1.0`, four threads, five 10-second repetitions unless stated
-- Uruquim built with Odin `dev-2026-07-nightly:819fdc7`, `-o:speed`
-- Uruquim `max_handlers=4`, matching the four allocated server CPUs
+- Druse built with Odin `dev-2026-07-nightly:819fdc7`, `-o:speed`
+- Druse `max_handlers=4`, matching the four allocated server CPUs
 - Go `1.26.1`; `GOMAXPROCS=4`
 - Axum Tokio worker count `4`
 - Fastify run as four cluster workers
-- c100 result is the median of five runs; Uruquim's adoption A/B uses ten runs
+- c100 result is the median of five runs; Druse's adoption A/B uses ten runs
 
 The peers are pinned in the benchmark lockfiles:
 
@@ -45,7 +45,7 @@ The peers are pinned in the benchmark lockfiles:
 - Fastify `5.8.5` / Node `25.1.0`
 
 The comparison is semantic, not a claim that every invalid-input contract is
-identical. Uruquim rejects malformed JSON, trailing values, duplicate keys,
+identical. Druse rejects malformed JSON, trailing values, duplicate keys,
 unknown fields, wrong shapes and out-of-range integers with its stable
 taxonomy. Axum uses Serde with `deny_unknown_fields` and also rejects duplicate
 fields. The Go peers use the stdlib decoder with unknown-field and trailing
@@ -75,37 +75,37 @@ Values are median req/s and median p99. Non-2xx is zero unless shown.
 
 | runtime/framework | health | small JSON | small echo | medium round trip | routed |
 |---|---:|---:|---:|---:|---:|
-| **Uruquim / Odin** | **245,465 / 0.661 ms** | 210,678 / 0.850 ms | 149,189 / 1.35 ms | 9,623 / 18.78 ms¹ | **180,193 / 0.596 ms** |
+| **Druse / Odin** | **245,465 / 0.661 ms** | 210,678 / 0.850 ms | 149,189 / 1.35 ms | 9,623 / 18.78 ms¹ | **180,193 / 0.596 ms** |
 | Go `net/http` | 150,727 / 2.55 ms | 144,632 / 2.65 ms | 111,221 / 3.38 ms | 15,848 / 50.71 ms | 130,754 / 2.95 ms |
 | Gin | 145,946 / 2.67 ms | 141,793 / 2.78 ms | 107,613 / 3.59 ms | 16,321 / 40.25 ms | 128,076 / 3.03 ms |
 | Fiber / fasthttp | 256,732 / 1.37 ms | 243,710 / 1.54 ms | 170,399 / 3.99 ms | 22,309 / 16.95 ms | 222,878 / 1.61 ms |
 | Axum / Hyper | 257,405 / 0.684 ms | **245,284 / 0.723 ms** | **207,608 / 0.940 ms** | **54,496 / 3.74 ms** | 167,746 / 1.08 ms |
 | Fastify / Node | 114,846 / 1.85 ms | 112,722 / 1.93 ms | 64,473 / 3.22 ms | 32,486 / 6.20 ms | 98,596 / 2.18 ms |
 
-¹ Uruquim returned 87 load-shed 503s across 481,506 medium requests
+¹ Druse returned 87 load-shed 503s across 481,506 medium requests
 (`0.01807%`) in the fused A/B block. The table reports total completed req/s,
 so the corresponding successful goodput is slightly lower. Reporting req/s
 without this error rate would be misleading.
 
 The realistic reading is mixed:
 
-- Uruquim comfortably beats `net/http`, Gin and Fastify on small common paths.
-- Fiber is modestly faster, while Uruquim keeps substantially lower p99 for
+- Druse comfortably beats `net/http`, Gin and Fastify on small common paths.
+- Fiber is modestly faster, while Druse keeps substantially lower p99 for
   small JSON and routed work.
-- Axum leads this matrix. Uruquim is not the universal latency leader once the
+- Axum leads this matrix. Druse is not the universal latency leader once the
   payload becomes CPU-heavy.
-- Uruquim's medium decoder is the clear outlier and deserves a dedicated future
+- Druse's medium decoder is the clear outlier and deserves a dedicated future
   work package.
 
 ## Decode-only control
 
 This endpoint returns 204 after a successful medium decode, removing response
-serialization and Uruquim's longer float rendering.
+serialization and Druse's longer float rendering.
 
 | runtime/framework | req/s | p99 |
 |---|---:|---:|
-| Uruquim, direct-parse control | 11,268 | 18.70 ms |
-| Uruquim, fused tree decode | 16,679 | 12.70 ms |
+| Druse, direct-parse control | 11,268 | 18.70 ms |
+| Druse, fused tree decode | 16,679 | 12.70 ms |
 | Go `net/http` | 18,895 | 42.11 ms |
 | Gin | 19,155 | 34.72 ms |
 | Fiber | 27,062 | 13.43 ms |
@@ -113,7 +113,7 @@ serialization and Uruquim's longer float rendering.
 | Fastify | 41,763 | 4.71 ms |
 
 The original gap therefore belonged to decode/validation, not merely to
-response size. Fusing the two Uruquim passes closes a material portion of it,
+response size. Fusing the two Druse passes closes a material portion of it,
 but Axum is still the decisive architecture reference: Serde performs typed,
 monomorphized decoding and field lookup without building a general
 `json.Value` tree.
@@ -174,7 +174,7 @@ partial-tree cleanup uses the same allocator.
 
 A private build-time rollback remains for one release:
 
-    -define:URUQUIM_JSON_DIRECT_PREFLIGHT_PARSE=false
+    -define:DRUSE_JSON_DIRECT_PREFLIGHT_PARSE=false
 
 Applications do not set this flag in normal use. The faster path is native and
 the public 82-symbol API is unchanged.
@@ -234,7 +234,7 @@ Compatibility is fail-safe:
 
 A private rollback remains:
 
-    -define:URUQUIM_JSON_FUSED_TREE_DECODE=false
+    -define:DRUSE_JSON_FUSED_TREE_DECODE=false
 
 ### Five-run block A/B, c100
 
@@ -264,10 +264,11 @@ medium workload:
 Eight lanes reduce refusal probability, but cost throughput and tail latency
 through oversubscription. This is not a free tuning recommendation. The native
 automatic policy remains CPU-derived; operators should use
-`web.stats().lane_collisions` and choose between load shedding and queueing for
-their workload.
+`web.stats().handler_dwell_ns` to derive lane utilization. The old
+`lane_collisions` field was retired after dedicated accept proved it counted
+acceptor refusals under the wrong name.
 
-Before the fused decoder, Uruquim's c400 median results were:
+Before the fused decoder, Druse's c400 median results were:
 
 | workload | req/s | p99 | non-2xx |
 |---|---:|---:|---:|
@@ -332,11 +333,11 @@ and reproduction instructions are in
 
 1. **Do not revisit transport flags for this gap.** The decode-only control
    isolates CPU in JSON/RTTI.
-2. **Prototype an integrated fused-target descriptor, not the rejected
-   standalone cache.** The post-fusion profile puts field-tag lookup at 10.16%
-   self CPU. A descriptor owned by the disposable parse arena could resolve
-   effective field targets once per concrete struct, but it needs a new A/B and
-   must preserve explicit-tag/default-name/flattened-using precedence.
+2. **Completed 2026-07-29: integrated fused-target descriptor.** The
+   request-local descriptor is now shared by shape validation and fused
+   destination writes. It improved medium decode throughput by about 15% in
+   both A/B orders without a small-echo regression. See
+   `2026-07-29-json-fused-target-descriptors.md`.
 3. **Do not revive the standalone RTTI cache unchanged.** It was measured and
    failed the application-path adoption rule.
 4. **Study a one-pass typed parser.** The fused decoder removes the second token

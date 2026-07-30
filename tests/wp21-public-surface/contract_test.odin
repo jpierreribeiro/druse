@@ -34,7 +34,7 @@ package wp21_public_surface
 import "core:log"
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // The exact bytes of the standardized envelope. Written out in full rather than
 // referenced: this suite is an external consumer, and a consumer that read the
@@ -44,7 +44,7 @@ WP21_INTERNAL_ENVELOPE ::
 	`{"error":{"code":"internal_error","message":"Internal server error"}}`
 
 // ---------------------------------------------------------------------------
-// The framework logs one Error-level `uruquim:` diagnostic every time it
+// The framework logs one Error-level `druse:` diagnostic every time it
 // finalizes a missing response. The test runner treats an Error log line as a
 // failure, so the suite captures the framework's own lines and FORWARDS
 // everything else — a swallow-everything logger would make `testing.expect`
@@ -66,7 +66,7 @@ wp21_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	record := (^Wp21_Log)(data)
-	if level == .Error && strings.contains(text, "uruquim:") {
+	if level == .Error && strings.contains(text, "druse:") {
 		record.framework_calls += 1
 		return
 	}

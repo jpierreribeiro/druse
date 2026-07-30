@@ -1,4 +1,4 @@
-// Uruquim example 09 — Graceful shutdown.
+// Druse example 09 — Graceful shutdown.
 //
 // A production server must stop WITHOUT dropping the requests already in flight
 // — every rolling deploy sends it a signal and expects the in-flight work to
@@ -8,7 +8,7 @@
 //
 // Build and run it from the repository root:
 //
-//	odin run examples/09-graceful-shutdown -collection:uruquim=.
+//	odin run examples/09-graceful-shutdown -collection:druse=.
 //
 // Then send it a signal (or press Ctrl+C):
 //
@@ -22,7 +22,7 @@ package main
 
 import "base:runtime"
 import "core:sys/posix"
-import web "uruquim:web"
+import web "druse:web"
 
 // The App lives for the whole process, so it is a package global — a signal
 // handler receives only the signal number and cannot be handed the App any

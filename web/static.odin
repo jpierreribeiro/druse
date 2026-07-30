@@ -23,7 +23,7 @@
 // path the check already approved:
 //
 //	`..` anywhere            rejected. Not resolved, not collapsed.
-//	`%` anywhere             rejected. Uruquim does not decode the path
+//	`%` anywhere             rejected. Druse does not decode the path
 //	                         (WP31a, permanent), so `%2e%2e` would sail past a
 //	                         textual `..` check and be decoded by nobody-knows-
 //	                         what downstream. A file whose name needs percent
@@ -65,7 +65,7 @@
 // **No directory listing.** A listing is a feature that leaks a filesystem, and
 // the applications that want one can write it.
 package web
-// uruquim:file application
+// druse:file application
 
 import "core:os"
 import "core:strings"

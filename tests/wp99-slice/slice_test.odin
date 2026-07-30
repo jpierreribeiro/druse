@@ -25,7 +25,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // The application's own job state — owned by App_State, synchronized by the app
 // (the framework's rule: application-owned mutable state synchronizes itself).

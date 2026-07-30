@@ -61,7 +61,7 @@ Every promoted question receives a small spec with:
 
 ### Working hypothesis
 
-The current model is the most balanced option for Uruquim today:
+The current model is the most balanced option for Druse today:
 
 ```text
 core repository                 first-party Crystals repository

@@ -21,7 +21,7 @@ import "core:sync"
 import "core:sys/linux"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // Distinct from every port any other suite binds.
 CANDIDATE_PORTS :: [?]int{55027, 55353, 55621, 55897}

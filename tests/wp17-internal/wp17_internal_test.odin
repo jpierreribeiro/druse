@@ -39,7 +39,7 @@ package web
 import "base:runtime"
 import "core:mem"
 import "core:testing"
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -88,7 +88,7 @@ wp17_run :: proc(a: ^App, ctx: ^Context, method: Method, path: string) {
 	)
 }
 
-// A logger that captures the framework's own `uruquim:` Error diagnostics into
+// A logger that captures the framework's own `druse:` Error diagnostics into
 // the test's sink — so the ADR-019 diagnostic text (property (c): it names the
 // offending pattern) is an assertion rather than a claim, and so an EXPECTED
 // diagnostic is not recorded by the runner as a test failure. Every other
@@ -105,7 +105,7 @@ wp17_capture_logger_proc :: proc(
 	location := #caller_location,
 ) {
 	sink := (^Wp17_Sink)(data)
-	if level == .Error && wp17_contains(text, "uruquim:") {
+	if level == .Error && wp17_contains(text, "druse:") {
 		for i in 0 ..< len(text) {
 			if sink.log_n < len(sink.log_buf) {
 				sink.log_buf[sink.log_n] = text[i]

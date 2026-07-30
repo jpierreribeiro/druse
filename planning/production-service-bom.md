@@ -10,7 +10,7 @@ morto. Este documento converte a pergunta composicional em checagem permanente.
 **A regra:** cada item recebe **exatamente uma** classificação:
 
 - **CORE** — capacidade do `web`, com gate e ledger;
-- **CRYSTAL** — pacote opcional em `uruquim-crystals` (CE-E3: custo zero se
+- **CRYSTAL** — pacote opcional em `druse-crystals` (CE-E3: custo zero se
   não importado);
 - **DELEGADO** — responsabilidade declarada do proxy reverso, do supervisor ou
   da infraestrutura, com a linha correspondente em `docs/operations.md`;
@@ -41,7 +41,7 @@ composicional novo entra aqui com classificação no mesmo PR que o menciona.
 
 | Item | Classificação | Onde/gatilho |
 |---|---|---|
-| Cliente HTTP de saída | CRYSTAL | `http_client`, metade Crystals da Fase 7: HTTP/1.1 sobre `core:net`, pool de conexões limitado, timeouts, cancelamento integrado ao drain, retry limitado; substituição declarada = cliente do futuro `core:net/http` (espelho do ADR-033 lado servidor). **ENTREGUE e CONGELADO** na Fase 7.5-A1..A3 (`uruquim-crystals` PR #13; `docs/phase-7.5-composition-freeze.md`) — **satisfaz E8-7** |
+| Cliente HTTP de saída | CRYSTAL | `http_client`, metade Crystals da Fase 7: HTTP/1.1 sobre `core:net`, pool de conexões limitado, timeouts, cancelamento integrado ao drain, retry limitado; substituição declarada = cliente do futuro `core:net/http` (espelho do ADR-033 lado servidor). **ENTREGUE e CONGELADO** na Fase 7.5-A1..A3 (`druse-crystals` PR #13; `docs/phase-7.5-composition-freeze.md`) — **satisfaz E8-7** |
 | TLS de saída + verificação de certificado | CRYSTAL | parte **inseparável** do `http_client` (FFI OpenSSL ou lib futura do core); nunca prometido separado — chamar uma API HTTPS externa sem verificação real é pior que não chamar. **ENTREGUE** (7.5-A3): FFI OpenSSL fail-closed — self-signed recusa, host-errado recusa, cadeia+host confiável aceita; provado contra peers `s_server` reais |
 | Orçamento de deadline (request → pool → query → chamada de saída) | ABERTO | gatilho: existência do `http_client` — **DISPAROU** (7.5-A1..A3). A porção da chamada de saída está entregue (orçamento connect+request no `http_client`); a composição fim-a-fim (deadline de request → query de DB → chamada de saída como um só orçamento) permanece ABERTO para a Fase 8; linha no evidence backlog §7 |
 | gRPC | RECUSADO no core | Crystal somente com evidência da Fase 8 |
@@ -53,7 +53,7 @@ composicional novo entra aqui com classificação no mesmo PR que o menciona.
 | Item | Classificação | Onde/gatilho |
 |---|---|---|
 | Health/readiness | CORE (padrão) | handler comum da aplicação; a Fase 8 exige o endpoint |
-| Exposição de métricas (formato Prometheus) | CRYSTAL | `metrics`, metade Crystals da Fase 7, sobre os hooks de observer existentes; regras de redação preservadas. **ENTREGUE e CONGELADO** na Fase 7.5-A4/A5 (`uruquim-crystals` PR #13; `web/metrics`): counters por `Framework_Error` (saída limitada pelo enum) + `refused_connections`; redação WP20 preservada por construção (só nomes de enum, zero bytes de request) — **satisfaz E8-7** |
+| Exposição de métricas (formato Prometheus) | CRYSTAL | `metrics`, metade Crystals da Fase 7, sobre os hooks de observer existentes; regras de redação preservadas. **ENTREGUE e CONGELADO** na Fase 7.5-A4/A5 (`druse-crystals` PR #13; `web/metrics`): counters por `Framework_Error` (saída limitada pelo enum) + `refused_connections`; redação WP20 preservada por construção (só nomes de enum, zero bytes de request) — **satisfaz E8-7** |
 | Logs estruturados | CORE | `context.logger` + redação (Framework_Event não carrega bytes de request) |
 | Tracing distribuído / OpenTelemetry | RECUSADO no core | ABERTO; gatilho já registrado: um incidente da Fase 8 que as métricas redigidas não expliquem (evidence backlog §7) |
 | Recuperação de crash | DELEGADO (supervisor) | ADR-020; `docs/operations.md` — o abort é a política, o restart é o mecanismo |

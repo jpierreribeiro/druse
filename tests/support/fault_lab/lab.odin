@@ -19,7 +19,7 @@
 // Without that, a failure found at 3 a.m. cannot be handed to anyone.
 //
 // WHAT THIS PACKAGE MAY NOT DO, because it is machinery and the guardrails
-// apply to machinery too (the WP3 rule): it imports no `uruquim:web`, declares
+// apply to machinery too (the WP3 rule): it imports no `druse:web`, declares
 // no `any` and no state bag, and owns no global. The suite passes it a `^Lab`.
 package fault_lab
 

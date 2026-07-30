@@ -4,25 +4,25 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-ODIN="${URUQUIM_ODIN_BIN:-}"
+ODIN="${DRUSE_ODIN_BIN:-}"
 if test -z "$ODIN" && command -v odin >/dev/null 2>&1; then ODIN="$(command -v odin)"; fi
-if test -z "$ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then ODIN=/tmp/uruquim-odin-toolchain/odin; fi
-if test -z "$ODIN"; then echo "EXP13 -> BLOCKED: no Odin toolchain (set URUQUIM_ODIN_BIN)." >&2; exit 2; fi
+if test -z "$ODIN" && test -x /tmp/druse-toolchain/odin; then ODIN=/tmp/druse-toolchain/odin; fi
+if test -z "$ODIN"; then echo "EXP13 -> BLOCKED: no Odin toolchain (set DRUSE_ODIN_BIN)." >&2; exit 2; fi
 
 PORT=58700
-ROUNDS="${URUQUIM_SOAK_ROUNDS:-800}"
+ROUNDS="${DRUSE_SOAK_ROUNDS:-800}"
 CLIENTS=8
 
-TMP="$(mktemp -d -t uruquim-exp13-XXXXXXXX)"
+TMP="$(mktemp -d -t druse-exp13-XXXXXXXX)"
 trap 'rm -rf "$TMP"; pkill -f exp13-server 2>/dev/null || true' EXIT
 
-mkdir -p "$TMP/uruquim" "$TMP/c"
-cp -r "$ROOT/web" "$ROOT/vendor" "$TMP/uruquim/"
+mkdir -p "$TMP/druse" "$TMP/c"
+cp -r "$ROOT/web" "$ROOT/vendor" "$TMP/druse/"
 cat >"$TMP/c/main.odin" <<'ODIN'
 package main
 
 import "core:fmt"
-import web "uruquim:web"
+import web "druse:web"
 
 Reply :: struct {
 	ok: bool `json:"ok"`,
@@ -63,7 +63,7 @@ main :: proc() {
 }
 ODIN
 
-env -u ODIN_ROOT "$ODIN" build "$TMP/c" -collection:uruquim="$TMP/uruquim" -o:speed \
+env -u ODIN_ROOT "$ODIN" build "$TMP/c" -collection:druse="$TMP/druse" -o:speed \
   -out:"$TMP/exp13-server" >/dev/null 2>&1 || { echo "EXP13: consumer did not build" >&2; exit 1; }
 
 "$TMP/exp13-server" >/dev/null 2>&1 &

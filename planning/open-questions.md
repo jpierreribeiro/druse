@@ -13,7 +13,7 @@ optional/PATCH representation (OQ-31) and bidirectional streaming lifecycle
 - **Evidence.** Local dev execution on `dev-2026-07-nightly:819fdc7` is complete:
   first run 5/9, corrected second run 9/9, and the extended handler suite
   10/10. The SHA/commit-verified distribution is persistent at
-  `/opt/uruquim-odin` on the Ubuntu VPS, and clean commit `4ae2d1c` passed its
+  `/opt/druse` on the Ubuntu VPS, and clean commit `4ae2d1c` passed its
   systemd verifier. odin-http vendoring remains a separate WP8 concern.
 - **Deadline.** closed before WP1.
 
@@ -121,7 +121,7 @@ Recorded because this is the thinnest entry in the file and the one most changed
 by work already shipped — an open question nobody revisits is indistinguishable
 from a closed one.
 
-### OQ-13 · Collection name (`uruquim:web`) final?
+### OQ-13 · Collection name (`druse:web`) final?
 Chosen; confirm in WP0. Trivial to change before 1.0.
 
 ### OQ-16 · Trusted proxy policy
@@ -238,7 +238,7 @@ to be corrected under G-08.
 
 Research finding C-6 is the substance of the answer: Go's `context.WithValue`
 and Rust's `http::Extensions` exist for type-erased, dynamically-keyed state
-crossing library boundaries, which Uruquim does not have — so the finding
+crossing library boundaries, which Druse does not have — so the finding
 SUPPORTS G-03 rather than challenging it. ADR-028 accepted option 1 and placed
 the burden of proof on reopening: the evidence must be **a real program that
 cannot be written cleanly in this tree**, never a hypothetical. Option 1 is

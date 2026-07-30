@@ -13,7 +13,7 @@
 // the captured parameter is a view, and the `Allow` value is built into a fixed
 // request-local buffer.
 package web
-// uruquim:file application
+// druse:file application
 
 // segment_next yields the next `/`-separated segment of a path, in place.
 //

@@ -14,7 +14,7 @@
 // does not provide.
 package wp2_probe_internal_slot
 
-import web "uruquim:web"
+import web "druse:web"
 
 probe :: proc(r: web.Request) -> int {
 	return len(r.headers.private.pairs)

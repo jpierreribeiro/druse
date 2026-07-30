@@ -24,9 +24,9 @@
 // total for the life of the server, which is the shape every counter-scraping
 // system already knows how to difference.
 package web
-// uruquim:file application
+// druse:file application
 
-import transport "uruquim:web/internal/transport"
+import transport "druse:web/internal/transport"
 
 // refused_connections reports how many connections this process has refused for
 // admission (WP47's `Limits.max_connections`) since the server started.
@@ -54,16 +54,17 @@ refused_connections :: proc() -> int {
 // how many slow readers the write deadline cut off — and the three stream
 // counters that were maintained in the registry and reachable from no public
 // API, so a slow-consumer abort was counted and then unseeable. Campaign C adds
-// `handler_dwell_ns`: the framework's FIRST saturation point (C-05: lanes ÷
+// `handler_dwell_ns`: the framework's Handler-capacity signal (C-05: lanes ÷
 // dwell). The predecessor, `lane_collisions`, was MISNAMED rather than dead: its
 // lane-collision increment was unreachable under dedicated accept (WP119), but
 // the acceptor's saturation refusal also incremented it, so the number moved
-// while meaning something other than its name. Handled by replacing the failed
-// counter, not by reviving it.
+// while meaning something other than its name. `saturation_refusals` now names
+// that acceptor resource honestly, while dwell remains the Handler-utilization
+// signal.
 //
 // WHY A STRUCT OF INTEGERS AND NOT A METRICS API. The same reason as
 // `refused_connections`: a framework that exports a metrics abstraction has
-// chosen a vendor for its users. Eight running totals an application reads and
+// chosen a vendor for its users. Ten running totals an application reads and
 // hands to whatever it already runs is the smallest thing that discharges the
 // obligation. **Redaction holds by construction**: every field is an integer,
 // so no request-derived byte can reach an observer through it — the gate pins
@@ -76,13 +77,16 @@ Server_Stats :: struct {
 	// Admission — identical to `refused_connections()`, included so one read
 	// answers the whole write-and-refuse picture.
 	refused_connections:   int,
+	// Acceptor-side Handler saturation. This is a TCP refusal before any HTTP
+	// request has been parsed, so it must never be described as a 503 response.
+	saturation_refusals:   int,
 	// Buffered responses.
 	responses_sent:        int, // sends that completed without error
 	response_bytes:        i64, // bytes reported on-the-wire for those sends
 	send_errors:           int, // sends that completed with an error
 	write_deadline_aborts: int, // connections the sweep aborted for a stalled write
-	// Handler saturation (Campaign C). The FIRST resource to bind (C-05: capacity
-	// is lanes / dwell). Under dedicated accept, a request that arrives at a
+	// Handler saturation (Campaign C). Capacity is lanes / dwell; the first
+	// visible refusal is scheduler-dependent. Under dedicated accept, a request that arrives at a
 	// busy lane queues on that lane's socket — no 503, no counter, only latency
 	// — so the old `lane_collisions` counter never saw the saturation its name
 	// described; what it did count was the acceptor's own refusals, which is a
@@ -100,12 +104,13 @@ Server_Stats :: struct {
 }
 
 // stats returns the running server's write-side counters, or the zero value
-// when no server is running. It allocates nothing and reads nine integers under
+// when no server is running. It allocates nothing and reads ten integers under
 // one lock, so the snapshot is coherent.
 stats :: proc() -> Server_Stats {
 	s := transport.server_stats()
 	return Server_Stats {
 		refused_connections   = s.refused_connections,
+		saturation_refusals   = s.saturation_refusals,
 		responses_sent        = s.responses_sent,
 		response_bytes        = s.response_bytes,
 		send_errors           = s.send_errors,

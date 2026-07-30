@@ -9,7 +9,7 @@ that already proves it or naming the suite C-03 wrote to fill it.
 
 ## 0. What "closed" means, and why it is the point
 
-Uruquim has found faults one at a time, and each time the finding was real: the
+Druse has found faults one at a time, and each time the finding was real: the
 orphaned `recv` (WP58), the negative chunk size (patch 14), the multi-lane
 shutdown crash (WP70), the use-after-free through a deferred dispatch (F-002),
 the write deadline. Every one was discovered by *encountering* it.
@@ -55,7 +55,7 @@ than re-measuring it: a second copy of a test is a second thing to keep true.
 |---|---|---|
 | B1 | Handler blocks | ✅ `wp71`/`wp72-concurrent-serving`; `tests/support/blocking_lab` |
 | B2 | Handler returns without responding | ✅ standardized 500 — `wp6-public-surface`, `docs/errors.md` |
-| B3 | Handler responds, then faults | 📕 the process aborts, by construction. Odin has no recoverable panic (ADR-020) and Uruquim declines to fake one; a test that proved it would abort the runner. The supervisor is the answer, and C-06 tests that topology. |
+| B3 | Handler responds, then faults | 📕 the process aborts, by construction. Odin has no recoverable panic (ADR-020) and Druse declines to fake one; a test that proved it would abort the runner. The supervisor is the answer, and C-06 tests that topology. |
 | B4 | Every Handler lane busy when a request arrives | 🆕 `c03-fault-campaign` `c03_a_contended_lane_refuses_with_503_and_stays_alive` — the F-002 fix, under test rather than under an ad-hoc validation |
 | B5 | Slow dependency inside the handler | ✅ `tests/support/web_blocking_lab` |
 | B6 | Client disconnects while the handler runs | 🆕 `c03-fault-campaign` `c03_a_disconnect_during_the_handler_does_not_outlive_the_request` |
@@ -114,7 +114,7 @@ owning it starts with measuring it rather than reasoning about it.
   refusing everyone.
 - **(b) The accept re-arm is delayed 10 ms per transient failure.** An RST that
   lands before `accept` returns gives `ECONNABORTED`. Patch 21 tolerates it by
-  re-arming after `URUQUIM_ACCEPT_RETRY_DELAY` (10 ms), so each lane spends
+  re-arming after `DRUSE_ACCEPT_RETRY_DELAY` (10 ms), so each lane spends
   10 ms not accepting per failure — roughly 100 accepts/s/lane — and the listen
   backlog fills behind it.
 

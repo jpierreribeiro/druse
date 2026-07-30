@@ -13,7 +13,7 @@
 package test_wp14_public_surface
 
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 Create_User :: struct {
 	name:  string,

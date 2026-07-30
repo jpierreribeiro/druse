@@ -7,7 +7,7 @@
 // Expected diagnostic: 'Header_Pair' is not exported by 'web'
 package wp2_probe_header_pair
 
-import web "uruquim:web"
+import web "druse:web"
 
 probe :: proc() {
 	p: web.Header_Pair

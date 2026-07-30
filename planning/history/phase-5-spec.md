@@ -34,13 +34,13 @@ Gin is roughly eighty thousand stars of convenience over `net/http`. It does not
 TLS, HTTP/2, keep-alive, the HTTP/1.1 parser, timeouts, graceful shutdown, streaming, or the
 connection lifecycle. Go's standard library does, and Gin stands on it.
 
-Uruquim has no such foundation to stand on, which is why roughly forty percent of this
+Druse has no such foundation to stand on, which is why roughly forty percent of this
 project is a server nobody else wrote. That asymmetry is the honest frame for every
-comparison: where Uruquim is behind Gin, it is usually behind `net/http`, not behind Gin.
+comparison: where Druse is behind Gin, it is usually behind `net/http`, not behind Gin.
 
-It also explains where Uruquim is *ahead*. Gin does not implement timeouts (ADR-031 recorded
+It also explains where Druse is *ahead*. Gin does not implement timeouts (ADR-031 recorded
 this) and does not state its per-request memory cost, because it never had to think about
-either. Uruquim bounds its per-request working memory, ships read deadlines in the core, and
+either. Druse bounds its per-request working memory, ships read deadlines in the core, and
 documents what it does not bound. That is the differentiator, and Phase 5 must not spend it.
 
 **The bar for this phase:** a person arriving from Gin should not feel that something is
@@ -213,7 +213,7 @@ Estimated ledger: **55 → ~62** application symbols, test-support unchanged at 
 Every ledger-growing WP amends the full set together — `build/check_public_api.sh`,
 `build/phase1-public-signatures.txt`, a numbered Amendment in `phase-1-freeze.md` carrying
 all eight G-09 evidences, `docs/ai-context.md`, `docs/canonical-patterns.md`, `build/check.sh`,
-and the `// uruquim:file application` marker in each new file. Missing one is a red gate.
+and the `// druse:file application` marker in each new file. Missing one is a red gate.
 
 Each WP follows `CONTRIBUTING.md:61` — SPEC → TESTS committed RED → IMPLEMENTATION → REVIEW —
 and enters by its own PR against `main`.

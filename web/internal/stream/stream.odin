@@ -20,7 +20,7 @@
 //
 // Still not imported by `web` (that wiring is WP90); a buffered-only binary
 // links none of this, and no name here is a ledger candidate (WP101).
-package uruquim_internal_stream
+package druse_internal_stream
 
 import "core:mem"
 import "core:sync"
@@ -333,7 +333,6 @@ try_send :: proc(r: ^Registry, tok: Token, data: []u8) -> Send_Result {
 	} else if r.wake != nil {
 		r.wake(r.wake_user)
 	}
-	sync.mutex_unlock(&s.mu)
 	// 6. a closed typed result.
 	return .Sent
 }

@@ -4,14 +4,14 @@
 experiments, not an async public API. The shipped decision remains bounded
 concurrent synchronous Handlers (`planning/phase-6-concurrency.md`).
 
-**Owner direction:** a fully asynchronous Uruquim is a desirable long-term arm
+**Owner direction:** a fully asynchronous Druse is a desirable long-term arm
 to evaluate, but is too ambitious to select without a runtime, database and
 streaming prototype. Preference is a hypothesis; measurements and ownership
 decide.
 
 ## 1. Terms, so different mechanisms are not given one name
 
-| Layer | Current Uruquim | Meaning |
+| Layer | Current Druse | Meaning |
 |---|---|---|
 | connection I/O | asynchronous/non-blocking | `core:nbio` waits for socket readiness without one Handler/thread per idle connection |
 | application Handler | synchronous | one ordinary procedure runs until it returns |
@@ -25,7 +25,7 @@ partial request input and slow response readers do not consume a Handler unit.
 The remaining question is narrower:
 
 > Is suspending application work while it waits for dependencies worth the
-> runtime, ownership and API cost for Uruquim's measured workloads?
+> runtime, ownership and API cost for Druse's measured workloads?
 
 ## 2. What is known today
 
@@ -45,7 +45,7 @@ The remaining question is narrower:
   perimeters. A whole-server allocation/RSS audit is still incomplete.
 
 Therefore the repository does **not** currently support claims that sync is
-faster, async is faster, or Uruquim beats another framework end to end.
+faster, async is faster, or Druse beats another framework end to end.
 
 ## 3. Arms a future shootout must implement
 

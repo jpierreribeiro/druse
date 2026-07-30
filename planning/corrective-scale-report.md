@@ -35,15 +35,16 @@ cgroup contract (Caddy `proxy_buffering off`, `TimeoutStopSec > max_drain_time`,
    the gap Env A's 24h TTL could not close.
 5. **Owed scale demos** — the **3,000 concurrent real-socket SSE** round (needs a
    public stream-cap knob — an ABERTO item to resolve or a documented per-host
-   `DEFAULT_MAX_STREAMS` note) and a sustained high-connection load to validate the
-   **C-04 per-connection retention rule at scale** (RSS ≈ `max_connections ×
-   largest response`).
+   `DEFAULT_MAX_STREAMS` note) and the corrected **C-04 concurrent buffered
+   response matrix**: body-size distribution, handler concurrency, slow readers,
+   live arena peak and process RSS high-water.
 
 ## 3. What is measured (pre-registered)
 
 - throughput and latency (p50/p95/p99) **by route pattern**;
-- **RSS vs concurrent connections** — does it track the C-04 rule, and does it
-  return to baseline after clients leave (the soak's leak-watch, at scale);
+- **RSS and live allocation vs concurrent buffered responses** — derive the
+  workload-specific envelope and observe whether RSS stabilizes after clients
+  leave; do not infer live ownership from RSS alone;
 - pool counters (open/idle/in-use/waiters) and stream counters
   (open/queued/full/closed) under saturation, and their return to baseline;
 - refusal behaviour: fast 503 at pool cap / stream `Full` while liveness stays
@@ -92,5 +93,5 @@ The functional/concurrency/drill/soak results are recorded in the board's
 ## 6. What I need from the owner
 
 SSH (or a key) to the larger VPS(s), each with Docker (for the isolated PostgreSQL)
-and the same isolation convention (`/opt/uruquim-verify`, never the box's own
+and the same isolation convention (`/opt/druse-verify`, never the box's own
 services). Nothing else — the build, deploy, and suites are scripted.

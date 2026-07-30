@@ -120,7 +120,7 @@ The obligations that follow are already in force and were honoured by every
 package this phase: nothing in `web/` learned anything about the backend, the
 multipart parser consumes `[]u8` and never touches a socket, static file serving
 fills `Outbound` like any other response, and the three drain patches are marked
-`URUQUIM PATCH — BRIDGE` — expected to be **deleted**, not ported.
+`DRUSE PATCH — BRIDGE` — expected to be **deleted**, not ported.
 
 ---
 
@@ -170,7 +170,7 @@ the phase did, not evidence that nobody looked.**
 - [x] Amendments 19–22 in `phase-1-freeze.md`, each with all eight G-09 evidences
 - [x] `build/phase1-public-signatures.txt` updated; struct shapes frozen field-by-field
 - [x] `build/phase1-direct-dependencies.txt` updated for `core:os`
-- [x] Every new `web/*.odin` carries its `// uruquim:file application` marker
+- [x] Every new `web/*.odin` carries its `// druse:file application` marker
 - [x] Docs parity: every new symbol in `docs/ai-context.md` with a compiling fixture
 - [x] `docs/operations.md` §3 and §10 name every new perimeter and every remaining gap
 - [x] Eight examples compile against the public surface only

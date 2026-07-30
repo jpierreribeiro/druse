@@ -13,4 +13,4 @@
 // re-proved on every gate run, not cited from an external scratch prototype.
 package web_testing
 
-import _ "uruquim:web"
+import _ "druse:web"

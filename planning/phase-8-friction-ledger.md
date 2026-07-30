@@ -2,7 +2,7 @@
 
 **Status: LIVE.** The evidence instrument of proof-by-use
 (`planning/phase-8-plan.md` §2). Every friction the reference application
-(`uruquim-board`) hits against the **public** framework surface is recorded here
+(`druse-board`) hits against the **public** framework surface is recorded here
 with all nine fields. A core/Crystal change happens only in a separately
 reviewed corrective WP with its original gates — this ledger is a **veto and
 evidence source, not an accretion exception.**

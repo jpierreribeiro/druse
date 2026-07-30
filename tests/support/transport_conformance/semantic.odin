@@ -275,7 +275,7 @@ scenarios_storage := []Scenario{
 			// and it has been deliberately reversed, not accidentally broken:
 			// C-1 records HEAD as effectively mandatory, and mapping it to
 			// `.UNKNOWN` meant health checkers, proxies and monitoring systems
-			// got a 405 from every Uruquim application.
+			// got a 405 from every Druse application.
 			//
 			// HEAD now matches as GET with the body suppressed at commit. The
 			// row stays in the conformance matrix because the property is

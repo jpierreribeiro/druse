@@ -6,14 +6,14 @@
 // neutral `Outbound` back to the wire. It names no `web` type.
 //
 // EXECUTION (WP8 D6, amended by WP71): a single catch-all handler feeds the
-// Uruquim dispatcher — the backend router is NOT used. Handler capacity is
+// Druse dispatcher — the backend router is NOT used. Handler capacity is
 // resolved from the neutral Config below; `redirect_head_to_get = false`, so
 // HEAD stays HEAD and the backend never rewrites a method.
 package transport
 
-import http "uruquim:vendor/odin-http"
-import ingest "uruquim:web/internal/ingest"
-import stream "uruquim:web/internal/stream"
+import http "druse:vendor/odin-http"
+import ingest "druse:web/internal/ingest"
+import stream "druse:web/internal/stream"
 import "core:mem"
 import "core:net"
 import "core:nbio"
@@ -376,6 +376,7 @@ _server_stats :: proc() -> Server_Stats {
 	}
 	out := Server_Stats {
 		refused_connections   = sync.atomic_load(&server.refused_total),
+		saturation_refusals   = sync.atomic_load(&server.refused_saturation_total),
 		responses_sent        = sync.atomic_load(&server.responses_sent),
 		response_bytes        = sync.atomic_load(&server.response_bytes),
 		send_errors           = sync.atomic_load(&server.send_errors),
@@ -549,7 +550,7 @@ start_upload :: proc(exchange: ^Exchange, content_length: int) {
 	exchange.spool_active = true
 	exchange.spool_last = .Ready
 
-	// URUQUIM (ingest audit F1) — ARM THE ONLY CLEANUP THAT SURVIVES A TEARDOWN.
+	// DRUSE (ingest audit F1) — ARM THE ONLY CLEANUP THAT SURVIVES A TEARDOWN.
 	//
 	// Until now a spool was released either by `on_upload_done` (an orderly
 	// error) or by `driver_cleanup` (dispatch ran). Neither reaches a connection
@@ -743,7 +744,7 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 	// deferred retry, because everything the dispatch names lives in the
 	// connection's temp arena and cannot outlive a client disconnect (F-002).
 	if !http.handler_lane_enter(res) {
-		// URUQUIM (ingest audit F3) — RELEASE A SPOOLED BODY WE WILL NEVER
+		// DRUSE (ingest audit F3) — RELEASE A SPOOLED BODY WE WILL NEVER
 		// DISPATCH. `driver_cleanup` is the usual owner of `upload_cancel`, and
 		// it only runs once `cfg.dispatch` has been called — which this refusal
 		// returns before. Without this, every upload refused for lane contention
@@ -756,7 +757,7 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 			exchange.spool_active = false
 			_ = ingest.cancel(&exchange.spool, .Cancelled_By_Drain)
 		}
-		// URUQUIM FIX (F-002) — a deferred dispatch can never run safely. The
+		// DRUSE FIX (F-002) — a deferred dispatch can never run safely. The
 		// Exchange and everything it names (`req`/`res` into `conn.loop`, the
 		// inbound views) live in the connection's temp arena, which
 		// `connection_close` frees wholesale when the client disconnects. A
@@ -785,7 +786,7 @@ dispatch_exchange :: proc(exchange: ^Exchange) {
 		return
 	}
 
-	// URUQUIM PATCH 35 (Campaign C) — bracket the synchronous dispatch so its
+	// DRUSE PATCH 35 (Campaign C) — bracket the synchronous dispatch so its
 	// elapsed time feeds the observable saturation signal. `lane_collisions` is
 	// retired: it named a lane-collision refusal that dedicated accept made
 	// unreachable, and in practice only ever counted the ACCEPTOR's saturation
@@ -1127,8 +1128,9 @@ write_response :: proc(res: ^http.Response, out: Outbound) {
 // PATH, after the handler had already produced an answer.
 //
 // IT IS NOT A THEORETICAL PRESSURE. Two measurements in this same audit make it
-// reachable: J3 peaked at 588 MB of RSS for one in-limit request, and M9
-// measured GB-scale retention across idle keep-alive connections.
+// reachable: J3 peaked at 588 MB of RSS for one in-limit request, and corrected
+// C-04 attribution found about 25.2 MiB of live connection-arena space while a
+// handler produced one 4 MiB buffered response.
 //
 // THE DEGRADATION ALLOCATES NOTHING, which is the only thing that can be true
 // on this path: a 500 with no headers and no body, from fields already owned by

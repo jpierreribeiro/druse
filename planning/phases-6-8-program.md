@@ -7,7 +7,7 @@ This is the program-level map. The executable work-package plans are
 Phase 6 still performs an exact entry verification, and no future signature
 described here is frozen by this program document.
 
-The program turns Uruquim from a production-capable HTTP core into a proven
+The program turns Druse from a production-capable HTTP core into a proven
 platform for ordinary data-backed applications and bounded streaming,
 without turning the common API into a full-stack framework.
 
@@ -33,7 +33,7 @@ And the product remains:
 
 ---
 
-## 1. Is Uruquim still a microframework?
+## 1. Is Druse still a microframework?
 
 **Yes.** “Micro” describes the required core and the number of concepts a user
 must learn, not a prohibition on capable optional packages.
@@ -54,7 +54,7 @@ spec.
 The intended product shape is:
 
 ```text
-uruquim:web                         microframework core
+druse:web                         microframework core
   routing, middleware, HTTP I/O,
   safety, lifecycle, stream primitive
 
@@ -92,9 +92,9 @@ way to write something; programs transform data; algorithms should not be
 hidden inside type-system cleverness; and the language should remain possible
 for a person to understand.
 
-For Uruquim, those statements become executable rules:
+For Druse, those statements become executable rules:
 
-| Odin principle | Uruquim rule | Gate |
+| Odin principle | Druse rule | Gate |
 |---|---|---|
 | Simplicity and readability | One canonical path for each common operation; conventional names | public ledger, examples, Phase-8 usability trial |
 | Minimal: one way | No alias families, second Handler model or equivalent responders | public-surface gate |
@@ -125,7 +125,7 @@ Axum describes itself as an HTTP routing and request-handling library focused
 on **ergonomics and modularity**. Its high-level model is routes, handlers,
 extractors, responses, state and middleware. That is the useful comparison:
 
-| Axum | Uruquim |
+| Axum | Druse |
 |---|---|
 | routes map to handlers | routes map to synchronous `Handler` procedures |
 | extractors parse request data | explicit bool/value extractors commit canonical errors |
@@ -136,20 +136,20 @@ extractors, responses, state and middleware. That is the useful comparison:
 
 The comparison ends there.
 
-- Axum is async Rust over Tokio/Hyper; Uruquim intentionally preserves ordinary
+- Axum is async Rust over Tokio/Hyper; Druse intentionally preserves ordinary
   synchronous Odin handlers.
 - Axum explicitly says runtime/transport independence is not currently a goal;
-  it is a load-bearing Uruquim goal.
-- Axum obtains a large middleware ecosystem through Tower traits; Uruquim uses
+  it is a load-bearing Druse goal.
+- Axum obtains a large middleware ecosystem through Tower traits; Druse uses
   procedures and packages, because reproducing Tower would be foreign
   abstraction rather than Odin design.
 - Rust traits, derives and macros can encode integrations at the type level;
-  Uruquim prefers registration-time validation, explicit records and closed
+  Druse prefers registration-time validation, explicit records and closed
   error sets.
 
 So the intended statement is:
 
-> Uruquim aims for Axum's modularity and extractor ergonomics, expressed as
+> Druse aims for Axum's modularity and extractor ergonomics, expressed as
 > procedural, allocator-aware Odin rather than async Rust.
 
 Primary reference: <https://docs.rs/axum/latest/axum/>.
@@ -162,7 +162,7 @@ SQLx calls itself an SQL toolkit and explicitly says it is **not an ORM**. It
 keeps SQL visible, provides pooling and transactions, and can check queries
 against a schema. That is the useful comparison for the Phase-6 data stack.
 
-| SQLx | Uruquim data Crystals |
+| SQLx | Druse data Crystals |
 |---|---|
 | SQL remains SQL; no DSL required | explicit SQL and positional bindings |
 | connection pool | bounded, fail-fast PostgreSQL pool |
@@ -174,18 +174,18 @@ against a schema. That is the useful comparison for the Phase-6 data stack.
 
 The comparison also ends at important boundaries:
 
-- Uruquim does not promise compile-time SQL typing without either generation or
+- Druse does not promise compile-time SQL typing without either generation or
   metaprogramming; the checker is optional and honest about dynamic SQL.
-- Uruquim does not import Rust's async model. Blocking calls are made safe by
+- Druse does not import Rust's async model. Blocking calls are made safe by
   bounded concurrent handler lanes and pool backpressure.
-- Uruquim migrations are a separate deployment tool, not a server startup side
+- Druse migrations are a separate deployment tool, not a server startup side
   effect.
 - Database failures remain database/domain errors until the application maps
   them at the HTTP boundary.
 
 The intended statement is:
 
-> Uruquim follows SQLx's SQL-first direction, but replaces async Rust and
+> Druse follows SQLx's SQL-first direction, but replaces async Rust and
 > macro-based checking with synchronous Odin, explicit decoding and optional
 > CI verification.
 
@@ -261,15 +261,15 @@ contracts, not one magical stream abstraction.
 
 ---
 
-## 6. What Uruquim is comparable to — precisely
+## 6. What Druse is comparable to — precisely
 
-| Uruquim composition | Fair comparison | Not a fair claim |
+| Druse composition | Fair comparison | Not a fair claim |
 |---|---|---|
-| `uruquim:web` | Gin, Echo, Fiber, Flask core | Rails/Django batteries included |
+| `druse:web` | Gin, Echo, Fiber, Flask core | Rails/Django batteries included |
 | `web` + data Crystals | Gin + pgx + goose/sqlc; Axum + SQLx | GORM/Active Record ORM |
 | `web` + stream primitive + SSE | Axum SSE and explicit HTTP streaming stacks | a browser UI/session runtime |
 
-Uruquim's prospective differentiation is not “more features than all four”. It
+Druse's prospective differentiation is not “more features than all four”. It
 is a combination that is rare in Odin and uncommon elsewhere:
 
 1. a tiny canonical application surface;
@@ -387,7 +387,7 @@ dropping “micro” from the README to excuse accretion.
 The program does not place this sentence in the README today. It defines what
 the evidence should eventually permit:
 
-> **Uruquim is an explicit, production-oriented Odin microframework for JSON,
+> **Druse is an explicit, production-oriented Odin microframework for JSON,
 > data-backed applications and explicit streaming workloads: simple by default, bounded by
 > construction, and joyful to program.**
 

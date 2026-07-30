@@ -1,4 +1,4 @@
-# Operating Uruquim
+# Operating Druse
 
 **Who this is for:** whoever has to deploy this and be woken up by it.
 
@@ -13,12 +13,12 @@ deployment guide that only lists features is a guide that gets someone paged.
 **Behind a reverse proxy, under a supervisor.** Both halves are load-bearing.
 
 ```
-    internet → reverse proxy (TLS) → Uruquim (HTTP) → your handlers
+    internet → reverse proxy (TLS) → Druse (HTTP) → your handlers
                                         ↑
                                    supervisor
 ```
 
-**Why a proxy.** Uruquim does not terminate TLS and will not: in-process TLS
+**Why a proxy.** Druse does not terminate TLS and will not: in-process TLS
 would import an enormous attack surface into a framework whose value is a small,
 frozen, gate-enforced one. The proxy holds the certificate, and it is also the
 thing that should assert HSTS — a framework behind it asserting HSTS on a
@@ -54,7 +54,7 @@ there will not be. **This is also how Gin is deployed in practice** — the
 difference is that this document writes the boundary down instead of leaving it
 folklore.
 
-**The canonical unit is `ops/deploy/uruquim.service`** — copy it, edit three
+**The canonical unit is `ops/deploy/druse.service`** — copy it, edit three
 values, `systemctl enable --now`. It encodes the whole mandatory topology in one
 place: `Restart=on-failure` (the recovery), `TimeoutStopSec` (the shutdown outer
 bound, kept longer than `max_drain_time`), `MemoryMax` (the C-04 cgroup bound),
@@ -82,7 +82,7 @@ could write from a signal handler. So let systemd capture the core:
 
 ```
 apt install systemd-coredump      # or your distro's equivalent
-coredumpctl gdb uruquim           # opens the last crash; `bt` shows the stack
+coredumpctl gdb druse           # opens the last crash; `bt` shows the stack
 ```
 
 The faulting handler is on the stack — the request that killed the process,
@@ -189,7 +189,7 @@ lock, atomics or a thread-safe service; immutable configuration does not.
 | total process memory | the OS — set a cgroup limit |
 | middleware chain **depth** | you; ~100k frames, and exceeding it is a **segfault, not a diagnostic** |
 
-**Uruquim bounds its own per-request working memory. It does not bound the
+**Druse bounds its own per-request working memory. It does not bound the
 server.** Any sentence that says "bounded" without naming which perimeter is a
 sentence this project's gate exists to prevent.
 
@@ -302,6 +302,7 @@ are CPU-bound, size `max_handlers` deliberately and scale with more processes.
 
 ```odin
 web.refused_connections()   // running total of admission refusals
+web.stats().saturation_refusals // acceptor refusals while every Handler lane is active
 web.observe(&app, on_framework_error)
 web.use(&app, web.logger)
 web.use(&app, web.request_id)
@@ -322,11 +323,17 @@ web.use(&app, web.request_id)
   mean_dwell  = Δhandler_dwell_ns / Δresponses_sent
   ```
 
-  Utilization approaching 1 means the lane pool binds first; mean dwell says
+  Utilization approaching 1 means the lane pool is saturated; mean dwell says
   whether to raise `max_handlers` or shorten the handler. Do not read a flat
   latency graph as headroom — queueing on a busy lane is invisible there.
-  Capacity is `lanes ÷ mean handler dwell` (C-05 measured the Handler lane
-  binds first).
+  Capacity is `lanes ÷ mean handler dwell`. C-05 also showed that the first
+  visible refusal is scheduler-dependent, so do not infer a fixed resource
+  ordering from a single 503 or admission refusal.
+* **`web.stats().saturation_refusals` counts the acceptor boundary.** It rises
+  when every Handler lane is active and a newly accepted socket is closed
+  before an HTTP request is parsed. This is deliberately a transport refusal:
+  the acceptor must not manufacture a 503 for a request it has never read.
+  Request-aware overload paths may still return 503 with `Retry-After`.
 * **`observe`** receives a typed event for every framework-detected failure.
   It cannot change the response; it is for exporting to metrics or alerting.
 * **Key every metric on `web.route(ctx)`, never on `ctx.request.path`.** The
@@ -419,10 +426,10 @@ carries the header, it does not replay events.
 **Large uploads.** The buffered path (`web.body`, `form_file`, up to
 `max_body`) is unchanged and canonical. A bounded spool substrate for bodies
 larger than memory exists internally (fragmentation-correct multipart, generated
-`uruquim-spool-` files at `0600`, per-upload/process quotas, exactly-once
+`druse-spool-` files at `0600`, per-upload/process quotas, exactly-once
 cleanup) but has **no public upload API yet** — see §10. When it ships, temp
 files are deleted on every non-persisted path; the operator's only concern is
-crash remnants, which carry the `uruquim-spool-` prefix.
+crash remnants, which carry the `druse-spool-` prefix.
 
 **After first-byte commit**, framework 4xx/5xx responders cannot append a second
 envelope, and the adapter that carries this must be replaceable: every streaming
@@ -476,47 +483,50 @@ the topology those limitations make mandatory:
   panic (ADR-020) — and a handler blocked in foreign code cannot be preempted,
   so the supervisor's kill is the outer bound on shutdown. Keep
   `max_drain_time` (default 10 s) well inside `TimeoutStopSec`.
-* **Set `max_response_bytes`, then run under a memory cgroup sized by a measured
-  rule.** `max_response_bytes` (ADR-045, default 0 = off) caps ONE response: a
+* **Set `max_response_bytes`, then run under a memory cgroup sized by a
+  representative concurrent measurement.** `max_response_bytes` (ADR-045,
+  default 0 = off) caps ONE response body: a
   handler that builds a larger body gets a standardized 500 before the bytes are
   copied to the wire, converting an out-of-memory that kills every in-flight
   request into one typed `Response_Too_Large` an observer sees. Set it to the
-  largest response any handler legitimately builds. It is the write-side mirror of
-  `max_body`.
+  largest response any handler legitimately builds. It is the write-side mirror
+  of `max_body`, but it does not bound arbitrary temporary allocations the
+  handler makes before committing that body.
 
-  The cgroup is still the AGGREGATE guard, because the per-response limit bounds
-  one response and total process memory is `max_connections` of them. C-04
-  measured the shape: a connection retains **~1.0× the largest response it ever
-  served**, held for the connection's life, and there is no per-request leak. So
-  size the cgroup for
+  C-04 corrected an earlier attribution error. A completed 4 MiB response left
+  its connection arena with one 1 MiB reservation, only 4,040 bytes committed
+  and zero used; the body-sized blocks were released. The process RSS remained
+  above baseline anyway, so RSS high-water must not be described as a live
+  per-connection body. During construction, however, that same test used about
+  25.2 MiB of arena space for a 4 MiB response, and a slow in-flight send retains
+  its completed buffer until send completion.
 
-  > `max_connections × min(max_response_bytes, largest response your handlers can build) + baseline`
-
-  which, with `max_response_bytes` set, is a number you control directly rather
-  than one your handlers imply. Unset, it is **1024 ×** your largest response at
-  the defaults, and `max_connections` is the only setting that moves the product.
-  Two further levers reduce it:
-  - **`max_idle_time` is a memory control, not only a slot economy.** Closing an
-    idle keep-alive connection **destroys its arena**, returning the retained
-    response memory; a connection you keep alive keeps its peak footprint.
-  - **`web.stream` does not pay the retention at all.** Streamed chunks leave
-    through the registry's ring, not the connection arena, so a large streamed
-    response costs a window, not its length. Prefer it for big payloads — the
-    win is memory, not only latency. Matrix rows 5, 8 and 12.
+  There is no universal `max_connections × response size` multiplier. Measure a
+  concurrent matrix using your body-size distribution, handler allocation
+  behaviour, `max_handlers`, `max_connections` and slow-reader policy. Put the
+  cgroup above the measured peak plus explicit headroom, then verify the
+  over-budget failure. Two strong levers are:
+  - **Enable `max_write_time`.** It bounds how long a slow reader may retain an
+    in-flight buffered response.
+  - **Use `web.stream` for large output.** Streamed chunks leave through the
+    registry's bounded ring, so memory scales with the configured window rather
+    than total response length. Matrix rows 5, 8 and 12.
 * **Enable `max_write_time` and `max_idle_time`**, sized to your slowest
   legitimate client. They ship OFF because a framework-chosen number would reset
   real clients on upgrade; OFF is not a recommendation. Matrix row 5.
 * **Size `max_handlers` above your expected concurrency, and treat utilization as
-  the sizing signal.** C-05 measured that the Handler lane is the **first**
-  resource to bind — a synchronous handler holds its lane for its whole
+  the sizing signal.** A synchronous handler holds its lane for its whole
   duration. Under dedicated accept, contention does not answer 503 itself: a
   request contending for a busy lane queues silently on that lane's socket.
   Saturation therefore appears as **rising lane utilization**, which you read
   from `web.stats().handler_dwell_ns`: utilization approaching 1 means the lane
-  pool binds first; the acceptor still answers 503 + `Retry-After: 1` only when
-  **every** lane is blocked. Capacity is roughly `lanes ÷ mean handler dwell`.
-  The knob is `max_handlers` — **not** `max_connections`, which only decides
-  how many clients get to wait. Matrix row 4.
+  pool is saturated; when **every** lane is blocked the acceptor closes new
+  sockets without writing HTTP and increments `saturation_refusals`. Capacity
+  is roughly `lanes ÷ mean handler dwell`.
+  `max_handlers` controls service capacity; `max_connections` bounds how many
+  clients can be admitted or left waiting. Ten repeated C-05 runs observed
+  either lane saturation or admission refusal first, so their ordering is not
+  an operational invariant. Matrix row 4.
 * **Tune the accept backlog** (`somaxconn`) — it is the kernel's, and the only
   place a connection can queue. Matrix row 11.
 * **One server per process**, and install your own `SIGTERM`/`SIGINT` handler

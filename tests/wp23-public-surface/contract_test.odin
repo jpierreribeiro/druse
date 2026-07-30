@@ -1,5 +1,5 @@
 // WP23 public surface contract — `web.request_id`, as an EXTERNAL consumer of
-// `uruquim:web` sees it.
+// `druse:web` sees it.
 //
 // THIS WORK PACKAGE IS A SECURITY BOUNDARY, and this suite is where the trust
 // policy is visible from outside. The inbound `X-Request-Id` is
@@ -21,7 +21,7 @@ package test_wp23_public
 
 import "core:strings"
 import "core:testing"
-import web "uruquim:web"
+import web "druse:web"
 
 // ---------------------------------------------------------------------------
 // Handlers that report what the FRAMEWORK decided, through the public read

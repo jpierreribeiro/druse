@@ -48,7 +48,7 @@ Wp7_User :: struct {
 // ---------------------------------------------------------------------------
 
 @(private = "file")
-WP7_LOG_MARKER :: "uruquim:"
+WP7_LOG_MARKER :: "druse:"
 
 @(private = "file")
 Wp7_Log :: struct {

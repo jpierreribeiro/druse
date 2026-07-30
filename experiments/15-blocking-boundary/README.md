@@ -6,7 +6,7 @@ latch stands in for a synchronous PostgreSQL query without involving a driver.
 Run:
 
 ```sh
-odin run experiments/15-blocking-boundary -collection:uruquim=.
+odin run experiments/15-blocking-boundary -collection:druse=.
 ```
 
 Pre-registered interpretation:
@@ -36,7 +36,7 @@ WP72 measures the integrated multi-lane server under the full fault corpus.
 
 The executable runs the four-lane arms before the one-lane negative control.
 `odin-http` is process-oriented and mixed lane-count restarts in the same process
-retain backend event-loop state; Uruquim starts one server with one immutable lane
+retain backend event-loop state; Druse starts one server with one immutable lane
 count, so restart order is harness state rather than a production topology. The
 test locks this ordering instead of allowing randomized test order to pollute the
 result.

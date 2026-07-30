@@ -5,7 +5,7 @@
 // be approximated here. Header normalization is transport-conformance work
 // (WP9); response headers belong to the renderer (WP6).
 package web
-// uruquim:file application
+// druse:file application
 
 // Header_View is the framework-owned view of the request headers.
 //

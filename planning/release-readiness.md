@@ -2,11 +2,11 @@
 
 **Status: LIVE GATE, 2026-07-24. Owner-delegated to me** ("só será lançado de
 verdade quando você aprovar, o seu padrão de qualidade"). This document is the
-single place that decides whether Uruquim ships. A release/tag happens only when
+single place that decides whether Druse ships. A release/tag happens only when
 **all six gates below are GREEN**; until then this file records the exact
 remaining gap. I approve to the quality bar, not to optimism.
 
-**SCOPE — this is a LIBRARY.** Uruquim is an HTTP framework, not a hosted product.
+**SCOPE — this is a LIBRARY.** Druse is an HTTP framework, not a hosted product.
 It has no users, stores no data, and therefore has **no "GA" gated on a privacy
 review or on any one deployment's scale campaign** — those belong to whoever builds
 an *application* on top of it, not to the library. The gates below measure the only
@@ -20,7 +20,7 @@ framework's, and are removed from this assessment.)
   padrão").
 - **Since the pilot, `main` advanced** with PATCH 28 (WP114 — non-spinning accept
   suspension, p99 24× better, wp71/c05 + 150 gates green) and Phase 9 (io_uring infra
-  + the measured perf investigation: Uruquim competes with fasthttp on throughput,
+  + the measured perf investigation: Druse competes with fasthttp on throughput,
   wins on latency). This is a straight technical improvement over the pilot and is
   ready for a refreshed pilot tag on the owner's go.
 
@@ -91,7 +91,7 @@ cleanly — so this is reversible on request.
 vulnerability, `web.set_header`'s name hardened to a strict RFC 9110 token; the 14
 prior findings stay pinned. **Docs:** every symbol documented in `docs/ai-context.md`;
 the capability matrix updated. (Privacy of end-user data is not a library concern —
-it belongs to whoever builds an app on Uruquim; removed from this gate.)
+it belongs to whoever builds an app on Druse; removed from this gate.)
 
 ## Gate 6 — WP112 human condition + WP113 verdict + merge/tag
 

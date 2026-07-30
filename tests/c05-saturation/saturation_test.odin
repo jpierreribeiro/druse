@@ -1,12 +1,12 @@
-// C-05 — the combined-saturation lab: WHICH QUEUE SATURATES FIRST.
+// C-05 — the combined-saturation lab: HOW THE SERVER DEGRADES AND RECOVERS.
 //
 // THE QUESTION, and it is the architecture backlog's, not a new one: a request
 // passes through several bounded resources in series — the kernel's accept
 // backlog, the server's admission budget (`max_connections` minus
 // `reserved_conns`), a synchronous Handler lane, and process memory. Each has
-// its own limit and its own refusal. Under rising load **one of them binds
-// first**, and which one it is decides what an operator sees, what they should
-// tune, and whether the degradation is honest.
+// its own limit and its own refusal. Under dedicated accept, which refusal is
+// observed first in a particular run is scheduler-dependent: excess work may
+// be refused or may wait on a lane-owned socket until the client times out.
 //
 // Nobody had measured it. `planning/closure-readiness-matrix.md` records every
 // one of those resources with a limit and a saturation policy — that is C-02's
@@ -19,8 +19,8 @@
 // refused it:
 //
 //	200                  served
-//	503                  the HANDLER LANE refused (F-002's refuse-and-retry)
-//	connected-then-EOF   the ADMISSION BUDGET refused (accepted, closed unread)
+//	503                  DEFECT: acceptor wrote HTTP before parsing a request
+//	connected-then-EOF   an admission or Handler-saturation transport refusal
 //	connect failed       the kernel BACKLOG or the fd table refused
 //	timeout              nothing refused; something is merely slow
 //
@@ -28,7 +28,7 @@
 // same one the C-03 RST-flood probe needed: an admission refusal accepts the
 // TCP connection and then closes it with nothing written, so a client that only
 // counts "errors" cannot tell it from a backlog drop. This suite counts them
-// apart, which is why it can name the binding constraint instead of guessing.
+// apart, which is why it can describe the degradation instead of guessing.
 //
 // WHAT IT DELIBERATELY DOES NOT DO: it is not a benchmark. The numbers it
 // prints are a RATIO between refusal kinds, not a throughput claim, and the
@@ -45,7 +45,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 CANDIDATE_PORTS :: [?]int{55037, 55363, 55631, 55907}
 
@@ -64,8 +64,8 @@ CLIENT_PATIENCE :: 3 * time.Second
 
 Outcome :: enum {
 	Served, // 200
-	Lane_Refused, // 503 — the Handler lane said no, AND told the client when to retry
-	Lane_Refused_No_Retry, // 503 with no Retry-After — an H-4 defect (immediate retry, re-collision)
+	Lane_Refused, // DEFECT: pre-request 503, retained as the negative-control outcome
+	Lane_Refused_No_Retry, // same defect without Retry-After
 	Admission_Refused, // connected, then closed with nothing written
 	Connect_Failed, // the backlog or the fd table said no
 	Timed_Out, // slow, not refused
@@ -88,12 +88,22 @@ Server :: struct {
 g_server: ^Server
 g_clients: []Client
 g_next: int
+g_hold_entered: int
+g_hold_release: sync.Sema
+g_hold_results: [4]Outcome
+g_hold_next: int
 
 work_handler :: proc(ctx: ^web.Context) {
 	// A synchronous dwell is the point: it occupies a Handler lane for a known
 	// time, which is what makes lane saturation reachable and legible.
 	time.sleep(WORK_DWELL)
 	web.text(ctx, .OK, "done")
+}
+
+hold_handler :: proc(ctx: ^web.Context) {
+	_ = sync.atomic_add(&g_hold_entered, 1)
+	sync.wait(&g_hold_release)
+	web.text(ctx, .OK, "released")
 }
 
 serve_thread :: proc() {
@@ -107,6 +117,7 @@ base_limits :: proc() -> web.Limits {
 	l := web.DEFAULT_LIMITS
 	l.max_connections = MAX_CONNECTIONS
 	l.reserved_conns = RESERVED_CONNS
+	l.max_handlers = 4
 	l.max_drain_time = i64(3 * time.Second)
 	return l
 }
@@ -121,6 +132,7 @@ start_server_with :: proc(s: ^Server, limits: web.Limits) -> bool {
 		s.app = web.app()
 		web.limits(&s.app, limits)
 		web.get(&s.app, "/work", work_handler)
+		web.get(&s.app, "/hold", hold_handler)
 		s.port = candidate
 		s.thread = thread.create_and_start(serve_thread)
 		sync.wait(&s.ready)
@@ -167,8 +179,9 @@ wait_until_accepting :: proc(port: int) -> bool {
 }
 
 REQ :: "GET /work HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+HOLD_REQ :: "GET /hold HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
 
-one_request :: proc(port: int) -> Outcome {
+one_request_with :: proc(port: int, request: string) -> Outcome {
 	ep := net.Endpoint{address = net.IP4_Address{127, 0, 0, 1}, port = port}
 	sock, derr := net.dial_tcp(ep)
 	if derr != nil {
@@ -178,7 +191,7 @@ one_request :: proc(port: int) -> Outcome {
 	_ = net.set_option(sock, .Receive_Timeout, CLIENT_PATIENCE)
 	_ = net.set_option(sock, .Send_Timeout, CLIENT_PATIENCE)
 
-	buf := transmute([]u8)string(REQ)
+	buf := transmute([]u8)request
 	sent := 0
 	for sent < len(buf) {
 		n, serr := net.send_tcp(sock, buf[sent:])
@@ -193,12 +206,18 @@ one_request :: proc(port: int) -> Outcome {
 	reply: [512]u8
 	n, rerr := net.recv_tcp(sock, reply[:])
 	if rerr != nil {
-		return .Timed_Out
+		if rerr == net.TCP_Recv_Error.Timeout {
+			return .Timed_Out
+		}
+		// A peer-side close may surface as Reset/Broken_Pipe rather than a
+		// zero-byte EOF. Both are explicit transport refusals; classifying every
+		// recv error as timeout hid seven of eight controlled closes.
+		return .Admission_Refused
 	}
 	if n == 0 {
 		// Accepted, then closed with NOTHING written. This is the admission
 		// refusal's signature, and telling it apart from a backlog drop is the
-		// whole reason this suite can name a binding constraint.
+		// reason this suite can distinguish how saturation presented.
 		return .Admission_Refused
 	}
 	if n < 12 {
@@ -217,10 +236,9 @@ one_request :: proc(port: int) -> Outcome {
 	case 200:
 		return .Served
 	case 503:
-		// H-4 — a lane refusal must carry Retry-After. The 503 header block fits
-		// in the first recv (it is tiny and Connection: close), so a
-		// case-insensitive search of what we read is sufficient; a 503 without
-		// the header is its own outcome, not a plain Lane_Refused.
+		// A dedicated acceptor has not parsed a request and may not answer HTTP.
+		// Keep both old shapes distinct so the rollback control proves this
+		// instrument sees the defect rather than merely an absent header.
 		lower := strings.to_lower(head, context.temp_allocator)
 		if strings.contains(lower, "retry-after:") {
 			return .Lane_Refused
@@ -228,6 +246,18 @@ one_request :: proc(port: int) -> Outcome {
 		return .Lane_Refused_No_Retry
 	}
 	return .Malformed
+}
+
+one_request :: proc(port: int) -> Outcome {
+	return one_request_with(port, REQ)
+}
+
+hold_client_thread :: proc() {
+	i := sync.atomic_add(&g_hold_next, 1)
+	if i < 0 || i >= len(g_hold_results) {
+		return
+	}
+	g_hold_results[i] = one_request_with(g_server.port, HOLD_REQ)
 }
 
 client_thread :: proc() {
@@ -268,12 +298,84 @@ run_level :: proc(port: int, clients: int) -> Tally {
 }
 
 @(test)
-c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testing.T) {
+c05_combined_saturation_degrades_recovers_and_stops :: proc(t: ^testing.T) {
 	server: Server
 	if !start_server(&server) {
 		testing.expect(t, false, "no candidate port produced a working server")
 		return
 	}
+
+	// Deterministic PATCH 42 perimeter. Occupy all four configured Handler
+	// lanes behind a barrier, then drive eight ordinary requests while the
+	// acceptor can prove no lane is available. This is the non-vacuous control
+	// the probabilistic ramp below cannot provide on every scheduler.
+	g_hold_entered = 0
+	g_hold_next = 0
+	hold_threads: [4]^thread.Thread
+	for i in 0 ..< len(hold_threads) {
+		hold_threads[i] = thread.create_and_start(hold_client_thread)
+	}
+	holds_ready := false
+	for _ in 0 ..< 200 {
+		if sync.atomic_load(&g_hold_entered) == len(hold_threads) {
+			holds_ready = true
+			break
+		}
+		time.sleep(5 * time.Millisecond)
+	}
+	testing.expectf(
+		t,
+		holds_ready,
+		"only %d/%d hold handlers entered; the deterministic saturation control never established its precondition",
+		sync.atomic_load(&g_hold_entered),
+		len(hold_threads),
+	)
+
+	saturation_before := web.stats().saturation_refusals
+	controlled := run_level(server.port, 8)
+	saturation_after := web.stats().saturation_refusals
+	controlled_http :=
+		controlled[.Lane_Refused] + controlled[.Lane_Refused_No_Retry]
+	testing.expectf(
+		t,
+		controlled_http == 0,
+		"%d HTTP 503 responses were emitted before a request was parsed in the deterministic saturation control",
+		controlled_http,
+	)
+	testing.expectf(
+		t,
+		controlled[.Admission_Refused] == 8,
+		"expected 8 transport refusals with all lanes held, got %d (timeouts=%d malformed=%d)",
+		controlled[.Admission_Refused],
+		controlled[.Timed_Out],
+		controlled[.Malformed],
+	)
+	testing.expectf(
+		t,
+		saturation_after - saturation_before == 8,
+		"saturation_refusals moved by %d for 8 controlled refusals",
+		saturation_after - saturation_before,
+	)
+	for _ in 0 ..< len(hold_threads) {
+		sync.post(&g_hold_release)
+	}
+	for i in 0 ..< len(hold_threads) {
+		thread.join(hold_threads[i])
+		thread.destroy(hold_threads[i])
+		testing.expectf(
+			t,
+			g_hold_results[i] == .Served,
+			"held request %d did not complete after release: %v",
+			i,
+			g_hold_results[i],
+		)
+	}
+	fmt.printf(
+		"[c05] controlled saturation: transport_refused=%d pre_request_503=%d counter_delta=%d\n",
+		controlled[.Admission_Refused],
+		controlled_http,
+		saturation_after - saturation_before,
+	)
 
 	fmt.printf(
 		"[c05] budget=%d slots (max_connections=%d - reserved=%d), handler dwell=%v\n",
@@ -292,7 +394,7 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	// clients driven — those are not the same number and differ by 2-3x once
 	// the ramp starts refusing.
 	total_served := 0
-	// Any refusal the design NAMES, of whichever kind bound first.
+	// Any refusal the design names, independent of which kind appears first.
 	total_refused := 0
 	// Clients that waited out CLIENT_PATIENCE without a reply. Under dedicated
 	// accept this is the COMMON face of saturation, not an anomaly: a request
@@ -300,8 +402,8 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	// as latency rather than as a 503. Counted separately because a bound that
 	// presents as queueing is still a bound.
 	total_timed_out := 0
-	first_refusal_kind := Outcome.Served
-	first_refusal_level := 0
+	first_observed_refusal_kind := Outcome.Served
+	first_observed_refusal_level := 0
 
 	for clients in LEVELS {
 		tally := run_level(server.port, clients)
@@ -327,21 +429,21 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 			tally[.Connect_Failed]
 		total_timed_out += tally[.Timed_Out]
 
-		// The FIRST level at which anything is refused names the binding
-		// constraint. A lane refusal counts whether or not it carried Retry-After
-		// — the header is an H-4 quality check on the refusal, not a fifth
-		// resource.
+		// Record the first OBSERVED refusal for diagnostics. This is explicitly
+		// not an architectural ordering assertion: dedicated accept, lane-owned
+		// socket queueing and client scheduling decide which visible refusal
+		// happens first in any one run.
 		lane_refused := tally[.Lane_Refused] + tally[.Lane_Refused_No_Retry]
-		if first_refusal_kind == .Served {
+		if first_observed_refusal_kind == .Served {
 			if tally[.Admission_Refused] > 0 {
-				first_refusal_kind = .Admission_Refused
-				first_refusal_level = clients
+				first_observed_refusal_kind = .Admission_Refused
+				first_observed_refusal_level = clients
 			} else if lane_refused > 0 {
-				first_refusal_kind = .Lane_Refused
-				first_refusal_level = clients
+				first_observed_refusal_kind = .Lane_Refused
+				first_observed_refusal_level = clients
 			} else if tally[.Connect_Failed] > 0 {
-				first_refusal_kind = .Connect_Failed
-				first_refusal_level = clients
+				first_observed_refusal_kind = .Connect_Failed
+				first_observed_refusal_level = clients
 			}
 		}
 		// Let the server return to rest between levels, so each level measures
@@ -349,13 +451,13 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		time.sleep(300 * time.Millisecond)
 	}
 
-	if first_refusal_kind == .Served {
+	if first_observed_refusal_kind == .Served {
 		fmt.printf("[c05] no resource bound at any level up to %d clients\n", LEVELS[len(LEVELS) - 1])
 	} else {
 		fmt.printf(
-			"[c05] FIRST BINDING CONSTRAINT: %v, at %d concurrent clients\n",
-			first_refusal_kind,
-			first_refusal_level,
+			"[c05] FIRST OBSERVED REFUSAL (scheduler-dependent): %v, at %d concurrent clients\n",
+			first_observed_refusal_kind,
+			first_observed_refusal_level,
 		)
 	}
 
@@ -363,18 +465,14 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 	after := one_request(server.port)
 	fmt.printf("[c05] after the ramp: %v\n", after)
 
-	// Campaign C — `lane_collisions` is RETIRED: under dedicated accept the
-	// ramp's 503s come only from the acceptor's own saturation refusal, and a
-	// request contending for a busy lane queues silently on the lane's socket
-	// instead of being refused. The observable saturation signal is now dwell:
-	// total nanoseconds lanes spent inside handlers. After the ramp, that
-	// total must cover every request we DROVE (served OR refused), with a
-	// floor way below one dwell per request, because it counts only time
-	// inside the dispatch bracket (queue time excluded).
+	// Campaign C plus PATCH 42: handler dwell measures dispatched work, while
+	// saturation_refusals names accepted sockets closed before HTTP dispatch.
+	// The two counters deliberately describe different resources.
 	stats := web.stats()
 	fmt.printf(
-		"[c05] web.stats().handler_dwell_ns=%d (clients observed %d lane 503s; handler dwell %v)\n",
+		"[c05] handler_dwell_ns=%d saturation_refusals=%d pre_request_503=%d handler dwell=%v\n",
 		stats.handler_dwell_ns,
+		stats.saturation_refusals,
 		total_lane_503,
 		WORK_DWELL,
 	)
@@ -411,11 +509,9 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		"the server did not serve a normal request after the ramp (got %v); saturation must be transient",
 		after,
 	)
-	// H-4 — every lane refusal must carry Retry-After. The ramp reliably produces
-	// 503s (the binding constraint), so this asserts a property over real
-	// refusals rather than forcing one: a 503 without the header tells the client
-	// nothing about when to come back, so it retries at once onto the same
-	// contended pool and collides again.
+	// PATCH 42 — zero HTTP responses may originate before request parsing. The
+	// two 503 counters are retained as a rollback detector, not as a supported
+	// overload outcome.
 	fmt.printf(
 		"[c05] lane 503s: %d total, %d without Retry-After\n",
 		total_lane_503,
@@ -461,18 +557,14 @@ c05_the_binding_constraint_under_combined_saturation_is_named :: proc(t: ^testin
 		total_timed_out,
 		"refusal" if total_refused > 0 else "queueing (no refusal at all)",
 	)
-	if total_lane_503 == 0 {
-		fmt.printf(
-			"[c05] NOTE: no lane 503 occurred this run (the ramp bound on %v first), so the Retry-After property was NOT exercised — this run is not evidence for H-4\n",
-			first_refusal_kind,
-		)
-	}
 	testing.expectf(
 		t,
-		total_lane_503_no_retry == 0,
-		"%d lane 503s arrived without a Retry-After header; a refusal that does not say when to retry invites an immediate re-collision (H-4)",
+		total_lane_503 == 0,
+		"%d HTTP 503 responses were emitted before a request was parsed (%d lacked Retry-After); acceptor saturation must be a transport refusal",
+		total_lane_503,
 		total_lane_503_no_retry,
 	)
+	testing.expectf(t, stats.saturation_refusals >= 8, "the controlled saturation refusals disappeared from the running total")
 	// Campaign C — the dwell counter is WIRED, not decorative. A dwell total
 	// that stays near zero while every SERVED request ran a 40 ms handler is a
 	// dead saturation signal, which is the defect this replaced.

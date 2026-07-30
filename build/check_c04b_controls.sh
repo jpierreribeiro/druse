@@ -14,37 +14,44 @@
 # Response_Too_Large — proven on real (in-memory transport) traffic.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_LIMITS="$URUQUIM_ROOT/web/limits.odin"
-URUQUIM_ERRORS="$URUQUIM_ROOT/web/errors.odin"
-URUQUIM_SERVE="$URUQUIM_ROOT/web/serve.odin"
-URUQUIM_SUITE="$URUQUIM_ROOT/tests/c04b-response-limit/contract_test.odin"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_LIMITS="$DRUSE_ROOT/web/limits.odin"
+DRUSE_ERRORS="$DRUSE_ROOT/web/errors.odin"
+DRUSE_SERVE="$DRUSE_ROOT/web/serve.odin"
+DRUSE_SUITE="$DRUSE_ROOT/tests/c04b-response-limit/contract_test.odin"
 
 fail() { echo "C04B-CONTROL-FAIL: $*" >&2; exit 1; }
 
-URUQUIM_ODIN="${URUQUIM_ODIN_BIN:-odin}"
-URUQUIM_ODIN_DIR="$(cd "$(dirname "$(readlink -f "$URUQUIM_ODIN")")" && pwd)"
+DRUSE_ODIN="${DRUSE_ODIN_BIN:-odin}"
+if [[ "$DRUSE_ODIN" != */* ]]; then
+  DRUSE_ODIN="$(command -v "$DRUSE_ODIN")"
+fi
+DRUSE_ODIN="$(readlink -f "$DRUSE_ODIN")"
+DRUSE_ODIN_DIR="$(cd "$(dirname "$DRUSE_ODIN")" && pwd)"
+DRUSE_TMP="$(mktemp -d -t druse-c04b-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_TMP"' EXIT
 
 # --- the surface exists as ratified ------------------------------------------
-grep -qE 'max_response_bytes: int' "$URUQUIM_LIMITS" ||
+grep -qE 'max_response_bytes: int' "$DRUSE_LIMITS" ||
   fail "Limits.max_response_bytes is missing its ratified field"
-grep -qE 'Response_Too_Large' "$URUQUIM_ERRORS" ||
+grep -qE 'Response_Too_Large' "$DRUSE_ERRORS" ||
   fail "Framework_Error.Response_Too_Large is missing"
 
 # --- the enforcement is on the SHARED path, before copy-out (R-10) -----------
 # It must sit in driver_run, which both transports run, not in a socket-only
 # path — otherwise test_request and a real socket would disagree about the 500.
-grep -qE 'error_enforce_response_size\(ctx\)' "$URUQUIM_SERVE" ||
+grep -qE 'error_enforce_response_size\(ctx\)' "$DRUSE_SERVE" ||
   fail "error_enforce_response_size is not called on the shared driver path; test_request and the socket could disagree (R-10)"
 
 # --- the guard is `>` (exactly-the-limit is served, mirroring max_body) -------
-grep -qE 'len\(res\.body\) <= limit' "$URUQUIM_ERRORS" ||
+grep -qE 'len\(res\.body\) <= limit' "$DRUSE_ERRORS" ||
   fail "the response-size guard is not '<= limit' (exactly the limit must be accepted, one byte more refused)"
 
 # --- the behaviour is wired: the suite is green ------------------------------
-test -f "$URUQUIM_SUITE" || fail "tests/c04b-response-limit/contract_test.odin is missing"
-env ODIN_ROOT="$URUQUIM_ODIN_DIR" "$URUQUIM_ODIN" test "$URUQUIM_ROOT/tests/c04b-response-limit" \
-  -collection:uruquim="$URUQUIM_ROOT" >/dev/null 2>&1 ||
+test -f "$DRUSE_SUITE" || fail "tests/c04b-response-limit/contract_test.odin is missing"
+env ODIN_ROOT="$DRUSE_ODIN_DIR" "$DRUSE_ODIN" test "$DRUSE_ROOT/tests/c04b-response-limit" \
+  -collection:druse="$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$DRUSE_TMP/c04b" >/dev/null 2>&1 ||
   fail "the C-04b response-limit suite did not pass"
 
 echo "C-04b control: max_response_bytes replaces an over-limit response with a 500 before copy-out, exactly-the-limit served, default off, breach observed as Response_Too_Large; suite green"

@@ -20,8 +20,8 @@ package wp28_runner
 import "core:fmt"
 import "core:os"
 import "core:time"
-import bench "uruquim:tests/support/bench"
-import sh "uruquim:tests/support/shootout"
+import bench "druse:tests/support/bench"
+import sh "druse:tests/support/shootout"
 
 CARDINALITIES :: [?]int{5, 50, 500, 5_000}
 REPETITIONS :: 10

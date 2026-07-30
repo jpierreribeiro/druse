@@ -8,7 +8,7 @@
 // Route groups (`router`, `group`, `mount`) and middleware (`use`, `next`) are
 // Phase 2 and are deliberately absent.
 package web
-// uruquim:file application
+// druse:file application
 
 // get registers a handler for GET requests matching `pattern`.
 //

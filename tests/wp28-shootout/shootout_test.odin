@@ -19,7 +19,7 @@ package test_wp28_shootout
 
 import "core:mem"
 import "core:testing"
-import sh "uruquim:tests/support/shootout"
+import sh "druse:tests/support/shootout"
 
 // Every candidate, matched through its own entry point. There is no vtable and
 // no `rawptr` dispatch: the project's idiom guide rejects OOP simulation, and a

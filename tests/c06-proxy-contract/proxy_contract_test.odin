@@ -1,6 +1,6 @@
 // C-06 — the reverse-proxy contract, as a TESTED topology.
 //
-// THE POINT. `docs/operations.md` tells operators to run Uruquim behind a
+// THE POINT. `docs/operations.md` tells operators to run Druse behind a
 // reverse proxy, and the readiness matrix (C-02) delegates TLS to it by
 // decision. A delegation is an "acceptable operational limitation" **only if
 // the topology is mandatory, documented AND TESTED** — that is the
@@ -16,7 +16,7 @@
 //   + runnable everywhere the gate runs, forever, with no external dependency;
 //   + able to switch the ONE behaviour the contract turns on — response
 //     buffering — which an installed proxy would need a config file to do;
-//   - NOT evidence about nginx. It proves Uruquim behaves correctly under the
+//   - NOT evidence about nginx. It proves Druse behaves correctly under the
 //     contract; it cannot prove that any particular proxy implements it.
 //
 // So a real-proxy interop round remains OWED, and is recorded as such in
@@ -59,7 +59,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 UPSTREAM_PORTS :: [?]int{55041, 55367, 55635, 55911}
 PROXY_PORT :: 55941
@@ -83,7 +83,7 @@ STREAM_CHUNKS :: 20 // 3.0 s of stream
 BUFFERED_PATIENCE :: 1200 * time.Millisecond
 
 // ---------------------------------------------------------------------------
-// The upstream: an ordinary Uruquim server.
+// The upstream: an ordinary Druse server.
 // ---------------------------------------------------------------------------
 
 Server :: struct {

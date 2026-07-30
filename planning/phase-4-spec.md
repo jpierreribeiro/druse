@@ -71,7 +71,7 @@ Read at `vendor/odin-http/server.odin`, commit `112c49b`:
   Closed`).
 * **`server_shutdown` is admission-stop plus a wake-up**: an atomic `closing`
   flag and `nbio.wake_up` per thread. Idempotent and safe from another thread —
-  which the Uruquim adapter's `request_stop` already relies on.
+  which the Druse adapter's `request_stop` already relies on.
 * **The drain is real.** `_server_thread_shutdown` closes every `New`, `Idle`
   and `Pending` connection immediately, leaves `Active` ones alone, and ticks
   the event loop until the connection map is empty.
@@ -136,7 +136,7 @@ trip it:
   WP44 owns.
 * **Signal handling.** The vendored server offers a SIGINT handler that "can
   only be called once in the lifetime of the program because of a hacky
-  interaction with libc" — its own words. Whether Uruquim exposes any signal
+  interaction with libc" — its own words. Whether Druse exposes any signal
   integration is WP44's; this spec records only that the constraint exists.
 
 ---
@@ -163,7 +163,7 @@ obligations against §2's own limits.
 
 ## 2.2 What Phase 3 already bounds, restated so the gap is visible
 
-The Phase-2 capacity ledger, as amended through Phase 3, bounds **Uruquim's own
+The Phase-2 capacity ledger, as amended through Phase 3, bounds **Druse's own
 per-request working memory**: response headers per response, the `Allow` value,
 the extractor envelope, the logger line, the request ID, the poison diagnostic,
 path parameters per pattern, and — since WP36 — the request body, the request

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"uruquim-bench/application-matrix-go/workload"
+	"druse-bench/application-matrix-go/workload"
 )
 
 type contextKey string

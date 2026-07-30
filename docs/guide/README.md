@@ -22,12 +22,6 @@ program carries one flag:
 
 That flag makes `import web "druse:web"` resolve.
 
-> **If your checkout still builds with `-collection:uruquim=`, use that name in
-> the flag and in every `import`.** The collection is renamed to `druse` with
-> the repository. Nothing else in this guide changes.
-
-This note appears once, here. No other page repeats it.
-
 ## Start here
 
 1. **[Odin in ten minutes](00-odin-in-ten-minutes.md)** — the eight language

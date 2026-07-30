@@ -10,8 +10,8 @@
 package test_c4_stream_live
 
 import "core:testing"
-import web "uruquim:web"
-import stream "uruquim:web/internal/stream"
+import web "druse:web"
+import stream "druse:web/internal/stream"
 
 @(test)
 c4_is_live_tracks_open_and_close :: proc(t: ^testing.T) {

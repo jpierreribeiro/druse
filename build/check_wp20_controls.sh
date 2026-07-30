@@ -20,33 +20,33 @@
 # control it did not run.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 fail() {
   echo "WP20-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W20_ODIN="${URUQUIM_ODIN_BIN:-}"
-if test -z "$URUQUIM_W20_ODIN" && command -v odin >/dev/null 2>&1; then
-  URUQUIM_W20_ODIN="$(command -v odin)"
+DRUSE_W20_ODIN="${DRUSE_ODIN_BIN:-}"
+if test -z "$DRUSE_W20_ODIN" && command -v odin >/dev/null 2>&1; then
+  DRUSE_W20_ODIN="$(command -v odin)"
 fi
-if test -z "$URUQUIM_W20_ODIN" && test -x /tmp/uruquim-odin-toolchain/odin; then
-  URUQUIM_W20_ODIN=/tmp/uruquim-odin-toolchain/odin
+if test -z "$DRUSE_W20_ODIN" && test -x /tmp/druse-toolchain/odin; then
+  DRUSE_W20_ODIN=/tmp/druse-toolchain/odin
 fi
-if test -z "$URUQUIM_W20_ODIN"; then
-  echo "WP20 CONTROLS -> BLOCKED: no Odin toolchain found (set URUQUIM_ODIN_BIN). NOTHING RAN." >&2
+if test -z "$DRUSE_W20_ODIN"; then
+  echo "WP20 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
 
-URUQUIM_W20_TMP="$(mktemp -d -t uruquim-wp20-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W20_TMP"' EXIT
+DRUSE_W20_TMP="$(mktemp -d -t druse-wp20-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W20_TMP"' EXIT
 
 internal_tree() { # name
-  local t="$URUQUIM_W20_TMP/$1"
+  local t="$DRUSE_W20_TMP/$1"
   mkdir -p "$t"
-  cp "$URUQUIM_ROOT"/web/*.odin "$t/"
-  cp "$URUQUIM_ROOT"/tests/wp20-internal/*.odin "$t/"
+  cp "$DRUSE_ROOT"/web/*.odin "$t/"
+  cp "$DRUSE_ROOT"/tests/wp20-internal/*.odin "$t/"
   printf '%s' "$t"
 }
 
@@ -58,8 +58,8 @@ assert_mutated() { # label file before-hash
 }
 
 run_selected() { # tree test-names
-  env -u ODIN_ROOT "$URUQUIM_W20_ODIN" test "$1" \
-    "-collection:uruquim=$URUQUIM_ROOT" -out:"$URUQUIM_W20_TMP/runner" \
+  env -u ODIN_ROOT "$DRUSE_W20_ODIN" test "$1" \
+    "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_W20_TMP/runner" \
     "-define:ODIN_TEST_NAMES=$2" 2>&1
 }
 
@@ -168,18 +168,18 @@ must_go_red "$T" "$NAMES" "5: report site unpaired -> that variant's test"
 # --- 6. a `path: string` field on the event (STATIC: the gate must reject) ---
 # The §6.2 redaction constraint. This control drives the CHECKER, not the test
 # suite: the field set is a static property, and the gate is what holds it.
-T="$URUQUIM_W20_TMP/redaction"
+T="$DRUSE_W20_TMP/redaction"
 mkdir -p "$T/build" "$T/web/testing" "$T/web/internal/transport" "$T/tests" "$T/vendor"
-cp "$URUQUIM_ROOT"/build/check_public_api.sh "$T/build/"
-cp "$URUQUIM_ROOT"/build/check.sh "$T/build/"
-cp "$URUQUIM_ROOT"/web/*.odin "$T/web/"
-cp "$URUQUIM_ROOT"/web/testing/*.odin "$T/web/testing/"
+cp "$DRUSE_ROOT"/build/check_public_api.sh "$T/build/"
+cp "$DRUSE_ROOT"/build/check.sh "$T/build/"
+cp "$DRUSE_ROOT"/web/*.odin "$T/web/"
+cp "$DRUSE_ROOT"/web/testing/*.odin "$T/web/testing/"
 # REPOINTED (audit): ALL of web/internal, not just transport. `ingest` and
 # `stream` arrived later and the transport imports them, so this tree stopped
 # compiling and the control reported a BROKEN PROBE rather than a result.
-cp -r "$URUQUIM_ROOT"/web/internal/. "$T/web/internal/"
-cp -r "$URUQUIM_ROOT"/vendor/odin-http "$T/vendor/odin-http"
-cp -r "$URUQUIM_ROOT"/tests/. "$T/tests/"
+cp -r "$DRUSE_ROOT"/web/internal/. "$T/web/internal/"
+cp -r "$DRUSE_ROOT"/vendor/odin-http "$T/vendor/odin-http"
+cp -r "$DRUSE_ROOT"/tests/. "$T/tests/"
 
 # The unmutated tree must PASS the checker first, or a later rejection would
 # prove nothing about the mutation.

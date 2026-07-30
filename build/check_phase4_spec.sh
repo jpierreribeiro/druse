@@ -20,15 +20,15 @@
 # nobody re-reads.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_P4S="$URUQUIM_ROOT/planning/phase-4-spec.md"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_P4S="$DRUSE_ROOT/planning/phase-4-spec.md"
 
 fail() {
   echo "PHASE4-SPEC-FAIL: $*" >&2
   exit 1
 }
 
-test -f "$URUQUIM_P4S" || fail "planning/phase-4-spec.md is missing"
+test -f "$DRUSE_P4S" || fail "planning/phase-4-spec.md is missing"
 
 # Prose wraps, and every assertion below is about prose. Read flattened, or a
 # sentence that spans two lines reads as absent while sitting right there — the
@@ -38,7 +38,7 @@ test -f "$URUQUIM_P4S" || fail "planning/phase-4-spec.md is missing"
 # bearing sentences in this spec are deliberately pulled out as block quotes, so
 # flattening without stripping '>' turns exactly the most important lines into
 # the ones the gate cannot see. Found by this gate failing on its own document.
-URUQUIM_FLAT="$(sed -E 's/^[[:space:]]*>[[:space:]]?//' "$URUQUIM_P4S" | tr '\n' ' ' | tr -s ' ')"
+DRUSE_FLAT="$(sed -E 's/^[[:space:]]*>[[:space:]]?//' "$DRUSE_P4S" | tr '\n' ' ' | tr -s ' ')"
 
 # ---------------------------------------------------------------------------
 # 1. The lifecycle is FIVE states, closed, and named.
@@ -46,9 +46,9 @@ URUQUIM_FLAT="$(sed -E 's/^[[:space:]]*>[[:space:]]?//' "$URUQUIM_P4S" | tr '\n'
 # Exact in both directions: a sixth state is as much a defect as a missing one,
 # because the point of a closed enum is that a reviewer can enumerate it.
 # ---------------------------------------------------------------------------
-for URUQUIM_STATE in Configuring Serving Draining Stopped Failed; do
-  grep -qF "\`$URUQUIM_STATE\`" "$URUQUIM_P4S" ||
-    fail "the lifecycle no longer names the state '$URUQUIM_STATE'. Five states, and a state machine you cannot enumerate is one you cannot audit."
+for DRUSE_STATE in Configuring Serving Draining Stopped Failed; do
+  grep -qF "\`$DRUSE_STATE\`" "$DRUSE_P4S" ||
+    fail "the lifecycle no longer names the state '$DRUSE_STATE'. Five states, and a state machine you cannot enumerate is one you cannot audit."
 done
 
 # COUNTED IN BOTH DIRECTIONS, and the first version of this check was only
@@ -57,16 +57,16 @@ done
 # deletion and was blind to an addition. Found by control 2, which is exactly
 # what a control is for. The count is now over every state-shaped row in the
 # table, and the five names are verified separately above.
-URUQUIM_STATE_ROWS="$(grep -cE '^\| `[A-Z][A-Za-z_]*` \| .* \| (yes|no|\*\*yes\*\*|\*\*no\*\*) \|' "$URUQUIM_P4S" || true)"
-test "$URUQUIM_STATE_ROWS" -eq 5 ||
-  fail "the lifecycle table has $URUQUIM_STATE_ROWS state rows, not 5. Adding a state is a spec amendment, not an edit — and a closed enum that quietly grows is no longer one a reviewer can enumerate."
+DRUSE_STATE_ROWS="$(grep -cE '^\| `[A-Z][A-Za-z_]*` \| .* \| (yes|no|\*\*yes\*\*|\*\*no\*\*) \|' "$DRUSE_P4S" || true)"
+test "$DRUSE_STATE_ROWS" -eq 5 ||
+  fail "the lifecycle table has $DRUSE_STATE_ROWS state rows, not 5. Adding a state is a spec amendment, not an edit — and a closed enum that quietly grows is no longer one a reviewer can enumerate."
 
 # The whole point of §1.1: data, not booleans.
-grep -qiE 'never a set of booleans|not a set of booleans' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'never a set of booleans|not a set of booleans' <<<"$DRUSE_FLAT" ||
   fail "the spec no longer says the lifecycle is data rather than booleans. That sentence IS the decision — three independent flags admit eight combinations, five of them nonsense."
 
 # One-way transitions. A resumable drain is the convenience this refuses.
-grep -qF 'Draining → Serving' "$URUQUIM_P4S" ||
+grep -qF 'Draining → Serving' "$DRUSE_P4S" ||
   fail "the spec no longer refuses the Draining -> Serving transition by name. A refusal that stops being written down is a refusal a later package adds back as a convenience."
 
 # ---------------------------------------------------------------------------
@@ -76,19 +76,19 @@ grep -qF 'Draining → Serving' "$URUQUIM_P4S" ||
 # exists because obligations are what a shutdown implementation is graded on,
 # and the temptation at implementation time is to grade against what was built.
 # ---------------------------------------------------------------------------
-grep -qiE 'admission stops first' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'admission stops first' <<<"$DRUSE_FLAT" ||
   fail "proof obligation 1 (admission stops first, observably) is missing"
-grep -qiE 'close-after-send, never close-mid-send' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'close-after-send, never close-mid-send' <<<"$DRUSE_FLAT" ||
   fail "proof obligation 2 (close-after-send) is missing"
-grep -qiE 'deadline is ABSOLUTE' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'deadline is ABSOLUTE' <<<"$DRUSE_FLAT" ||
   fail "proof obligation 3 (an absolute deadline) is missing"
-grep -qiE 'cleanup runs exactly once' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'cleanup runs exactly once' <<<"$DRUSE_FLAT" ||
   fail "proof obligation 4 (cleanup exactly once) is missing"
-grep -qiE 'reservation still holds in .Draining.' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'reservation still holds in .Draining.' <<<"$DRUSE_FLAT" ||
   fail "proof obligation 5 (the reservation holds while draining) is missing — the easiest to forget and the hardest to diagnose in production"
 
 # "Wait forever" must stay named as the anti-pattern, not softened into silence.
-grep -qiE '"Wait forever" is not a deadline' <<<"$URUQUIM_FLAT" ||
+grep -qiE '"Wait forever" is not a deadline' <<<"$DRUSE_FLAT" ||
   fail "the spec no longer states that waiting forever is not a deadline. It is the vendored server's CURRENT behaviour, so dropping the sentence hides a live defect."
 
 # ---------------------------------------------------------------------------
@@ -98,9 +98,9 @@ grep -qiE '"Wait forever" is not a deadline' <<<"$URUQUIM_FLAT" ||
 # loop has no deadline. If that paragraph goes, WP44 starts from "expose what is
 # already there", which is false and would ship a hang.
 # ---------------------------------------------------------------------------
-grep -qF '112c49b' "$URUQUIM_P4S" ||
+grep -qF '112c49b' "$DRUSE_P4S" ||
   fail "§1.2 no longer cites the vendored commit it was read against. A claim about someone else's code with no commit behind it is a memory, not a reading."
-grep -qiE 'drain loop has no deadline' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'drain loop has no deadline' <<<"$DRUSE_FLAT" ||
   fail "the spec no longer records that the vendored drain loop has NO deadline. That gap is why WP44 is not merely 'expose what exists'."
 
 # ---------------------------------------------------------------------------
@@ -110,28 +110,28 @@ grep -qiE 'drain loop has no deadline' <<<"$URUQUIM_FLAT" ||
 # failure mode this whole section exists to prevent — and the reservation column
 # is the one that will be left blank, because it is the one that is hard.
 # ---------------------------------------------------------------------------
-URUQUIM_ROWS="$(grep -E '^\| R-[0-9]+ \|' "$URUQUIM_P4S" || true)"
-URUQUIM_ROW_COUNT="$(grep -c . <<<"$URUQUIM_ROWS" || true)"
-test "$URUQUIM_ROW_COUNT" -ge 9 ||
-  fail "the capacity ledger has $URUQUIM_ROW_COUNT rows, fewer than the 9 the spec ratified. A resource that loses its row loses its bound."
+DRUSE_ROWS="$(grep -E '^\| R-[0-9]+ \|' "$DRUSE_P4S" || true)"
+DRUSE_ROW_COUNT="$(grep -c . <<<"$DRUSE_ROWS" || true)"
+test "$DRUSE_ROW_COUNT" -ge 9 ||
+  fail "the capacity ledger has $DRUSE_ROW_COUNT rows, fewer than the 9 the spec ratified. A resource that loses its row loses its bound."
 
-while IFS= read -r URUQUIM_ROW; do
-  test -n "$URUQUIM_ROW" || continue
+while IFS= read -r DRUSE_ROW; do
+  test -n "$DRUSE_ROW" || continue
   # 5 content columns between 6 pipes; a trailing pipe closes the row.
-  URUQUIM_CELLS="$(awk -F'|' '{print NF-2}' <<<"$URUQUIM_ROW")"
-  test "$URUQUIM_CELLS" -eq 6 ||
-    { echo "$URUQUIM_ROW" >&2; fail "a capacity row does not carry exactly the id plus five columns (capacity, behaviour-when-full, diagnostic, cleanup owner, reserved-for-stop)"; }
-  for URUQUIM_COL in 3 4 5 6 7; do
-    URUQUIM_CELL="$(awk -F'|' -v c="$URUQUIM_COL" '{gsub(/^[ \t]+|[ \t]+$/, "", $c); print $c}' <<<"$URUQUIM_ROW")"
-    test -n "$URUQUIM_CELL" ||
-      { echo "$URUQUIM_ROW" >&2; fail "a capacity row has an EMPTY column. A row is not complete until it answers all five questions — and the blank one will be 'reserved for stop', because that is the hard one."; }
+  DRUSE_CELLS="$(awk -F'|' '{print NF-2}' <<<"$DRUSE_ROW")"
+  test "$DRUSE_CELLS" -eq 6 ||
+    { echo "$DRUSE_ROW" >&2; fail "a capacity row does not carry exactly the id plus five columns (capacity, behaviour-when-full, diagnostic, cleanup owner, reserved-for-stop)"; }
+  for DRUSE_COL in 3 4 5 6 7; do
+    DRUSE_CELL="$(awk -F'|' -v c="$DRUSE_COL" '{gsub(/^[ \t]+|[ \t]+$/, "", $c); print $c}' <<<"$DRUSE_ROW")"
+    test -n "$DRUSE_CELL" ||
+      { echo "$DRUSE_ROW" >&2; fail "a capacity row has an EMPTY column. A row is not complete until it answers all five questions — and the blank one will be 'reserved for stop', because that is the hard one."; }
   done
-done <<<"$URUQUIM_ROWS"
+done <<<"$DRUSE_ROWS"
 
 # The reservation rule itself, and the inequality that makes it work.
-grep -qiE 'at or below the reservation' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'at or below the reservation' <<<"$DRUSE_FLAT" ||
   fail "the reservation rule no longer states that admission is refused AT OR BELOW the reservation rather than at zero. 'When it reaches zero' is the bug this rule exists to prevent."
-grep -qiE 'running out and having none left to shut down with' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'running out and having none left to shut down with' <<<"$DRUSE_FLAT" ||
   fail "§2.1 no longer states why the reservation column exists. Without that sentence the column reads as bookkeeping and gets filled in with 'n/a'."
 
 # ---------------------------------------------------------------------------
@@ -141,13 +141,13 @@ grep -qiE 'running out and having none left to shut down with' <<<"$URUQUIM_FLAT
 # is a denial of service the framework would perform on itself, and it is the
 # kind of rule that is obvious in a spec and forgotten in an implementation.
 # ---------------------------------------------------------------------------
-grep -qiE 'amplifier, not a diagnostic' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'amplifier, not a diagnostic' <<<"$DRUSE_FLAT" ||
   fail "§2.5's rule against per-event logging under overload is gone. A log line per refused connection turns a load spike into an I/O storm."
 
 # ---------------------------------------------------------------------------
 # 6. "Bounded" stays gated, and the rows do not over-claim.
 # ---------------------------------------------------------------------------
-grep -qiE 'they do not bound a handler.s own allocations' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'they do not bound a handler.s own allocations' <<<"$DRUSE_FLAT" ||
   fail "the spec no longer disclaims what its rows do NOT bound. Server bounds are not framework bounds, and the gated word depends on that distinction holding."
 
 # ---------------------------------------------------------------------------
@@ -158,36 +158,36 @@ grep -qiE 'they do not bound a handler.s own allocations' <<<"$URUQUIM_FLAT" ||
 # incomplete and needs maintaining against attackers who read it too, while the
 # rule needs no list and fails closed.
 # ---------------------------------------------------------------------------
-grep -qiE 'no request-derived byte reaches a log line' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'no request-derived byte reaches a log line' <<<"$DRUSE_FLAT" ||
   fail "§3 no longer states the redaction rule in its strong form. 'Do not log secrets' needs a definition of secret and a list somebody maintains; 'nothing derived from the request' needs neither and fails closed."
 
-URUQUIM_PERMITTED="$(grep -cE '^\| (the|a|framework) .*\*\*.* \| .* \|$' "$URUQUIM_P4S" || true)"
-test "$URUQUIM_PERMITTED" -ge 7 ||
-  fail "the permitted-to-record table has $URUQUIM_PERMITTED rows, fewer than the 7 ratified. A row that vanishes is a field nobody can justify recording — or one nobody has to."
+DRUSE_PERMITTED="$(grep -cE '^\| (the|a|framework) .*\*\*.* \| .* \|$' "$DRUSE_P4S" || true)"
+test "$DRUSE_PERMITTED" -ge 7 ||
+  fail "the permitted-to-record table has $DRUSE_PERMITTED rows, fewer than the 7 ratified. A row that vanishes is a field nobody can justify recording — or one nobody has to."
 
-grep -qiE 'never be recorded' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'never be recorded' <<<"$DRUSE_FLAT" ||
   fail "§3 no longer states what may NEVER be recorded. A permitted list without its complement reads as guidance."
 
 # The OWASP relationship, stated rather than implied. Without this sentence a
 # later reader adds an `is_password_like()` check that gives false comfort.
-grep -qiE 'recorded as motivation and the rule is what is enforced' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'recorded as motivation and the rule is what is enforced' <<<"$DRUSE_FLAT" ||
   fail "§3 no longer records that OWASP's do-not-log list is MOTIVATION and the strong rule is the MECHANISM. Enforcing the list instead of the rule would be weaker than what already ships."
 
-grep -qiE 'forges additional log records' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'forges additional log records' <<<"$DRUSE_FLAT" ||
   fail "§3 lost the log-injection half: a CR or LF in a permitted field turns a reader's evidence into an attacker's writing surface"
 
-grep -qiE 'a metric that silently stops being emitted is worse than no metric' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'a metric that silently stops being emitted is worse than no metric' <<<"$DRUSE_FLAT" ||
   fail "§3.5 no longer requires the drop policy to be observable"
-grep -qiE 'may never apply backpressure to a request' <<<"$URUQUIM_FLAT" ||
+grep -qiE 'may never apply backpressure to a request' <<<"$DRUSE_FLAT" ||
   fail "§3.5 no longer forbids a logger applying backpressure to the serving path. Observation exists to describe the system, never to become the reason it is slow."
-echo "phase-4 spec: the redaction rule is stated in its strong form; $URUQUIM_PERMITTED permitted fields, each with a reason"
+echo "phase-4 spec: the redaction rule is stated in its strong form; $DRUSE_PERMITTED permitted fields, each with a reason"
 
 # ---------------------------------------------------------------------------
 # 7. Unfinished work has no place in a ratified spec.
 # ---------------------------------------------------------------------------
-if grep -nE '\b(TODO|FIXME|XXX|TBD)\b' "$URUQUIM_P4S"; then
+if grep -nE '\b(TODO|FIXME|XXX|TBD)\b' "$DRUSE_P4S"; then
   fail "planning/phase-4-spec.md contains an unfinished-work marker. A ratified spec cannot have open work in it."
 fi
 
-echo "phase-4 spec: lifecycle is 5 closed states with 5 proof obligations; $URUQUIM_ROW_COUNT capacity rows, each answering all five questions"
+echo "phase-4 spec: lifecycle is 5 closed states with 5 proof obligations; $DRUSE_ROW_COUNT capacity rows, each answering all five questions"
 echo "PASS: Phase-4 specification gate (WP39 lifecycle, WP40 capacity ledger)"

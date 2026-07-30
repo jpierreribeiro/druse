@@ -53,14 +53,14 @@ request_id assigns every request an ID, honours a well-formed client value, and 
 stats :: proc() -> Server_Stats
 ```
 
-stats returns the running server's write-side counters, or the zero value when no server is running. It allocates nothing and reads nine integers under one lock, so the snapshot is coherent.
+stats returns the running server's write-side counters, or the zero value when no server is running. It allocates nothing and reads ten integers under one lock, so the snapshot is coherent.
 
 Taught in [`05-recipes/observe-the-framework.md`](../guide/05-recipes/observe-the-framework.md).
 
 ## `Server_Stats`
 
 ```odin
-Server_Stats :: struct {refused_connections: int, responses_sent: int, response_bytes: i64, send_errors: int, write_deadline_aborts: int, handler_dwell_ns: i64, stream_refused_full: int, stream_refused_budget: int, stream_aborted_slow: int}
+Server_Stats :: struct {refused_connections: int, saturation_refusals: int, responses_sent: int, response_bytes: i64, send_errors: int, write_deadline_aborts: int, handler_dwell_ns: i64, stream_refused_full: int, stream_refused_budget: int, stream_aborted_slow: int}
 ```
 
 Server_Stats is the write-side accounting `web.stats` returns (Closure H-3).

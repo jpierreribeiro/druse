@@ -20,18 +20,18 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import http "uruquim:vendor/odin-http"
-import stream "uruquim:web/internal/stream"
-import transport "uruquim:web/internal/transport"
+import http "druse:vendor/odin-http"
+import stream "druse:web/internal/stream"
+import transport "druse:web/internal/transport"
 
 @(test)
 wp92_the_stream_write_deadline_is_safe_without_tuning :: proc(t: ^testing.T) {
 	// Pure resolution, so this cannot be a two-instance-counter artifact: with
 	// the deadline off, a stream still gets the pre-registered default; with
 	// it set, the app's value wins.
-	testing.expect_value(t, http.stream_effective_write_deadline(0), http.URUQUIM_STREAM_DEFAULT_WRITE_TIMEOUT)
+	testing.expect_value(t, http.stream_effective_write_deadline(0), http.DRUSE_STREAM_DEFAULT_WRITE_TIMEOUT)
 	testing.expect_value(t, http.stream_effective_write_deadline(5 * time.Second), 5 * time.Second)
-	testing.expect(t, http.URUQUIM_STREAM_DEFAULT_WRITE_TIMEOUT > 0, "the default must actually bound something")
+	testing.expect(t, http.DRUSE_STREAM_DEFAULT_WRITE_TIMEOUT > 0, "the default must actually bound something")
 }
 
 @(test)

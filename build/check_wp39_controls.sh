@@ -21,21 +21,21 @@
 # that still looks complete.
 set -euo pipefail
 
-URUQUIM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-URUQUIM_DOC="planning/phase-4-spec.md"
+DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRUSE_DOC="planning/phase-4-spec.md"
 
 fail() {
   echo "WP39-CONTROL-FAIL: $*" >&2
   exit 1
 }
 
-URUQUIM_W39_TMP="$(mktemp -d -t uruquim-wp39-controls-XXXXXXXX)"
-trap 'rm -rf "$URUQUIM_W39_TMP"' EXIT
+DRUSE_W39_TMP="$(mktemp -d -t druse-wp39-controls-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_W39_TMP"' EXIT
 
 tree_copy() { # name
-  local t="$URUQUIM_W39_TMP/$1"
+  local t="$DRUSE_W39_TMP/$1"
   mkdir -p "$t"
-  cp -r "$URUQUIM_ROOT/build" "$URUQUIM_ROOT/planning" "$t/"
+  cp -r "$DRUSE_ROOT/build" "$DRUSE_ROOT/planning" "$t/"
   printf '%s' "$t"
 }
 
@@ -65,9 +65,9 @@ must_reject() { # tree label expected-regex
 # --- 1. a lifecycle state deleted --------------------------------------------
 T="$(tree_copy state_deleted)"
 assert_green "$T" "1: state deleted"
-H="$(md5sum "$T/$URUQUIM_DOC" | cut -d' ' -f1)"
-sed -i '/^| `Draining` |/d' "$T/$URUQUIM_DOC"
-assert_mutated "state deleted" "$T/$URUQUIM_DOC" "$H"
+H="$(md5sum "$T/$DRUSE_DOC" | cut -d' ' -f1)"
+sed -i '/^| `Draining` |/d' "$T/$DRUSE_DOC"
+assert_mutated "state deleted" "$T/$DRUSE_DOC" "$H"
 must_reject "$T" "1: a lifecycle state is deleted" "state rows, not 5"
 
 # --- 2. a sixth state added ---------------------------------------------------
@@ -75,8 +75,8 @@ must_reject "$T" "1: a lifecycle state is deleted" "state rows, not 5"
 # reviewer can enumerate, which is the entire property §1.1 buys.
 T="$(tree_copy state_added)"
 assert_green "$T" "2: sixth state added"
-H="$(md5sum "$T/$URUQUIM_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_DOC" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
@@ -86,7 +86,7 @@ j = s.index("\n", i) + 1
 s = s[:j] + "| `Paused` | An invented sixth state | no | maybe |\n" + s[j:]
 open(p, "w").write(s)
 PYEOF
-assert_mutated "sixth state added" "$T/$URUQUIM_DOC" "$H"
+assert_mutated "sixth state added" "$T/$DRUSE_DOC" "$H"
 must_reject "$T" "2: a sixth lifecycle state is added" "state rows, not 5"
 
 # --- 3. a proof obligation deleted -------------------------------------------
@@ -95,15 +95,15 @@ must_reject "$T" "2: a sixth lifecycle state is added" "state rows, not 5"
 # invisible rather than arguable.
 T="$(tree_copy obligation_deleted)"
 assert_green "$T" "3: obligation deleted"
-H="$(md5sum "$T/$URUQUIM_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_DOC" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
 s = s.replace("**Cleanup runs exactly once.**", "**Cleanup is tidy.**", 1)
 open(p, "w").write(s)
 PYEOF
-assert_mutated "obligation deleted" "$T/$URUQUIM_DOC" "$H"
+assert_mutated "obligation deleted" "$T/$DRUSE_DOC" "$H"
 must_reject "$T" "3: a proof obligation is deleted" "cleanup exactly once"
 
 # --- 4. the anti-pattern softened --------------------------------------------
@@ -111,15 +111,15 @@ must_reject "$T" "3: a proof obligation is deleted" "cleanup exactly once"
 # sentence does not remove a warning — it hides a live defect.
 T="$(tree_copy forever_softened)"
 assert_green "$T" "4: wait-forever softened"
-H="$(md5sum "$T/$URUQUIM_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_DOC" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
 s = s.replace('**"Wait forever" is not a deadline**', "**Waiting is discouraged**", 1)
 open(p, "w").write(s)
 PYEOF
-assert_mutated "wait-forever softened" "$T/$URUQUIM_DOC" "$H"
+assert_mutated "wait-forever softened" "$T/$DRUSE_DOC" "$H"
 must_reject "$T" "4: the wait-forever anti-pattern is softened" "waiting forever is not a deadline"
 
 # --- 5. the vendored-drain finding deleted -----------------------------------
@@ -127,15 +127,15 @@ must_reject "$T" "4: the wait-forever anti-pattern is softened" "waiting forever
 # and would ship a hang.
 T="$(tree_copy finding_deleted)"
 assert_green "$T" "5: vendored finding deleted"
-H="$(md5sum "$T/$URUQUIM_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_DOC" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
 s = s.replace("drain loop has no deadline", "drain loop is straightforward", 1)
 open(p, "w").write(s)
 PYEOF
-assert_mutated "vendored finding deleted" "$T/$URUQUIM_DOC" "$H"
+assert_mutated "vendored finding deleted" "$T/$DRUSE_DOC" "$H"
 must_reject "$T" "5: the vendored no-deadline finding is deleted" "drain loop has NO deadline"
 
 # --- 6. a capacity row loses its reservation ---------------------------------
@@ -143,8 +143,8 @@ must_reject "$T" "5: the vendored no-deadline finding is deleted" "drain loop ha
 # emptied, and the row still looks like a row.
 T="$(tree_copy row_hollowed)"
 assert_green "$T" "6: reservation cell emptied"
-H="$(md5sum "$T/$URUQUIM_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_DOC" <<'PYEOF'
 import sys, re
 p = sys.argv[1]
 s = open(p).read()
@@ -162,7 +162,7 @@ assert "yes" in cells[6], "probe is aimed at the wrong column: %r" % cells[6]
 cells[6] = "  "
 open(p, "w").write(s[:m.start()] + "|".join(cells) + s[m.end():])
 PYEOF
-assert_mutated "reservation cell emptied" "$T/$URUQUIM_DOC" "$H"
+assert_mutated "reservation cell emptied" "$T/$DRUSE_DOC" "$H"
 must_reject "$T" "6: a capacity row's reservation cell is emptied" "EMPTY column"
 
 # --- 7. the reservation rule weakened ----------------------------------------
@@ -170,15 +170,15 @@ must_reject "$T" "6: a capacity row's reservation cell is emptied" "EMPTY column
 # same and differ by whether the server can still shut itself down.
 T="$(tree_copy rule_weakened)"
 assert_green "$T" "7: reservation rule weakened"
-H="$(md5sum "$T/$URUQUIM_DOC" | cut -d' ' -f1)"
-python3 - "$T/$URUQUIM_DOC" <<'PYEOF'
+H="$(md5sum "$T/$DRUSE_DOC" | cut -d' ' -f1)"
+python3 - "$T/$DRUSE_DOC" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
 s = s.replace("at or below the reservation", "at zero", 1)
 open(p, "w").write(s)
 PYEOF
-assert_mutated "reservation rule weakened" "$T/$URUQUIM_DOC" "$H"
+assert_mutated "reservation rule weakened" "$T/$DRUSE_DOC" "$H"
 must_reject "$T" "7: the reservation rule is weakened to 'at zero'" "AT OR BELOW the reservation"
 
 # --- 8. POSITIVE control ------------------------------------------------------

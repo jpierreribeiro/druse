@@ -54,11 +54,11 @@ true:
 | Half of the condition | Instrument | Gate |
 |---|---|---|
 | every operation has a declared owner / capacity / deadline / cancellation | `planning/closure-async-op-inventory.md` — **23 operation-creating call sites × 10 questions**, census derived from the source | `check_c01_controls.sh` |
-| every framework-owned resource has limit / deadline / cancellation / saturation / metric / shutdown | `planning/closure-readiness-matrix.md` — **13 resources × 8 properties, no unanswered cell** | `check_readiness_matrix.sh` |
+| every framework-owned resource has limit / deadline / cancellation / saturation / metric / shutdown | `planning/closure-readiness-matrix.md` — **14 resources × 8 properties, no unanswered cell** | `check_readiness_matrix.sh` |
 | the fault space is enumerated rather than discovered | `planning/closure-fault-campaign.md` — **34 cells, 0 unanswered** | `check_c03_controls.sh` |
-| the combined saturation profile is known, and the write-observability gap is specified | `planning/closure-saturation-and-write-observability.md` — the **Handler lane binds first, at 4 concurrent clients** | `check_c05_controls.sh` |
+| the combined saturation profile is known, and the write-observability gap is specified | `planning/closure-saturation-and-write-observability.md` — first visible refusal is scheduler-dependent; stable capacity is **`lanes ÷ dwell`**, with connection slots bounding waiting/admission | `check_c05_controls.sh` |
 | the router's deliberate differences are pinned as a negative corpus | `planning/closure-httprouter-study.md` — 10 cases, BSD-3 notice gated | `check_c08_controls.sh` |
-| unbounded memory has a named, mandatory topology **with a measured sizing rule** | `planning/closure-response-size-and-memory.md` — `max_connections × largest response` | `check_c04_controls.sh` |
+| unbounded memory has a named, mandatory topology **with measured attribution** | `planning/closure-response-size-and-memory.md` — completed responses release oversize arena blocks; concurrent peak and RSS remain cgroup-owned | `check_c04_controls.sh` |
 | the delegated topology is **tested**, not only documented | `planning/closure-proxy-contract.md` | `check_c06_controls.sh` |
 
 **Unclassified cells: zero.** Every cell in the matrix and every cell in the
@@ -87,14 +87,14 @@ There are none of the latter two. What remains:
 > that signature. The record below is kept as the history of how it was found.
 
 > **VALIDATED IN PRODUCTION (Phase 8, deployment #1, 2026-07-24).** The very
-> first real deployment of the reference application (`uruquim-board`) hit this
+> first real deployment of the reference application (`druse-board`) hit this
 > unprompted: on the test VPS (default `RLIMIT_MEMLOCK` = 8 MiB) the server
 > exited cleanly every ~1 s under systemd instead of crashing — patch 30's
 > graceful unwind, in the field. The operational remedy the patch-29 diagnostic
 > names, `LimitMEMLOCK=infinity` in the systemd unit, made it serve. A framework
 > fix made in Hardening was confirmed by the first use, and the fix's *value* —
 > a clean, recoverable failure with a named remedy rather than a crash-loop — is
-> exactly what a real deployment needs. See `uruquim-board/DEPLOYMENTS.md` #1.
+> exactly what a real deployment needs. See `druse-board/DEPLOYMENTS.md` #1.
 
 **The original open-defect record:
 
@@ -165,6 +165,7 @@ Deferred work here means *a specification handed forward*, not an open question.
 | `web.Server_Stats` / `web.stats()` (C-05) | same, +2 ledger | the first deployment running detached streams |
 | A real-proxy interop round (C-06) | no proxy binary on the gate machine | before any production deployment behind nginx |
 | Upstream keep-alive + duplicated limits through a **pooling** proxy (C-06) | needs a second fixture, not a switch on the first | with the real-proxy round |
+| Concurrent buffered-response matrix (corrected C-04) | local attribution proved reclamation but not the aggregate live/RSS envelope | before setting the production cgroup budget |
 | The **hours-long** soak (C-04) | a 2-second two-phase run answers the shape question; only a long run reaches slow accumulation | a quiet machine |
 | The **3,000 real-socket** SSE round (Phase 7) | same | the same quiet machine — run once, together |
 | `radix_compact` (C-08) | optimisation with no readiness consequence | only on material gain, and it must pass the backtracking test unchanged |
@@ -175,7 +176,8 @@ Deferred work here means *a specification handed forward*, not an open question.
 
 > **PRODUCTION-READY FOR A CONTROLLED PILOT**, behind a reverse proxy with
 > `proxy_buffering off`, under a supervisor with a kill timeout, inside a memory
-> cgroup sized by the C-04 rule, with `max_write_time` and `max_idle_time`
+> cgroup sized from the corrected C-04 concurrent campaign, with
+> `max_write_time` and `max_idle_time`
 > enabled. The Closure's exit condition is **met**: no framework-owned operation
 > lacks a declared owner, capacity, deadline or cancellation, and every
 > delegation names a topology that is mandatory, documented and now tested.
@@ -219,7 +221,7 @@ foundation where:
 - shutdown actually terminates in the three ways it previously did not;
 - the limitations list is one gated document rather than eleven prose lists, two
   of which were lying;
-- the saturation profile is known, and it is not the one the configuration
-  suggests: **the Handler lane binds first, at four concurrent clients**, while
-  the connection budget sits idle. An operator tuning `max_connections` is
-  tuning the wrong knob, and Phase 8's board will meet this immediately.
+- the saturation profile is known without claiming a scheduler invariant the
+  test cannot support: handler capacity is **`lanes ÷ dwell`**, connection slots
+  bound waiting/admission, and the first visible refusal may be either lane
+  saturation or admission pressure.

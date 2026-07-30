@@ -20,7 +20,7 @@ import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
-import web "uruquim:web"
+import web "druse:web"
 
 // The slow handler's dwell: long enough to hold a lane across another client's
 // whole request, short enough that a phase costs a fraction of a second.

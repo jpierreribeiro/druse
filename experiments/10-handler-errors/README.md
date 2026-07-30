@@ -1,6 +1,6 @@
 # Experiment 10 — handler error propagation
 
-**Question.** Should the canonical Uruquim handler remain
+**Question.** Should the canonical Druse handler remain
 `proc(ctx: ^Context)`, return a typed error like Echo, or return an explicit
 response-or-error outcome?
 
@@ -17,7 +17,7 @@ makes the closed-world cost visible.
 **Command.**
 
 ```bash
-odin test . -collection:uruquim=../..
+odin test . -collection:druse=../..
 ```
 
 **Coverage.** Each model proves JSON success, domain 404, unknown 500 + server
