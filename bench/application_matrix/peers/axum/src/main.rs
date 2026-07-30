@@ -39,6 +39,31 @@ struct MediumDocument {
     tags: Vec<String>,
 }
 
+// The same document with an integer score. Odin's pinned encoder renders f64
+// with sixteen decimals, so the float document is 960 bytes larger there than
+// here and the two cannot be compared byte for byte. This variant is
+// byte-identical across every server in the matrix.
+#[derive(Clone, Serialize)]
+struct MediumItemInt {
+    id: i64,
+    name: String,
+    score: i64,
+    active: bool,
+}
+
+#[derive(Clone, Serialize)]
+struct MediumDocumentInt {
+    request_id: String,
+    items: Vec<MediumItemInt>,
+    tags: Vec<String>,
+}
+
+#[derive(Clone)]
+struct AppState {
+    medium: Arc<MediumDocument>,
+    medium_int: Arc<MediumDocumentInt>,
+}
+
 #[derive(Serialize)]
 struct RoutedResponse {
     id: i64,
@@ -69,10 +94,14 @@ async fn main() {
         .route("/health", get(health))
         .route("/json/small", get(json_small))
         .route("/json/medium", get(json_medium_get).post(json_medium))
+        .route("/json/medium/int", get(json_medium_int_get))
         .route("/json/medium/decode", post(json_medium_decode))
         .route("/json/echo", post(json_echo))
         .nest("/api", api)
-        .with_state(Arc::new(medium_document()));
+        .with_state(AppState {
+            medium: Arc::new(medium_document()),
+            medium_int: Arc::new(medium_document_int()),
+        });
 
     let port = std::env::args().nth(1).unwrap_or_else(|| "8081".to_owned());
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
@@ -96,8 +125,12 @@ async fn json_small() -> Json<SmallDocument> {
     })
 }
 
-async fn json_medium_get(State(document): State<Arc<MediumDocument>>) -> Json<Arc<MediumDocument>> {
-    Json(document)
+async fn json_medium_int_get(State(state): State<AppState>) -> Json<Arc<MediumDocumentInt>> {
+    Json(state.medium_int.clone())
+}
+
+async fn json_medium_get(State(state): State<AppState>) -> Json<Arc<MediumDocument>> {
+    Json(state.medium.clone())
 }
 
 async fn json_echo(Json(input): Json<SmallDocument>) -> Json<SmallDocument> {
@@ -141,6 +174,25 @@ async fn noop(request: axum::extract::Request, next: Next) -> Response {
 async fn auth(mut request: axum::extract::Request, next: Next) -> Response {
     request.extensions_mut().insert(AccountId(7));
     next.run(request).await
+}
+
+fn medium_document_int() -> MediumDocumentInt {
+    let items = (1..=64)
+        .map(|id| MediumItemInt {
+            id,
+            name: "item-abcdefghijklmnop".to_owned(),
+            score: id,
+            active: true,
+        })
+        .collect();
+    MediumDocumentInt {
+        request_id: "req-0123456789abcdef".to_owned(),
+        items,
+        tags: ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+    }
 }
 
 fn medium_document() -> MediumDocument {
