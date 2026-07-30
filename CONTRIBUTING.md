@@ -3,7 +3,10 @@
 Two things about this project will surprise you, so they come first.
 
 **The public API is frozen and the build enforces it.** Phase 1 ratified exactly
-32 application symbols and 2 test-support symbols, and
+32 application symbols and 2 test-support symbols; the live ledger is now **80
+application + 2 test-support = 82**, and every symbol between those two numbers
+arrived as a numbered amendment in `planning/phase-1-freeze.md` carrying G-09
+evidence — never as a snapshot refresh.
 `build/check_phase1_freeze.sh` compares the compiler's own exported inventory —
 every signature, struct field, enum member and enum backing type — against a
 committed snapshot. Adding a public symbol fails the build. That is intentional,
