@@ -1,0 +1,55 @@
+# WHAT A RELEASE SHIPS.
+#
+# `git archive` — which is what GitHub runs to produce the tarball attached to a
+# tag — honours `export-ignore`. This file is therefore the difference between
+# what the REPOSITORY carries and what a RELEASE carries, and the two should not
+# be the same thing.
+#
+# The repository carries its evidence on purpose: 977 of 1,598 tracked files are
+# campaign results under `evidence/`, and they are there so that every number
+# in `docs/reports/` can be recomputed rather than believed. That is the right
+# call for the repository and the wrong one for a tarball, where it is 61% of
+# the file count and 0% of the use.
+#
+# The rule for adding a line here: would someone who wants to USE Druse be worse
+# off without this path? If not, it is not part of a release.
+
+# Campaign evidence: every run behind every number in docs/reports/.
+evidence/           export-ignore
+
+# The owner's working area — labs, delivery bundles, the session dossier. None
+# of it is tracked today; the line is here so a stray commit cannot put it in a
+# release by accident.
+PRIORIDADE/         export-ignore
+
+# Planning, freeze manifests, ADRs, risk register, roadmaps. The record of how
+# decisions were made; not needed to use what they decided.
+planning/           export-ignore
+knowledge-base/     export-ignore
+release-candidate/  export-ignore
+
+# Throwaway prototypes. They ratify signatures; they are not the framework.
+experiments/        export-ignore
+
+# The gate, its mutation controls, and the benchmark harnesses. Everything here
+# is for developing Druse, not for depending on it.
+build/              export-ignore
+bench/              export-ignore
+ops/                export-ignore
+tests/              export-ignore
+
+# Working copies and agent scratch.
+bundle/             export-ignore
+tina/               export-ignore
+.claude/            export-ignore
+.githooks/          export-ignore
+.gitattributes      export-ignore
+.gitignore          export-ignore
+
+# WHAT REMAINS, and it is the whole of the answer to "how do I use this":
+#   web/          the library
+#   vendor/       the pinned backend it needs to build
+#   examples/     compiling programs
+#   docs/         the guide, reference, cookbook, operations and error contract
+#   README.md CHANGELOG.md LICENSE SECURITY.md CONTRIBUTING.md
+#   odin-version.txt   the toolchain the above is pinned to

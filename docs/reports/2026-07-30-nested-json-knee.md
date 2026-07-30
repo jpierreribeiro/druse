@@ -110,4 +110,4 @@ bench/application_matrix/run-rate-sweep.sh OUT /json/medium/int 10 3 \
 ```
 
 Requires a dedicated idle host. Evidence:
-`PRIORIDADE/entrega/evidencias/2026-07-30-json-knee/`.
+`evidence/2026-07-30-json-knee/`.

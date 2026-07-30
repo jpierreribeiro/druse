@@ -128,7 +128,7 @@ signature snapshot matches the compiler's own inventory byte for byte.
    throughput **+15.63%**, HWM **+1.08%** against a pre-registered ceiling of
    +5%, median maximum RSS **+0.64%**, and `reflect::struct_tag_lookup` frames
    **7,296 → 121** (`perf report` 15.20% → 0.26%). Evidence:
-   `PRIORIDADE/entrega/evidencias/2026-07-29-release-candidate/json-hwm-profile/`.
+   `evidence/2026-07-29-release-candidate/json-hwm-profile/`.
 2. **A 12-hour mixed soak** of the release candidate on the same box — started
    2026-07-29T22:27:47Z, due 2026-07-30T10:28Z, and its outcome is recorded here
    before the tag is cut — `/health`

@@ -70,7 +70,7 @@ Raw `wrk` outputs, scripts, binary/source checksums and the exact Git bundle are
 stored outside the repository under:
 
 ```text
-PRIORIDADE/entrega/evidencias/2026-07-29-json-fused-target-aws/
+evidence/2026-07-29-json-fused-target-aws/
 ```
 
 ## Remaining limit

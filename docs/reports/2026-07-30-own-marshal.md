@@ -64,7 +64,7 @@ p50 in the low hundreds of microseconds with ~100% of the offered rate served is
 a service time and the run is below the knee, whatever the heading says.
 
 All three campaigns are preserved, the two censored ones included, in
-`PRIORIDADE/entrega/evidencias/2026-07-30-own-marshal/`.
+`evidence/2026-07-30-own-marshal/`.
 
 ## Where the time went: a like-for-like profile pair
 
@@ -153,7 +153,7 @@ a per-type descriptor table; the same shape applies here.
 
 ## Evidence
 
-`PRIORIDADE/entrega/evidencias/2026-07-30-own-marshal/`
+`evidence/2026-07-30-own-marshal/`
 
 | directory | what it is |
 |---|---|

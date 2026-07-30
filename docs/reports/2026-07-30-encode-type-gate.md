@@ -122,4 +122,4 @@ correctness control, and adopting it is a work package: the freeze ritual, the
 full gate, and a decision on whether the conservative walk's coverage is wide
 enough to keep the promise in `docs/errors.md`.
 
-Evidence: `PRIORIDADE/entrega/evidencias/2026-07-30-encode-prototype/`.
+Evidence: `evidence/2026-07-30-encode-prototype/`.

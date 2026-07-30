@@ -50,7 +50,7 @@ responses identically:
 The negative control removed the production `free_all`. It retained all seven
 blocks and 25,167,567 used bytes, and the attribution assertion failed for the
 intended reason. The raw baseline and mutant logs are preserved under
-`PRIORIDADE/entrega/evidencias/2026-07-28-validacao-local/`.
+`evidence/2026-07-28-validacao-local/`.
 
 **F-C04-1, corrected — completed large responses do not leave body-sized live
 blocks in the connection arena.** The ~28 MiB RSS remaining above baseline is

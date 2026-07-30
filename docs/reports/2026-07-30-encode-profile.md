@@ -106,6 +106,6 @@ One box, one document shape, one rate, one lane count.
 
 ## Evidence
 
-`PRIORIDADE/entrega/evidencias/2026-07-30-encode-profile/` — both manifests,
+`evidence/2026-07-30-encode-profile/` — both manifests,
 both symbol tables, the exact response each profile encoded, and the load report
 proving each run stayed below its knee.

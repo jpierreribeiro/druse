@@ -125,4 +125,4 @@ DRUSE_BENCH_PEER_BIN=... bench/application_matrix/run-openload-matrix.sh OUT 200
 python3 bench/application_matrix/summarise-openload-matrix.py OUT
 ```
 
-Evidence: `PRIORIDADE/entrega/evidencias/2026-07-30-six-framework-matrix/`.
+Evidence: `evidence/2026-07-30-six-framework-matrix/`.
