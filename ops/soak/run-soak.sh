@@ -98,7 +98,7 @@ curl -fsS --max-time 1 "http://127.0.0.1:$PORT/health" >/dev/null
   # unix_nanos joins this row to the generator's per-request CSV. Everything the
   # old telemetry recorded was relative to a start time it never printed, so no
   # server-side sample could be matched to a client-side failure.
-  echo "sample,utc,unix_nanos,elapsed_s,rss_kib,hwm_kib,threads,fds,proc_ticks,host_ticks,stats_http,listen_overflows,listen_drops,tcp_abort_on_close,tcp_retrans"
+  echo "sample,utc,unix_nanos,elapsed_s,rss_kib,hwm_kib,threads,fds,proc_ticks,host_ticks,stats_http,stats_curl_exit,listen_overflows,listen_drops,tcp_abort_on_close,tcp_retrans"
   sample=0
   started=$SECONDS
   while kill -0 "$server_pid" 2>/dev/null; do
@@ -110,8 +110,14 @@ curl -fsS --max-time 1 "http://127.0.0.1:$PORT/health" >/dev/null
     proc_ticks="$(awk '{print $14+$15}' "/proc/$server_pid/stat" 2>/dev/null || echo 0)"
     host_ticks="$(awk 'NR==1 {for(i=2;i<=NF;i++) s+=$i; print s}' /proc/stat)"
     stats_file="$OUT/telemetry/stats-$(printf '%06d' "$sample").json"
+    # curl's exit code, not only its HTTP code. A /stats sample that fails
+    # records `000` and nothing else, which is how a pre-registered criterion —
+    # "/stats observed during load" — was measured for twelve hours with 111
+    # failures whose cause was never captured. 7 is refused, 28 is timeout,
+    # 52 is an empty reply, 56 is a receive failure: a taxonomy for free.
     stats_http="$(curl -sS --max-time 1 -o "$stats_file" -w '%{http_code}' \
-      "http://127.0.0.1:$PORT/stats" || true)"
+      "http://127.0.0.1:$PORT/stats" 2>/dev/null)" || true
+    stats_curl_exit=$?
     # Kernel counters. A request the kernel dropped before the server ever saw
     # it looks identical, from userspace, to a request the server refused —
     # these four numbers are what tells the two apart, and no previous run
@@ -122,11 +128,11 @@ curl -fsS --max-time 1 "http://127.0.0.1:$PORT/health" >/dev/null
       /^TcpExtTCPAbortOnClose/ {a=$2}
       /^TcpRetransSegs/        {r=$2}
       END {printf "%s,%s,%s,%s", (o?o:0), (d?d:0), (a?a:0), (r?r:0)}')"
-    printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+    printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
       "$sample" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(date -u +%s%N)" \
       "$((SECONDS-started))" \
       "$rss" "$hwm" "$threads" "$fds" "$proc_ticks" "$host_ticks" \
-      "${stats_http:-000}" "${nstat_line:-0,0,0,0}"
+      "${stats_http:-000}" "${stats_curl_exit:-0}" "${nstat_line:-0,0,0,0}"
     if [[ "${rss:-0}" -ge "$MAX_RSS_KIB" ]]; then
       echo "rss_safety_stop=$rss" >"$OUT/control/safety-stop.txt"
       kill -TERM "$server_pid" 2>/dev/null || true

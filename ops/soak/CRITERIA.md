@@ -35,7 +35,10 @@ fault the framework produced.
 5. **Threads constant** for the whole run.
 6. **File descriptors** back within baseline + 4 after the settling window.
 7. **RSS tail slope** at most 1 MiB/h over the second half of the run.
-8. **`/stats` answers 200** on every sample.
+8. **`/stats` answers 200 on every sample**, and a sample that does not carries
+   the reason it did not — curl's exit code alongside the HTTP code. This was
+   measured and never enforced: a 12-hour run recorded 111 failures of 8,611,
+   passed, and the number sat in the artefact with no cause and no consequence.
 9. Safety stop: RSS above 4 GiB ends the run and fails it.
 
 ## Accounting, not tolerance

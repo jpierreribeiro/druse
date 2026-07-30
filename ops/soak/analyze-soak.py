@@ -240,6 +240,41 @@ if counted != classified:
         "exists to refuse"
     )
 
+# ---------------------------------------------------------------------------
+# The /stats criterion was MEASURED and never ENFORCED.
+#
+# `stats_missing_samples` has always been computed and reported, and no reason
+# was ever appended for it. A 12-hour run recorded 111 samples of 8,611 where
+# /stats answered nothing at all, passed, and the number sat in the artefact
+# where nobody looked. The data existed, the criterion existed, and nothing
+# connected them — the same defect as the unexplained failures, one field over.
+#
+# Rule 1 applies to these samples too: a failure to reach /stats has a cause,
+# and the sampler now records curl's exit code alongside the HTTP code. A
+# missing sample whose cause was not captured fails the run.
+# ---------------------------------------------------------------------------
+stats_causes = {}
+stats_uncaptured = 0
+for row in stats_missing:
+    code = row.get("stats_curl_exit")
+    if code in (None, "", "0"):
+        stats_uncaptured += 1
+    else:
+        stats_causes[code] = stats_causes.get(code, 0) + 1
+summary["stats_failure_causes"] = stats_causes
+summary["stats_failures_uncaptured"] = stats_uncaptured
+
+if stats_missing:
+    reasons.append(
+        f"/stats did not answer 200 on {len(stats_missing)} of "
+        f"{len(telemetry)} samples"
+    )
+if stats_uncaptured:
+    reasons.append(
+        f"{stats_uncaptured} of those samples captured no cause: the observability "
+        "endpoint failed and the instrument did not record why"
+    )
+
 summary["reasons"] = reasons
 if reasons:
     summary["result"] = "FAIL"
