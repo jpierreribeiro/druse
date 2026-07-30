@@ -84,7 +84,24 @@ This is strictly stronger, and it is affordable precisely because a healthy run
 produces few failures. If an instrument cannot afford it, that is evidence about
 the instrument, not an argument against the rule.
 
-A criterion of the form "at most X%" is the shape that hides cause by
+**The rule applies to countable anomalies, not to continuous measurements.**
+This distinction is load-bearing, and it was sharpened by auditing against a
+criterion that turned out to be sound. A failure, a refused request, a dropped
+connection is a discrete event with a cause that can be named, and each one must
+be. RSS, latency and throughput are continuous, and a threshold is the only way
+to judge them — `tests/c04-response-size` allows 2 MiB of growth and says why
+("allocator bookkeeping and test-side buffers"), which is a stated derivation,
+not an anonymous allowance. Demanding an "attribution" for every byte of RSS
+would be the rule applied past its meaning.
+
+So a threshold on a continuous measurement is legitimate, and carries its own
+obligation: **say where the number came from.** `build/check_wp26_bench.sh`
+derives its tolerance floor from the machine, and `build/check_phase4_freeze.sh`
+refuses a freeze that makes a performance claim from inside the instrument's own
+noise — "a percentile from inside it is a number about the machine". That is the
+standard for thresholds, and it already exists here.
+
+A criterion of the form "at most X% of *events*" is the shape that hides cause by
 construction. Every one of them in this repository is suspect until it has been
 read against this rule.
 
