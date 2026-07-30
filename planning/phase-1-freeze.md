@@ -2741,3 +2741,72 @@ core's escaping turns the suite red rather than drifting the wire in silence.
 `tests/enc1-quoted-string/`, remove the ENC1 block from `build/check.sh`, and
 remove the `core:unicode/utf8` line from `build/phase1-direct-dependencies.txt`
 and from §7. Nothing calls the writer, so nothing else moves.
+
+## Amendment 41 — the per-type JSON validation gate becomes the default, no ledger growth
+
+**Date: 2026-07-30. Authority: the owner, on the measurements below. Ledger
+effect: none; application remains 80 and test-support remains 2.** No public
+name, signature, field or enum member moves; `JSON_TYPE_GATE` is `@(private)`
+and applications cannot see it.
+
+**What changes.** `web/respond.odin`'s `DRUSE_JSON_TYPE_GATE` defaults to `true`.
+Every JSON response was re-parsed after marshalling; now the re-parse runs only
+for payload types that can carry a float, decided once per instantiation.
+
+**Why, in numbers.** `docs/reports/2026-07-30-encode-type-gate.md`, measured with
+`bench/application_matrix/run-variant-ab.sh` on `/json/medium/int` (4,310 bytes,
+verified byte-identical across variants before measuring), five alternating
+repeats, 4 lanes, server pinned to CPUs 0-3 and the generator to 4-7, one commit
+with the two binaries differing only by the define and each recorded by sha256:
+
+| variant | p50, below the knee | ceiling, above it |
+|---|---:|---:|
+| control | 339 µs | 20,431/s |
+| type gate | **267 µs (−21.2%)** | **26,097/s (+27.7%)** |
+| `skipval` (not shippable) | 264 µs (−23.0%) | 26,746/s (+31.9%) |
+
+The third row is why this is being adopted rather than pushed further: removing
+the pass **entirely** — which would put invalid JSON on the wire — buys 23.0%
+and 31.9%. The gate captures 92% and 87% of that while keeping the guarantee.
+Recorded in the same run and worth repeating: `presize` held 10.7% of the encode
+profile and measured +0.9% p50 / −2.6% ceiling. **A symbol's share of a profile
+is not the gain available from removing it**, and pre-sizing must not be revived.
+
+**Why it is safe.** The walk is conservative by construction: anything it does
+not recognise answers "may hold a float" and keeps the pass. Pointers are
+deliberately not enumerated — R-13 forbids `web/` from reading through a pointer
+payload until ADR-003 is amended, and the conservative answer concedes nothing
+because the pinned marshaller does not follow pointers either.
+
+**The promise this keeps, and the document that was not making it.**
+`docs/errors.md` listed three producers of `internal_error` and named only "a
+pointer or a procedure". It did **not** mention a non-finite float — the single
+condition this pass exists to catch (NUM-001, RFC 8259 §6). The gap predates
+this amendment: the behaviour has always been there, undocumented. Adopting a
+gate over an undocumented promise would be adopting nothing, so `docs/errors.md`
+now names the case as a fourth producer, and says the token never reaches the
+client.
+
+**Evidence, and it is executable.** `build/check_typegate_controls.sh`, wired
+into `build/check.sh`:
+
+- control 0 pins this default verbatim in the source, the mechanism
+  `check_wp71_controls.sh` uses for `DRUSE_DEDICATED_ACCEPT` — a default with no
+  assertion walks back on the next refactor and nobody notices;
+- controls 1 and 2 are the positive cases `planning/diagnosability.md` requires:
+  `wp6_num001_non_finite_float_yields_a_complete_500` green with the gate on
+  **and** under the rollback define;
+- control 3 blinds the walk to floats, control 4 inverts the gate's polarity, and
+  control 5 hollows out the rollback branch — each must turn NUM-001 red. Control
+  5 exists because a rollback that silently stops validating is worse than no
+  rollback: it reports success.
+
+Every probe asserts its own edit landed by md5 and reports BROKEN PROBE
+otherwise, so a pattern that drifts against a refactor is a loud error rather
+than a false verdict.
+
+**Rollback.** `-define:DRUSE_JSON_TYPE_GATE=false` restores the unconditional
+pass, and control 2 proves that path is still a real validation rather than a
+decorative branch. The flag is kept for one release, matching the
+dedicated-accept and `JSON_FUSED_*` rollouts; removing it later means deleting
+the `when`/`else` pair, control 2 and control 5 together.
