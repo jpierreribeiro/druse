@@ -53,8 +53,29 @@ print()
 
 for endpoint in endpoints:
     print(f"### {endpoint}")
-    print(f"  {'server':10} {'goodput/s':>10} {'% offered':>10} {'p50 us':>9} "
-          f"{'p99 us':>9} {'failures':>9}  classes")
+    print(f"  {'server':10} {'goodput/s':>10} {'% offered':>10} {'B/resp':>8} "
+          f"{'p50 us':>9} {'p99 us':>9} {'failures':>9}  classes")
+
+    # Bytes per response, per server. This is the field that says whether two
+    # servers answered the same request with the same work, and this summary did
+    # not print it. On 2026-07-30 Druse emitted 5,398 bytes per response on
+    # /json/medium where three Go peers emitted 4,438 — a 21.6% difference that
+    # reached a published table as a like-for-like comparison, because the one
+    # number that would have exposed it was computed by the generator, written
+    # into the artefact, and never read.
+    sizes = {}
+    for server in servers:
+        reports = runs.get((server, endpoint))
+        if not reports:
+            continue
+        per_response = [
+            report.get("response_bytes", 0) / report["succeeded"]
+            for report in reports
+            if report.get("succeeded")
+        ]
+        if per_response:
+            sizes[server] = statistics.median(per_response)
+
     for server in servers:
         reports = runs.get((server, endpoint))
         if not reports:
@@ -71,8 +92,21 @@ for endpoint in endpoints:
         note = ""
         if offered and goodput < offered * 0.95:
             note = "  <- did not serve the offered rate; latency here is a queue"
-        print(f"  {server:10} {goodput:10,.0f} {share:9.1f}% {p50:9,.0f} {p99:9,.0f} "
-              f"{failures:9,}  {classes if classes else ''}{note}")
+        print(f"  {server:10} {goodput:10,.0f} {share:9.1f}% {sizes.get(server, 0):8,.0f} "
+              f"{p50:9,.0f} {p99:9,.0f} {failures:9,}  {classes if classes else ''}{note}")
+
+    # A spread wider than one byte means the servers did not answer with the
+    # same payload, and the row is not a comparison until that is explained.
+    if len(sizes) > 1 and (max(sizes.values()) - min(sizes.values())) > 1:
+        smallest = min(sizes.values())
+        print()
+        print(f"  !! RESPONSE SIZES DIFFER on {endpoint} — this row is NOT a "
+              f"like-for-like comparison:")
+        for server, size in sorted(sizes.items(), key=lambda kv: kv[1]):
+            delta = (size / smallest - 1) * 100 if smallest else 0
+            print(f"       {server:10} {size:8,.0f} B/resp  {delta:+6.1f}%")
+        print("     A latency or goodput difference here is partly a payload "
+              "difference. Equalise the response before publishing the row.")
     print()
 
 unclassified = 0
