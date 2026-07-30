@@ -42,15 +42,37 @@ for name in ("health", "tiny", "json-encode", "json-decode", "bytes-64k", "wait-
     files = sorted((root / "cycles").glob(f"c*-{name}.json"))
     reports = [json.loads(path.read_text()) for path in files]
     statuses = {}
+    # Failure classes are aggregated here for the same reason the statuses are:
+    # a key that is not carried forward is a key that is discarded, and this
+    # analyser's own first run proved the point — it counted 212 failures and
+    # reported zero classified, because this loop built a workload dict with no
+    # `failures` in it while the reports had them all along.
+    failure_counts = {}
+    failure_examples = {}
     for report in reports:
         for status, count in report["status"].items():
             statuses[status] = statuses.get(status, 0) + count
+        for entry in report.get("failures", []):
+            klass = entry.get("class") or "unnamed"
+            failure_counts[klass] = failure_counts.get(klass, 0) + entry.get("count", 0)
+            if entry.get("example_error") and klass not in failure_examples:
+                failure_examples[klass] = entry["example_error"]
     workloads[name] = {
         "runs": len(reports),
         "planned": sum(report["planned"] for report in reports),
         "completed": sum(report["completed"] for report in reports),
         "transport_errors": sum(report["transport_errors"] for report in reports),
         "status": statuses,
+        "failures": [
+            {
+                "class": klass,
+                "count": count,
+                "example_error": failure_examples.get(klass, ""),
+            }
+            for klass, count in sorted(
+                failure_counts.items(), key=lambda item: -item[1]
+            )
+        ],
         "median_p99_us": statistics.median(
             report["latency_p99_us"] for report in reports
         ) if reports else None,

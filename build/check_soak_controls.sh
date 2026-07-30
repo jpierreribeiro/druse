@@ -200,3 +200,50 @@ else
   fail "the analyser could not read a well-formed run directory: $(cat "$TMP/verdict.err")"
 fi
 echo "PASS (soak): the analyser refuses a run whose failures carry no cause"
+
+# ---------------------------------------------------------------------------
+# The analyser CARRIES a cause it was given. This is the positive half of the
+# check above, and it is here because its absence let a real defect through:
+# the analyser aggregated each workload into a dict with no `failures` key, so
+# the accounting rule read an empty list and reported every failure as
+# unexplained. The run above still went red — for the wrong reason — and the
+# control could not tell the difference. A rule that only ever says "no cause"
+# is indistinguishable from a broken one.
+# ---------------------------------------------------------------------------
+cat >"$TMP/run/cycles/c0001-tiny.json" <<'JSON'
+{"planned": 10, "completed": 10, "transport_errors": 2, "status": {"200": 8, "0": 2},
+ "latency_p99_us": 1000,
+ "failures": [{"class": "peer_reset", "count": 2,
+               "example_error": "read tcp 127.0.0.1:1->127.0.0.1:2: connection reset by peer"}]}
+JSON
+
+python3 "$SOAK/analyze-soak.py" "$TMP/run" >"$TMP/verdict2.json" 2>"$TMP/verdict2.err" ||
+  fail "the analyser could not read a run whose failures are classified: $(cat "$TMP/verdict2.err")"
+
+python3 - "$TMP/verdict2.json" <<'PY' || fail "the analyser dropped a cause the artefact carried"
+import json, sys
+verdict = json.load(open(sys.argv[1]))
+if verdict["failures_counted"] != 2:
+    print(f"expected 2 counted, got {verdict['failures_counted']}", file=sys.stderr)
+    raise SystemExit(1)
+if verdict["failures_classified"] != 2:
+    print(
+        f"the artefact classified 2 failures and the analyser reported "
+        f"{verdict['failures_classified']}: the aggregation discarded them",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+if verdict["failures_unclassified"] != 0:
+    print(f"classified failures reported as unclassified", file=sys.stderr)
+    raise SystemExit(1)
+if verdict["failure_classes"].get("peer_reset") != 2:
+    print(f"class lost in aggregation: {verdict['failure_classes']}", file=sys.stderr)
+    raise SystemExit(1)
+if "connection reset by peer" not in verdict["failure_examples"].get("peer_reset", ""):
+    print("the example error text was dropped", file=sys.stderr)
+    raise SystemExit(1)
+if any("not classified" in reason for reason in verdict["reasons"]):
+    print(f"analyser called an explained failure unexplained: {verdict['reasons']}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+echo "PASS (soak): the analyser carries a cause the artefact gave it, class and text intact"
