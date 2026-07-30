@@ -49,6 +49,7 @@ bash -n "$DRUSE_ROOT/build/check_public_api.sh"
 bash -n "$DRUSE_ROOT/build/check_wp3_mutations.sh"
 bash -n "$DRUSE_ROOT/build/check_wp9_mutations.sh"
 bash -n "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"
+bash -n "$DRUSE_ROOT/build/check_typegate_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_m8_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_m9_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_g11_teardown.sh"
@@ -1417,6 +1418,13 @@ echo "PASS: the previously ungated evidence suites run in the gate"
 # multipart one was guarded only by a suite CI did not run until this session.
 echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"
+
+# The per-type JSON validation gate is an ADOPTED DEFAULT, so the gate must hold
+# it to the two things adoption promises: the skip never skips a type that can
+# carry a non-finite float, and the build-time rollback is a real validation
+# rather than a decorative branch. Both positive states and three mutations.
+echo "--- Per-type JSON validation gate: adopted default + rollback controls ---"
+env DRUSE_ODIN_BIN="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_typegate_controls.sh"
 
 echo "--- WP9 raw-wire corpus: mutation controls (the cases must detect) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_wp9_mutations.sh"
