@@ -153,8 +153,15 @@ examples/                Compiling programs (all built by the gate)
 
 ## Status
 
-Phases 1, 2, 3 and 4 are complete: implementation finished, public contracts
-frozen behind a gate. What "frozen" means, symbol by symbol and with the
+**Released: `v0.10.0`** — a pre-1.0 public release, no longer marked a pilot.
+Two controlled pilots came before it, `v0.9.0-pilot` and `v0.9.1-pilot`. What
+each release earned, and the one gap in its evidence, is recorded in
+[`planning/release-readiness.md`](planning/release-readiness.md); notable
+changes are in [`CHANGELOG.md`](CHANGELOG.md).
+
+Phases 1 through 7 are complete and frozen, and Phase 8 — proof by use — has a
+final verdict. Implementation finished, public contracts frozen behind a gate.
+What "frozen" means, symbol by symbol and with the
 evidence behind each one, is recorded in
 [`planning/phase-1-freeze.md`](planning/phase-1-freeze.md),
 [`planning/phase-2-freeze.md`](planning/phase-2-freeze.md) and
@@ -190,10 +197,32 @@ buffered multipart forms and an absolute graceful-drain deadline. It also fixed
 an upstream pending-read use-after-free found by the drain laboratory. The
 freeze is [`planning/phase-5-freeze.md`](planning/phase-5-freeze.md).
 
-**Phase 6 is in progress.** It makes conventional synchronous application I/O
-safe through bounded Handler concurrency, then builds the SQL-first PostgreSQL
-and migration ecosystem outside `web`. The accepted contract is
-[`planning/phase-6-spec.md`](planning/phase-6-spec.md).
+**Phase 6 made conventional synchronous application I/O safe** through bounded
+Handler concurrency, and built the SQL-first PostgreSQL and migration ecosystem
+outside `web` — in the Crystals repository, where its half is frozen. The core
+half added no public symbol. The freeze is
+[`planning/phase-6-freeze.md`](planning/phase-6-freeze.md).
+
+**Phase 7 shipped two orthogonal contracts, never one magic stream:** detached
+response streaming as a public API, and an opt-in large-body path whose
+bounded-memory substrate is built and tested but whose public upload API was
+deferred and then delivered separately. It cost five symbols. The freeze is
+[`planning/phase-7-freeze.md`](planning/phase-7-freeze.md), which also names
+what did not ship.
+
+**Phase 8 was proof by use, and it found eight things.** A real multi-user
+application, built and deployed from outside the library, produced friction
+findings F8-1 through F8-8; the Corrective Program C1–C7 resolved every one,
+each verified running against real PostgreSQL and real clients rather than in a
+test. The verdict is [`planning/phase-8-verdict.md`](planning/phase-8-verdict.md)
+and the findings are in
+[`planning/phase-8-friction-ledger.md`](planning/phase-8-friction-ledger.md).
+
+**Phase 9 measured performance instead of claiming it**, on a dedicated 8-vCPU
+box: the framework competes with fasthttp on throughput and wins on latency, and
+the investigation is recorded — including the reproducibility problems in the
+table above — in
+[`planning/perf-netpoller-study-and-architecture.md`](planning/perf-netpoller-study-and-architecture.md).
 
 The current synchronous-Handler decision is not treated as the last possible
 runtime. Its four-arm future evaluation, workloads and decision checklist are
@@ -217,7 +246,11 @@ particular what the framework does and does not bound.
   and correlation IDs (`web.request_id`) with a tested trust policy.
 - One log line per request (`web.logger`) and a typed framework-error
   observer (`web.observe`) — each costs zero bytes in an application that
-  does not use it, proven by `nm` in the gate.
+  does not use it, proven by `nm` in the gate. **`web.logger` writes to
+  `context.logger`, and Odin installs none by default**, so an application that
+  wants those lines — or any framework diagnostic — assigns one in `main`.
+  Druse does not import `core:log` on your behalf: that would cost about 37 KiB
+  in every binary (`docs/middleware.md`).
 - Path and query extractors that respond with a standardized `400` on bad
   input, so handlers only check a bool and return.
 - JSON request bodies (`web.body`) with a fixed 4 MiB cap, decoded into a
@@ -246,8 +279,19 @@ particular what the framework does and does not bound.
 - Graceful shutdown with an absolute drain deadline.
 - Bounded synchronous Handler concurrency: automatic 4..32 capacity by
   default, explicit `1` for compatibility, and no async Handler API.
+- Detached response streaming (`web.stream`, `web.stream_send`,
+  `web.stream_close`, `web.stream_live`) with refusal counted rather than
+  silent, and an opt-in spooled upload path (`web.enable_upload`, `web.upload`,
+  `web.upload_persist`) that does not hold the body in RAM.
+- Server counters through `web.stats` — refusals, responses, bytes, send
+  errors, write-deadline aborts, handler dwell time and the stream refusal
+  reasons.
+- One request-scoped typed value (`web.request_state`), and application state
+  that answers whether it was there (`web.state` returns `(^T, bool)`).
+- Structural bounds on JSON, not just byte bounds: `Limits.max_json_nodes`
+  refuses a body whose shape costs more than its size suggests.
 
-**Public surface:** 62 application symbols + 2 test-support symbols = 64 —
+**Public surface:** 80 application symbols + 2 test-support symbols = 82 —
 frozen. The gate compares the compiler's own exported inventory, down to every
 struct field, enum member and enum backing type, against
 `build/phase1-public-signatures.txt`, and the direct import set against
@@ -287,8 +331,9 @@ observable contracts hold.
 What exists today is a production-minded HTTP microframework for JSON APIs,
 with explicit operational boundaries and a bootstrap transport intended to be
 replaced by the official Odin HTTP package after that real implementation is
-available and passes the same conformance corpus. A frozen contract is not a
-tag: semantic versioning and any release remain the owner's decision.
+available and passes the same conformance corpus. The frozen contract now
+carries a version: `v0.10.0`, pre-1.0, where a breaking change moves the MINOR
+and `1.0` waits on accrued real-world use rather than on another gate.
 
 ## Supported platform and toolchain
 
@@ -305,6 +350,18 @@ Stated honestly rather than implied:
 - **Consumption is by vendoring or a git submodule** at a pinned commit — the
   ecosystem's own convention, since Odin will never officially support a
   package manager.
+
+**The operational contract, which the release does not soften.** These are not
+a pilot's caveats to be dropped at 1.0; they are what this framework is:
+
+- **Linux x86-64.**
+- **One server per process.** `web.serve` owns the process's listening
+  lifecycle; two servers in one process is not a supported topology.
+- **TLS terminates at the proxy.** Druse does not terminate TLS and will not —
+  the decision, and what it costs, is in `docs/operations.md`.
+- **A supervisor is mandatory, not a nicety.** Odin has no recoverable panic, so
+  a faulting handler aborts the process and the supervisor restarting it *is*
+  the recovery mechanism. There is no other one.
 
 The mandatory gate (`build/check.sh`) runs on the pinned toolchain and is the
 single source of truth for what "passing" means in this repository.
@@ -341,9 +398,10 @@ vulnerability.
 people: the public API is frozen and the build enforces it, and growing it
 requires measured evidence rather than agreement.
 
-Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md). There has been
-no release: no tag exists, and cutting one is the owner's decision. What happens
-next is planned in [`planning/roadmap.md`](planning/roadmap.md).
+Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md), and the current
+release is `v0.10.0` — read its **Breaking** section before upgrading from a
+pilot tag. What happens next is planned in
+[`planning/roadmap.md`](planning/roadmap.md).
 
 **Consuming Druse.** Odin has no package manager
 [by design](https://odin-lang.org/docs/faq/), so vendor the `web/` directory or

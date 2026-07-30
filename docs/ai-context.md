@@ -1031,7 +1031,7 @@ Installing an observer changes no response.
 ## Testing
 
 The test-support ledger is exactly **2** symbols, tracked separately from the
-73 application symbols.
+80 application symbols.
 
 ```text
 test_request(&app, method, path) -> Recorded_Response

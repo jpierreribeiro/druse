@@ -1,28 +1,42 @@
-# Druse roadmap — Phases 2 to 8 and the release track
+# Druse roadmap — the phase program and the release track
 
 Living document. Written after the Phase-1 freeze (`a7d2e9e`) from the evidence
 in [`post-phase1-audit.md`](post-phase1-audit.md) and
 [`odin-fit-audit.md`](odin-fit-audit.md).
 
-Detail remains **proportional to distance**. Phases 1–5 are complete and
-frozen. The next executable program is mapped by
-[`phases-6-8-program.md`](phases-6-8-program.md): Phase 6 has a normative spec
-and hand-off plan; Phases 7 and 8 have deliberately revisable plans whose first
-WP must refresh them against the preceding freeze. No future signature is
-frozen merely because the program names a capability.
+Detail remains **proportional to distance**. The phase program this document
+mapped has been executed: Phases 1–7 are frozen and Phase 8 returned its
+verdict, so the sections below on Phases 6, 7 and 8 are now a record of what was
+planned, kept beside the freezes that record what shipped. No future signature
+was ever frozen merely because this document named a capability, and none is
+now.
 
 ## Where the project is
 
-*(Updated 2026-07-21, after the Phase-5 freeze.)*
+*(Updated 2026-07-30, at the `v0.10.0` release.)*
 
-Phases 1–5 are complete and frozen at `6b6edbc`: **62 application symbols + 2
-test-support symbols**. Druse now has indexed routing, middleware, typed
-application state, configurable limits, production lifecycle, proxy-aware
-operation, deadlines, observability, drain, CORS, static files and bounded
-in-memory multipart. The full gate protects public signatures, claims,
-lifetimes, capacities, raw-wire behaviour and mutation controls. Large uploads
-still cannot exceed the buffered request-body model; Phase 7 now owns the
-opt-in spool/stream solution. No release has been made.
+**Phases 1–7 are complete and frozen, and Phase 8 has a final verdict.** The
+ledger is **80 application + 2 test-support = 82**, frozen at `f2963a3`. Druse
+has indexed routing, middleware, typed application state answered as
+`(^T, bool)`, configurable limits including a structural bound on JSON,
+production lifecycle, proxy-aware operation, deadlines, observability with
+server counters, drain, CORS, static files, bounded in-memory multipart,
+detached response streaming and an opt-in spooled upload path. The full gate
+protects public signatures, claims, lifetimes, capacities, raw-wire behaviour
+and mutation controls.
+
+Three releases exist: `v0.9.0-pilot` and `v0.9.1-pilot` (controlled pilots,
+2026-07-24 and 2026-07-25) and **`v0.10.0`** (2026-07-30), the first not marked
+a pilot and the first under the name Druse. The gate record and the one gap in
+the release's evidence are in
+[`release-readiness.md`](release-readiness.md).
+
+What Phase 5 left open has closed: large uploads no longer require the buffered
+request-body model. What remains open is written down rather than implied —
+`future-research.md`, `open-questions.md` and
+`architecture-evidence-questions.md` hold the questions that need experiments,
+and `sync-async-evaluation.md` holds the runtime decision this framework has
+not treated as final.
 
 ## What each phase is for, in plain terms
 
