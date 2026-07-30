@@ -107,7 +107,13 @@ perf report --stdio --children -i "$OUT/perf.data" \
 perf script -i "$OUT/perf.data" >"$OUT/perf-script.txt" 2>/dev/null || true
 
 {
-  echo "perf_samples=$(grep -c 'cycles:u' "$OUT/perf-script.txt" 2>/dev/null || echo 0)"
+  # A sample block starts at column zero with the command name; its stack
+  # frames are indented. Counting the event name instead is fragile — the
+  # kernel fell back from cycles:u to task-clock:u on this host and the count
+  # silently reported zero, which is a metric that lies rather than one that
+  # is missing.
+  echo "perf_event=$(awk 'NR==1 {print $(NF-1)}' "$OUT/perf-script.txt" 2>/dev/null || echo unknown)"
+  echo "perf_samples=$(grep -c '^[^[:space:]]' "$OUT/perf-script.txt" 2>/dev/null || echo 0)"
   echo "goodput=$(python3 -c "import json;print(round(json.load(open('$OUT/load.json'))['goodput_per_second']))" 2>/dev/null || echo unknown)"
   echo "served_share=$(python3 -c "import json;d=json.load(open('$OUT/load.json'));print(round(d['goodput_per_second']/$RATE*100,1))" 2>/dev/null || echo unknown)"
   echo "p50_us=$(python3 -c "import json;print(json.load(open('$OUT/load.json'))['latency_p50_us'])" 2>/dev/null || echo unknown)"

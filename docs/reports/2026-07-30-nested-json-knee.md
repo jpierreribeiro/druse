@@ -28,12 +28,19 @@ the picture twice over:
 | Druse goodput | 19,527/s (97.6%) | **19,991/s (100%)** |
 | Druse p50 | 119,512 µs | **2,378 µs** |
 
-**Removing the float rendering cut the p50 by fifty times and let Druse serve
-the full rate.** That is far more than a 21.6% payload difference explains:
-sixteen decimals is not merely more bytes, it is substantially more CPU per
-response. No previous measurement could see this, because no previous
-measurement had the two documents side by side — the 2026-07-25 study avoided
-the confound by measuring decode only, which removed the question along with it.
+**Both of those are past or at a knee.** See below for the number that is not.
+
+That fifty-fold difference is **not** the cost of float rendering, and reading it
+as one would repeat the error this report exists to correct. A later sweep of the
+float route put its knee one step lower — it serves 15,000/s fully and 95.4% of
+20,000 — so at 20,000 the float route was past its knee while the integer route
+was still inside. Comparing them there compares a queue against a service time.
+
+**Measured below both knees, float rendering costs 3% at 5,000/s and 6% at
+10,000/s of p50, and about 8% of ceiling throughput** (~19,150/s against
+~20,800/s). `2026-07-30-encode-profile.md` corroborates it from the other side:
+float-specific symbols are about 6.8% of encode self time. A modest, real cost —
+not fifty times.
 
 ## The sweep
 
@@ -86,16 +93,11 @@ goroutine pool. On four CPUs the same pressure lands in different places.
 
 ## What this does not settle
 
-It does not explain the 2.3×. Two candidates are visible in the code and neither
-is measured here: Druse runs a **second full validation pass** over every
-marshalled body (`encoding_json.is_valid`, `web/respond.odin:108`) that no peer
-runs, and the pinned encoder walks RTTI with a `struct_tag_lookup` per field per
-request where Go's `encoding/json` caches a per-type encoder. **The encode path
-has never been profiled** — the profile in the 2026-07-25 study is a decode
-profile, and no marshal symbol appears in it.
-
-It does not measure the float cost in isolation. The 50× is at one rate, on the
-socket, and mixes rendering cost with the queue it caused.
+It does not explain the 2.3× — but `2026-07-30-encode-profile.md`, written the
+same day, does profile it for the first time. The two candidates named here both
+appear: the second validation pass is about a quarter of encode self time, and
+`struct_tag_lookup` is 4.3%. The largest single group is neither — it is the
+stdlib writing strings one rune at a time, also about a quarter.
 
 It is one box, one document shape, no TLS, no database, and Axum and Fastify are
 absent because the host has neither toolchain.
