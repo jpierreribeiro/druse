@@ -168,6 +168,11 @@ ENDPOINTS=(
   "health|/health|GET|"
   "json-small|/json/small|GET|"
   "json-medium|/json/medium|GET|"
+  # Byte-identical across every server: the float variant above is 960 bytes
+  # larger on Druse because Odin's encoder writes sixteen decimals, so only this
+  # row supports a cross-framework claim. The difference between the two, within
+  # one server, is what that server's float rendering costs.
+  "json-medium-int|/json/medium/int|GET|"
   "decode-medium|/json/medium/decode|POST|medium-json"
   "extract|/api/users/42?verbose=1|GET|"
 )

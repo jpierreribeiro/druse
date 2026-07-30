@@ -18,6 +18,32 @@ Medium_Item :: struct {
 	active: bool    `json:"active"`,
 }
 
+// The same document with an INTEGER score.
+//
+// Odin's pinned `core:encoding/json` renders `f64` in fixed point with sixteen
+// decimals — `1.5000000000000000` where Go writes `1.5` — so the float variant
+// puts 960 more bytes on the wire than the peers for the same 64 items, and the
+// two cannot be compared byte for byte. The 2026-07-25 study avoided this by
+// measuring decode only; the 2026-07-30 open-loop run reintroduced it and had to
+// withdraw the row.
+//
+// This variant is byte-identical across every server in the matrix, so the
+// cross-framework comparison is valid. And the difference between the two
+// endpoints WITHIN one server isolates what that server's float rendering costs,
+// which is a question neither could answer alone.
+Medium_Item_Int :: struct {
+	id:     int    `json:"id"`,
+	name:   string `json:"name"`,
+	score:  int    `json:"score"`,
+	active: bool   `json:"active"`,
+}
+
+Medium_Document_Int :: struct {
+	request_id: string            `json:"request_id"`,
+	items:      []Medium_Item_Int `json:"items"`,
+	tags:       []string          `json:"tags"`,
+}
+
 Medium_Document :: struct {
 	request_id: string        `json:"request_id"`,
 	items:      []Medium_Item `json:"items"`,
@@ -25,6 +51,7 @@ Medium_Document :: struct {
 }
 
 medium_items: [64]Medium_Item
+medium_items_int: [64]Medium_Item_Int
 medium_tags := [6]string{"alpha", "beta", "gamma", "delta", "epsilon", "zeta"}
 
 Auth_State :: struct {
@@ -62,6 +89,14 @@ json_medium_get :: proc(ctx: ^web.Context) {
 	web.ok(ctx, Medium_Document {
 		request_id = "req-0123456789abcdef",
 		items = medium_items[:],
+		tags = medium_tags[:],
+	})
+}
+
+json_medium_int_get :: proc(ctx: ^web.Context) {
+	web.ok(ctx, Medium_Document_Int {
+		request_id = "req-0123456789abcdef",
+		items = medium_items_int[:],
 		tags = medium_tags[:],
 	})
 }
@@ -131,6 +166,12 @@ main :: proc() {
 			score = f64(i) + 1.5,
 			active = true,
 		}
+		medium_items_int[i] = Medium_Item_Int {
+			id = i + 1,
+			name = "item-abcdefghijklmnop",
+			score = i + 1,
+			active = true,
+		}
 	}
 
 	app := web.app()
@@ -147,6 +188,7 @@ main :: proc() {
 	web.get(&app, "/health", health)
 	web.get(&app, "/json/small", json_small)
 	web.get(&app, "/json/medium", json_medium_get)
+	web.get(&app, "/json/medium/int", json_medium_int_get)
 	web.post(&app, "/json/echo", json_echo)
 	web.post(&app, "/json/medium", json_medium)
 	web.post(&app, "/json/medium/decode", json_medium_decode)

@@ -29,6 +29,9 @@ func main() {
 	mux.HandleFunc("GET /json/medium", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, workload.Medium)
 	})
+	mux.HandleFunc("GET /json/medium/int", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, workload.MediumInt)
+	})
 	mux.HandleFunc("POST /json/echo", func(w http.ResponseWriter, r *http.Request) {
 		var input workload.SmallDocument
 		if err := decodeBody(r, &input); err != nil {
