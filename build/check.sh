@@ -1632,6 +1632,29 @@ timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/b
   -out:"$DRUSE_BIN_TMP/wp99-slice" ||
   fail "the WP99 integration slice did not pass within the timeout"
 
+# ENC1 — Druse's quoted-string writer must produce THE SAME BYTES as
+# `core:io`'s. The suite is exhaustive where exhaustion is possible: every rune
+# in the Unicode range, every single byte, every two-byte sequence. The oracle
+# is the live `core:io` procedure, so a toolchain bump that changes core's
+# escaping turns this red instead of drifting the wire silently.
+#
+# The writer is package-private, so this uses the WP2-WP19 THROWAWAY-package
+# arrangement: the real `web/` sources plus the test file, compiled together and
+# removed afterwards.
+echo "--- ENC1 quoted-string writer: byte-for-byte vs core:io (odin test) ---"
+DRUSE_ENC1_TMP="$(mktemp -d -t druse-enc1-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_ENC1_TMP"' EXIT
+cp "$DRUSE_ROOT"/web/*.odin "$DRUSE_ENC1_TMP/"
+cp "$DRUSE_ROOT"/tests/enc1-quoted-string/*.odin "$DRUSE_ENC1_TMP/"
+timeout 300 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ENC1_TMP" \
+  "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_BIN_TMP/enc1-quoted-string" ||
+  fail "the ENC1 quoted-string equivalence suite did not pass within the timeout"
+rm -rf "$DRUSE_ENC1_TMP"
+trap - EXIT
+test ! -d "$DRUSE_ENC1_TMP" || fail "the throwaway ENC1 test package was not removed"
+echo "PASS: ENC1 ran against the real sources; throwaway package removed"
+
 # The gate leaves NO artifact in the working tree.
 rm -rf "$DRUSE_BIN_TMP"
 if find "$DRUSE_ROOT" -maxdepth 1 -type f -name 'druse-*' -print -quit | grep -q .; then
