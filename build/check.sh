@@ -1486,6 +1486,13 @@ for druse_control in c7 wp16 wp17 wp18 wp19 wp20 wp21 wp22 wp23 wp24 wp25 \
   echo "control: check_${druse_control}_controls.sh -> all mutations detected"
 done
 
+# Diagnosability of the release instrument itself. The mutation controls above
+# prove a test CAN fail; this one proves that when the soak instrument fails,
+# the artefact NAMES the cause. It was added after a 12-hour run counted 674
+# transport failures and could explain none of them.
+echo "--- soak instrument: a failure it observes is a failure it can name ---"
+bash "$DRUSE_ROOT/build/check_soak_controls.sh"
+
 # The gate leaves NO artifact in the working tree.
 echo "--- WP69 blocking boundary: process-isolated liveness evidence ---"
 bash "$DRUSE_ROOT/build/check_wp69_controls.sh"
