@@ -19,6 +19,21 @@ const medium = {
   tags: ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"],
 };
 
+// The same document with an integer score. Odin's pinned encoder renders f64
+// with sixteen decimals, so the float document is 960 bytes larger there and the
+// two cannot be compared byte for byte. This one is byte-identical across every
+// server in the matrix.
+const mediumInt = {
+  request_id: "req-0123456789abcdef",
+  items: Array.from({ length: 64 }, (_, index) => ({
+    id: index + 1,
+    name: "item-abcdefghijklmnop",
+    score: index + 1,
+    active: true,
+  })),
+  tags: ["alpha", "beta", "gamma", "delta", "epsilon", "zeta"],
+};
+
 const smallSchema = {
   type: "object",
   additionalProperties: false,
@@ -71,6 +86,7 @@ app.get("/health", async (_, reply) => {
 });
 app.get("/json/small", async () => small);
 app.get("/json/medium", async () => medium);
+app.get("/json/medium/int", async () => mediumInt);
 app.post("/json/echo", { schema: { body: smallSchema } }, async (request) => request.body);
 app.post("/json/medium", { schema: { body: mediumSchema } }, async (request) => request.body);
 app.post(

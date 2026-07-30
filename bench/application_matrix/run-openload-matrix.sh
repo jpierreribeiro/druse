@@ -68,19 +68,23 @@ else
     fail "the Go peers do not build; set DRUSE_BENCH_PEER_BIN to a directory of prebuilt ones"
 fi
 
+# Axum: prebuilt alongside the Go peers when DRUSE_BENCH_PEER_BIN is set, since
+# a benchmark host with no cargo is the normal case.
 have_axum=0
-if [ -d "$MATRIX/peers/axum" ] && command -v cargo >/dev/null 2>&1; then
+if [ -n "${DRUSE_BENCH_PEER_BIN:-}" ] && [ -x "$DRUSE_BENCH_PEER_BIN/axum" ]; then
+  cp "$DRUSE_BENCH_PEER_BIN/axum" "$OUT/bin/axum" && have_axum=1
+elif [ -d "$MATRIX/peers/axum" ] && command -v cargo >/dev/null 2>&1; then
   if (cd "$MATRIX/peers/axum" && cargo build --release --locked >/dev/null 2>&1); then
-    cp "$MATRIX/peers/axum/target/release/"* "$OUT/bin/axum" 2>/dev/null || true
+    cp "$MATRIX/peers/axum/target/release/druse-application-matrix-axum" "$OUT/bin/axum" 2>/dev/null || true
     [ -x "$OUT/bin/axum" ] && have_axum=1
   fi
 fi
+
+# Fastify runs from source; DRUSE_BENCH_NODE points at a node that is not on PATH.
+NODE_BIN="${DRUSE_BENCH_NODE:-$(command -v node || true)}"
 have_fastify=0
-if [ -d "$MATRIX/peers/fastify" ] && command -v node >/dev/null 2>&1; then
-  if [ -d "$MATRIX/peers/fastify/node_modules" ] ||
-     (cd "$MATRIX/peers/fastify" && npm ci --silent >/dev/null 2>&1); then
-    have_fastify=1
-  fi
+if [ -d "$MATRIX/peers/fastify/node_modules" ] && [ -x "$NODE_BIN" ]; then
+  have_fastify=1
 fi
 
 {
@@ -97,7 +101,7 @@ fi
   if [ "$peer_build" != local ]; then
     echo "go_peers_sha256=$(sha256sum "$OUT/bin/nethttp" "$OUT/bin/gin" "$OUT/bin/fiber" | awk '{printf "%s ", $1}')"
   fi
-  echo "node=$(node --version 2>&1 || echo absent)"
+  echo "node=$("${NODE_BIN:-node}" --version 2>&1 || echo absent)"
   echo "cargo=$(cargo --version 2>&1 || echo absent)"
   echo "kernel=$(uname -srmo)"
   echo "rate_per_second=$RATE"
@@ -133,7 +137,7 @@ start_server() { # name -> writes $OUT/server.pid
     nethttp|gin|fiber)
              taskset -c "$SERVER_CPUS" "$OUT/bin/$1" >"$OUT/runs/$1-server.log" 2>&1 & ;;
     axum)    taskset -c "$SERVER_CPUS" "$OUT/bin/axum" >"$OUT/runs/$1-server.log" 2>&1 & ;;
-    fastify) (cd "$MATRIX/peers/fastify" && taskset -c "$SERVER_CPUS" node server.mjs) \
+    fastify) (cd "$MATRIX/peers/fastify" && taskset -c "$SERVER_CPUS" "$NODE_BIN" server.mjs) \
                >"$OUT/runs/$1-server.log" 2>&1 & ;;
     *) fail "unknown server $1" ;;
   esac
