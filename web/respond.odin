@@ -12,6 +12,7 @@ package web
 // druse:file application
 
 import encoding_json "core:encoding/json"
+import "core:reflect"
 import "core:mem"
 
 // The stdlib import is ALIASED because this package exports a procedure named
@@ -42,6 +43,88 @@ Status :: enum int {
 	Too_Many_Requests     = 429,
 	Internal_Server_Error = 500,
 	Service_Unavailable   = 503,
+}
+
+// The per-type validation gate, behind a build flag until it is adopted.
+//
+// The second pass over every marshalled body exists to catch ONE condition — a
+// non-finite float — which is a property of the TYPE. The recorded reasoning
+// (below, at the call site) says a compile-time walk cannot express this on the
+// pinned toolchain, which is true: `base:intrinsics` resolves a field type only
+// by name. What it did not consider is a RUNTIME walk done ONCE PER TYPE:
+// `@(static)` inside a parametric procedure gives each instantiation its own
+// slot — verified on the pinned toolchain — so the answer costs one integer
+// test per request after the first, with no map and no per-request reflection.
+//
+// That is a different object from the RTTI cache the JSON study measured and
+// rejected: that one cached field metadata per request on the decode path and
+// cost p99 +17.8%. This caches one integer per type for the life of the process.
+@(private) JSON_TYPE_GATE :: #config(DRUSE_JSON_TYPE_GATE, false)
+@(private) JSON_FLOAT_WALK_MAX_DEPTH :: 32
+
+// json_type_may_hold_float answers whether a value of `id` can reach the
+// marshaller carrying a float. Only a float makes the pinned marshaller emit a
+// bare `NaN` or `Inf`, so a type that cannot hold one cannot produce invalid
+// JSON and its output does not need re-parsing.
+//
+// The walk is CONSERVATIVE: anything unrecognised answers `true` and keeps the
+// check. A wrong `false` puts invalid JSON on the wire, which is the single
+// outcome this mechanism exists to prevent, so every uncertain case pays the
+// pass. `any`, procedures and raw pointers are unrecognised by construction —
+// their contents are not knowable from the type.
+//
+// Depth is bounded because a self-referential type would recurse forever;
+// reaching the bound answers `true`.
+@(private)
+json_type_may_hold_float :: proc(id: typeid, depth := 0) -> bool {
+	if depth > JSON_FLOAT_WALK_MAX_DEPTH {
+		return true
+	}
+	info := reflect.type_info_base(type_info_of(id))
+	if info == nil {
+		return true
+	}
+
+	#partial switch variant in info.variant {
+	case reflect.Type_Info_Float, reflect.Type_Info_Complex, reflect.Type_Info_Quaternion:
+		return true
+	case reflect.Type_Info_Integer, reflect.Type_Info_Boolean, reflect.Type_Info_String,
+	     reflect.Type_Info_Rune, reflect.Type_Info_Enum, reflect.Type_Info_Bit_Set:
+		return false
+	case reflect.Type_Info_Struct:
+		for index in 0 ..< int(variant.field_count) {
+			if json_type_may_hold_float(variant.types[index].id, depth + 1) {
+				return true
+			}
+		}
+		return false
+	case reflect.Type_Info_Array:
+		return json_type_may_hold_float(variant.elem.id, depth + 1)
+	case reflect.Type_Info_Slice:
+		return json_type_may_hold_float(variant.elem.id, depth + 1)
+	case reflect.Type_Info_Dynamic_Array:
+		return json_type_may_hold_float(variant.elem.id, depth + 1)
+	case reflect.Type_Info_Map:
+		return json_type_may_hold_float(variant.key.id, depth + 1) ||
+			json_type_may_hold_float(variant.value.id, depth + 1)
+	// A pointer is deliberately NOT enumerated here, so it falls through to
+	// `true` and pays the pass. Following `variant.elem` would be the tighter
+	// answer, but R-13 forbids web/ from reading through a pointer payload
+	// until ADR-003 is amended, and a guardrail that has to distinguish
+	// "inspects a pointee's TYPE" from "dereferences a pointee's VALUE" is a
+	// guardrail that can be argued around. The conservative answer costs a
+	// validation pass on types that hold pointers and concedes nothing: the
+	// pinned marshaller does not follow pointers either, so such a field
+	// cannot put a float on the wire in the first place.
+	case reflect.Type_Info_Union:
+		for member in variant.variants {
+			if json_type_may_hold_float(member.id, depth + 1) {
+				return true
+			}
+		}
+		return false
+	}
+	return true
 }
 
 // json writes `value` as a JSON response with the given status.
@@ -105,7 +188,23 @@ json :: proc(ctx: ^Context, status: Status, value: $T) {
 	// byte-scan pre-filter for `N`/`I` is defeated by ordinary text. Guessing here
 	// would silently disable a check that keeps invalid JSON off the wire, so the
 	// cost stays until the intrinsic exists. Recorded rather than left implicit.
-	if err != nil || !encoding_json.is_valid(data, .JSON) {
+	json_invalid := false
+	when JSON_TYPE_GATE {
+		// 0 unknown, 1 validate, 2 skip. Per-instantiation, so this is one
+		// integer per response type for the life of the process. Two lanes
+		// racing on the first write compute the SAME value, so the race is
+		// benign — neither can install a wrong answer.
+		@(static) gate: int
+		if gate == 0 {
+			gate = json_type_may_hold_float(T) ? 1 : 2
+		}
+		if gate == 1 {
+			json_invalid = !encoding_json.is_valid(data, .JSON)
+		}
+	} else {
+		json_invalid = !encoding_json.is_valid(data, .JSON)
+	}
+	if err != nil || json_invalid {
 		// The encoder may hand back a partially-filled buffer alongside the
 		// error. It has no owner, so it is released here.
 		if data != nil {
