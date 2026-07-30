@@ -138,7 +138,40 @@ expected_status = {
     "bytes-64k": "200",
     "wait-40ms": "200",
 }
-for name, workload in workloads.items():
+# A profile can be absent because the run deliberately excluded it — the
+# saturation experiment removes the blocking handler by setting its rate to
+# zero, and the orchestrator records that in control/skipped.txt. Without this,
+# a profile with no runs divides by a planned count of zero, is charged a
+# transport error ratio of 1.0, and fails the run for never having happened.
+#
+# Absence WITH a recorded reason is fine. Absence WITHOUT one is red: a profile
+# that vanished and nobody wrote down why is exactly the shape of defect this
+# analyser exists to refuse.
+skipped = {}
+skipped_path = root / "control/skipped.txt"
+if skipped_path.exists():
+    for line in skipped_path.read_text().splitlines():
+        fields = dict(
+            part.split("=", 1) for part in line.split() if "=" in part
+        )
+        if "skipped" in fields:
+            skipped[fields["skipped"]] = fields.get("reason", "unstated")
+summary["skipped_workloads"] = skipped
+
+for name, workload in list(workloads.items()):
+    if workload["runs"] == 0:
+        if name in skipped:
+            workload["skipped_reason"] = skipped[name]
+            workload["transport_error_ratio"] = None
+            workload["unexpected_http_status"] = {}
+            continue
+        reasons.append(
+            f"{name} produced no runs and control/skipped.txt gives no reason: "
+            "a profile disappeared from the run unexplained"
+        )
+        workload["transport_error_ratio"] = None
+        workload["unexpected_http_status"] = {}
+        continue
     error_ratio = (
         workload["transport_errors"] / workload["planned"]
         if workload["planned"]

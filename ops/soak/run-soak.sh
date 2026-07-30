@@ -144,6 +144,16 @@ sampler_pid=$!
 run_load() {
   local cycle="$1" name="$2" path="$3" rate="$4" connections="$5"
   local method="${6:-GET}" payload="${7:-}"
+  # Rate 0 means "this profile is not part of this run" — the saturation
+  # experiment removes the blocking handler that way. The generator exits with
+  # usage on a zero rate, which the orchestrator would otherwise record as a
+  # failed load generator: an arm deliberately configured would be reported as
+  # an arm that broke.
+  if [[ "$rate" -le 0 ]]; then
+    echo "skipped=$name reason=rate_zero" >>"$OUT/control/skipped.txt"
+    LAST_PID=""
+    return 0
+  fi
   local args=(
     -url "http://127.0.0.1:$PORT$path"
     -method "$method"
@@ -236,6 +246,10 @@ while [[ "$(date +%s)" -lt "$END_EPOCH" ]]; do
     pids+=("$LAST_PID")
   fi
   for pid in "${pids[@]}"; do
+    # A skipped profile contributes an empty entry, and `wait ""` fails — which
+    # would record a load-generator error for a generator that was deliberately
+    # never started.
+    [[ -z "$pid" ]] && continue
     wait "$pid" || echo "cycle=$cycle child=$pid exit=$?" >>"$OUT/control/load-errors.txt"
   done
 

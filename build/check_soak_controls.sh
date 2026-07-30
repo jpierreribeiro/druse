@@ -247,3 +247,48 @@ if any("not classified" in reason for reason in verdict["reasons"]):
     raise SystemExit(1)
 PY
 echo "PASS (soak): the analyser carries a cause the artefact gave it, class and text intact"
+
+# ---------------------------------------------------------------------------
+# A profile absent WITH a recorded reason is fine; absent WITHOUT one is red.
+#
+# The saturation experiment removes the blocking handler by setting its rate to
+# zero, and the orchestrator records that in control/skipped.txt. Before this
+# distinction existed, a profile with no runs divided by a planned count of zero,
+# was charged a transport error ratio of 1.0, and failed the run for never having
+# happened — an arm deliberately configured would have been read as an arm that
+# broke. The opposite mistake is worse: a profile that silently vanishes and
+# nobody notices.
+# ---------------------------------------------------------------------------
+rm -f "$TMP/run/cycles/c0001-wait-40ms.json"
+
+# 1. absent and unexplained -> red, naming the disappearance
+python3 "$SOAK/analyze-soak.py" "$TMP/run" >"$TMP/verdict3.json" 2>&1 || true
+python3 - "$TMP/verdict3.json" <<'PY' || fail "a profile vanished from the run and the analyser did not say so"
+import json, sys
+verdict = json.load(open(sys.argv[1]))
+if verdict["result"] != "FAIL":
+    print("a profile disappeared and the run passed", file=sys.stderr)
+    raise SystemExit(1)
+if not any("no runs and control/skipped.txt gives no reason" in r for r in verdict["reasons"]):
+    print(f"failed for the wrong reason: {verdict['reasons']}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+
+# 2. absent WITH a reason -> accepted, and the reason is carried through
+mkdir -p "$TMP/run/control"
+echo "skipped=wait-40ms reason=rate_zero" >"$TMP/run/control/skipped.txt"
+python3 "$SOAK/analyze-soak.py" "$TMP/run" >"$TMP/verdict4.json" 2>&1 || true
+python3 - "$TMP/verdict4.json" <<'PY' || fail "a deliberately excluded profile was reported as a failure"
+import json, sys
+verdict = json.load(open(sys.argv[1]))
+if any("wait-40ms" in r for r in verdict["reasons"]):
+    print(f"the skipped profile still failed the run: {verdict['reasons']}", file=sys.stderr)
+    raise SystemExit(1)
+if verdict.get("skipped_workloads", {}).get("wait-40ms") != "rate_zero":
+    print(f"the reason was not carried: {verdict.get('skipped_workloads')}", file=sys.stderr)
+    raise SystemExit(1)
+if verdict["workloads"]["wait-40ms"].get("skipped_reason") != "rate_zero":
+    print("the workload row does not say why it is empty", file=sys.stderr)
+    raise SystemExit(1)
+PY
+echo "PASS (soak): an absent profile is red unless the run recorded why it is absent"
