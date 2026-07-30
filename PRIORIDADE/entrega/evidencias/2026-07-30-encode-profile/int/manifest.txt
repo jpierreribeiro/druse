@@ -1,0 +1,18 @@
+started_utc=2026-07-30T15:18:49Z
+git_head=c8a2c16
+endpoint=/json/medium/int
+offered_rate=10000
+profile_seconds=30
+lanes=4
+response_bytes=4310
+server_cpus=0-3
+load_cpus=4-7
+compiler=/home/ubuntu/odin/odin version dev-2026-07-nightly:819fdc7
+kernel=Linux 6.17.0-1017-aws x86_64 GNU/Linux
+server_sha256=cf69b0c8aad8fed598729a278939001cf1d9033bf8399bee63f17df8c3c51adb
+perf_samples=0
+0
+goodput=10000
+served_share=100.0
+p50_us=327
+failures=1

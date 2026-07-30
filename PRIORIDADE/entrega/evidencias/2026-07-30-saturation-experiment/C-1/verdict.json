@@ -1,0 +1,157 @@
+{
+  "cycles": 1,
+  "failure_classes": {
+    "eof_on_fresh_conn": 4,
+    "peer_reset": 4,
+    "request_write_failed": 2
+  },
+  "failure_examples": {
+    "eof_on_fresh_conn": "Get \"http://127.0.0.1:8080/json/medium\": EOF",
+    "peer_reset": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:35992->127.0.0.1:8080: read: connection reset by peer",
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:60612->127.0.0.1:8080: use of closed network connection"
+  },
+  "failures_classified": 10,
+  "failures_counted": 10,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 14,
+    "last": 14,
+    "max": 178
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 1598,
+    "median_p99_us": 1598,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 6876
+  },
+  "reasons": [],
+  "result": "PASS",
+  "rss_kib": {
+    "first": 4156,
+    "last": 5584,
+    "max": 6876,
+    "min": 4156,
+    "tail_slope_kib_per_hour": -4113.01632277776
+  },
+  "skipped_workloads": {
+    "wait-40ms": "rate_zero"
+  },
+  "stats_missing_samples": 1,
+  "telemetry_samples": 927,
+  "threads": {
+    "max": 5,
+    "min": 5
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 135000,
+      "failures": [],
+      "max_p99_us": 1782,
+      "median_p99_us": 1782,
+      "planned": 135000,
+      "runs": 1,
+      "status": {
+        "200": 135000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 18000,
+      "failures": [],
+      "max_p99_us": 1598,
+      "median_p99_us": 1598,
+      "planned": 18000,
+      "runs": 1,
+      "status": {
+        "200": 18000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 3600000,
+      "failures": [
+        {
+          "class": "peer_reset",
+          "count": 4,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:35992->127.0.0.1:8080: read: connection reset by peer"
+        },
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 2,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF"
+        },
+        {
+          "class": "request_write_failed",
+          "count": 2,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:60612->127.0.0.1:8080: use of closed network connection"
+        }
+      ],
+      "max_p99_us": 1118,
+      "median_p99_us": 1118,
+      "planned": 3600000,
+      "runs": 1,
+      "status": {
+        "0": 8,
+        "204": 3599992
+      },
+      "transport_error_ratio": 2.222222222222222e-06,
+      "transport_errors": 8,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 1350000,
+      "failures": [
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 2,
+          "example_error": "Get \"http://127.0.0.1:8080/json/medium\": EOF"
+        }
+      ],
+      "max_p99_us": 1673,
+      "median_p99_us": 1673,
+      "planned": 1350000,
+      "runs": 1,
+      "status": {
+        "0": 2,
+        "200": 1349998
+      },
+      "transport_error_ratio": 1.4814814814814815e-06,
+      "transport_errors": 2,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 9000000,
+      "failures": [],
+      "max_p99_us": 1388,
+      "median_p99_us": 1388,
+      "planned": 9000000,
+      "runs": 1,
+      "status": {
+        "200": 9000000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 0,
+      "failures": [],
+      "max_p99_us": null,
+      "median_p99_us": null,
+      "planned": 0,
+      "runs": 0,
+      "skipped_reason": "rate_zero",
+      "status": {},
+      "transport_error_ratio": null,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}

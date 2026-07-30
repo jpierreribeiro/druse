@@ -1,0 +1,19 @@
+started_utc=2026-07-30T12:51:26Z
+git_head=
+compiler=/home/ubuntu/odin/odin version dev-2026-07-nightly:819fdc7
+go=go version go1.22.2 linux/amd64
+go_peers=prebuilt:/home/ubuntu/peerbin
+go_peers_sha256=a9bd5ad733f77ea78e5cd03810c938a83f07917ed89395ad2c93c6dcdfdcfbe3 dc551e887833102aee2485c4890278e04719a54e1c3cf9ef096591ce823464e2 d2169feef93613382f656ce5bc0f2dd2952498ad3af409f86ca3f1a4a8bfa1d8 
+node=bench/application_matrix/run-openload-matrix.sh: line 95: node: command not found
+absent
+cargo=bench/application_matrix/run-openload-matrix.sh: line 96: cargo: command not found
+absent
+kernel=Linux 6.17.0-1017-aws x86_64 GNU/Linux
+rate_per_second=20000
+seconds_per_run=10
+repeats=5
+server_cpus=0-3
+load_cpus=4-7
+druse_lanes=4
+axum_included=0
+fastify_included=0

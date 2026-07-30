@@ -1,0 +1,38 @@
+open-loop application matrix — offered 20,000/s, 5 repeats, 10s each
+commit   kernel Linux 6.17.0-1017-aws x86_64 GNU/Linux
+
+### decode-medium
+  server      goodput/s  % offered    p50 us    p99 us  failures  classes
+  druse          17,512      87.6%   734,767 1,405,238       145  {'peer_reset': 75, 'request_write_failed': 44, 'eof_on_fresh_conn': 16, 'broken_pipe': 9, 'dial_other': 1}  <- did not serve the offered rate; latency here is a queue
+  fiber          19,998     100.0%       408     6,741         0  
+  gin            16,413      82.1% 1,085,796 2,161,636         0    <- did not serve the offered rate; latency here is a queue
+  nethttp        16,163      80.8% 1,183,419 2,352,868         0    <- did not serve the offered rate; latency here is a queue
+
+### extract
+  server      goodput/s  % offered    p50 us    p99 us  failures  classes
+  druse          20,000     100.0%       109     1,097         0  
+  fiber          20,000     100.0%        98     1,131         0  
+  gin            20,000     100.0%       124     1,127         0  
+  nethttp        20,000     100.0%       124     1,118         0  
+
+### health
+  server      goodput/s  % offered    p50 us    p99 us  failures  classes
+  druse          20,000     100.0%       101     1,075         0  
+  fiber          20,000     100.0%        95     1,186         0  
+  gin            20,000     100.0%       119     1,127         0  
+  nethttp        20,000     100.0%       118     1,128         0  
+
+### json-medium
+  server      goodput/s  % offered    p50 us    p99 us  failures  classes
+  druse          19,542      97.7%   113,136   232,601        64  {'peer_reset': 43, 'eof_on_fresh_conn': 21}
+  fiber          20,000     100.0%       145       754         0  
+  gin            20,000     100.0%       164       498         0  
+  nethttp        20,000     100.0%       164       494         0  
+
+### json-small
+  server      goodput/s  % offered    p50 us    p99 us  failures  classes
+  druse          20,000     100.0%       105     1,077         0  
+  fiber          20,000     100.0%        96     1,170         0  
+  gin            20,000     100.0%       120     1,125         0  
+  nethttp        20,000     100.0%       120     1,128         0  
+
