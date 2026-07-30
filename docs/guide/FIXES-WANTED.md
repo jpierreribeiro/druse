@@ -113,21 +113,28 @@ right type and the wrong data.
 
 ---
 
-## 6 — `api_key.DEFAULT_PREFIX` is `"uru"`
+## 6 — ~~`api_key.DEFAULT_PREFIX` is `"uru"`~~ — **TAKEN**
 
 **Where the warning lives:** nowhere yet. Found while writing this guide.
 
-`auth/api_key` sets `DEFAULT_PREFIX :: "uru"`. It is derived from the former
-product name, and it appears in every key a default-configured application
-issues.
+`auth/api_key` set `DEFAULT_PREFIX :: "uru"`, derived from the former product
+name, and it appeared in every key a default-configured application issued.
 
-**Proposal.** Change it with the rename. `"dru"`, or a value the application
-must choose.
+**Done.** The value is `"dru"`. The package comment now also states what this
+guide already told readers and the source did not: the default is a fallback,
+not a recommendation. A secret-scanner rule is written against one issuer's
+prefix, so a key branded with the framework's name is the least useful thing a
+leaked key could say about where it came from. Set `Config.prefix` to your own.
 
-**Cost of not doing it.** Keys issued in production carry the old name
-permanently, and they cannot be reissued without invalidating every client.
-This is the one item on this list with a deadline: it stops being reversible
-the first time a real key is issued.
+The stronger form of the proposal — no default at all, so an application must
+choose — was considered and not taken. `manager` already refuses an empty
+prefix, so the guard exists; only the default defeats it. It stays available if
+the fallback proves to be the wrong call.
+
+**Why it was first.** This was the one item on this list with a deadline: keys
+issued in production carry their prefix permanently and cannot be reissued
+without invalidating every client. It stopped being a one-line change the first
+time a real key was issued.
 
 ---
 
