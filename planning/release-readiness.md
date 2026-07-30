@@ -18,11 +18,14 @@ framework's, and are removed from this assessment.)
 - **`v0.9.0-pilot` — RELEASED (2026-07-24), all six gates GREEN.** Approved under the
   owner's delegated quality authority ("só será lançado quando você aprovar, o seu
   padrão").
-- **Since the pilot, `main` advanced** with PATCH 28 (WP114 — non-spinning accept
+- **`v0.9.1-pilot` — RELEASED (2026-07-25).** PATCH 28 (WP114 — non-spinning accept
   suspension, p99 24× better, wp71/c05 + 150 gates green) and Phase 9 (io_uring infra
   + the measured perf investigation: Druse competes with fasthttp on throughput,
-  wins on latency). This is a straight technical improvement over the pilot and is
-  ready for a refreshed pilot tag on the owner's go.
+  wins on latency).
+- **`v0.10.0` — RELEASING (2026-07-30), the first not marked a pilot.** The six
+  gates stay green and every step is done except one: the tag is cut when the
+  12-hour soak closes green. What this release added, and the one place its
+  evidence stops, are recorded below under *Release record*.
 
 ---
 
@@ -104,15 +107,62 @@ merge `phase8`→`main` (core), `corrective`→`main` (crystals), `corrective-re
 
 ---
 
+## Release record
+
+| Tag | Date | What it was |
+|---|---|---|
+| `v0.9.0-pilot` | 2026-07-24 | Controlled pilot. Phase 8 proof-by-use + the Corrective Program C1–C7, verified live. All six gates green as a library. |
+| `v0.9.1-pilot` | 2026-07-25 | Non-spinning accept suspension (PATCH 28 / WP114, p99 24× better) + Phase 9: io_uring infrastructure and the measured performance investigation. |
+| `v0.10.0` | 2026-07-30 | First release under the name **Druse**, and the first not marked a pilot. 97 commits. |
+
+## `v0.10.0` — what earned it, and what did not
+
+**The six gates above stay green.** Nothing in this release reopened one. The
+ledger is unchanged at 80 application + 2 test-support = 82, and the frozen
+signature snapshot matches the compiler's own inventory byte for byte.
+
+**Four things are new since `v0.9.1-pilot`, and each carries its own evidence:**
+
+1. **Fused strict JSON decoding.** AWS c5.2xlarge, order alternated, two blocks
+   of six measurements per variant plus two 30-second profiles: decode
+   throughput **+15.63%**, HWM **+1.08%** against a pre-registered ceiling of
+   +5%, median maximum RSS **+0.64%**, and `reflect::struct_tag_lookup` frames
+   **7,296 → 121** (`perf report` 15.20% → 0.26%). Evidence:
+   `PRIORIDADE/entrega/evidencias/2026-07-29-release-candidate/json-hwm-profile/`.
+2. **A 12-hour mixed soak** of the release candidate on the same box — started
+   2026-07-29T22:27:47Z, due 2026-07-30T10:28Z, and its outcome is recorded here
+   before the tag is cut — `/health`
+   20/s, `/tiny` 10,000/s, JSON encode 1,500/s, JSON decode 4,000/s, 64 KiB
+   responses 150/s and a 40 ms blocking handler 15/s, with RST and slow readers
+   injected every fifth cycle. Criteria were pre-registered before the run: zero
+   health transport errors, health p99 under 250 ms in every cycle, at most
+   0.01% transport error on the other routes, no unexpected HTTP status, constant
+   thread count, final FDs within baseline + 4 after settling, and an RSS tail
+   slope of at most 1 MiB/h over the second half.
+3. **A teaching guide and a generated API reference**, both gated: the cookbook's
+   programs are extracted from compiling sources, every ledger symbol is taught
+   on a page, and the reference is checked against the compiler's inventory.
+4. **A subsystem audit** that fixed defects with negative controls and repaired
+   several suites that could not fail — including the raw-wire corpus, where a
+   case had been passing for the wrong reason.
+
+**The one thing this release does not have, stated plainly.** The 12-hour soak
+ran on `9b46a46`, the revision immediately before the rename. The tagged commit
+is the rename on top of it, verified by the full gate but not by its own 12-hour
+soak. The rename is mechanical — a scripted substitution over 412 files, no
+public symbol renamed, no control flow touched — and its three runtime-visible
+effects (log prefix, spool-file prefix, build-define names) are recorded in the
+changelog. That is the honest boundary of the evidence: **the behaviour was
+soaked at the parent commit, not at the tag.** Re-soaking the tag was offered
+and declined as unnecessary; this note is the record of that choice, not an
+oversight.
+
 ## Standing state
 
-All six gates GREEN as a **library**: correctness, a frozen public API (ledger 82),
-the 14 security findings pinned, and — with Phase 9 — measured performance that
-competes with fasthttp (Go's ceiling) and wins on latency. Every remaining "blocker"
-in the earlier draft was an **application** operational item (a specific deployment's
-scale matrix, a privacy review of end-user data) — not a library concern, now removed.
-
-**FINAL: `v0.9.0-pilot` released; `main` has since advanced with PATCH 28 + Phase 9,
-a straight technical improvement, ready for a refreshed pilot tag on the owner's go.**
-Library readiness is a maturity question (pilot → stable as real-world use accrues),
-not a product-GA gate.
+`v0.10.0` ships as a **pre-1.0 library**: correctness, a frozen public API, the
+14 security findings pinned, measured performance that competes with fasthttp on
+throughput and wins on latency, and — new here — a soak-verified 12-hour
+steady state. Maturity beyond this is a question of accrued real-world use, not
+of another gate. The operational contract has not changed and is not negotiable
+by a release note: **Linux x86-64, one server per process, TLS terminated at the
+proxy, and a supervisor** (`docs/operations.md`).
