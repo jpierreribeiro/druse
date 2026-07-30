@@ -141,6 +141,7 @@ Read for the reasoning, not the instruction.
 | [Druse and Crystals](01-concepts/core-and-crystals.md) | The boundary between the two repositories |
 | [Shape of an application](01-concepts/shape-of-an-application.md) | Where services live, and what `main` looks like |
 | [Fixes wanted](FIXES-WANTED.md) | Which hazards here should be an API change instead of a warning |
+| [Friction map](friction-map.md) | The 30 recorded frictions, and the page that prevents each |
 
 ## What this guide does not yet teach
 
@@ -167,8 +168,10 @@ behind a `Store` contract the guide does teach). Go to
   form, authorization, Docker. Blocked on a reference program.
 - `03-build-intake/` — the asynchronous, worker-shaped stack: jobs, mail,
   storage, idempotency, SSE, API keys.
-- `friction-map.md` — blocked. It is built from `druse-miniature/FRICTION.md`,
-  which is not reachable from this repository.
+
+Written since: [`friction-map.md`](friction-map.md) — all 30 friction entries
+against the pages that prevent them. Four are named as gaps the guide would not
+have prevented, and two the programme still lists as open are closed.
 
 **Still missing:** a server-rendered build-along that ties templates, forms,
 cookies and CSRF into one program. The subject pages above cover each part;
