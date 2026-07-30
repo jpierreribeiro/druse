@@ -1493,6 +1493,12 @@ done
 echo "--- soak instrument: a failure it observes is a failure it can name ---"
 bash "$DRUSE_ROOT/build/check_soak_controls.sh"
 
+# The benchmark summary must notice when two servers did not do the same work.
+# It did not, once, and a comparison of four servers went out in which one
+# answered with 21.6% more bytes than the others.
+echo "--- benchmark summary: a comparison it presents is a comparison it checked ---"
+bash "$DRUSE_ROOT/build/check_bench_controls.sh"
+
 # The gate leaves NO artifact in the working tree.
 echo "--- WP69 blocking boundary: process-isolated liveness evidence ---"
 bash "$DRUSE_ROOT/build/check_wp69_controls.sh"
