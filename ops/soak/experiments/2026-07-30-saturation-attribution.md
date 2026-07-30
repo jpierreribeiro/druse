@@ -76,6 +76,23 @@ if any of these hold:
 3. `ListenOverflows` or `ListenDrops` move during the failures (the kernel is
    involved, and neither H1 nor its stated alternative describes that).
 
+## Deviation from this pre-registration, recorded at launch
+
+**The arms run on `f2963a3`, not on `9b46a46`.** This document was written
+expecting the soak's own revision. The remote checkout of `9b46a46` predates the
+rename, so its sources import the `uruquim:` collection and cannot be built by
+this harness, which passes `-collection:druse=`.
+
+Rather than teach the harness to speak both names, the arms run on the renamed
+core — which is the revision `v0.10.0` will tag. The rename is a scripted
+substitution that renames no public symbol and touches no control flow, and the
+full gate is green on it. Against a question about acceptor saturation under
+load, the two revisions are the same program.
+
+It is written here rather than left to be noticed, because a pre-registration
+that quietly acquires the run's actual parameters afterwards is not a
+pre-registration.
+
 ## Decision this feeds
 
 The `v0.10.0` tag is waiting on it. A confirmed H1 means the failures are a
