@@ -68,9 +68,10 @@ agree :: proc(d: ^Differ, s: string) -> (ours: string, theirs: string, ok: bool)
 	strings.builder_reset(&d.ours)
 	strings.builder_reset(&d.theirs)
 
-	if err := json_write_quoted_string(strings.to_writer(&d.ours), s); err != nil {
-		return "", "", false
-	}
+	// Druse writes straight into the Builder; the oracle is the live `core:io`
+	// procedure over a writer backed by the SAME kind of Builder, so the only
+	// thing the comparison can be sensitive to is the bytes.
+	json_write_quoted_string(&d.ours, s)
 	if _, err := io.write_quoted_string(strings.to_writer(&d.theirs), s, '"', nil, true);
 	   err != nil {
 		return "", "", false

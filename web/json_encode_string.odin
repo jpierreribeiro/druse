@@ -16,6 +16,18 @@
 // from there. Go's `encoding/json` does exactly this, and it is why Go's encoder
 // is fast on the payloads real applications send.
 //
+// WHY IT WRITES TO A `strings.Builder` AND NOT AN `io.Writer`. The first version
+// of this file took an `io.Writer`, and the gate rejected it: that signature
+// added `core:io` to `web`'s direct-import set, which is a frozen manifest
+// (`build/phase1-direct-dependencies.txt`), and it kept the very indirection the
+// fast path exists to remove. `strings.write_byte`, `write_bytes` and
+// `write_string` append straight to the Builder's backing array — they return an
+// `int`, cannot fail, and dispatch through nothing. The one Builder procedure
+// that does reach `io` is `strings.write_rune`, so this file encodes runes with
+// `utf8.encode_rune` and writes the bytes instead. Net effect: one new direct
+// dependency (`core:unicode/utf8`, Amendment 40) rather than three, and a
+// shorter path than the version that was measured at 5.5x-7.7x.
+//
 // BYTE-FOR-BYTE EQUIVALENCE IS THE CONTRACT, NOT A GOAL. This procedure is a
 // faster way to produce THE SAME BYTES as
 // `io.write_quoted_string(w, s, '"', nil, for_json = true)` — the exact call
@@ -29,9 +41,15 @@
 // `docs/reports/` — and this project has already published one number that was
 // an artifact of two servers emitting different bytes
 // (`2026-07-30-open-loop-application-matrix.md`, the withdrawn row). The
-// differential test in `tests/wp-enc1-quoted-string` proves the equivalence over
+// differential test in `tests/enc1-quoted-string` proves the equivalence over
 // every rune in the Unicode range and every possible byte, and it is the reason
 // this file may be trusted.
+//
+// ONE DECODER, NOT TWO. `core:unicode/utf8` does the decoding here rather than a
+// hand-rolled scanner, for the same reason `web/json_decode.odin` refuses to
+// implement a second JSON grammar: two decoders that can disagree about the same
+// bytes is a defect waiting for an input nobody thought of. The fast path skips
+// the decoder for ASCII; it does not replace it.
 //
 // SCOPE. This is the primitive only. Routing the marshaller's four string sites
 // through it requires Druse to own the marshal walk, because
@@ -41,8 +59,7 @@
 package web
 // druse:file application
 
-import "core:io"
-import "core:unicode/utf16"
+import "core:strings"
 import "core:unicode/utf8"
 
 // The lowercase hex alphabet, matching `core:io`'s `DIGITS_LOWER`. A `é`
@@ -65,28 +82,28 @@ JSON_HEX_DIGITS := [16]byte {
 // escaping and may be copied verbatim. Every exit from the fast path flushes
 // that run before doing anything else, and re-opens it after.
 @(private)
-json_write_quoted_string :: proc(w: io.Writer, s: string) -> (err: io.Error) {
-	io.write_byte(w, '"') or_return
+json_write_quoted_string :: proc(b: ^strings.Builder, s: string) {
+	strings.write_byte(b, '"')
 
 	start, i := 0, 0
 	for i < len(s) {
-		b := s[i]
+		c := s[i]
 
 		// The fast path. A byte is copied verbatim exactly when core would have
 		// written it unchanged: printable ASCII (0x20..0x7E) that is neither the
 		// quote nor the backslash. 0x7F is excluded because core does not
 		// consider it printable and escapes it as ``.
-		if b >= 0x20 && b < 0x7f && b != '"' && b != '\\' {
+		if c >= 0x20 && c < 0x7f && c != '"' && c != '\\' {
 			i += 1
 			continue
 		}
 
 		if start < i {
-			io.write_string(w, s[start:i]) or_return
+			strings.write_string(b, s[start:i])
 		}
 
-		if b < utf8.RUNE_SELF {
-			json_write_escaped_ascii(w, b) or_return
+		if c < utf8.RUNE_SELF {
+			json_write_escaped_ascii(b, c)
 			i += 1
 		} else {
 			r, width := utf8.decode_rune_in_string(s[i:])
@@ -97,11 +114,11 @@ json_write_quoted_string :: proc(w: io.Writer, s: string) -> (err: io.Error) {
 			// correctly encoded U+FFFD, which decodes with width 3 and is
 			// escaped as `�` below.
 			if width == 1 && r == utf8.RUNE_ERROR {
-				io.write_string(w, `\x`) or_return
-				io.write_byte(w, JSON_HEX_DIGITS[b >> 4]) or_return
-				io.write_byte(w, JSON_HEX_DIGITS[b & 0xf]) or_return
+				strings.write_string(b, `\x`)
+				strings.write_byte(b, JSON_HEX_DIGITS[c >> 4])
+				strings.write_byte(b, JSON_HEX_DIGITS[c & 0xf])
 			} else {
-				json_write_escaped_rune(w, r) or_return
+				json_write_escaped_rune(b, r)
 			}
 			i += width
 		}
@@ -110,23 +127,22 @@ json_write_quoted_string :: proc(w: io.Writer, s: string) -> (err: io.Error) {
 	}
 
 	if start < len(s) {
-		io.write_string(w, s[start:]) or_return
+		strings.write_string(b, s[start:])
 	}
 
-	io.write_byte(w, '"') or_return
-	return
+	strings.write_byte(b, '"')
 }
 
 // json_write_escaped_ascii handles the single-byte cases the fast path rejects:
 // the quote, the backslash, the C0 controls, and 0x7F.
 @(private)
-json_write_escaped_ascii :: proc(w: io.Writer, b: byte) -> (err: io.Error) {
-	switch b {
+json_write_escaped_ascii :: proc(b: ^strings.Builder, c: byte) {
+	switch c {
 	case '"':
-		io.write_string(w, `\"`) or_return
+		strings.write_string(b, `\"`)
 		return
 	case '\\':
-		io.write_string(w, `\\`) or_return
+		strings.write_string(b, `\\`)
 		return
 
 	// The five controls core spells with a short escape when `for_json` is set.
@@ -134,41 +150,42 @@ json_write_escaped_ascii :: proc(w: io.Writer, b: byte) -> (err: io.Error) {
 	// `r < 32 && for_json` branch, whose default arm writes `\u000X`. Spelling
 	// them short here would be a silent wire change.
 	case '\b':
-		io.write_string(w, `\b`) or_return
+		strings.write_string(b, `\b`)
 		return
 	case '\f':
-		io.write_string(w, `\f`) or_return
+		strings.write_string(b, `\f`)
 		return
 	case '\n':
-		io.write_string(w, `\n`) or_return
+		strings.write_string(b, `\n`)
 		return
 	case '\r':
-		io.write_string(w, `\r`) or_return
+		strings.write_string(b, `\r`)
 		return
 	case '\t':
-		io.write_string(w, `\t`) or_return
+		strings.write_string(b, `\t`)
 		return
 	}
 
-	if b < 0x20 {
-		io.write_string(w, `\u00`) or_return
-		io.write_byte(w, JSON_HEX_DIGITS[b >> 4]) or_return
-		io.write_byte(w, JSON_HEX_DIGITS[b & 0xf]) or_return
+	if c < 0x20 {
+		strings.write_string(b, `\u00`)
+		strings.write_byte(b, JSON_HEX_DIGITS[c >> 4])
+		strings.write_byte(b, JSON_HEX_DIGITS[c & 0xf])
 		return
 	}
 
 	// 0x7F, the only remaining byte the fast path rejects.
-	return json_write_u16_escape(w, u16(b))
+	json_write_u16_escape(b, u16(c))
 }
 
 // json_write_escaped_rune handles a decoded rune at or above U+0080.
 @(private)
-json_write_escaped_rune :: proc(w: io.Writer, r: rune) -> (err: io.Error) {
+json_write_escaped_rune :: proc(b: ^strings.Builder, r: rune) {
 	// core's `is_printable` admits U+00A1..U+00FF except the soft hyphen
 	// (U+00AD) and writes those raw. Everything else above ASCII — including
 	// U+0080..U+00A0 and every rune above U+00FF — is escaped.
 	if r >= 0xa1 && r <= 0xff && r != 0xad {
-		io.write_rune(w, r) or_return
+		buf, width := utf8.encode_rune(r)
+		strings.write_bytes(b, buf[:width])
 		return
 	}
 
@@ -178,28 +195,25 @@ json_write_escaped_rune :: proc(w: io.Writer, r: rune) -> (err: io.Error) {
 	}
 
 	if c < 0x10000 {
-		return json_write_u16_escape(w, u16(c))
+		json_write_u16_escape(b, u16(c))
+		return
 	}
 
 	// Above the BMP, core encodes the surrogate pair as two `\uXXXX` escapes
-	// when `for_json` is set.
-	buf: [2]u16
-	utf16.encode(buf[:], []rune{c})
-	for unit in buf {
-		json_write_u16_escape(w, unit) or_return
-	}
-	return
+	// when `for_json` is set. The split is the UTF-16 formula, written out
+	// rather than imported: one dependency for six lines of arithmetic is a
+	// dependency the freeze manifest would have to carry for ever.
+	c -= 0x10000
+	json_write_u16_escape(b, u16(0xd800 + (c >> 10)))
+	json_write_u16_escape(b, u16(0xdc00 + (c & 0x3ff)))
 }
 
 // json_write_u16_escape writes `\uXXXX`, most significant nibble first.
 @(private)
-json_write_u16_escape :: proc(w: io.Writer, v: u16) -> (err: io.Error) {
-	io.write_string(w, `\u`) or_return
-	for shift := uint(12); ; shift -= 4 {
-		io.write_byte(w, JSON_HEX_DIGITS[(v >> shift) & 0xf]) or_return
-		if shift == 0 {
-			break
-		}
-	}
-	return
+json_write_u16_escape :: proc(b: ^strings.Builder, v: u16) {
+	strings.write_string(b, `\u`)
+	strings.write_byte(b, JSON_HEX_DIGITS[(v >> 12) & 0xf])
+	strings.write_byte(b, JSON_HEX_DIGITS[(v >> 8) & 0xf])
+	strings.write_byte(b, JSON_HEX_DIGITS[(v >> 4) & 0xf])
+	strings.write_byte(b, JSON_HEX_DIGITS[v & 0xf])
 }

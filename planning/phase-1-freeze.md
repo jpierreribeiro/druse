@@ -334,12 +334,12 @@ Evidence: `tests/wp9-semantic/http_factory_test.odin::wp9_semantic_matrix_on_the
 
 ## 7. Dependency inventory
 
-Snapshot: `build/phase1-direct-dependencies.txt` (23 direct imports, diffed on
+Snapshot: `build/phase1-direct-dependencies.txt` (27 direct imports, diffed on
 every gate run).
 
 | Package | Direct imports |
 |---|---|
-| `web` | `core:mem`, `core:strings`, `core:encoding/json`, `core:os`, `core:reflect`, `core:strconv`, `druse:web/testing`, `druse:web/internal/transport` |
+| `web` | `core:mem`, `core:strings`, `core:encoding/json`, `core:os`, `core:reflect`, `core:strconv`, `core:sync`, `core:unicode/utf8`, `druse:web/testing`, `druse:web/internal/transport` |
 | `web/testing` | `core:mem`, `core:strings` |
 | `web/internal/transport` | `core:mem`, `core:net`, `core:slice`, `core:strings`, `core:time`, `druse:vendor/odin-http` |
 | `examples/01..03` | `druse:web` only |
@@ -2663,3 +2663,81 @@ answers `web.internal_error` rather than ignoring it.
 **Rollback.** Restore the single-result signature and the two asserts; revert
 the call sites. The two new tests must be deleted with it — they cannot run
 against an asserting implementation, which is the whole point.
+
+## Amendment 40 — WP-ENC1: `web` gains `core:unicode/utf8`, no ledger growth
+
+**Date: 2026-07-30. Authority: the encode-path investigation of 2026-07-30 and
+the measurements below. Ledger effect: none; application remains 80 and
+test-support remains 2.**
+
+**Dependency ledger: `web` gains `core:unicode/utf8`.** An Odin standard-library
+package under the repository's BSD-3-Clause license (`$ODIN_ROOT/LICENSE`). Its
+sole owner is the private `web/json_encode_string.odin`: the ASCII fast path
+skips the decoder for the bytes that need no inspection, and calls
+`utf8.decode_rune_in_string` / `utf8.encode_rune` for the ones that do. The type
+appears in no public signature and crosses no transport boundary.
+
+**Why the dependency is justified, and why it is only one.**
+`docs/reports/2026-07-30-encode-profile.md` measured 25.7% of encode self time in
+writing quoted strings, because `core:io` decodes a string into runes and pushes
+them through the `io.Writer` vtable one rune at a time. The fix is the standard
+ASCII fast path. The first version of that writer took an `io.Writer` and would
+have added **three** direct dependencies — `core:io`, `core:unicode/utf16` and
+`core:unicode/utf8`. The gate rejected it, and the rejection was right: two of
+the three were avoidable.
+
+- `core:io` is not needed. `strings.write_byte`, `write_bytes` and
+  `write_string` append straight to a `strings.Builder`, return an `int` rather
+  than an `io.Error`, and dispatch through nothing — and `core:strings` is
+  already a dependency. Dropping `io` also removed the indirection the fast path
+  exists to avoid, and the writer got faster for it.
+- `core:unicode/utf16` is not needed. The surrogate split above the BMP is six
+  lines of arithmetic; a dependency the freeze manifest would carry for ever is
+  not the right price for that.
+- `core:unicode/utf8` **is** needed, and reimplementing it would be the wrong
+  trade. `web/json_decode.odin` refuses to implement a second JSON grammar
+  because "two grammars that can disagree about the same body is the defect this
+  file exists to avoid"; a second UTF-8 decoder is the same defect in a smaller
+  box. The standard decoder stays the only decoder.
+
+**Cost evidence.** `examples/01-hello-world`, `-o:speed`, the pinned
+`dev-2026-07-nightly:819fdc7` compiler, built from two trees that differ only by
+the presence of `web/json_encode_string.odin` — `074578a` (absent) and this
+change (present):
+
+| build | with the file | without the file | delta |
+|---|---:|---:|---:|
+| 1 | 755,080 | 759,176 | −4,096 |
+| 2 | 755,080 | 759,168 | −4,088 |
+| 3 | 755,072 | 759,168 | −4,096 |
+
+**Read this as "no measurable cost", not as a saving.** The delta is one page and
+it is negative, which is what link-layout noise looks like; repeated builds of
+identical source differ by ~8 bytes here, which is FINDING-A of
+`planning/benchmark-methodology.md` reproducing itself. Per §10 of that document
+binary size is reported and never asserted. What the table supports is the only
+claim being made: an application that never calls the writer does not pay for the
+dependency.
+
+**The used-path cost is not measured yet, and is deliberately not guessed.**
+Nothing calls `json_write_quoted_string` today — `core:encoding/json` invokes
+`io.write_quoted_string` directly and offers no hook, so routing the marshaller
+through it requires Druse to own the marshal walk. That is its own work package,
+and the used-path figure belongs to it.
+
+**Evidence.** `tests/enc1-quoted-string/enc1_quoted_string_test.odin` proves the
+writer produces bytes identical to
+`io.write_quoted_string(w, s, '"', nil, for_json = true)` — the exact call the
+pinned marshaller makes — over every rune in the Unicode range (1,114,112), every
+single byte (256) and every two-byte sequence (65,536). The last two are the only
+inputs that reach invalid UTF-8, which `core:io` renders as `\xHH` — not valid
+JSON, and reproduced on purpose, because equivalence is the contract and a
+"better" encoder would invalidate every byte-count comparison in `docs/reports/`.
+The oracle is the live `core:io` procedure, so a toolchain bump that changes
+core's escaping turns the suite red rather than drifting the wire in silence.
+`build/check.sh` runs it under the WP2–WP19 throwaway-package arrangement.
+
+**Rollback.** Delete `web/json_encode_string.odin` and
+`tests/enc1-quoted-string/`, remove the ENC1 block from `build/check.sh`, and
+remove the `core:unicode/utf8` line from `build/phase1-direct-dependencies.txt`
+and from §7. Nothing calls the writer, so nothing else moves.
