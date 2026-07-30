@@ -1,0 +1,12 @@
+started_utc=2026-07-30T21:58:16Z
+git_head=528ae6a
+endpoint=/json/medium/int
+variants=control ownmarshal
+repeats=3
+rate_below_knee=10000
+rate_above_knee=70000
+seconds_per_run=10
+lanes=4
+kernel=Linux 6.17.0-1017-aws x86_64 GNU/Linux
+sha256_control=a2b8fde9afa87c8acf7ef01ff5ecbdada6716d579e47b8de2df47cf7f83404f9
+sha256_ownmarshal=21876449c8e9532eb16e32d23281ddb1dfca205d962224f9c76764826ff92643

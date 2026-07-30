@@ -43,13 +43,24 @@ PEER_PORT=8081
 PORT="$DRUSE_PORT"
 LANES="${DRUSE_BENCH_LANES:-4}"
 
+# Build-time defines for the DRUSE server only, space separated, e.g.
+#   DRUSE_BENCH_DEFINES="-define:DRUSE_JSON_OWN_MARSHAL=true"
+#
+# Without this the matrix could only ever measure the default build, so a
+# framework comparison could not answer "and where does the variant sit?"
+# without a second, hand-built tree. The peers are untouched by it, and the
+# value is recorded in the manifest so a matrix can never be mistaken for one
+# run against a different Druse.
+DEFINES="${DRUSE_BENCH_DEFINES:-}"
+
 mkdir -p "$OUT"/{bin,runs}
 
 fail() { echo "MATRIX-FAIL: $*" >&2; exit 1; }
 
 # --- build everything up front, so a broken peer fails before any measurement
 echo "building..."
-"$ODIN_BIN" build "$MATRIX/druse" -collection:druse="$ROOT" -o:speed \
+# shellcheck disable=SC2086 # DEFINES is a deliberate word list, not one word.
+"$ODIN_BIN" build "$MATRIX/druse" -collection:druse="$ROOT" -o:speed $DEFINES \
   -out:"$OUT/bin/druse" || fail "the Druse matrix server does not build"
 (cd "$ROOT/ops/soak/openload" && go build -buildvcs=false -trimpath \
   -o "$OUT/bin/openload" main.go) || fail "openload does not build"
@@ -110,6 +121,7 @@ fi
   echo "server_cpus=$SERVER_CPUS"
   echo "load_cpus=$LOAD_CPUS"
   echo "druse_lanes=$LANES"
+  echo "druse_defines=${DEFINES:-none}"
   echo "axum_included=$have_axum"
   echo "fastify_included=$have_fastify"
 } >"$OUT/manifest.txt"

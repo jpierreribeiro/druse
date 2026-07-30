@@ -33,6 +33,15 @@ MATRIX="$ROOT/bench/application_matrix"
 ODIN_BIN="${DRUSE_ODIN_BIN:-odin}"
 SERVER_CPUS="${DRUSE_BENCH_SERVER_CPUS:-0-3}"
 LOAD_CPUS="${DRUSE_BENCH_LOAD_CPUS:-4-7}"
+
+# Build-time defines for the server under the profiler, space separated, e.g.
+#   DRUSE_BENCH_DEFINES="-define:DRUSE_JSON_OWN_MARSHAL=true"
+#
+# Without this the profiler could only ever profile the DEFAULT build, which
+# makes it useless for the one question a variant campaign asks: did the share
+# this change was aimed at actually move? The value is recorded in the manifest
+# so a profile can never be mistaken for a different variant's.
+DEFINES="${DRUSE_BENCH_DEFINES:-}"
 PORT=8080
 
 mkdir -p "$OUT"
@@ -43,7 +52,8 @@ sudo -n true 2>/dev/null || fail "perf record needs passwordless sudo here"
 ss -ltn 2>/dev/null | grep -q ":$PORT[[:space:]]" &&
   fail "port $PORT is already in use; refusing to profile a server this script did not start"
 
-"$ODIN_BIN" build "$MATRIX/druse" -collection:druse="$ROOT" -o:speed \
+# shellcheck disable=SC2086 # DEFINES is a deliberate word list, not one word.
+"$ODIN_BIN" build "$MATRIX/druse" -collection:druse="$ROOT" -o:speed $DEFINES \
   -out:"$OUT/server" || fail "the matrix server does not build"
 (cd "$ROOT/ops/soak/openload" && go build -buildvcs=false -trimpath \
   -o "$OUT/openload" main.go) || fail "openload does not build"
@@ -112,6 +122,7 @@ perf script -i "$OUT/perf.data" >"$OUT/perf-script.txt" 2>/dev/null || true
   # kernel fell back from cycles:u to task-clock:u on this host and the count
   # silently reported zero, which is a metric that lies rather than one that
   # is missing.
+  echo "defines=${DEFINES:-none}"
   echo "perf_event=$(awk 'NR==1 {print $(NF-1)}' "$OUT/perf-script.txt" 2>/dev/null || echo unknown)"
   echo "perf_samples=$(grep -c '^[^[:space:]]' "$OUT/perf-script.txt" 2>/dev/null || echo 0)"
   echo "goodput=$(python3 -c "import json;print(round(json.load(open('$OUT/load.json'))['goodput_per_second']))" 2>/dev/null || echo unknown)"

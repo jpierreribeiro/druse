@@ -1,0 +1,19 @@
+started_utc=2026-07-30T22:04:09Z
+git_head=unknown
+endpoint=/json/medium/int
+offered_rate=10000
+profile_seconds=30
+lanes=4
+response_bytes=4310
+server_cpus=0-3
+load_cpus=4-7
+compiler=/home/ubuntu/odin/odin version dev-2026-07-nightly:819fdc7
+kernel=Linux 6.17.0-1017-aws x86_64 GNU/Linux
+server_sha256=fb5f37ef6d5c76551a6fe99a2c809f20e461a9eac4a473dedfda3a9b8be4338f
+defines=-define:DRUSE_JSON_OWN_MARSHAL=true
+perf_event=2004008
+perf_samples=6089
+goodput=10000
+served_share=100.0
+p50_us=154
+failures=0
