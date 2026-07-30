@@ -20,7 +20,7 @@ unexplained error and could not tell the two apart.
 Three arms, each run twice in alternating order (A B C C B A), 15 minutes each,
 on AWS `c5.2xlarge` with the server pinned to CPUs 0-3 and the generators to
 4-7 — the soak's own topology. Predictions were written down before the run in
-[`ops/soak/experiments/2026-07-30-saturation-attribution.md`](../../ops/soak/experiments/2026-07-30-saturation-attribution.md),
+`ops/soak/experiments/2026-07-30-saturation-attribution.md`,
 including the conditions under which the experiment would settle nothing.
 
 | Arm | Change from the soak's configuration |
