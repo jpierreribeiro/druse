@@ -103,9 +103,12 @@ goodput says the latency figure describes a queue rather than a service time.
 > held 144–145 µs with a spread of one microsecond: past the knee, that figure
 > measures how far the queue grew, not what a request cost.
 >
-> **The number is withdrawn pending a re-run** with the float rendering
-> normalised and a rate sweep to locate the knee. The other three rows stand:
-> they are byte-identical across all four servers.
+> **The number is withdrawn and has been replaced.**
+> `2026-07-30-nested-json-knee.md` re-ran it on a byte-identical document and
+> swept the rate: below the knee the gap is about 2.3x, not the three orders of
+> magnitude in this table, and removing the float rendering alone cut the p50
+> fifty-fold. The other three rows stand: they are byte-identical across all
+> four servers.
 >
 > `summarise-openload-matrix.py` now prints bytes per response and refuses to
 > present a row whose servers disagree on it. It did not, which is why this
