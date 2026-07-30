@@ -1,0 +1,48 @@
+{
+  "url": "http://127.0.0.1:8080/json/medium/decode",
+  "method": "POST",
+  "rate_per_second": 20000,
+  "duration_seconds": 10,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785420765669580061,
+  "started_utc": "2026-07-30T14:12:45.669580061Z",
+  "ended_unix_nanos": 1785420776786536674,
+  "ended_utc": "2026-07-30T14:12:56.786536674Z",
+  "planned": 200000,
+  "completed": 200000,
+  "succeeded": 199964,
+  "transport_errors": 36,
+  "status": {
+    "0": 36,
+    "204": 199964
+  },
+  "failures": [
+    {
+      "class": "peer_reset",
+      "count": 34,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:14808-\u003e127.0.0.1:8080: read: connection reset by peer"
+    },
+    {
+      "class": "request_write_failed",
+      "count": 2,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:15108-\u003e127.0.0.1:8080: use of closed network connection"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 199922,
+  "conn_fresh": 78,
+  "extra_dials": 1,
+  "wrote_request": 199998,
+  "achieved_per_second": 17990.53528085536,
+  "goodput_per_second": 17987.296984504806,
+  "latency_p50_us": 580704,
+  "latency_p90_us": 1005621,
+  "latency_p99_us": 1106371,
+  "latency_p999_us": 1117653,
+  "latency_max_us": 1126721,
+  "scheduler_lag_p99_us": 1099939,
+  "scheduler_lag_max_us": 1111501,
+  "completion_window_seconds": 11.116956604,
+  "response_bytes": 0
+}

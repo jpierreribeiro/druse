@@ -1,0 +1,48 @@
+{
+  "url": "http://127.0.0.1:8080/tiny",
+  "method": "GET",
+  "rate_per_second": 10000,
+  "duration_seconds": 900,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785412491673124923,
+  "started_utc": "2026-07-30T11:54:51.673124923Z",
+  "ended_unix_nanos": 1785413391673171357,
+  "ended_utc": "2026-07-30T12:09:51.673171357Z",
+  "planned": 9000000,
+  "completed": 9000000,
+  "succeeded": 8999987,
+  "transport_errors": 13,
+  "status": {
+    "0": 13,
+    "200": 8999987
+  },
+  "failures": [
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 12,
+      "example_error": "Get \"http://127.0.0.1:8080/tiny\": EOF"
+    },
+    {
+      "class": "request_write_failed",
+      "count": 1,
+      "example_error": "Get \"http://127.0.0.1:8080/tiny\": http: server closed idle connection"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 8999801,
+  "conn_fresh": 199,
+  "extra_dials": 1,
+  "wrote_request": 8999994,
+  "achieved_per_second": 9999.99948464447,
+  "goodput_per_second": 9999.98504020077,
+  "latency_p50_us": 325,
+  "latency_p90_us": 942,
+  "latency_p99_us": 40166,
+  "latency_p999_us": 41547,
+  "latency_max_us": 62689,
+  "scheduler_lag_p99_us": 1094,
+  "scheduler_lag_max_us": 20042,
+  "completion_window_seconds": 900.000046382,
+  "response_bytes": 35999948
+}

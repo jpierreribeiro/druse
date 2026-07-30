@@ -1,0 +1,2 @@
+scheduled_unix_nanos,sent_unix_nanos,done_unix_nanos,latency_ns,scheduler_lag_ns,status,body_bytes,conn_reused,conn_was_idle,dial_count,wrote_request,failure_class,error_text
+1785410979394591843,1785410979394632055,1785410979394810152,218317,40221,0,0,false,false,1,false,eof_on_fresh_conn,"Get ""http://127.0.0.1:8080/json/medium"": EOF"

@@ -1,0 +1,63 @@
+{
+  "url": "http://127.0.0.1:8080/json/medium/decode",
+  "method": "POST",
+  "rate_per_second": 20000,
+  "duration_seconds": 10,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785420292421195081,
+  "started_utc": "2026-07-30T14:04:52.421195081Z",
+  "ended_unix_nanos": 1785420303497197803,
+  "ended_utc": "2026-07-30T14:05:03.497197803Z",
+  "planned": 200000,
+  "completed": 200000,
+  "succeeded": 199927,
+  "transport_errors": 73,
+  "status": {
+    "0": 73,
+    "204": 199927
+  },
+  "failures": [
+    {
+      "class": "peer_reset",
+      "count": 39,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:8270-\u003e127.0.0.1:8080: read: connection reset by peer"
+    },
+    {
+      "class": "request_write_failed",
+      "count": 15,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:8036-\u003e127.0.0.1:8080: use of closed network connection"
+    },
+    {
+      "class": "broken_pipe",
+      "count": 10,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": readfrom tcp 127.0.0.1:8968-\u003e127.0.0.1:8080: write tcp 127.0.0.1:8968-\u003e127.0.0.1:8080: write: broken pipe"
+    },
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 8,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF"
+    },
+    {
+      "class": "dial_other",
+      "count": 1,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:8528-\u003e127.0.0.1:8080: use of closed network connection"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 199905,
+  "conn_fresh": 95,
+  "extra_dials": 3,
+  "wrote_request": 199964,
+  "achieved_per_second": 18057.055872940946,
+  "goodput_per_second": 18050.46504754732,
+  "latency_p50_us": 537332,
+  "latency_p90_us": 972515,
+  "latency_p99_us": 1065713,
+  "latency_p999_us": 1075741,
+  "latency_max_us": 1087166,
+  "scheduler_lag_p99_us": 1058945,
+  "scheduler_lag_max_us": 1070293,
+  "completion_window_seconds": 11.076002722,
+  "response_bytes": 0
+}

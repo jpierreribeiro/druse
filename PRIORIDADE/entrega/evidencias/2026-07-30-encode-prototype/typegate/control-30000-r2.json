@@ -1,0 +1,53 @@
+{
+  "url": "http://127.0.0.1:8080/json/medium/int",
+  "method": "GET",
+  "rate_per_second": 30000,
+  "duration_seconds": 10,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785429898755290053,
+  "started_utc": "2026-07-30T16:44:58.755290053Z",
+  "ended_unix_nanos": 1785429913299676314,
+  "ended_utc": "2026-07-30T16:45:13.299676314Z",
+  "planned": 300000,
+  "completed": 300000,
+  "succeeded": 299957,
+  "transport_errors": 43,
+  "status": {
+    "0": 43,
+    "200": 299957
+  },
+  "failures": [
+    {
+      "class": "peer_reset",
+      "count": 19,
+      "example_error": "Get \"http://127.0.0.1:8080/json/medium/int\": read tcp 127.0.0.1:23410-\u003e127.0.0.1:8080: read: connection reset by peer"
+    },
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 19,
+      "example_error": "Get \"http://127.0.0.1:8080/json/medium/int\": EOF"
+    },
+    {
+      "class": "request_write_failed",
+      "count": 5,
+      "example_error": "Get \"http://127.0.0.1:8080/json/medium/int\": http: server closed idle connection"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 299846,
+  "conn_fresh": 154,
+  "extra_dials": 2,
+  "wrote_request": 299986,
+  "achieved_per_second": 20626.514920834146,
+  "goodput_per_second": 20623.558453695492,
+  "latency_p50_us": 2281830,
+  "latency_p90_us": 4091063,
+  "latency_p99_us": 4499966,
+  "latency_p999_us": 4540721,
+  "latency_max_us": 4549541,
+  "scheduler_lag_p99_us": 4493684,
+  "scheduler_lag_max_us": 4538971,
+  "completion_window_seconds": 14.54438625,
+  "response_bytes": 1292814670
+}

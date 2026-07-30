@@ -1,0 +1,48 @@
+{
+  "url": "http://127.0.0.1:8080/json/medium/decode",
+  "method": "POST",
+  "rate_per_second": 4000,
+  "duration_seconds": 900,
+  "connections": 256,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785407636716667854,
+  "started_utc": "2026-07-30T10:33:56.716667854Z",
+  "ended_unix_nanos": 1785408536716932468,
+  "ended_utc": "2026-07-30T10:48:56.716932468Z",
+  "planned": 3600000,
+  "completed": 3600000,
+  "succeeded": 3599992,
+  "transport_errors": 8,
+  "status": {
+    "0": 8,
+    "204": 3599992
+  },
+  "failures": [
+    {
+      "class": "request_write_failed",
+      "count": 5,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:54292-\u003e127.0.0.1:8080: use of closed network connection"
+    },
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 3,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 3599943,
+  "conn_fresh": 57,
+  "extra_dials": 1,
+  "wrote_request": 3599992,
+  "achieved_per_second": 3999.998823920346,
+  "goodput_per_second": 3999.9899350340706,
+  "latency_p50_us": 487,
+  "latency_p90_us": 782,
+  "latency_p99_us": 1668,
+  "latency_p999_us": 41249,
+  "latency_max_us": 45686,
+  "scheduler_lag_p99_us": 550,
+  "scheduler_lag_max_us": 4984,
+  "completion_window_seconds": 900.000264618,
+  "response_bytes": 0
+}

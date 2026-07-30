@@ -1,0 +1,14 @@
+started_utc=2026-07-30T16:23:11Z
+git_head=proto
+endpoint=/json/medium/int
+variants=control presize skipval both
+repeats=5
+rate_below_knee=10000
+rate_above_knee=30000
+seconds_per_run=10
+lanes=4
+kernel=Linux 6.17.0-1017-aws x86_64 GNU/Linux
+sha256_control=1a9ed545632c448e0dba4fbf205343a9b7d806f0b8aa87cd654353f05b85eec5
+sha256_presize=3e58645ed83e016be30eb2bda5b1293cd280d37154a12dbdd906407b86dd1845
+sha256_skipval=70f68c40a6619e380c7d69da94bc158e7c84006f05d0e01f98a287377276d933
+sha256_both=3f564fa29e3b9985448a51e550d211a48e49c4b3a66ac124ea6829000fc8dee4

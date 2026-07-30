@@ -1,0 +1,58 @@
+{
+  "url": "http://127.0.0.1:8080/json/medium/decode",
+  "method": "POST",
+  "rate_per_second": 20000,
+  "duration_seconds": 10,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785416775078260294,
+  "started_utc": "2026-07-30T13:06:15.078260294Z",
+  "ended_unix_nanos": 1785416786638829630,
+  "ended_utc": "2026-07-30T13:06:26.63882963Z",
+  "planned": 200000,
+  "completed": 200000,
+  "succeeded": 199968,
+  "transport_errors": 32,
+  "status": {
+    "0": 32,
+    "204": 199968
+  },
+  "failures": [
+    {
+      "class": "peer_reset",
+      "count": 13,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:62926-\u003e127.0.0.1:8080: read: connection reset by peer"
+    },
+    {
+      "class": "request_write_failed",
+      "count": 9,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:62398-\u003e127.0.0.1:8080: use of closed network connection"
+    },
+    {
+      "class": "broken_pipe",
+      "count": 6,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": readfrom tcp 127.0.0.1:62842-\u003e127.0.0.1:8080: write tcp 127.0.0.1:62842-\u003e127.0.0.1:8080: write: broken pipe"
+    },
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 4,
+      "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 199927,
+  "conn_fresh": 73,
+  "extra_dials": 2,
+  "wrote_request": 199981,
+  "achieved_per_second": 17300.18601914296,
+  "goodput_per_second": 17297.417989379894,
+  "latency_p50_us": 761627,
+  "latency_p90_us": 1359746,
+  "latency_p99_us": 1534865,
+  "latency_p999_us": 1558906,
+  "latency_max_us": 1566107,
+  "scheduler_lag_p99_us": 1526726,
+  "scheduler_lag_max_us": 1553446,
+  "completion_window_seconds": 11.560569336,
+  "response_bytes": 0
+}

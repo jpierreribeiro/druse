@@ -1,0 +1,43 @@
+{
+  "url": "http://127.0.0.1:8080/json/medium",
+  "method": "GET",
+  "rate_per_second": 25000,
+  "duration_seconds": 10,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785423783896980990,
+  "started_utc": "2026-07-30T15:03:03.89698099Z",
+  "ended_unix_nanos": 1785423796917257769,
+  "ended_utc": "2026-07-30T15:03:16.917257769Z",
+  "planned": 250000,
+  "completed": 250000,
+  "succeeded": 249976,
+  "transport_errors": 24,
+  "status": {
+    "0": 24,
+    "200": 249976
+  },
+  "failures": [
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 24,
+      "example_error": "Get \"http://127.0.0.1:8080/json/medium\": EOF"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 249864,
+  "conn_fresh": 136,
+  "extra_dials": 0,
+  "wrote_request": 249992,
+  "achieved_per_second": 19200.820721109754,
+  "goodput_per_second": 19198.977442320527,
+  "latency_p50_us": 1502417,
+  "latency_p90_us": 2708531,
+  "latency_p99_us": 2990463,
+  "latency_p999_us": 3018389,
+  "latency_max_us": 3025935,
+  "scheduler_lag_p99_us": 2983524,
+  "scheduler_lag_max_us": 3014371,
+  "completion_window_seconds": 13.02027677,
+  "response_bytes": 1349370448
+}

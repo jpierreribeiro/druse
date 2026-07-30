@@ -1,0 +1,48 @@
+{
+  "url": "http://127.0.0.1:8080/json/medium",
+  "method": "GET",
+  "rate_per_second": 20000,
+  "duration_seconds": 10,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785421284838207093,
+  "started_utc": "2026-07-30T14:21:24.838207093Z",
+  "ended_unix_nanos": 1785421295095962016,
+  "ended_utc": "2026-07-30T14:21:35.095962016Z",
+  "planned": 200000,
+  "completed": 200000,
+  "succeeded": 199973,
+  "transport_errors": 27,
+  "status": {
+    "0": 27,
+    "200": 199973
+  },
+  "failures": [
+    {
+      "class": "peer_reset",
+      "count": 20,
+      "example_error": "Get \"http://127.0.0.1:8080/json/medium\": read tcp 127.0.0.1:45278-\u003e127.0.0.1:8080: read: connection reset by peer"
+    },
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 7,
+      "example_error": "Get \"http://127.0.0.1:8080/json/medium\": EOF"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 199893,
+  "conn_fresh": 107,
+  "extra_dials": 0,
+  "wrote_request": 199997,
+  "achieved_per_second": 19497.443801083697,
+  "goodput_per_second": 19494.81164617055,
+  "latency_p50_us": 126577,
+  "latency_p90_us": 234761,
+  "latency_p99_us": 255726,
+  "latency_p999_us": 259400,
+  "latency_max_us": 263832,
+  "scheduler_lag_p99_us": 249091,
+  "scheduler_lag_max_us": 252358,
+  "completion_window_seconds": 10.257754916,
+  "response_bytes": 1079454254
+}

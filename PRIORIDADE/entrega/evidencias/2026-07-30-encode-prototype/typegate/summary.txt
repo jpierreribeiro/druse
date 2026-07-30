@@ -1,0 +1,9 @@
+variant A/B — /json/medium/int, 5 repeats, 4 lanes, commit typegate
+
+  variant      p50 below knee     delta   ceiling at 30000     delta  failures
+  control              339 us         —          20,431/s         —         3
+  typegate             267 us    -21.2%          26,097/s    +27.7%         4
+
+  p50 is a service time only below the knee; the ceiling column is the
+  one number a past-the-knee run reports honestly. Deltas are against
+  'control'.

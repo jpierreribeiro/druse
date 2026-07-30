@@ -1,0 +1,48 @@
+{
+  "url": "http://127.0.0.1:8080/tiny",
+  "method": "GET",
+  "rate_per_second": 10000,
+  "duration_seconds": 900,
+  "connections": 128,
+  "timeout_seconds": 5,
+  "started_unix_nanos": 1785407634711854486,
+  "started_utc": "2026-07-30T10:33:54.711854486Z",
+  "ended_unix_nanos": 1785408534712106359,
+  "ended_utc": "2026-07-30T10:48:54.712106359Z",
+  "planned": 9000000,
+  "completed": 9000000,
+  "succeeded": 8999981,
+  "transport_errors": 19,
+  "status": {
+    "0": 19,
+    "200": 8999981
+  },
+  "failures": [
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 18,
+      "example_error": "Get \"http://127.0.0.1:8080/tiny\": EOF"
+    },
+    {
+      "class": "peer_reset",
+      "count": 1,
+      "example_error": "Get \"http://127.0.0.1:8080/tiny\": read tcp 127.0.0.1:33504-\u003e127.0.0.1:8080: read: connection reset by peer"
+    }
+  ],
+  "unclassified": 0,
+  "conn_reused": 8999801,
+  "conn_fresh": 199,
+  "extra_dials": 0,
+  "wrote_request": 8999990,
+  "achieved_per_second": 9999.99720197856,
+  "goodput_per_second": 9999.976090873357,
+  "latency_p50_us": 338,
+  "latency_p90_us": 1020,
+  "latency_p99_us": 40482,
+  "latency_p999_us": 41944,
+  "latency_max_us": 61247,
+  "scheduler_lag_p99_us": 1093,
+  "scheduler_lag_max_us": 22090,
+  "completion_window_seconds": 900.000251822,
+  "response_bytes": 35999924
+}

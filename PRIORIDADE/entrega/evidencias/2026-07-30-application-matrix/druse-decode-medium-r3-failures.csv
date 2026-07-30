@@ -1,0 +1,6 @@
+scheduled_unix_nanos,sent_unix_nanos,done_unix_nanos,latency_ns,scheduler_lag_ns,status,body_bytes,conn_reused,conn_was_idle,dial_count,wrote_request,failure_class,error_text
+1785416375817173183,1785416375817175760,1785416375820384652,3211481,2591,0,0,true,false,1,true,peer_reset,"Post ""http://127.0.0.1:8080/json/medium/decode"": read tcp 127.0.0.1:29006->127.0.0.1:8080: read: connection reset by peer"
+1785416375817123183,1785416375817226704,1785416375820409944,3286771,103534,0,0,true,false,1,true,peer_reset,"Post ""http://127.0.0.1:8080/json/medium/decode"": read tcp 127.0.0.1:29012->127.0.0.1:8080: read: connection reset by peer"
+1785416375817273183,1785416375817284535,1785416375820448626,3175446,11352,0,0,true,false,1,true,peer_reset,"Post ""http://127.0.0.1:8080/json/medium/decode"": read tcp 127.0.0.1:29034->127.0.0.1:8080: read: connection reset by peer"
+1785416375817323183,1785416375817366552,1785416375820456531,3133350,43368,0,0,true,false,0,true,peer_reset,"Post ""http://127.0.0.1:8080/json/medium/decode"": read tcp 127.0.0.1:29048->127.0.0.1:8080: read: connection reset by peer"
+1785416375817223183,1785416375817274358,1785416375820459921,3236742,51188,0,0,true,false,1,true,peer_reset,"Post ""http://127.0.0.1:8080/json/medium/decode"": read tcp 127.0.0.1:29024->127.0.0.1:8080: read: connection reset by peer"

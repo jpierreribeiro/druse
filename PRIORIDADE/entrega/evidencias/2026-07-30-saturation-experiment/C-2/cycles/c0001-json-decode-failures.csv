@@ -1,0 +1,5 @@
+scheduled_unix_nanos,sent_unix_nanos,done_unix_nanos,latency_ns,scheduler_lag_ns,status,body_bytes,conn_reused,conn_was_idle,dial_count,wrote_request,failure_class,error_text
+1785410551675649112,1785410551675686269,1785410551675866990,217878,37145,0,0,true,false,1,false,request_write_failed,"Post ""http://127.0.0.1:8080/json/medium/decode"": write tcp 127.0.0.1:5102->127.0.0.1:8080: use of closed network connection"
+1785411031834649112,1785411031835700183,1785411031836273003,1623891,1051061,0,0,false,false,1,false,request_write_failed,"Post ""http://127.0.0.1:8080/json/medium/decode"": write tcp 127.0.0.1:6982->127.0.0.1:8080: use of closed network connection"
+1785411431752649112,1785411431754270690,1785411431757150005,4500893,1621566,0,0,true,false,1,true,peer_reset,"Post ""http://127.0.0.1:8080/json/medium/decode"": read tcp 127.0.0.1:47934->127.0.0.1:8080: read: connection reset by peer"
+1785411431749899112,1785411431754216354,1785411431757168491,7269382,4317238,0,0,false,false,1,true,peer_reset,"Post ""http://127.0.0.1:8080/json/medium/decode"": read tcp 127.0.0.1:47950->127.0.0.1:8080: read: connection reset by peer"

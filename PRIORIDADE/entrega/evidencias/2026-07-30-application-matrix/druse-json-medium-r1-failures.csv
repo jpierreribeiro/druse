@@ -1,0 +1,13 @@
+scheduled_unix_nanos,sent_unix_nanos,done_unix_nanos,latency_ns,scheduler_lag_ns,status,body_bytes,conn_reused,conn_was_idle,dial_count,wrote_request,failure_class,error_text
+1785415908935648005,1785415908935695992,1785415908936210557,562555,47975,0,0,false,false,1,false,eof_on_fresh_conn,"Get ""http://127.0.0.1:8080/json/medium"": EOF"
+1785415908935598005,1785415908935952773,1785415908936273245,675238,354801,0,0,false,false,1,false,eof_on_fresh_conn,"Get ""http://127.0.0.1:8080/json/medium"": EOF"
+1785415908935798005,1785415908935839042,1785415908936318082,520078,41024,0,0,false,false,1,true,eof_on_fresh_conn,"Get ""http://127.0.0.1:8080/json/medium"": EOF"
+1785415908935948005,1785415908935960558,1785415908936400151,452146,12546,0,0,false,false,1,true,eof_on_fresh_conn,"Get ""http://127.0.0.1:8080/json/medium"": EOF"
+1785415908935748005,1785415908936038715,1785415908939140180,3392178,290711,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:56456->127.0.0.1:8080: read: connection reset by peer"
+1785415908935898005,1785415908936091151,1785415908939228927,3330926,193158,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:56460->127.0.0.1:8080: read: connection reset by peer"
+1785415908936148005,1785415908936158475,1785415908939282196,3134190,10461,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:56464->127.0.0.1:8080: read: connection reset by peer"
+1785415908935998005,1785415908936044885,1785415908939281577,3283575,46876,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:56480->127.0.0.1:8080: read: connection reset by peer"
+1785415908948548005,1785415908948565828,1785415908956324364,7776364,17832,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:57272->127.0.0.1:8080: read: connection reset by peer"
+1785415908949098005,1785415908949103382,1785415908956667501,7569497,5366,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:57380->127.0.0.1:8080: read: connection reset by peer"
+1785415908949048005,1785415908949085599,1785415908956692225,7644222,37591,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:57368->127.0.0.1:8080: read: connection reset by peer"
+1785415908948998005,1785415908949036486,1785415908956712688,7714684,38478,0,0,false,false,1,true,peer_reset,"Get ""http://127.0.0.1:8080/json/medium"": read tcp 127.0.0.1:57354->127.0.0.1:8080: read: connection reset by peer"

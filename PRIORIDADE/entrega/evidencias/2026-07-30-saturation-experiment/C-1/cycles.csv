@@ -1,0 +1,2 @@
+cycle,started_utc,ended_utc,health_status,health_transport_errors,health_p99_us,stats_http
+1,2026-07-30T11:06:16Z,2026-07-30T11:21:37Z,18000,0,1598,200

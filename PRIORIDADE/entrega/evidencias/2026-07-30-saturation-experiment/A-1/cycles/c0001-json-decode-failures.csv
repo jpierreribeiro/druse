@@ -1,0 +1,9 @@
+scheduled_unix_nanos,sent_unix_nanos,done_unix_nanos,latency_ns,scheduler_lag_ns,status,body_bytes,conn_reused,conn_was_idle,dial_count,wrote_request,failure_class,error_text
+1785407638738667854,1785407638739684094,1785407638739917900,1250058,1016248,0,0,false,false,1,false,request_write_failed,"Post ""http://127.0.0.1:8080/json/medium/decode"": write tcp 127.0.0.1:54292->127.0.0.1:8080: use of closed network connection"
+1785407638880167854,1785407638880499670,1785407638880709307,541469,331816,0,0,false,false,1,false,request_write_failed,"Post ""http://127.0.0.1:8080/json/medium/decode"": write tcp 127.0.0.1:54308->127.0.0.1:8080: use of closed network connection"
+1785407657660417854,1785407657661391767,1785407657661559187,1141350,973921,0,0,false,false,1,false,eof_on_fresh_conn,"Post ""http://127.0.0.1:8080/json/medium/decode"": EOF"
+1785407657660917854,1785407657661355818,1785407657661568148,650298,438051,0,0,false,false,1,false,request_write_failed,"Post ""http://127.0.0.1:8080/json/medium/decode"": write tcp 127.0.0.1:30382->127.0.0.1:8080: use of closed network connection"
+1785407933757667854,1785407933758815544,1785407933759239346,1571574,1147690,0,0,true,false,1,false,request_write_failed,"Post ""http://127.0.0.1:8080/json/medium/decode"": write tcp 127.0.0.1:42656->127.0.0.1:8080: use of closed network connection"
+1785408301801417854,1785408301801473456,1785408301801650968,233118,55603,0,0,false,false,1,false,eof_on_fresh_conn,"Post ""http://127.0.0.1:8080/json/medium/decode"": EOF"
+1785408449747917854,1785408449748533866,1785408449749243772,1325939,616025,0,0,false,false,1,false,eof_on_fresh_conn,"Post ""http://127.0.0.1:8080/json/medium/decode"": EOF"
+1785408462798667854,1785408462799797169,1785408462800270950,1603195,1129320,0,0,false,false,1,false,request_write_failed,"Post ""http://127.0.0.1:8080/json/medium/decode"": http: server closed idle connection"

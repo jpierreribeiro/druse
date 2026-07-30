@@ -1,0 +1,143 @@
+=== arm A (run 1), 15 min ===
+{
+  "arm": "A",
+  "failure_classes": {
+    "eof_on_fresh_conn": 38,
+    "peer_reset": 1,
+    "request_write_failed": 5
+  },
+  "failure_examples": {
+    "eof_on_fresh_conn": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF",
+    "peer_reset": "Get \"http://127.0.0.1:8080/tiny\": read tcp 127.0.0.1:33504->127.0.0.1:8080: read: connection reset by peer",
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:54292->127.0.0.1:8080: use of closed network connection"
+  },
+  "failures": 44,
+  "failures_per_million": 3.117,
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 3,
+    "tcp_retrans": 3593
+  },
+  "planned": 14116500,
+  "run": 1,
+  "saturation_refusals": 120
+}
+=== arm B (run 1), 15 min ===
+{
+  "arm": "B",
+  "failure_classes": {},
+  "failure_examples": {},
+  "failures": 0,
+  "failures_per_million": 0.0,
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 0,
+    "tcp_retrans": 1418
+  },
+  "planned": 14116500,
+  "run": 1,
+  "saturation_refusals": 0
+}
+=== arm C (run 1), 15 min ===
+{
+  "arm": "C",
+  "failure_classes": {
+    "eof_on_fresh_conn": 4,
+    "peer_reset": 4,
+    "request_write_failed": 2
+  },
+  "failure_examples": {
+    "eof_on_fresh_conn": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF",
+    "peer_reset": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:35992->127.0.0.1:8080: read: connection reset by peer",
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:60612->127.0.0.1:8080: use of closed network connection"
+  },
+  "failures": 10,
+  "failures_per_million": 0.709,
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 4,
+    "tcp_retrans": 16
+  },
+  "planned": 14103000,
+  "run": 1,
+  "saturation_refusals": 26
+}
+=== arm C (run 2), 15 min ===
+{
+  "arm": "C",
+  "failure_classes": {
+    "eof_on_fresh_conn": 1,
+    "peer_reset": 2,
+    "request_write_failed": 2
+  },
+  "failure_examples": {
+    "eof_on_fresh_conn": "Get \"http://127.0.0.1:8080/json/medium\": EOF",
+    "peer_reset": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:47934->127.0.0.1:8080: read: connection reset by peer",
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:5102->127.0.0.1:8080: use of closed network connection"
+  },
+  "failures": 5,
+  "failures_per_million": 0.355,
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 2,
+    "tcp_retrans": 15
+  },
+  "planned": 14103000,
+  "run": 2,
+  "saturation_refusals": 8
+}
+=== arm B (run 2), 15 min ===
+{
+  "arm": "B",
+  "failure_classes": {},
+  "failure_examples": {},
+  "failures": 0,
+  "failures_per_million": 0.0,
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 0,
+    "tcp_retrans": 4313
+  },
+  "planned": 14116500,
+  "run": 2,
+  "saturation_refusals": 0
+}
+=== arm A (run 2), 15 min ===
+{
+  "arm": "A",
+  "failure_classes": {
+    "broken_pipe": 3,
+    "eof_on_fresh_conn": 50,
+    "request_write_failed": 17
+  },
+  "failure_examples": {
+    "broken_pipe": "Post \"http://127.0.0.1:8080/json/medium/decode\": readfrom tcp 127.0.0.1:23512->127.0.0.1:8080: write tcp 127.0.0.1:23512->127.0.0.1:8080: write: broken pipe",
+    "eof_on_fresh_conn": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF",
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:16468->127.0.0.1:8080: use of closed network connection"
+  },
+  "failures": 70,
+  "failures_per_million": 4.959,
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 3,
+    "tcp_retrans": 4485
+  },
+  "planned": 14116500,
+  "run": 2,
+  "saturation_refusals": 157
+}
+
+=== pre-registered decision rule ===
+H1 (the failures ARE saturation refusals) survives only if failures and
+refusals fall together in BOTH arm B (16 lanes) and arm C (no blocking
+handler). Failures persisting while refusals fall refutes it, and the
+per-request CSV then carries the real cause.
+
+The experiment does not settle the question if arm A produced no failures, if
+any failure arrived unclassified, or if the kernel counters moved.

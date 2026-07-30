@@ -1,0 +1,124 @@
+{
+  "cycles": 1,
+  "failure_classes": {},
+  "failure_examples": {},
+  "failures_classified": 0,
+  "failures_counted": 0,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 38,
+    "last": 38,
+    "max": 248
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 38395,
+    "median_p99_us": 38395,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 13112
+  },
+  "reasons": [],
+  "result": "PASS",
+  "rss_kib": {
+    "first": 6928,
+    "last": 11648,
+    "max": 13092,
+    "min": 6928,
+    "tail_slope_kib_per_hour": -1001.8577903537655
+  },
+  "skipped_workloads": {},
+  "stats_missing_samples": 0,
+  "telemetry_samples": 927,
+  "threads": {
+    "max": 17,
+    "min": 17
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 135000,
+      "failures": [],
+      "max_p99_us": 1514,
+      "median_p99_us": 1514,
+      "planned": 135000,
+      "runs": 1,
+      "status": {
+        "200": 135000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 18000,
+      "failures": [],
+      "max_p99_us": 38395,
+      "median_p99_us": 38395,
+      "planned": 18000,
+      "runs": 1,
+      "status": {
+        "200": 18000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 3600000,
+      "failures": [],
+      "max_p99_us": 1106,
+      "median_p99_us": 1106,
+      "planned": 3600000,
+      "runs": 1,
+      "status": {
+        "204": 3600000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 1350000,
+      "failures": [],
+      "max_p99_us": 1647,
+      "median_p99_us": 1647,
+      "planned": 1350000,
+      "runs": 1,
+      "status": {
+        "200": 1350000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 9000000,
+      "failures": [],
+      "max_p99_us": 1431,
+      "median_p99_us": 1431,
+      "planned": 9000000,
+      "runs": 1,
+      "status": {
+        "200": 9000000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 13500,
+      "failures": [],
+      "max_p99_us": 41619,
+      "median_p99_us": 41619,
+      "planned": 13500,
+      "runs": 1,
+      "status": {
+        "200": 13500
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}

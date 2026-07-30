@@ -1,0 +1,13 @@
+started_utc=2026-07-30T16:42:22Z
+git_head=typegate
+endpoint=/json/medium/int
+variants=control typegate
+repeats=5
+rate_below_knee=10000
+rate_above_knee=30000
+seconds_per_run=10
+lanes=4
+kernel=Linux 6.17.0-1017-aws x86_64 GNU/Linux
+sha256_control=dbbfc764f5ed00bd68b709f7e413bab992763bd33cfb48a8ef55a0e2b9832ae9
+sha256_typegate=d04aabce588ac6cbe4cf202f5189792af432732321630efa727b5214580bab78
+retry_start variant=typegate repeat=1 attempt=1
