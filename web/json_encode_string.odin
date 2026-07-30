@@ -75,14 +75,49 @@ JSON_HEX_DIGITS := [16]byte {
 	'8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
 }
 
-// json_write_quoted_string writes `s` as a quoted JSON string, producing bytes
-// identical to `io.write_quoted_string(w, s, '"', nil, true)`.
+// json_write_quoted_string writes a string VALUE, matching
+// `io.write_quoted_string(w, s, '"', nil, for_json = true)`.
+@(private)
+json_write_quoted_string :: proc(b: ^strings.Builder, s: string) {
+	json_write_quoted(b, s, for_json = true)
+}
+
+// json_write_quoted_key writes an OBJECT KEY, matching
+// `io.write_quoted_string(w, name)` — the call `opt_write_key` makes, whose
+// `for_json` argument defaults to FALSE.
+//
+// THE ASYMMETRY IS THE STDLIB'S, AND IT IS REPRODUCED ON PURPOSE. The same
+// U+0007 comes out `` in a value and `\a` in a key, and `\a` is not a
+// JSON escape (RFC 8259 §7 admits only `" \ / b f n r t uXXXX`). Worse,
+// `encoding_json.is_valid` — the validator the response path uses as its last
+// line of defence — does not apply escape rules inside keys, so it passes such
+// a body. Measured, not inferred: `experiments/25-marshal-parity` records
+// `{"k\ax":"vy"}` as what the stdlib emits and `is_valid` answering true.
+//
+// Reproducing it keeps this file a faster way to emit the SAME bytes. Whether
+// Druse should diverge is a wire-behaviour question with its own evidence and
+// its own ADR, and it must not ride along inside a performance change.
+@(private)
+json_write_quoted_key :: proc(b: ^strings.Builder, s: string) {
+	json_write_quoted(b, s, for_json = false)
+}
+
+// json_write_escaped_rune_value writes one rune the way a string VALUE would
+// spell it, without the surrounding quotes. The stdlib's `Type_Info_Rune` arm
+// calls `io.write_escaped_rune(w, r, '"', for_json = true)` between two quote
+// bytes, and this is that call.
+@(private)
+json_write_escaped_rune_value :: proc(b: ^strings.Builder, r: rune) {
+	json_write_escaped_rune(b, r, for_json = true)
+}
+
+// json_write_quoted is the shared implementation.
 //
 // The loop holds one invariant: `s[start:i]` is a run of bytes that need no
 // escaping and may be copied verbatim. Every exit from the fast path flushes
 // that run before doing anything else, and re-opens it after.
 @(private)
-json_write_quoted_string :: proc(b: ^strings.Builder, s: string) {
+json_write_quoted :: proc(b: ^strings.Builder, s: string, for_json: bool) {
 	strings.write_byte(b, '"')
 
 	start, i := 0, 0
@@ -103,7 +138,7 @@ json_write_quoted_string :: proc(b: ^strings.Builder, s: string) {
 		}
 
 		if c < utf8.RUNE_SELF {
-			json_write_escaped_ascii(b, c)
+			json_write_escaped_rune(b, rune(c), for_json)
 			i += 1
 		} else {
 			r, width := utf8.decode_rune_in_string(s[i:])
@@ -118,7 +153,7 @@ json_write_quoted_string :: proc(b: ^strings.Builder, s: string) {
 				strings.write_byte(b, JSON_HEX_DIGITS[c >> 4])
 				strings.write_byte(b, JSON_HEX_DIGITS[c & 0xf])
 			} else {
-				json_write_escaped_rune(b, r)
+				json_write_escaped_rune(b, r, for_json)
 			}
 			i += width
 		}
@@ -133,24 +168,63 @@ json_write_quoted_string :: proc(b: ^strings.Builder, s: string) {
 	strings.write_byte(b, '"')
 }
 
-// json_write_escaped_ascii handles the single-byte cases the fast path rejects:
-// the quote, the backslash, the C0 controls, and 0x7F.
+// json_write_escaped_rune is `io.write_escaped_rune(w, r, '"', false, nil, for_json)`.
+//
+// The two modes diverge in exactly two places, and both are on the wire:
+//
+//	byte < 0x20 that is not \b \f \n \r \t   value: `\u00XX`   key: `\a` `\v` `\e` or `\xHH`
+//	rune above the BMP                       value: surrogate pair   key: `\UXXXXXXXX`
 @(private)
-json_write_escaped_ascii :: proc(b: ^strings.Builder, c: byte) {
-	switch c {
-	case '"':
-		strings.write_string(b, `\"`)
+json_write_escaped_rune :: proc(b: ^strings.Builder, r: rune, for_json: bool) {
+	if r == '"' || r == '\\' {
+		strings.write_byte(b, '\\')
+		strings.write_byte(b, byte(r))
 		return
-	case '\\':
-		strings.write_string(b, `\\`)
-		return
+	}
 
-	// The five controls core spells with a short escape when `for_json` is set.
-	// `\a`, `\v` and `\e` are NOT in this list — core reaches them through its
-	// `r < 32 && for_json` branch, whose default arm writes `\u000X`. Spelling
-	// them short here would be a silent wire change.
+	// core's `is_printable` admits 0x20..0x7E and U+00A1..U+00FF except the
+	// soft hyphen (U+00AD), and writes those raw. Everything else is escaped.
+	if json_rune_is_printable(r) {
+		buf, width := utf8.encode_rune(r)
+		strings.write_bytes(b, buf[:width])
+		return
+	}
+
+	if r < 32 && for_json {
+		// The five controls core spells short in JSON mode. `\a`, `\v` and
+		// `\e` are NOT here — in JSON mode core reaches them through this
+		// arm's default and writes `\u000X`. Spelling them short would be a
+		// silent wire change.
+		switch r {
+		case '\b':
+			strings.write_string(b, `\b`)
+		case '\f':
+			strings.write_string(b, `\f`)
+		case '\n':
+			strings.write_string(b, `\n`)
+		case '\r':
+			strings.write_string(b, `\r`)
+		case '\t':
+			strings.write_string(b, `\t`)
+		case:
+			strings.write_string(b, `\u00`)
+			strings.write_byte(b, JSON_HEX_DIGITS[(r >> 4) & 0xf])
+			strings.write_byte(b, JSON_HEX_DIGITS[r & 0xf])
+		}
+		return
+	}
+
+	// The non-JSON arm, and the tail every non-printable rune at or above 32
+	// reaches in BOTH modes.
+	switch r {
+	case '\a':
+		strings.write_string(b, `\a`)
+		return
 	case '\b':
 		strings.write_string(b, `\b`)
+		return
+	case '\e':
+		strings.write_string(b, `\e`)
 		return
 	case '\f':
 		strings.write_string(b, `\f`)
@@ -164,48 +238,58 @@ json_write_escaped_ascii :: proc(b: ^strings.Builder, c: byte) {
 	case '\t':
 		strings.write_string(b, `\t`)
 		return
-	}
-
-	if c < 0x20 {
-		strings.write_string(b, `\u00`)
-		strings.write_byte(b, JSON_HEX_DIGITS[c >> 4])
-		strings.write_byte(b, JSON_HEX_DIGITS[c & 0xf])
-		return
-	}
-
-	// 0x7F, the only remaining byte the fast path rejects.
-	json_write_u16_escape(b, u16(c))
-}
-
-// json_write_escaped_rune handles a decoded rune at or above U+0080.
-@(private)
-json_write_escaped_rune :: proc(b: ^strings.Builder, r: rune) {
-	// core's `is_printable` admits U+00A1..U+00FF except the soft hyphen
-	// (U+00AD) and writes those raw. Everything else above ASCII — including
-	// U+0080..U+00A0 and every rune above U+00FF — is escaped.
-	if r >= 0xa1 && r <= 0xff && r != 0xad {
-		buf, width := utf8.encode_rune(r)
-		strings.write_bytes(b, buf[:width])
+	case '\v':
+		strings.write_string(b, `\v`)
 		return
 	}
 
 	c := r
+	if c < ' ' {
+		strings.write_string(b, `\x`)
+		strings.write_byte(b, JSON_HEX_DIGITS[byte(c) >> 4])
+		strings.write_byte(b, JSON_HEX_DIGITS[byte(c) & 0xf])
+		return
+	}
 	if c > utf8.MAX_RUNE {
 		c = 0xfffd
 	}
-
 	if c < 0x10000 {
 		json_write_u16_escape(b, u16(c))
 		return
 	}
 
-	// Above the BMP, core encodes the surrogate pair as two `\uXXXX` escapes
-	// when `for_json` is set. The split is the UTF-16 formula, written out
-	// rather than imported: one dependency for six lines of arithmetic is a
-	// dependency the freeze manifest would have to carry for ever.
-	c -= 0x10000
-	json_write_u16_escape(b, u16(0xd800 + (c >> 10)))
-	json_write_u16_escape(b, u16(0xdc00 + (c & 0x3ff)))
+	if for_json {
+		// Above the BMP, JSON mode writes the UTF-16 surrogate pair. The split
+		// is the standard formula, written out rather than imported: one frozen
+		// dependency for six lines of arithmetic is not a trade worth making.
+		d := c - 0x10000
+		json_write_u16_escape(b, u16(0xd800 + (d >> 10)))
+		json_write_u16_escape(b, u16(0xdc00 + (d & 0x3ff)))
+		return
+	}
+
+	strings.write_string(b, `\U`)
+	for shift := uint(28); ; shift -= 4 {
+		strings.write_byte(b, JSON_HEX_DIGITS[(u32(c) >> shift) & 0xf])
+		if shift == 0 {
+			break
+		}
+	}
+}
+
+// json_rune_is_printable is core's `is_printable`, which decides which runes go
+// on the wire raw.
+@(private)
+json_rune_is_printable :: proc(r: rune) -> bool {
+	if r <= 0xff {
+		switch r {
+		case 0x20 ..= 0x7e:
+			return true
+		case 0xa1 ..= 0xff:
+			return r != 0xad
+		}
+	}
+	return false
 }
 
 // json_write_u16_escape writes `\uXXXX`, most significant nibble first.

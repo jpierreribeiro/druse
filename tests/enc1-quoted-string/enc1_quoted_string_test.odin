@@ -63,6 +63,8 @@ differ_destroy :: proc(d: ^Differ) {
 // agree runs both writers over `s` and reports whether the bytes match. It
 // returns the two renderings so the caller can put them in the failure message
 // — "they differ" without the bytes is a bug report nobody can act on.
+// agree checks the VALUE spelling: `for_json = true`, the mode a string value
+// is written in.
 @(private = "file")
 agree :: proc(d: ^Differ, s: string) -> (ours: string, theirs: string, ok: bool) {
 	strings.builder_reset(&d.ours)
@@ -74,6 +76,28 @@ agree :: proc(d: ^Differ, s: string) -> (ours: string, theirs: string, ok: bool)
 	json_write_quoted_string(&d.ours, s)
 	if _, err := io.write_quoted_string(strings.to_writer(&d.theirs), s, '"', nil, true);
 	   err != nil {
+		return "", "", false
+	}
+
+	ours = strings.to_string(d.ours)
+	theirs = strings.to_string(d.theirs)
+	return ours, theirs, ours == theirs
+}
+
+// agree_key checks the KEY spelling: `for_json = false`, which is what
+// `opt_write_key` passes and therefore what an object key is written in.
+//
+// This is a SEPARATE oracle call, not the same one with a flag flipped, because
+// the two modes disagree for every byte below 0x20 outside `\b \f \n \r \t` and
+// for every rune above the BMP. A key path proven only against the value
+// oracle would be proven against the wrong thing.
+@(private = "file")
+agree_key :: proc(d: ^Differ, s: string) -> (ours: string, theirs: string, ok: bool) {
+	strings.builder_reset(&d.ours)
+	strings.builder_reset(&d.theirs)
+
+	json_write_quoted_key(&d.ours, s)
+	if _, err := io.write_quoted_string(strings.to_writer(&d.theirs), s); err != nil {
 		return "", "", false
 	}
 
@@ -221,6 +245,95 @@ enc1_run_boundaries_agree :: proc(t: ^testing.T) {
 		ours, theirs, ok := agree(&d, s)
 		testing.expectf(t, ok, "%q: druse wrote %q, core:io wrote %q", s, ours, theirs)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// The same exhaustion, for the KEY spelling
+// ---------------------------------------------------------------------------
+
+// Object keys go through `for_json = false`, which is a different set of
+// escapes, and since WP-ENC2 that path is production code in
+// `json_own_write_fields`. It gets the same treatment as the value path: every
+// rune, every byte, no sampling.
+@(test)
+enc1_every_rune_agrees_as_a_key :: proc(t: ^testing.T) {
+	d := differ_make()
+	defer differ_destroy(&d)
+
+	failures := 0
+	for r := rune(0); r <= utf8.MAX_RUNE; r += 1 {
+		buf, width := utf8.encode_rune(r)
+		ours, theirs, ok := agree_key(&d, string(buf[:width]))
+		if !ok {
+			failures += 1
+			if failures <= 8 {
+				testing.expectf(
+					t,
+					false,
+					"rune U+%04X as a key: druse wrote %q, core:io wrote %q",
+					int(r),
+					ours,
+					theirs,
+				)
+			}
+		}
+	}
+	testing.expectf(t, failures == 0, "%d runes spelled differently as a key", failures)
+}
+
+@(test)
+enc1_every_single_byte_agrees_as_a_key :: proc(t: ^testing.T) {
+	d := differ_make()
+	defer differ_destroy(&d)
+
+	for b := 0; b < 256; b += 1 {
+		one := [1]byte{byte(b)}
+		ours, theirs, ok := agree_key(&d, string(one[:]))
+		testing.expectf(
+			t,
+			ok,
+			"byte 0x%02X as a key: druse wrote %q, core:io wrote %q",
+			b,
+			ours,
+			theirs,
+		)
+	}
+}
+
+// The two modes must actually DIFFER where the stdlib makes them differ. Without
+// this, both spellings could collapse onto one implementation and every test
+// above would still pass — the key path would be silently "fixed", which is a
+// wire change smuggled in under a performance change.
+@(test)
+enc1_key_and_value_spellings_diverge :: proc(t: ^testing.T) {
+	d := differ_make()
+	defer differ_destroy(&d)
+
+	bell := "\a"
+
+	// Spelled with escapes rather than as literals: a raw control byte inside a
+	// test expectation is invisible in a diff and survives a careless edit.
+	VALUE_SPELLING :: "\"\\u0007\""
+	KEY_SPELLING :: "\"\\a\""
+	value_ours, _, value_ok := agree(&d, bell)
+	testing.expect(t, value_ok, "U+0007 as a value disagrees with core:io")
+	testing.expectf(
+		t,
+		value_ours == VALUE_SPELLING,
+		"U+0007 as a value should be %q, got %q",
+		VALUE_SPELLING,
+		value_ours,
+	)
+
+	key_ours, _, key_ok := agree_key(&d, bell)
+	testing.expect(t, key_ok, "U+0007 as a key disagrees with core:io")
+	testing.expectf(t, key_ours == KEY_SPELLING, "U+0007 as a key should be %q, got %q", KEY_SPELLING, key_ours)
+
+	testing.expect(
+		t,
+		value_ours != key_ours,
+		"the key and value spellings collapsed onto one; the stdlib distinguishes them and so must this",
+	)
 }
 
 // A string long enough that the fast path's bulk copy is the whole cost, with
