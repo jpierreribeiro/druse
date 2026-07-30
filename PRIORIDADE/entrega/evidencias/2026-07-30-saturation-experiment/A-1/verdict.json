@@ -1,0 +1,163 @@
+{
+  "cycles": 1,
+  "failure_classes": {
+    "eof_on_fresh_conn": 38,
+    "peer_reset": 1,
+    "request_write_failed": 5
+  },
+  "failure_examples": {
+    "eof_on_fresh_conn": "Get \"http://127.0.0.1:8080/tiny\": EOF",
+    "peer_reset": "Get \"http://127.0.0.1:8080/tiny\": read tcp 127.0.0.1:33504->127.0.0.1:8080: read: connection reset by peer",
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:54292->127.0.0.1:8080: use of closed network connection"
+  },
+  "failures_classified": 44,
+  "failures_counted": 44,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 14,
+    "last": 14,
+    "max": 179
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 2026,
+    "median_p99_us": 2026,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 7204
+  },
+  "reasons": [],
+  "result": "PASS",
+  "rss_kib": {
+    "first": 4156,
+    "last": 5588,
+    "max": 7220,
+    "min": 4156,
+    "tail_slope_kib_per_hour": -4341.024576312131
+  },
+  "skipped_workloads": {},
+  "stats_missing_samples": 15,
+  "telemetry_samples": 928,
+  "threads": {
+    "max": 5,
+    "min": 5
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 135000,
+      "failures": [],
+      "max_p99_us": 1774,
+      "median_p99_us": 1774,
+      "planned": 135000,
+      "runs": 1,
+      "status": {
+        "200": 135000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 18000,
+      "failures": [],
+      "max_p99_us": 2026,
+      "median_p99_us": 2026,
+      "planned": 18000,
+      "runs": 1,
+      "status": {
+        "200": 18000
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 3600000,
+      "failures": [
+        {
+          "class": "request_write_failed",
+          "count": 5,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:54292->127.0.0.1:8080: use of closed network connection"
+        },
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 3,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF"
+        }
+      ],
+      "max_p99_us": 1668,
+      "median_p99_us": 1668,
+      "planned": 3600000,
+      "runs": 1,
+      "status": {
+        "0": 8,
+        "204": 3599992
+      },
+      "transport_error_ratio": 2.222222222222222e-06,
+      "transport_errors": 8,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 1350000,
+      "failures": [
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 17,
+          "example_error": "Get \"http://127.0.0.1:8080/json/medium\": EOF"
+        }
+      ],
+      "max_p99_us": 40370,
+      "median_p99_us": 40370,
+      "planned": 1350000,
+      "runs": 1,
+      "status": {
+        "0": 17,
+        "200": 1349983
+      },
+      "transport_error_ratio": 1.2592592592592593e-05,
+      "transport_errors": 17,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 9000000,
+      "failures": [
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 18,
+          "example_error": "Get \"http://127.0.0.1:8080/tiny\": EOF"
+        },
+        {
+          "class": "peer_reset",
+          "count": 1,
+          "example_error": "Get \"http://127.0.0.1:8080/tiny\": read tcp 127.0.0.1:33504->127.0.0.1:8080: read: connection reset by peer"
+        }
+      ],
+      "max_p99_us": 40482,
+      "median_p99_us": 40482,
+      "planned": 9000000,
+      "runs": 1,
+      "status": {
+        "0": 19,
+        "200": 8999981
+      },
+      "transport_error_ratio": 2.111111111111111e-06,
+      "transport_errors": 19,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 13500,
+      "failures": [],
+      "max_p99_us": 42011,
+      "median_p99_us": 42011,
+      "planned": 13500,
+      "runs": 1,
+      "status": {
+        "200": 13500
+      },
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}

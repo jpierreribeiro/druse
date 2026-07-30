@@ -46,7 +46,7 @@ Median across five repeats.
 | | fiber | 20,000 | 100% | 98 µs | 1,131 µs | 0 |
 | | gin | 20,000 | 100% | 124 µs | 1,127 µs | 0 |
 | | nethttp | 20,000 | 100% | 124 µs | 1,118 µs | 0 |
-| `/json/medium` | **druse** | **19,542** | **97.7%** | **113,136 µs** | **232,601 µs** | **64** |
+| `/json/medium` **(not comparable — see correction)** | **druse** | **19,542** | **97.7%** | **113,136 µs** | **232,601 µs** | **64** |
 | | fiber | 20,000 | 100% | 145 µs | 754 µs | 0 |
 | | gin | 20,000 | 100% | 164 µs | 498 µs | 0 |
 | | nethttp | 20,000 | 100% | 164 µs | 494 µs | 0 |
@@ -65,16 +65,60 @@ The `extract` row matters most of those three — it is the one that exercises t
 framework rather than the socket, and Druse is at 109 µs against 124 µs for Gin
 and `net/http`.
 
-**On nested JSON it is the only server that does not serve the rate.** At
-`/json/medium` the three Go peers deliver 20,000/s at 145–164 µs while Druse
-delivers 19,542/s at a p50 of 113 **milliseconds** — three orders of magnitude,
-and the shortfall in goodput says the latency figure describes a queue, not a
-service time.
+**On nested JSON it is the only server that does not serve the rate — and that
+row is not a like-for-like comparison.** Read the correction below before using
+it. At `/json/medium` the three Go peers deliver 20,000/s at 145–164 µs while
+Druse delivers 19,542/s at a p50 of 113 **milliseconds**, and the shortfall in
+goodput says the latency figure describes a queue rather than a service time.
+
+> ### Correction, added after publication
+>
+> **Druse emits 5,398 bytes per response on this endpoint; the three peers emit
+> 4,438.** The documents are otherwise identical — same fields, same nesting,
+> same values, all four pre-build the 64-item payload once at startup. The
+> entire 960-byte difference is float rendering: Odin's pinned
+> `core:encoding/json` writes `1.5000000000000000` where Go writes `1.5`,
+> fifteen extra bytes times sixty-four items, which reproduces to the byte.
+>
+> **This confound was already known, and this run reintroduced it.**
+> `2026-07-25-json-application-performance.md` says: "the medium response is
+> compared semantically because Odin's pinned encoder renders `f64` with more
+> digits than the peer encoders. **The decode-only endpoint removes that
+> wire-size confound.**" That study measured `POST /json/medium/decode`
+> precisely to avoid this. This run measured `GET /json/medium` and did not
+> carry the caveat forward. That is an error in this report, not in the earlier
+> one.
+>
+> Two further asymmetries belong beside it. Druse runs a **second full
+> validation pass** over every marshalled body (`encoding_json.is_valid`,
+> `web/respond.odin:108`) that no peer runs. And Druse answers on **four fixed
+> handler lanes** where the peers use unbounded goroutines, so the same
+> per-request cost turns into a queue here and into a longer service time there.
+>
+> **What survives.** A 21.6% payload difference cannot produce a ~780× latency
+> difference, and Druse moved **more** bytes per second than the peers while
+> showing it — 103.5 MB/s against 88.8. So a real gap is being reported. But its
+> size is not the number in this table, and the table cannot be used to size it.
+> The five repeats spread from 101 ms to 199 ms, a factor of two, where the peers
+> held 144–145 µs with a spread of one microsecond: past the knee, that figure
+> measures how far the queue grew, not what a request cost.
+>
+> **The number is withdrawn and has been replaced.**
+> `2026-07-30-nested-json-knee.md` re-ran it on a byte-identical document and
+> swept the rate: below the knee the gap is about 2.3x, not the three orders of
+> magnitude in this table, and removing the float rendering alone cut the p50
+> fifty-fold. The other three rows stand: they are byte-identical across all
+> four servers.
+>
+> `summarise-openload-matrix.py` now prints bytes per response and refuses to
+> present a row whose servers disagree on it. It did not, which is why this
+> correction was found by hand after publication rather than by the instrument
+> before it.
 
 **`/json/medium/decode` saturates the box for three of the four.** Gin and
 `net/http` also fall behind, at 82.1% and 80.8%, with p50s over a second. Druse
 is between them and Fiber at 87.6%. Only Fiber serves it whole. So this endpoint
-is not a Druse-specific finding; the medium *encode* row above is.
+is not a Druse-specific finding. Neither, on its own, is the medium encode row above — see the correction.
 
 **Druse's failures are its own saturation refusals.** The classes are
 `peer_reset`, `request_write_failed` and `eof_on_fresh_conn` — the same
@@ -92,11 +136,14 @@ database, no keep-alive churn, and two peers missing entirely.
 It does not measure capacity. 20,000/s was chosen because all four can nominally
 serve it; the endpoints where they cannot are the finding, not the ceiling.
 
-It does not explain the medium-JSON gap. `2026-07-25-json-application-performance.md`
-established that strict decoding of a nested document was the material
-deficiency and that two changes improved it by 48% and 25%; this run says the gap
-is still there on the *encode* side under an equal offered rate, and does not say
-why.
+It does not size the medium-JSON gap, and after the correction above it does not
+claim to. `2026-07-25-json-application-performance.md` established that strict
+*decoding* of a nested document was the material deficiency and that two changes
+improved it by 48% and 25%. Neither touched encoding, and **the encode path has
+never been profiled** — the profile in that study is a decode profile taken under
+a POST workload, and no marshal symbol appears in it. What this run establishes
+is that an encode-side question exists and that the instrument was not yet good
+enough to answer it.
 
 ## Reproduce
 

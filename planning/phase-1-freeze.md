@@ -334,12 +334,12 @@ Evidence: `tests/wp9-semantic/http_factory_test.odin::wp9_semantic_matrix_on_the
 
 ## 7. Dependency inventory
 
-Snapshot: `build/phase1-direct-dependencies.txt` (23 direct imports, diffed on
+Snapshot: `build/phase1-direct-dependencies.txt` (27 direct imports, diffed on
 every gate run).
 
 | Package | Direct imports |
 |---|---|
-| `web` | `core:mem`, `core:strings`, `core:encoding/json`, `core:os`, `core:reflect`, `core:strconv`, `druse:web/testing`, `druse:web/internal/transport` |
+| `web` | `core:mem`, `core:strings`, `core:encoding/json`, `core:os`, `core:reflect`, `core:strconv`, `core:sync`, `core:unicode/utf8`, `druse:web/testing`, `druse:web/internal/transport` |
 | `web/testing` | `core:mem`, `core:strings` |
 | `web/internal/transport` | `core:mem`, `core:net`, `core:slice`, `core:strings`, `core:time`, `druse:vendor/odin-http` |
 | `examples/01..03` | `druse:web` only |
@@ -2663,3 +2663,230 @@ answers `web.internal_error` rather than ignoring it.
 **Rollback.** Restore the single-result signature and the two asserts; revert
 the call sites. The two new tests must be deleted with it — they cannot run
 against an asserting implementation, which is the whole point.
+
+## Amendment 40 — WP-ENC1: `web` gains `core:unicode/utf8`, no ledger growth
+
+**Date: 2026-07-30. Authority: the encode-path investigation of 2026-07-30 and
+the measurements below. Ledger effect: none; application remains 80 and
+test-support remains 2.**
+
+**Dependency ledger: `web` gains `core:unicode/utf8`.** An Odin standard-library
+package under the repository's BSD-3-Clause license (`$ODIN_ROOT/LICENSE`). Its
+sole owner is the private `web/json_encode_string.odin`: the ASCII fast path
+skips the decoder for the bytes that need no inspection, and calls
+`utf8.decode_rune_in_string` / `utf8.encode_rune` for the ones that do. The type
+appears in no public signature and crosses no transport boundary.
+
+**Why the dependency is justified, and why it is only one.**
+`docs/reports/2026-07-30-encode-profile.md` measured 25.7% of encode self time in
+writing quoted strings, because `core:io` decodes a string into runes and pushes
+them through the `io.Writer` vtable one rune at a time. The fix is the standard
+ASCII fast path. The first version of that writer took an `io.Writer` and would
+have added **three** direct dependencies — `core:io`, `core:unicode/utf16` and
+`core:unicode/utf8`. The gate rejected it, and the rejection was right: two of
+the three were avoidable.
+
+- `core:io` is not needed. `strings.write_byte`, `write_bytes` and
+  `write_string` append straight to a `strings.Builder`, return an `int` rather
+  than an `io.Error`, and dispatch through nothing — and `core:strings` is
+  already a dependency. Dropping `io` also removed the indirection the fast path
+  exists to avoid, and the writer got faster for it.
+- `core:unicode/utf16` is not needed. The surrogate split above the BMP is six
+  lines of arithmetic; a dependency the freeze manifest would carry for ever is
+  not the right price for that.
+- `core:unicode/utf8` **is** needed, and reimplementing it would be the wrong
+  trade. `web/json_decode.odin` refuses to implement a second JSON grammar
+  because "two grammars that can disagree about the same body is the defect this
+  file exists to avoid"; a second UTF-8 decoder is the same defect in a smaller
+  box. The standard decoder stays the only decoder.
+
+**Cost evidence.** `examples/01-hello-world`, `-o:speed`, the pinned
+`dev-2026-07-nightly:819fdc7` compiler, built from two trees that differ only by
+the presence of `web/json_encode_string.odin` — `074578a` (absent) and this
+change (present):
+
+| build | with the file | without the file | delta |
+|---|---:|---:|---:|
+| 1 | 755,080 | 759,176 | −4,096 |
+| 2 | 755,080 | 759,168 | −4,088 |
+| 3 | 755,072 | 759,168 | −4,096 |
+
+**Read this as "no measurable cost", not as a saving.** The delta is one page and
+it is negative, which is what link-layout noise looks like; repeated builds of
+identical source differ by ~8 bytes here, which is FINDING-A of
+`planning/benchmark-methodology.md` reproducing itself. Per §10 of that document
+binary size is reported and never asserted. What the table supports is the only
+claim being made: an application that never calls the writer does not pay for the
+dependency.
+
+**The used-path cost is not measured yet, and is deliberately not guessed.**
+Nothing calls `json_write_quoted_string` today — `core:encoding/json` invokes
+`io.write_quoted_string` directly and offers no hook, so routing the marshaller
+through it requires Druse to own the marshal walk. That is its own work package,
+and the used-path figure belongs to it.
+
+**Evidence.** `tests/enc1-quoted-string/enc1_quoted_string_test.odin` proves the
+writer produces bytes identical to
+`io.write_quoted_string(w, s, '"', nil, for_json = true)` — the exact call the
+pinned marshaller makes — over every rune in the Unicode range (1,114,112), every
+single byte (256) and every two-byte sequence (65,536). The last two are the only
+inputs that reach invalid UTF-8, which `core:io` renders as `\xHH` — not valid
+JSON, and reproduced on purpose, because equivalence is the contract and a
+"better" encoder would invalidate every byte-count comparison in `docs/reports/`.
+The oracle is the live `core:io` procedure, so a toolchain bump that changes
+core's escaping turns the suite red rather than drifting the wire in silence.
+`build/check.sh` runs it under the WP2–WP19 throwaway-package arrangement.
+
+**Rollback.** Delete `web/json_encode_string.odin` and
+`tests/enc1-quoted-string/`, remove the ENC1 block from `build/check.sh`, and
+remove the `core:unicode/utf8` line from `build/phase1-direct-dependencies.txt`
+and from §7. Nothing calls the writer, so nothing else moves.
+
+## Amendment 41 — the per-type JSON validation gate becomes the default, no ledger growth
+
+**Date: 2026-07-30. Authority: the owner, on the measurements below. Ledger
+effect: none; application remains 80 and test-support remains 2.** No public
+name, signature, field or enum member moves; `JSON_TYPE_GATE` is `@(private)`
+and applications cannot see it.
+
+**What changes.** `web/respond.odin`'s `DRUSE_JSON_TYPE_GATE` defaults to `true`.
+Every JSON response was re-parsed after marshalling; now the re-parse runs only
+for payload types that can carry a float, decided once per instantiation.
+
+**Why, in numbers.** `docs/reports/2026-07-30-encode-type-gate.md`, measured with
+`bench/application_matrix/run-variant-ab.sh` on `/json/medium/int` (4,310 bytes,
+verified byte-identical across variants before measuring), five alternating
+repeats, 4 lanes, server pinned to CPUs 0-3 and the generator to 4-7, one commit
+with the two binaries differing only by the define and each recorded by sha256:
+
+| variant | p50, below the knee | ceiling, above it |
+|---|---:|---:|
+| control | 339 µs | 20,431/s |
+| type gate | **267 µs (−21.2%)** | **26,097/s (+27.7%)** |
+| `skipval` (not shippable) | 264 µs (−23.0%) | 26,746/s (+31.9%) |
+
+The third row is why this is being adopted rather than pushed further: removing
+the pass **entirely** — which would put invalid JSON on the wire — buys 23.0%
+and 31.9%. The gate captures 92% and 87% of that while keeping the guarantee.
+Recorded in the same run and worth repeating: `presize` held 10.7% of the encode
+profile and measured +0.9% p50 / −2.6% ceiling. **A symbol's share of a profile
+is not the gain available from removing it**, and pre-sizing must not be revived.
+
+**Why it is safe.** The walk is conservative by construction: anything it does
+not recognise answers "may hold a float" and keeps the pass. Pointers are
+deliberately not enumerated — R-13 forbids `web/` from reading through a pointer
+payload until ADR-003 is amended, and the conservative answer concedes nothing
+because the pinned marshaller does not follow pointers either.
+
+**The promise this keeps, and the document that was not making it.**
+`docs/errors.md` listed three producers of `internal_error` and named only "a
+pointer or a procedure". It did **not** mention a non-finite float — the single
+condition this pass exists to catch (NUM-001, RFC 8259 §6). The gap predates
+this amendment: the behaviour has always been there, undocumented. Adopting a
+gate over an undocumented promise would be adopting nothing, so `docs/errors.md`
+now names the case as a fourth producer, and says the token never reaches the
+client.
+
+**Evidence, and it is executable.** `build/check_typegate_controls.sh`, wired
+into `build/check.sh`:
+
+- control 0 pins this default verbatim in the source, the mechanism
+  `check_wp71_controls.sh` uses for `DRUSE_DEDICATED_ACCEPT` — a default with no
+  assertion walks back on the next refactor and nobody notices;
+- controls 1 and 2 are the positive cases `planning/diagnosability.md` requires:
+  `wp6_num001_non_finite_float_yields_a_complete_500` green with the gate on
+  **and** under the rollback define;
+- control 3 blinds the walk to floats, control 4 inverts the gate's polarity, and
+  control 5 hollows out the rollback branch — each must turn NUM-001 red. Control
+  5 exists because a rollback that silently stops validating is worse than no
+  rollback: it reports success.
+
+Every probe asserts its own edit landed by md5 and reports BROKEN PROBE
+otherwise, so a pattern that drifts against a refactor is a loud error rather
+than a false verdict.
+
+**Rollback.** `-define:DRUSE_JSON_TYPE_GATE=false` restores the unconditional
+pass, and control 2 proves that path is still a real validation rather than a
+decorative branch. The flag is kept for one release, matching the
+dedicated-accept and `JSON_FUSED_*` rollouts; removing it later means deleting
+the `when`/`else` pair, control 2 and control 5 together.
+
+## Amendment 42 — WP-ENC2: a Druse-owned marshal walk behind a flag, no ledger growth
+
+**Date: 2026-07-30. Authority: the encode-path investigation of 2026-07-30.
+Ledger effect: none; application remains 80 and test-support remains 2.** Every
+symbol added is `@(private)`; `JSON_OWN_MARSHAL` is a `#config` an application
+cannot see. **Dependency effect: none** — `core:mem`, `core:reflect`,
+`core:strconv` and `core:strings` were already in the manifest.
+
+**What changes, and what does not.** `web/json_encode.odin` adds a marshal walk
+that writes through the measured quoted-string writer. It is **NOT adopted**:
+`DRUSE_JSON_OWN_MARSHAL` defaults to `false`, and no end-to-end number exists
+for it yet. `docs/reports/` carries no claim about it, deliberately.
+
+**Why it is a subset with a fallback rather than a replacement.** The shape is
+this package's own decoder, inverted: `web/json_decode.odin`'s
+`json_tree_type_supported` answers whether the fast path covers a type, and
+`false` means "fall back to the stdlib", never "reject the request".
+`json_own_supports` does the same, for the WHOLE type, **before a byte is
+written** — a fallback discovered three levels deep, after half a document is in
+the buffer, is not a fallback. The answer is cached per instantiation with
+`@(static)`, the mechanism Amendment 41's gate already relies on.
+
+**Three constraints shaped the design, and each was found by the gate rather
+than by foresight. That is what the gate is for, and it is worth recording:**
+
+1. **`base:runtime` is not in the manifest.** Covering `map`,
+   `Enumerated_Array` and `Fixed_Capacity_Dynamic_Array` needs
+   `runtime.map_cap`, `map_kvh_data_dynamic`, `map_cell_index_dynamic` and
+   `map_hash_is_valid`. Adding a frozen dependency for a path that is off by
+   default and unmeasured inverts this project's order, so those shapes are
+   **declined** and go to the stdlib.
+2. **`any` is banned from every line of `web/`** (G-03/ADR-011), by grep over
+   the whole package rather than over exported declarations —
+   `check_public_api.sh` rejected the first version for it. The stdlib
+   marshaller is written entirely in `any`, so this walk carries
+   `(data: rawptr, id: typeid)` and reads scalars through width-dispatched
+   casts, exactly as `web/json_decode.odin` already does on the way in.
+3. **The stdlib's emptiness flag is banned from `web/`** (AMEND-2), because the
+   rule decides on emptiness and would also drop a field legitimately named
+   `""`. The walk therefore **declines any struct whose `json:"…"` tag carries
+   flags at all**, without naming the flag: a comma in the tag sends the type to
+   the stdlib, which owns the rule. One implementation of it, not two.
+
+**Equivalence, and where each half is proven.** `tests/enc3-own-marshal` runs in
+the gate and makes two assertions per type: the coverage `json_own_supports`
+claims is **pinned in the test**, and where it claims coverage the bytes must
+equal `encoding_json.marshal`'s. The pinned boolean is the load-bearing half —
+the walk falls back for what it does not cover, and a fallback is correct by
+construction, so an output-only test would stay green while a widened coverage
+claim rotted. `experiments/25-marshal-parity` is the wider ratification: 36
+whole documents, the rejection set, and the shapes this file declines.
+
+It has already earned its keep. The first version of the walk accepted an enum
+in `json_own_supports` and declined it in `json_own_write`, because
+`reflect.type_info_base` resolves a NAMED type but leaves an enum an enum. The
+fallback would have hidden that as a silent loss of the fast path on every
+payload holding an enum. ENC3 turned it red.
+
+**The key/value escape asymmetry is reproduced, on purpose.** The stdlib writes
+object keys with `for_json = false` and string values with `for_json = true`, so
+the same U+0007 is spelled `\a` in a key and as a `\u`-escape in a value — and
+`\a` is not a JSON escape. `encoding_json.is_valid` does not apply escape rules
+inside keys and passes such a body. Both facts are measured in
+`experiments/25-marshal-parity`, not inferred. `tests/enc1-quoted-string` now
+proves BOTH spellings exhaustively — every rune and every byte, in each mode —
+and asserts they still differ, so the key path cannot be quietly "fixed" under a
+performance change. **Whether Druse should diverge from the stdlib here is a
+wire-behaviour decision that needs its own ADR**, and it is not taken here.
+
+**R-05 is untouched.** Nothing in the new path commits. A `false` from
+`json_own_write` discards the buffer and takes the stdlib path, which costs work
+and never correctness. The ownership contract is unchanged because the shape is:
+the stdlib marshaller also returns `b.buf[:]` from a Builder made with the same
+allocator, so `response_commit_owned` frees the same thing either way.
+
+**Rollback.** Delete `web/json_encode.odin` and `tests/enc3-own-marshal/`,
+remove the `when JSON_OWN_MARSHAL` block from `web/respond.odin` and the two
+ENC3 blocks from `build/check.sh`. Nothing else moves: the flag is off, so no
+shipped behaviour depends on any of it.

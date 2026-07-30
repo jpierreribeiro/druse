@@ -28,6 +28,27 @@ type MediumDocument struct {
 	Tags      []string     `json:"tags"`
 }
 
+// MediumItemInt is the same item with an integer score.
+//
+// Odin's pinned core:encoding/json renders float64 in fixed point with sixteen
+// decimals, so the float document is 960 bytes larger on Druse than here for the
+// same 64 items and the two cannot be compared byte for byte. This variant is
+// byte-identical across every server in the matrix, and the difference between
+// the two endpoints within one server isolates that server's float rendering
+// cost.
+type MediumItemInt struct {
+	ID     int    `json:"id"`
+	Name   string `json:"name"`
+	Score  int    `json:"score"`
+	Active bool   `json:"active"`
+}
+
+type MediumDocumentInt struct {
+	RequestID string          `json:"request_id"`
+	Items     []MediumItemInt `json:"items"`
+	Tags      []string        `json:"tags"`
+}
+
 type RoutedResponse struct {
 	ID        int  `json:"id"`
 	AccountID int  `json:"account_id"`
@@ -42,6 +63,25 @@ var Small = SmallDocument{
 }
 
 var Medium = makeMedium()
+
+var MediumInt = makeMediumInt()
+
+func makeMediumInt() MediumDocumentInt {
+	items := make([]MediumItemInt, 64)
+	for i := range items {
+		items[i] = MediumItemInt{
+			ID:     i + 1,
+			Name:   "item-abcdefghijklmnop",
+			Score:  i + 1,
+			Active: true,
+		}
+	}
+	return MediumDocumentInt{
+		RequestID: "req-0123456789abcdef",
+		Items:     items,
+		Tags:      []string{"alpha", "beta", "gamma", "delta", "epsilon", "zeta"},
+	}
+}
 
 func makeMedium() MediumDocument {
 	items := make([]MediumItem, 64)

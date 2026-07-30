@@ -1,0 +1,11 @@
+started_utc=2026-07-30T15:02:15Z
+git_head=f16552b
+endpoint=/json/medium
+rates=5000 10000 15000 20000 25000 30000
+seconds_per_run=10
+repeats=3
+server_cpus=0-3
+load_cpus=4-7
+druse_lanes=4
+compiler=/home/ubuntu/odin/odin version dev-2026-07-nightly:819fdc7
+kernel=Linux 6.17.0-1017-aws x86_64 GNU/Linux

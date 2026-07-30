@@ -49,6 +49,7 @@ bash -n "$DRUSE_ROOT/build/check_public_api.sh"
 bash -n "$DRUSE_ROOT/build/check_wp3_mutations.sh"
 bash -n "$DRUSE_ROOT/build/check_wp9_mutations.sh"
 bash -n "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"
+bash -n "$DRUSE_ROOT/build/check_typegate_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_m8_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_m9_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_g11_teardown.sh"
@@ -1418,6 +1419,13 @@ echo "PASS: the previously ungated evidence suites run in the gate"
 echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"
 
+# The per-type JSON validation gate is an ADOPTED DEFAULT, so the gate must hold
+# it to the two things adoption promises: the skip never skips a type that can
+# carry a non-finite float, and the build-time rollback is a real validation
+# rather than a decorative branch. Both positive states and three mutations.
+echo "--- Per-type JSON validation gate: adopted default + rollback controls ---"
+env DRUSE_ODIN_BIN="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_typegate_controls.sh"
+
 echo "--- WP9 raw-wire corpus: mutation controls (the cases must detect) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_wp9_mutations.sh"
 
@@ -1492,6 +1500,12 @@ done
 # transport failures and could explain none of them.
 echo "--- soak instrument: a failure it observes is a failure it can name ---"
 bash "$DRUSE_ROOT/build/check_soak_controls.sh"
+
+# The benchmark summary must notice when two servers did not do the same work.
+# It did not, once, and a comparison of four servers went out in which one
+# answered with 21.6% more bytes than the others.
+echo "--- benchmark summary: a comparison it presents is a comparison it checked ---"
+bash "$DRUSE_ROOT/build/check_bench_controls.sh"
 
 # The gate leaves NO artifact in the working tree.
 echo "--- WP69 blocking boundary: process-isolated liveness evidence ---"
@@ -1625,6 +1639,60 @@ timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/b
   "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
   -out:"$DRUSE_BIN_TMP/wp99-slice" ||
   fail "the WP99 integration slice did not pass within the timeout"
+
+# ENC1 — Druse's quoted-string writer must produce THE SAME BYTES as
+# `core:io`'s. The suite is exhaustive where exhaustion is possible: every rune
+# in the Unicode range, every single byte, every two-byte sequence. The oracle
+# is the live `core:io` procedure, so a toolchain bump that changes core's
+# escaping turns this red instead of drifting the wire silently.
+#
+# The writer is package-private, so this uses the WP2-WP19 THROWAWAY-package
+# arrangement: the real `web/` sources plus the test file, compiled together and
+# removed afterwards.
+echo "--- ENC1 quoted-string writer: byte-for-byte vs core:io (odin test) ---"
+DRUSE_ENC1_TMP="$(mktemp -d -t druse-enc1-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_ENC1_TMP"' EXIT
+cp "$DRUSE_ROOT"/web/*.odin "$DRUSE_ENC1_TMP/"
+cp "$DRUSE_ROOT"/tests/enc1-quoted-string/*.odin "$DRUSE_ENC1_TMP/"
+timeout 300 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ENC1_TMP" \
+  "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_BIN_TMP/enc1-quoted-string" ||
+  fail "the ENC1 quoted-string equivalence suite did not pass within the timeout"
+rm -rf "$DRUSE_ENC1_TMP"
+trap - EXIT
+test ! -d "$DRUSE_ENC1_TMP" || fail "the throwaway ENC1 test package was not removed"
+echo "PASS: ENC1 ran against the real sources; throwaway package removed"
+
+# ENC3 — the Druse-owned marshal walk. Two assertions per type: the coverage
+# `json_own_supports` claims is PINNED, and where it claims coverage the bytes
+# must equal the stdlib's. The pinned boolean is the load-bearing half: the walk
+# falls back for what it does not cover, and a fallback is correct by
+# construction, so an output-only test would stay green while a widened
+# coverage claim rotted.
+echo "--- ENC3 own marshal walk: pinned coverage + byte parity (odin test) ---"
+DRUSE_ENC3_TMP="$(mktemp -d -t druse-enc3-XXXXXXXX)"
+trap 'rm -rf "$DRUSE_ENC3_TMP"' EXIT
+cp "$DRUSE_ROOT"/web/*.odin "$DRUSE_ENC3_TMP/"
+cp "$DRUSE_ROOT"/tests/enc3-own-marshal/*.odin "$DRUSE_ENC3_TMP/"
+timeout 180 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ENC3_TMP" \
+  "-collection:druse=$DRUSE_ROOT" -out:"$DRUSE_BIN_TMP/enc3-own-marshal" ||
+  fail "the ENC3 own-marshal suite did not pass within the timeout"
+rm -rf "$DRUSE_ENC3_TMP"
+trap - EXIT
+test ! -d "$DRUSE_ENC3_TMP" || fail "the throwaway ENC3 test package was not removed"
+echo "PASS: ENC3 ran against the real sources; throwaway package removed"
+
+# The own-marshal path is a build-time rollback in the other direction: it is
+# OFF by default, so the state that needs proving is the one that is not
+# compiled by every other step. The public contract must be identical in both.
+echo "--- WP6 public surface under -define:DRUSE_JSON_OWN_MARSHAL=true ---"
+timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/wp6-public-surface" \
+  "-collection:druse=$DRUSE_ROOT" -define:DRUSE_JSON_OWN_MARSHAL=true \
+  -out:"$DRUSE_BIN_TMP/wp6-own-marshal" ||
+  fail "the WP6 contract does not hold with the Druse-owned marshal walk enabled"
+echo "PASS: the public response contract is identical with the own marshal walk on"
 
 # The gate leaves NO artifact in the working tree.
 rm -rf "$DRUSE_BIN_TMP"

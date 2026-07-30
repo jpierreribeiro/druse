@@ -23,6 +23,9 @@ func main() {
 	app.Get("/json/medium", func(c fiber.Ctx) error {
 		return c.JSON(workload.Medium)
 	})
+	app.Get("/json/medium/int", func(c fiber.Ctx) error {
+		return c.JSON(workload.MediumInt)
+	})
 	app.Post("/json/echo", func(c fiber.Ctx) error {
 		var input workload.SmallDocument
 		if err := workload.DecodeStrict(c.Body(), &input); err != nil {

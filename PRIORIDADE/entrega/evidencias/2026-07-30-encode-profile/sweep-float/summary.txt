@@ -1,0 +1,52 @@
+rate sweep — /json/medium, 3 repeats, 10s each, 4 Druse lanes
+commit f16552b  kernel Linux 6.17.0-1017-aws x86_64 GNU/Linux
+
+### druse
+   offered/s  goodput/s  % served   B/resp     p50 us     p99 us  failures  classes
+       5,000      5,000    100.0%    5,398        349        540         0  
+      10,000     10,000    100.0%    5,398        353        625         0  
+      15,000     14,995    100.0%    5,398        482      3,076       101  {'eof_on_fresh_conn': 82, 'peer_reset': 18, 'request_write_failed': 1}
+      20,000     19,086     95.4%    5,398    216,772    474,353        67  {'peer_reset': 55, 'eof_on_fresh_conn': 12}  <- past the knee; p50 is a queue depth
+      25,000     19,176     76.7%    5,398  1,516,673  3,006,063        44  {'eof_on_fresh_conn': 24, 'peer_reset': 20}  <- past the knee; p50 is a queue depth
+      30,000     19,159     63.9%    5,398  2,800,145  5,601,565       155  {'peer_reset': 147, 'eof_on_fresh_conn': 8}  <- past the knee; p50 is a queue depth
+
+### fiber
+   offered/s  goodput/s  % served   B/resp     p50 us     p99 us  failures  classes
+       5,000      5,000    100.0%    4,438        609      1,261         0  
+      10,000     10,000    100.0%    4,438        146      1,251         0  
+      15,000     15,000    100.0%    4,438        139        904         0  
+      20,000     20,000    100.0%    4,438        145        807         0  
+      25,000     25,000    100.0%    4,438        145        825         0  
+      30,000     30,000    100.0%    4,438        145      1,102         0  
+
+### gin
+   offered/s  goodput/s  % served   B/resp     p50 us     p99 us  failures  classes
+       5,000      5,000    100.0%    4,438        602      1,268         0  
+      10,000     10,000    100.0%    4,438        162        393         0  
+      15,000     15,000    100.0%    4,438        165        383         0  
+      20,000     20,000    100.0%    4,438        165        522         0  
+      25,000     25,000    100.0%    4,438        160        712         0  
+      30,000     29,999    100.0%    4,438        159        951         0  
+
+### nethttp
+   offered/s  goodput/s  % served   B/resp     p50 us     p99 us  failures  classes
+       5,000      5,000    100.0%    4,438        602      1,266         0  
+      10,000     10,000    100.0%    4,438        160        386         0  
+      15,000     15,000    100.0%    4,438        164        391         0  
+      20,000     20,000    100.0%    4,438        164        521         0  
+      25,000     25,000    100.0%    4,438        159        762         0  
+      30,000     30,000    100.0%    4,438        156        858         0  
+
+### knees
+  server       last rate served   first rate missed   p50 at last served    p99 there
+  druse                  15,000               20000               482 us     3,076 us
+  fiber                  30,000         not reached               145 us     1,102 us
+  gin                    30,000         not reached               159 us       951 us
+  nethttp                30,000         not reached               156 us       858 us
+
+  !! RESPONSE SIZES DIFFER between servers on this endpoint:
+       fiber         4,438 B/resp
+       gin           4,438 B/resp
+       nethttp       4,438 B/resp
+       druse         5,398 B/resp
+     The knees below are not comparable across servers: they are knees for different payloads.

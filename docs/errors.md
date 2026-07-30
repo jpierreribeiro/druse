@@ -237,11 +237,19 @@ the same 404/405 rules and never produces a 501.
 ```
 
 `internal_error` takes no message on purpose: failure detail is logged on the
-server, never returned to the client. The framework produces it in three cases,
+server, never returned to the client. The framework produces it in four cases,
 each logged first:
 
 - a response payload the JSON encoder cannot serialize (a pointer or a
   procedure — Phase-1 payloads are values);
+- a response payload that serializes into something that is **not valid JSON**.
+  The only way a *successful* marshal produces one is a **non-finite float** —
+  `NaN`, `+Inf`, `-Inf` — which the encoder writes as a bare token that no JSON
+  parser accepts (RFC 8259 §6; NUM-001 in `planning/numeric-contract.md`). The
+  body is checked before anything is committed, so the token never reaches the
+  client: you get this same complete 500, and the value that caused it appears
+  only in the server log. A field holding an `f64` you did not guard is the
+  usual source;
 - an unsupported request destination type or internal decoder/allocation
   failure (ordinary client type mismatches are `invalid_field`);
 - a handler that returns without responding. HTTP has no zero status, so the

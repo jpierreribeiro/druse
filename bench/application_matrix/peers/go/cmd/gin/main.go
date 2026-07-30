@@ -24,6 +24,9 @@ func main() {
 	router.GET("/json/medium", func(c *gin.Context) {
 		c.JSON(http.StatusOK, workload.Medium)
 	})
+	router.GET("/json/medium/int", func(c *gin.Context) {
+		c.JSON(http.StatusOK, workload.MediumInt)
+	})
 	router.POST("/json/echo", func(c *gin.Context) {
 		var input workload.SmallDocument
 		if err := workload.DecodeStrict(readBody(c), &input); err != nil {

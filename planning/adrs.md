@@ -2295,3 +2295,107 @@ none; the requirement it keeps is the one nobody disputes.
   evidence later shows a core-side breadcrumb earns its risk, it would be its own
   ADR with an async-signal-safety proof — this ADR records why it is not shipped
   now, not that it is forbidden forever.
+
+## ADR-048 — the shape of a saturation refusal: whether the acceptor answers 503 before closing
+
+- **Status.** **PROPOSED, 2026-07-30.** Written because the 2026-07-30 soak
+  attribution left a question the evidence raised but did not answer, and
+  because the current behaviour is a *stated principle* in `docs/operations.md`
+  §6, not an oversight. Changing it is a wire-behaviour change and must not
+  happen quietly. **No code, no doc and no default is changed by this ADR.**
+
+- **Context — what the evidence actually showed.**
+  `docs/reports/2026-07-30-soak-failure-attribution.md` established, with
+  pre-registered predictions across a six-arm experiment, that the 1,085 soak
+  failures are acceptor saturation refusals and not defects: `ListenOverflows`
+  and `ListenDrops` were zero in every arm, so the kernel accept queue never
+  overflowed, and sixteen lanes on the *same four CPUs* produced zero failures
+  and zero refusals in both repeats. The refusal is Druse's own admission
+  decision, exactly as `docs/operations.md` documents it — `max_connections`
+  1024, "the connection is **closed at accept**, not queued."
+
+  What the same evidence exposed is a *diagnosability* problem, not a capacity
+  one. **93 of 129 failures carried the same client-side signature: EOF on a
+  fresh connection with no HTTP response.** On the wire that is
+  byte-for-byte indistinguishable from a process that died between `accept` and
+  the first write. The server knows which it was —
+  `web.stats().saturation_refusals` counts precisely this boundary — but the
+  client, the load balancer and the on-call engineer reading a client-side log
+  cannot tell "the server is full, back off" from "the server crashed, fail
+  over." That asymmetry is the whole of the complaint, and it is real.
+
+- **The principle this would overturn.** `docs/operations.md` §6 does not merely
+  describe the mute close; it *justifies* it: "This is deliberately a transport
+  refusal: the acceptor must not manufacture a 503 for a request it has never
+  read. Request-aware overload paths may still return 503 with `Retry-After`."
+  That is a coherent position — a 503 is a *response*, and a response is an
+  answer to a request. Refusing before parsing means there is no request, no
+  method, no route, no `Retry-After` value derivable from anything the client
+  asked for. Any change here must argue against that sentence, not around it.
+
+- **Three options, and the one that is worse than it looks.**
+
+  1. **Keep the mute close.** Zero cost, principled, already documented. Leaves
+     the client unable to distinguish saturation from death.
+
+  2. **Always write `503` + `Retry-After` before closing.** This is the obvious
+     answer and it carries a TCP hazard that the obvious implementation walks
+     straight into. **Closing a socket with unread data in its receive buffer
+     makes Linux send RST rather than FIN**, and an RST can discard data already
+     queued in the client's receive buffer — including the 503 just written. The
+     client's request bytes are, by construction, exactly the data the acceptor
+     never read. So the naive `write(503); close()` yields, nondeterministically,
+     either a delivered 503 or a connection reset with nothing — which is
+     *strictly worse* than today, because today's signature is at least
+     consistent. Getting this right requires draining the request (spending, at
+     the moment of saturation, the read the refusal exists to avoid) or a
+     `shutdown(SHUT_WR)` with a bounded linger and a deadline — real work on the
+     cheapest path in the server, and the path that must stay cheap for the
+     refusal to remain a refusal rather than a second queue.
+
+  3. **A knob, default off.** Ship the 503 path behind an explicit limit or
+     `-define:`, defaulting to today's behaviour, so the change is measurable
+     against the current baseline before it is a default — the same discipline
+     the encode type gate is currently under (`DRUSE_JSON_TYPE_GATE`, built,
+     measured, deliberately not adopted).
+
+- **Recommendation — option 3, and not yet.** Two reasons for the ordering.
+
+  **First, the premise may dissolve.** The open question in this area is not the
+  shape of the refusal but the rule that produces it: `max_handlers = 0` resolves
+  from CPU count, bounded 4..32, which on the pinned 4-CPU server yields four
+  lanes — and four lanes is exactly where the refusals appear. A lane doing JSON
+  encode is not CPU-saturated for the whole time it holds its slot, so sizing
+  lanes to processors under-provisions admission. If that experiment shows the
+  auto rule is wrong for this workload, the refusals that motivate this ADR were
+  an artifact of a bad default, and the population of servers that would ever
+  emit the 503 shrinks accordingly. **Measure the auto-sizing rule before
+  changing the wire.**
+
+  **Second, the cheaper half of the complaint is already deliverable.** The
+  operator-side ambiguity — "was that saturation or a crash?" — is answered
+  today by `web.stats().saturation_refusals` and needs no wire change at all;
+  what it needs is for `docs/operations.md` to say plainly that a client-side
+  EOF-without-response *is* the expected saturation signature and that the
+  server-side counter is how you confirm it. That is a documentation fix with
+  no ADR and no risk, and it removes most of the on-call pain without touching
+  a byte on the wire. Only the client-side, automated back-off case genuinely
+  requires the 503 — and for a load balancer, health checks, not refused
+  connections, are the designed mechanism.
+
+- **What acceptance would require.** If option 3 is later accepted: a named
+  limit with today's behaviour as the default; a proof that the RST hazard is
+  handled (a test that asserts the client *receives* the 503 with the request
+  bytes unread, not merely that the server wrote it); a measurement that the
+  refusal path's cost has not grown enough to turn refusal into queueing; the
+  amendment of `docs/operations.md` §6 in the same commit as the behaviour, so
+  the document and the wire never disagree; and `docs/transport-conformance.md`
+  updated if the refusal becomes a conformance-visible response.
+
+- **Ledger.** **No growth.** This ADR adds no code, no public symbol, no limit
+  and no default. It records a question, the evidence bounding it, and the order
+  in which the two open items should be taken.
+
+- **Reversibility. N/A (a proposal).** Nothing is added to reverse. If the
+  auto-sizing experiment removes the motivating population, this ADR should be
+  closed as SUPERSEDED by that result rather than accepted.

@@ -1,0 +1,11 @@
+variant A/B — /json/medium/int, 5 repeats, 4 lanes, commit proto
+
+  variant      p50 below knee     delta   ceiling at 30000     delta  failures
+  control              343 us         —          20,279/s         —         6
+  presize              346 us     +0.9%          19,755/s     -2.6%        11
+  skipval              264 us    -23.0%          26,746/s    +31.9%         3
+  both                 279 us    -18.7%          25,069/s    +23.6%         0
+
+  p50 is a service time only below the knee; the ceiling column is the
+  one number a past-the-knee run reports honestly. Deltas are against
+  'control'.
