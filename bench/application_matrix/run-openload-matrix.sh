@@ -53,8 +53,20 @@ echo "building..."
   -out:"$OUT/bin/druse" || fail "the Druse matrix server does not build"
 (cd "$ROOT/ops/soak/openload" && go build -buildvcs=false -trimpath \
   -o "$OUT/bin/openload" main.go) || fail "openload does not build"
-(cd "$MATRIX/peers/go" && go build -o "$OUT/bin/" ./cmd/...) ||
-  fail "the Go peers do not build"
+# The Go peers pin go 1.26 in their go.mod. A host with an older toolchain that
+# cannot fetch one is a real situation, and building them elsewhere is a
+# legitimate answer — provided the artefact says so. DRUSE_BENCH_PEER_BIN points
+# at a directory of prebuilt peers, and the manifest records where they came
+# from, because "which Go compiled the peer" is part of what a comparison means.
+peer_build="local"
+if [ -n "${DRUSE_BENCH_PEER_BIN:-}" ]; then
+  cp "$DRUSE_BENCH_PEER_BIN"/{nethttp,gin,fiber} "$OUT/bin/" ||
+    fail "DRUSE_BENCH_PEER_BIN=$DRUSE_BENCH_PEER_BIN does not hold nethttp, gin and fiber"
+  peer_build="prebuilt:$DRUSE_BENCH_PEER_BIN"
+else
+  (cd "$MATRIX/peers/go" && go build -o "$OUT/bin/" ./cmd/...) ||
+    fail "the Go peers do not build; set DRUSE_BENCH_PEER_BIN to a directory of prebuilt ones"
+fi
 
 have_axum=0
 if [ -d "$MATRIX/peers/axum" ] && command -v cargo >/dev/null 2>&1; then
@@ -73,9 +85,18 @@ fi
 
 {
   echo "started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "git_head=$(git -C "$ROOT" rev-parse HEAD)"
+  # The commit, or an explicit refusal to guess. A tree copied without .git — a
+  # normal way to get code onto a benchmark host — makes `git rev-parse` print
+  # a fatal error to stderr and nothing to stdout, and the manifest silently
+  # loses the one field that says WHAT was measured. DRUSE_BENCH_COMMIT carries
+  # it in that case; absent both, the artefact says "unknown" out loud.
+  echo "git_head=${DRUSE_BENCH_COMMIT:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)}"
   echo "compiler=$("$ODIN_BIN" version 2>&1 | head -1)"
   echo "go=$(go version 2>&1)"
+  echo "go_peers=$peer_build"
+  if [ "$peer_build" != local ]; then
+    echo "go_peers_sha256=$(sha256sum "$OUT/bin/nethttp" "$OUT/bin/gin" "$OUT/bin/fiber" | awk '{printf "%s ", $1}')"
+  fi
   echo "node=$(node --version 2>&1 || echo absent)"
   echo "cargo=$(cargo --version 2>&1 || echo absent)"
   echo "kernel=$(uname -srmo)"
