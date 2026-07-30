@@ -45,7 +45,23 @@ Status :: enum int {
 	Service_Unavailable   = 503,
 }
 
-// The per-type validation gate, behind a build flag until it is adopted.
+// The per-type validation gate — ADOPTED as the default, with a build-time
+// rollback for one release (the discipline `DRUSE_DEDICATED_ACCEPT` and the
+// three `JSON_FUSED_*` flags were adopted under).
+//
+// Adopted on measurement: −21.2% p50 and +27.7% ceiling on `/json/medium/int`,
+// five alternating repeats over one commit, byte-identical responses verified
+// before measuring (`docs/reports/2026-07-30-encode-type-gate.md`). That is 92%
+// of the latency gain and 87% of the throughput gain that removing the pass
+// ENTIRELY would give — the `skipval` arm, which is not shippable — so what is
+// left on this particular table is small and the risk of chasing it is not.
+//
+// `build/check_typegate_controls.sh` is what makes the adoption an executable
+// fact rather than a comment: it pins this default literally, proves NUM-001
+// green in BOTH states, and requires three mutations to turn NUM-001 red — the
+// walk blind to floats, the polarity inverted, and the rollback branch hollowed
+// out. That last one exists because a rollback that silently stops validating
+// is worse than no rollback: it reports success.
 //
 // The second pass over every marshalled body exists to catch ONE condition — a
 // non-finite float — which is a property of the TYPE. The recorded reasoning
@@ -59,7 +75,7 @@ Status :: enum int {
 // That is a different object from the RTTI cache the JSON study measured and
 // rejected: that one cached field metadata per request on the decode path and
 // cost p99 +17.8%. This caches one integer per type for the life of the process.
-@(private) JSON_TYPE_GATE :: #config(DRUSE_JSON_TYPE_GATE, false)
+@(private) JSON_TYPE_GATE :: #config(DRUSE_JSON_TYPE_GATE, true)
 @(private) JSON_FLOAT_WALK_MAX_DEPTH :: 32
 
 // json_type_may_hold_float answers whether a value of `id` can reach the
