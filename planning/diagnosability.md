@@ -1,0 +1,133 @@
+# Diagnosability — the standard an instrument must meet
+
+**Status: NORMATIVE, 2026-07-30.** This document applies to every instrument in
+this repository that produces a verdict, a published number, or release
+evidence. It is enforced the way everything else here is enforced: by a control
+in the gate that fails when the property is absent.
+
+## The property, and why it is not the one we already had
+
+This project has been bitten seven times by tests that did not work, and every
+one of them is in the history:
+
+| Commit | What it was |
+|---|---|
+| `e7ae6b5` | a second suite that could not fail; audit all 43 and gate the pattern |
+| `0b1fea8` | the wire corpus could never fail |
+| `f06c447` | the drain "flake" was the c03 race; six suites nobody ran |
+| `77bf2a1` | one case passed for the wrong reason |
+| `28c977e` | one fix was guarded by an unrun suite |
+| `086eb9e` | wp90-deadlines was never a flake |
+| `a439618` | two falsified records |
+
+The answer this project invented is the **mutation control**: break the code on
+purpose, require the test to go red. Forty-one of them run in the gate. That
+discipline is mature and it answers one question:
+
+> **Falsifiability** — can this test fail?
+
+It does not answer the other one:
+
+> **Diagnosability** — when it fails, will the artefact say exactly why?
+
+Nothing in the gate required an answer to the second, so nothing provided one.
+On 2026-07-29 a 12-hour soak recorded **674 transport failures across 390
+million calls**, satisfied every criterion, and could not name a single cause.
+The generator stored a boolean and dropped the error value; the server under
+test installed neither a logger nor an observer, so every framework diagnostic
+was discarded twice over; the per-request log the generator could already write
+was never requested; and nothing carried an absolute timestamp, so the records
+that did exist could not be joined to each other.
+
+Nobody was careless. The standard was missing.
+
+## The three rules
+
+### 1. No discard
+
+An instrument that observes a failure **records its cause**, not a counter.
+
+If the code has an error value in hand, that value reaches the artefact. A
+boolean, a tally, or a status of `0` standing in for six different causes is a
+violation. Where the set of causes is known, classify into a **closed taxonomy**
+and keep the verbatim text as well — a taxonomy without the raw text cannot be
+audited, and raw text without a taxonomy cannot be counted.
+
+A cause outside the taxonomy is reported as `unclassified`. It is never folded
+into a neighbouring class, because a new failure mode that disguises itself as
+an old one is worse than one that is merely unnamed.
+
+### 2. Correlatable
+
+Every record carries **absolute time** — unix nanoseconds, not an offset from a
+start the artefact never printed — and enough identity to be joined to the other
+records of the same run.
+
+The test: can an analyst take one failure and ask what the server, the kernel and
+the other workloads were doing in that instant? If the answer requires a
+timestamp nobody wrote down, the instrument fails this rule.
+
+### 3. No anonymous tolerance
+
+**No criterion may accept a rate of anomaly without requiring each anomaly to be
+attributed.**
+
+This is the rule that would have caught the 674. A ceiling of "at most 0.01%
+transport error" is satisfied by 674 unexplained failures exactly as well as by
+zero. The ceiling is not wrong and it stays; what it cannot express is added
+beside it:
+
+> Every failure carries a named cause. A failure that is unclassified, or
+> counted with no class at all, fails the run **regardless of the rate**.
+
+This is strictly stronger, and it is affordable precisely because a healthy run
+produces few failures. If an instrument cannot afford it, that is evidence about
+the instrument, not an argument against the rule.
+
+A criterion of the form "at most X%" is the shape that hides cause by
+construction. Every one of them in this repository is suspect until it has been
+read against this rule.
+
+## How it is enforced
+
+Each instrument that falls under this standard carries a control in the gate
+that proves the property, in the shape `build/check_*_controls.sh` already uses:
+
+- a **positive** case: a deliberately caused failure must arrive classified,
+  with its text, locatable in absolute time;
+- one or more **mutations** of the instrument that remove the diagnostic and
+  must be detected;
+- where an analyser computes the verdict, a case proving it **refuses** an
+  artefact whose failures carry no cause.
+
+The positive case is not decoration. Without it, a typo in an assertion lets
+every mutation "pass" against any artefact at all — which is exactly how
+`0b1fea8` happened.
+
+`build/check_soak_controls.sh` is the reference implementation, and
+`ops/soak/CRITERIA.md` is the reference for criteria that carry their own
+history.
+
+## Instruments in scope
+
+Anything that produces a verdict, a published number, or release evidence:
+
+- the soak (`ops/soak/`) — **done**, and the model for the rest;
+- the JSON/HWM measurement harness;
+- the benchmark matrices under `bench/`;
+- every gate script whose criterion is a tolerance rather than a fact.
+
+The audit of the remaining instruments against these three rules is tracked
+separately. An instrument that has not been audited is not thereby compliant; it
+is unexamined, and the difference matters.
+
+## Criteria live in version control
+
+The soak criteria were relaxed after a red result — the offered load was about
+halved and the transport-error rule went from zero errors to at most 0.01%.
+Proving that required running the current analyser over the old data and
+comparing message strings, because the harness lived outside git.
+
+The relaxation was defensible. The invisibility was not. **A criterion with no
+history is a criterion that can be moved to fit a result, and nobody will be
+able to tell afterwards.**

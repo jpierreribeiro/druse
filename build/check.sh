@@ -1511,6 +1511,23 @@ env DRUSE_WP72_PREREQS_ALREADY_GREEN=1 DRUSE_COMPILER="$DRUSE_COMPILER" \
 # `max_write_time`, an idle keep-alive closes at `max_idle_time`, zero keeps
 # the shipped behaviour for both, and the WP46 read deadline still fires.
 # Serial (-define:ODIN_TEST_THREADS=1): seven servers on fixed ports.
+# Four suites that guarded real fixes and that nothing in this repository ran.
+# They were referenced only by the gates of experiment worktrees kept outside
+# version control, so `head-content-length` and `ingest-leak` — the regression
+# tests for two of the seven subsystem-audit fixes — were guarded by a gate that
+# does not exist here. All four passed when finally executed, so this closes a
+# coverage hole rather than a regression. planning/diagnosability.md: an
+# instrument nobody runs proves nothing.
+for druse_orphan in head-content-length ingest-leak wp118-accept-multishot \
+                    wp7_5-c1-inbound-stream; do
+  echo "--- $druse_orphan (odin test) ---"
+  timeout 180 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+    "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/$druse_orphan" \
+    "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+    -out:"$DRUSE_BIN_TMP/$druse_orphan" ||
+    fail "tests/$druse_orphan did not pass. It was outside the gate until 2026-07-30; if it is failing now, it has been failing unobserved."
+done
+
 echo "--- WP90 write/idle deadlines on the raw wire (odin test) ---"
 timeout 180 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
   "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/wp90-deadlines" \
