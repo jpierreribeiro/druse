@@ -1,0 +1,111 @@
+# The gate, in public.
+#
+# Everything this repository claims rests on `build/check.sh`, and until now it
+# ran only on a developer's machine and in a pre-push hook. That is a real
+# guarantee with no public evidence: a reader had to take the word of a README
+# for it. This workflow is the same script, on someone else's computer.
+#
+# It runs the WHOLE gate rather than a fast subset, deliberately. A cheaper job
+# would create two rulers -- the weak one visible and the strong one private --
+# and the visible one is the one people come to believe.
+name: gate
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# A newer push makes an older run pointless. Cancel it rather than paying for
+# an answer about a commit nobody is waiting on.
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: full gate (Linux x86-64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # The toolchain is PINNED and the pin carries its own checksum, so this
+      # step verifies rather than trusts. odin-version.txt is the single source:
+      # if the pin moves, this moves with it and no workflow edit is needed.
+      - name: Fetch the pinned Odin toolchain
+        run: |
+          set -euo pipefail
+          release="$(sed -n 's/^release=//p' odin-version.txt)"
+          asset="$(sed -n 's/^linux_amd64_asset=//p' odin-version.txt)"
+          want="$(sed -n 's/^linux_amd64_sha256=//p' odin-version.txt)"
+          test -n "$release" && test -n "$asset" && test -n "$want"
+          echo "pin: $release / $asset"
+          curl -fsSL -o "$asset" \
+            "https://github.com/odin-lang/Odin/releases/download/$release/$asset"
+          got="$(sha256sum "$asset" | cut -d' ' -f1)"
+          if [ "$want" != "$got" ]; then
+            echo "::error::toolchain checksum mismatch. want $want, got $got"
+            exit 1
+          fi
+          mkdir -p "$HOME/odin"
+          tar -xzf "$asset" -C "$HOME/odin" --strip-components=1
+          chmod +x "$HOME/odin/odin"
+          "$HOME/odin/odin" version
+
+      # `check.sh` needs clang to link its runnable checks and refuses to start
+      # without it; python3 backs the mutation controls and the summarisers.
+      - name: Tools the gate requires
+        run: |
+          set -euo pipefail
+          clang --version | head -1
+          python3 --version
+
+      - name: build/check.sh
+        env:
+          DRUSE_ODIN_BIN: ${{ github.workspace }}/../odin/odin
+        run: |
+          set -euo pipefail
+          export DRUSE_ODIN_BIN="$HOME/odin/odin"
+          bash build/check.sh
+
+  # The README says, honestly, that macOS and Windows are UNTESTED. This job
+  # does not make them tested -- the gate is Linux by construction: raw sockets,
+  # `nm`, `taskset`, kernel counters. What it does is replace "nobody has
+  # proven it" with a smaller claim that is proven: the library and the examples
+  # COMPILE, on every push, on both.
+  portability:
+    name: compiles (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    # NON-BLOCKING, on purpose. This job depends on a third-party action and on
+    # an UNPINNED nightly for platforms the project does not pin -- both are
+    # infrastructure that can break for reasons that say nothing about Druse.
+    # A red here must not put a red badge on a commit whose gate is green,
+    # because a badge that cries wolf is a badge people stop reading.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Odin (nightly, unpinned on this platform)
+        uses: laytan/setup-odin@v2
+        with:
+          release: latest
+
+      # Deliberately narrower than the Linux job, and the narrowness is the
+      # point: a green here means "it builds", not "it works". Claiming more
+      # from a compile would be the kind of overreach the README's platform
+      # section exists to avoid.
+      - name: Compile the library and the examples
+        shell: bash
+        run: |
+          set -euo pipefail
+          odin build examples/01-hello-world -collection:druse=. -out:hello
+          odin build examples/02-json-api    -collection:druse=. -out:jsonapi
+          odin build examples/03-route-params -collection:druse=. -out:params
+          echo "library and three examples compiled on ${{ matrix.os }}"

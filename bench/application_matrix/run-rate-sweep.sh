@@ -51,7 +51,7 @@ fail() { echo "SWEEP-FAIL: $*" >&2; exit 1; }
 (cd "$ROOT/ops/soak/openload" && go build -buildvcs=false -trimpath \
   -o "$OUT/bin/openload" main.go) || fail "openload does not build"
 if [ -n "${DRUSE_BENCH_PEER_BIN:-}" ]; then
-  cp "$DRUSE_BENCH_PEER_BIN"/{nethttp,gin,fiber} "$OUT/bin/" ||
+  cp "$DRUSE_BENCH_PEER_BIN"/{nethttp,gin,fiber,fasthttp} "$OUT/bin/" ||
     fail "DRUSE_BENCH_PEER_BIN does not hold the three Go peers"
 else
   (cd "$MATRIX/peers/go" && go build -o "$OUT/bin/" ./cmd/...) ||
@@ -104,7 +104,7 @@ stop_server() {
   fail "port $PORT is still held after stopping the server"
 }
 
-SERVERS=(druse nethttp gin fiber)
+SERVERS=(druse nethttp gin fiber fasthttp)
 
 for repeat in $(seq 1 "$REPEATS"); do
   order=("${SERVERS[@]}")
