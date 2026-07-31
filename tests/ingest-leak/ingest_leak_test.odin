@@ -232,14 +232,39 @@ upload_admission_survives_abandoned_bodies :: proc(t: ^testing.T) {
 	// THE ASSERTION. With slots leaked, admission is exhausted and `start_upload`
 	// refuses this with 503. With them released, it spools and dispatches exactly
 	// as the baseline did.
+	//
+	// POLLED, NOT SLEPT, and the distinction is the whole point of the test.
+	// The 150 ms above is a guess about how long a teardown takes on an idle
+	// machine; under the full gate it is sometimes not enough, and this suite
+	// then reported "admission slots leaked" for a teardown that had merely not
+	// finished yet — the exact confusion between a leak and momentary
+	// concurrency that the sleep exists to avoid. It failed that way in the
+	// 2026-07-30 pre-push gate while passing six consecutive standalone runs.
+	//
+	// A LEAK NEVER RECOVERS. That is what makes the retry sound rather than a
+	// way of wishing a red test green: if a slot is genuinely lost, no amount of
+	// waiting returns it, so a 201 inside the window proves the release
+	// happened and a 503 across the whole window proves it did not. The bound
+	// is generous because it costs nothing when the release is prompt — the
+	// loop exits on the first success.
 	{
 		body := body_of(SPOOLED)
 		defer delete(body)
-		status, ok := post(PORT, body)
+
+		status: int
+		ok: bool
+		for attempt in 0 ..< 40 {
+			status, ok = post(PORT, body)
+			if ok && status == 201 {
+				break
+			}
+			time.sleep(100 * time.Millisecond)
+		}
+
 		testing.expectf(
 			t,
 			ok && status == 201,
-			"upload after %d abandoned bodies: ok=%v status=%v (503 means admission slots leaked)",
+			"upload after %d abandoned bodies: ok=%v status=%v after 4s of retries (503 that never clears means admission slots leaked; a leak does not recover)",
 			ABANDONS,
 			ok,
 			status,
