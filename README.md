@@ -109,10 +109,17 @@ Stated plainly, because a framework that hides its edges wastes your time:
 ## Platform
 
 **Linux x86-64 only, and by construction rather than by omission.** The vendored
-bootstrap transport imports `core:sys/linux` and sets up an `io_uring` event
-loop per Handler lane, so macOS and Windows do not compile at all: CI proves it
-on every push by trying, and the build stops at `sched_yield` and
-`setsockopt_base`.
+bootstrap transport imports `core:sys/linux` and stands up an `io_uring` event
+loop per Handler lane, so the library is not portable in its current form.
+
+On macOS this is verified: CI builds an example on every push and the compile
+stops at `sched_yield` and `setsockopt_base`, which `core:sys/linux` declares
+and no other target does. CI asserts that failure and its cause, so a future
+transport that made the build succeed would turn the job red and send someone
+back to this paragraph.
+
+Windows is expected to fail the same way and is **not yet confirmed**: the first
+CI runs there died on a workflow bug before reaching any Druse source.
 
 This is not a gap waiting on testing. It lifts when the bootstrap transport is
 replaced by the official Odin HTTP package, not before.

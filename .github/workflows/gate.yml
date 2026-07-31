@@ -120,17 +120,38 @@ jobs:
       # -- because a success would mean the transport no longer binds
       # core:sys/linux, the README's platform sentence has gone stale, and
       # somebody should find that out from CI rather than from a bug report.
-      - name: Assert the library does NOT build here
+      # THE EXPECTED OUTCOME IS A COMPILE FAILURE, and it must fail for the
+      # RIGHT REASON. The first version of this step asserted only that the
+      # build failed, and on Windows it "passed" because `-out:hello` is missing
+      # an extension there -- a bug in this workflow, not a portability limit.
+      # It never reached a single line of Druse. Every mutation control in
+      # build/ checks the diagnostic and not just the exit status; so does this.
+      - name: Assert the library does NOT build here, for the documented reason
         shell: bash
         run: |
           set -uo pipefail
-          if odin build examples/01-hello-world -collection:druse=. -out:hello 2>build.log; then
+          out="hello"
+          [ "${{ runner.os }}" = "Windows" ] && out="hello.exe"
+
+          if odin build examples/01-hello-world -collection:druse=. -out:"$out" 2>build.log; then
             echo "::error::examples/01-hello-world COMPILED on ${{ matrix.os }}."
-            echo "::error::That is good news and a stale document: README's Platform section says"
-            echo "::error::Druse is Linux by construction because vendor/odin-http imports"
-            echo "::error::core:sys/linux. Re-check that claim and update it before this job is"
-            echo "::error::flipped back to expecting a green build."
+            echo "::error::Good news and a stale document: README's Platform section says Druse is"
+            echo "::error::Linux by construction because vendor/odin-http binds core:sys/linux."
+            echo "::error::Re-check that claim and update it before flipping this job green-on-build."
             exit 1
           fi
-          echo "the build failed here, as the Platform section states. First lines:"
-          head -5 build.log
+
+          echo "--- the build failed, as the Platform section states. Diagnostic: ---"
+          cat build.log
+
+          # The documented cause is the Linux syscall surface the vendored
+          # transport binds. Anything else means this job is reporting a broken
+          # runner, a bad flag or a missing toolchain as if it were portability.
+          if grep -qE "is not declared by 'linux'|core:sys/linux|sched_yield|setsockopt_base" build.log; then
+            echo "cause matches the documented one: the transport binds Linux syscalls."
+          else
+            echo "::error::The build failed, but NOT for the reason the README documents."
+            echo "::error::This job would have reported a workflow bug as a portability limit."
+            echo "::error::Fix the step, or update the Platform section to match reality."
+            exit 1
+          fi
