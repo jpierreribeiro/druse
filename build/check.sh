@@ -1444,6 +1444,28 @@ grep -q 'bash build/check.sh' "$DRUSE_ROOT/.github/workflows/gate.yml" ||
   fail "the workflow no longer runs build/check.sh; a green badge would promise something weaker than this gate"
 echo "PASS: the public workflow runs the same gate this script is"
 
+# --- the platform claim and the assertion that proves it say the same thing ---
+#
+# The portability job passes only when the compile failure names one of four
+# tokens, and README's Platform section quotes those tokens in prose. They were
+# duplicated with nothing keeping them together: editing the README's sentence
+# would fail nothing, and that paragraph is exactly where CI is supposed to send
+# a reader. A claim and its proof drifting apart is the subject of
+# planning/diagnosability.md, one layer out.
+#
+# `sched_yield` and `setsockopt_base` are the two symbols the README names, and
+# the two a real Windows run reported for the first time on 2026-07-31 (PR #155)
+# after the assertion was made to match the cause. If the transport stops
+# binding them, both places move together, and this says so.
+echo "--- The platform claim and its CI assertion agree ---"
+for druse_symbol in sched_yield setsockopt_base; do
+  grep -q "$druse_symbol" "$DRUSE_ROOT/.github/workflows/gate.yml" ||
+    fail "the portability job no longer matches '$druse_symbol', but README's Platform section still names it as a symbol the compile stops at. One of the two is now false."
+  grep -q "$druse_symbol" "$DRUSE_ROOT/README.md" ||
+    fail "README's Platform section no longer names '$druse_symbol', but the portability job still accepts it as proof of the platform claim. The paragraph CI sends a reader back to must name what CI actually checked."
+done
+echo "PASS: README and the portability assertion name the same symbols"
+
 # --- the supervisor contract: the shipped unit and the documents agree -------
 #
 # Same class of rule as the block above, and it belongs here for the same
