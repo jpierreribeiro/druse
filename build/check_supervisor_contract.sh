@@ -134,3 +134,43 @@ document that has to move with it."
 fi
 
 echo "PASS: ops/deploy/druse.service ships Restart=$UNIT_RESTART, LimitMEMLOCK=$UNIT_MEMLOCK, and every document in the tree agrees"
+
+# --- the OTHER shipped operational artefacts ---------------------------------
+#
+# `ops/ci/` is the self-hosted verifier: a systemd timer that runs this same gate
+# every five minutes on a VPS. It is shipped, it is operational, and it was in
+# exactly the position `ops/deploy/druse.service` was in before this file
+# existed -- checked by nothing that runs.
+#
+# It was not unchecked by oversight, which is the interesting part. The checks
+# below existed, in build/check_test.sh, which build/check.sh only parses
+# because check_test.sh recurses into the gate. Same shape as the orphan
+# detector: a real check, in a file nobody executes. Moved here, where the gate
+# reaches it.
+
+CI_DIR="$ROOT/ops/ci"
+test -d "$CI_DIR" || fail "ops/ci is missing; the self-hosted verifier is part of the shipped topology"
+
+for f in run.sh status.sh install-odin.sh; do
+  test -f "$CI_DIR/$f" || fail "missing self-hosted verifier file: ops/ci/$f"
+  bash -n "$CI_DIR/$f" || fail "ops/ci/$f does not parse; the VPS would run a broken verifier on its next tick"
+done
+
+# The verifier must build from a CLEAN WRITABLE COPY, not from the checkout it
+# is watching -- otherwise a gate that mutates sources (every mutation control
+# does) would race the working tree it is meant to be verifying.
+grep -Fq 'cd "$DRUSE_CI_WORK"' "$CI_DIR/run.sh" ||
+  fail "ops/ci/run.sh no longer builds from its clean writable archive; a verifier that runs in the watched tree races the mutations it is running"
+
+# A oneshot must NOT carry Restart=: systemd would relaunch a verifier that has
+# already reported, and the timer is what schedules it.
+if test -f "$CI_DIR/druse-ci.service"; then
+  grep -q '^Type=oneshot' "$CI_DIR/druse-ci.service" ||
+    fail "ops/ci/druse-ci.service is no longer Type=oneshot; the timer schedules it, and a long-running verifier would overlap its own next tick"
+  grep -q '^Restart=' "$CI_DIR/druse-ci.service" &&
+    fail "ops/ci/druse-ci.service declares Restart=; it is a oneshot driven by druse-ci.timer, and restarting it would run the gate in a loop outside the schedule"
+fi
+test -f "$CI_DIR/druse-ci.timer" ||
+  fail "ops/ci/druse-ci.timer is missing; without it druse-ci.service never runs and the self-hosted verifier is decoration"
+
+echo "PASS: ops/ci ships a parseable verifier, building from a clean copy, driven by a timer rather than a restart"

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/druse.png" alt="Druse" width="200">
+</p>
+
 # Druse
 
 *A web framework for the Joy of Programming.*

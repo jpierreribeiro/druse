@@ -744,9 +744,10 @@ Measured. 20,000 requests, R-c fence installed, one skipped `defer` per fault
 >
 > **Neither is reproducible from this repository.** Everything below lived in
 > `/tmp/wp13-probe/` and was never committed; the directory is gone. This
-> document predates the rule now in `planning/verification-campaign-plan.md`
-> that every reported number must be regenerable from a committed script, and it
-> does not meet it. ADR-020 does not rest on the constant — it rests on the shape
+> document predates the project's standing rule — every reported number must be
+> regenerable from a committed script — and it does not meet it. (The rule's own
+> document, `planning/verification-campaign-plan.md`, is not in the repository
+> either; see OQ-34. It is restated here rather than pointed at.) ADR-020 does not rest on the constant — it rests on the shape
 > in §9: linear, unbounded, and invisible to the supervisor.
 >
 > **The shape has since been re-measured from committed code, and the two

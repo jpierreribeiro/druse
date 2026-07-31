@@ -16,6 +16,21 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+  # A WEEKLY TICK, because two of the things this workflow depends on rot on
+  # someone else's schedule rather than on ours.
+  #
+  # The portability job installs `release: latest` -- an UNPINNED nightly, by
+  # necessity, since this project pins a toolchain for Linux and not for the
+  # platforms it does not support. That nightly, and the third-party action that
+  # fetches it, can break at any time. Without a schedule the first notice would
+  # be somebody's pull request going red for a reason that has nothing to do
+  # with their change, which is the surest way to teach people to ignore a red
+  # square. The runner images move underneath us the same way.
+  #
+  # Monday 06:00 UTC: one run a week, arriving before the week's work rather
+  # than during it.
+  schedule:
+    - cron: '0 6 * * 1'
 
 # A newer push makes an older run pointless. Cancel it rather than paying for
 # an answer about a commit nobody is waiting on.
@@ -182,3 +197,100 @@ jobs:
             echo "::error::Fix the step, or update the Platform section to match reality."
             exit 1
           fi
+
+  # WHAT A RELEASE ACTUALLY SHIPS, checked on the tag rather than assumed.
+  #
+  # GitHub attaches a `git archive` tarball to every tag, and `.gitattributes`
+  # decides what goes in it -- 20 `export-ignore` rules that strip evidence/,
+  # planning/, tests/, build/, ops/ and the rest, taking the archive from the
+  # repository's full weight down to about 2 MB of library, docs and examples.
+  #
+  # Nothing verified that. Two things could go wrong quietly and only be found
+  # by whoever downloaded the release: a new directory of internal material
+  # could ship because nobody added its export-ignore line, or a path something
+  # DEPENDS ON could stop shipping because somebody added one. The second is the
+  # dangerous one -- a tarball that is missing `vendor/odin-http` or `web/` is a
+  # release that does not build, and the gate above would still be green,
+  # because the gate runs against the repository and not against the artefact.
+  #
+  # So this job builds the artefact and uses it: extract, then compile an
+  # example against the extracted tree ALONE. That is the only assertion that
+  # catches both failures at once.
+  release-archive:
+    name: the release tarball is complete and builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch the pinned Odin toolchain
+        run: |
+          set -euo pipefail
+          release="$(sed -n 's/^release=//p' odin-version.txt)"
+          asset="$(sed -n 's/^linux_amd64_asset=//p' odin-version.txt)"
+          want="$(sed -n 's/^linux_amd64_sha256=//p' odin-version.txt)"
+          curl -fsSL -o "$asset" \
+            "https://github.com/odin-lang/Odin/releases/download/$release/$asset"
+          got="$(sha256sum "$asset" | cut -d' ' -f1)"
+          if [ "$want" != "$got" ]; then
+            echo "::error::toolchain checksum mismatch. want $want, got $got"
+            exit 1
+          fi
+          mkdir -p "$HOME/odin"
+          tar -xzf "$asset" -C "$HOME/odin" --strip-components=1
+          chmod +x "$HOME/odin/odin"
+
+      - name: Build the archive GitHub would attach
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rel
+          git archive --format=tar HEAD | tar -x -C /tmp/rel
+          echo "archive size: $(du -sh /tmp/rel | cut -f1)"
+          echo "top level:"; ls /tmp/rel
+
+      # THE EXCLUSIONS HOLD. Every export-ignore line is read from the file
+      # rather than restated here, so adding a rule cannot drift from its check.
+      - name: Nothing export-ignored is in the archive
+        run: |
+          set -euo pipefail
+          leaked=""
+          while read -r path; do
+            test -n "$path" || continue
+            if [ -e "/tmp/rel/$path" ]; then leaked="$leaked $path"; fi
+          done < <(grep -E '^[^#[:space:]]+[[:space:]]+export-ignore' .gitattributes |
+                     awk '{print $1}' | sed 's:/$::')
+          if [ -n "$leaked" ]; then
+            echo "::error::these paths are marked export-ignore but are in the tarball:$leaked"
+            echo "::error::A release would ship internal material. Check .gitattributes."
+            exit 1
+          fi
+          echo "all export-ignore rules held"
+
+      # AND THE INCLUSIONS HOLD, which is the half that bites harder: an
+      # over-eager export-ignore produces a tarball that cannot build, and no
+      # other job would notice, because every other job runs against the repo.
+      - name: The extracted archive builds on its own
+        run: |
+          set -euo pipefail
+          export ODIN_ROOT="$HOME/odin"
+          export PATH="$HOME/odin:$PATH"
+          for required in web vendor/odin-http examples LICENSE README.md odin-version.txt; do
+            test -e "/tmp/rel/$required" || {
+              echo "::error::the tarball is missing $required, so the release does not build"
+              exit 1
+            }
+          done
+          "$HOME/odin/odin" build /tmp/rel/examples/01-hello-world \
+            -collection:druse=/tmp/rel -out:/tmp/rel-hello
+          test -x /tmp/rel-hello
+          echo "an example compiled against the extracted tarball alone"
+
+      - name: Keep the archive with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: druse-release-tree
+          path: /tmp/rel
+          retention-days: 14

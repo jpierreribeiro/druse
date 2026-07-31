@@ -25,8 +25,10 @@ confirmation would be a green result for a reason it did not name
 (`planning/diagnosability.md` rule 4).
 
 This is recorded here because
-`planning/verification-campaign-plan.md` requires every reported number to be
-regenerable from a committed script, and ADR-020's number is not. The honest
+this project requires every reported number to be regenerable from a committed
+script, and ADR-020's number is not. (The rule is written in
+`planning/verification-campaign-plan.md`, which is not itself in the repository
+— OQ-34 — so it is restated rather than cited.) The honest
 close is not a fabricated reproduction — it is a committed measurement of the
 quantity the decision actually turns on, plus a plain statement that the
 historical constant stands on a prototype that no longer exists.

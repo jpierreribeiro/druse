@@ -212,9 +212,10 @@ agent usability study become the evidence for future API improvements and any
 
 ### Scheduled, not yet assigned to a phase
 
-**WP123 — per-server state replaces `g_server`.** ADR-018, accepted by the owner
-on 2026-07-31, closing a Phase-4 exit criterion that Phase 4 froze without
-meeting. WP43 removed `g_config`; what remains is one process-wide slot in
+**WP123 — per-server state replaces `g_server`.** Spec:
+[`wp123-per-server-state-spec.md`](wp123-per-server-state-spec.md). ADR-018,
+accepted by the owner on 2026-07-31, closing a Phase-4 exit criterion that
+Phase 4 froze without meeting. WP43 removed `g_config`; what remains is one process-wide slot in
 `web/internal/transport`, and the reason it cannot be finished internally is
 that `web.stats` and `web.refused_connections` take no server argument. Changing
 those is **public surface on a frozen contract**, so WP123 pays G-09 in full and

@@ -475,7 +475,10 @@ Internal only; no public surface change; no owner approval required.
   WP43; the remainder is owned by **WP123**, which is what this acceptance
   authorises. The owner approval the original text demanded is hereby given, for
   the public change named under "What is left" below.
-- **Owner.** WP43 (done, 2026-07-21) and WP123 (scheduled).
+- **Owner.** WP43 (done, 2026-07-21) and WP123 (scheduled; spec at
+  `planning/wp123-per-server-state-spec.md`, which fixes the App as the
+  per-server handle so no new public type is ratified, and names the proving
+  test — two servers in one process, each answering its own routes).
 
 **What changed since the proposal was written.** The Context below is kept for
 the record but is **no longer accurate**. WP43 removed `g_config` entirely: a
@@ -641,9 +644,12 @@ the stop API at the same time.
   quoting the number.** It is **not reproducible from this repository.** It comes
   from a WP13 prototype that lived entirely in `/tmp/wp13-probe/` and was never
   committed; that directory is long gone, and no script in the tree recreates it.
-  This predates — and does not satisfy — the rule now stated in
-  `planning/verification-campaign-plan.md`, that every number reaching a report
-  must be regenerable from a committed script. Two further cautions: the source
+  This predates — and does not satisfy — the project's standing rule that **every
+  number reaching a report must be regenerable from a committed script, and raw
+  artifacts committed rather than only prose**. (That rule is written down in
+  `planning/verification-campaign-plan.md`, which is itself NOT in the
+  repository — excluded per-clone through `.git/info/exclude`, see OQ-34. The
+  rule is restated here so it survives the pointer.) Two further cautions: the source
   document gives **8,250 B** in prose (`§9`, the arithmetic mean over a
   20,000-request soak: (167,751,057 − 2,751,057) ÷ 20,000) and **8,192 B** in its
   comparison matrix (the single 8 KiB buffer released by the skipped `defer`) —
@@ -666,8 +672,8 @@ the stop API at the same time.
   releasing a request-scoped 8 KiB buffer and one not. Result: **8,192.0 bytes
   per request, 0.0 residue, 0.0% linearity drift**, with 163,840,000 bytes still
   live at the end and nothing reclaimed. Committed script, committed output
-  (`RESULT-2026-07-31.txt`) — which is what `verification-campaign-plan.md`
-  requires and what this ADR could not previously offer.
+  (`RESULT-2026-07-31.txt`) — a regenerable number backed by its raw output,
+  which is what this ADR could not previously offer.
   **It also reconciles 8,250 against 8,192.** They count different things and
   are consistent: 8,192 is the one skipped free; 8,250 is ~58 bytes/request
   higher because the fence skipped EVERY `defer` in the frame, not one. Quote

@@ -1392,11 +1392,17 @@ env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
 # deliberately, with their reasons, in build/check_suite_inventory.sh — which
 # this gate RUNS, and which fails on any new orphan.
 #
-# `nbio-timeout` joins them on 2026-07-31. It was the orphan the orphan detector
-# could not see, because the detector lived inside build/check_test.sh and
-# check.sh only parses that file — check_test.sh is a meta-test that invokes
-# this gate several times, so calling it from here would recurse. Three @(test)
-# procedures, never executed by anything, for about five seconds of runtime.
+# `nbio-timeout` was wired in here on 2026-07-31 and TAKEN OUT AGAIN the same
+# day, which is worth recording rather than hiding. It was a genuine orphan --
+# three @(test) procedures the orphan detector could not see, because the
+# detector lived in build/check_test.sh, which this gate only parses. But the
+# suite is not IN this repository: it is excluded through `.git/info/exclude`,
+# per-clone and unversioned, so it exists in one working copy and nowhere else.
+# Naming it here made the gate pass on that machine and fail on every fresh
+# clone, CI included -- a green local run standing in for a green build, which
+# is diagnosability rule 4 with the machine as the hidden variable.
+# It is exempted in build/check_suite_inventory.sh with that reason. Committing
+# it is an owner decision, tracked as OQ-34.
 #
 # THREADS=1 for the ones that drive a server: one server per process.
 echo "--- Previously ungated suites: multipart, HEAD framing, ingest, upload ---"
@@ -1405,7 +1411,6 @@ for DRUSE_UNGATED in \
   head-content-length \
   ingest-leak \
   h2-graceful-acquire \
-  nbio-timeout \
   wp7_5-c1-inbound-stream \
   wp7_5-c2-upload; do
   env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \

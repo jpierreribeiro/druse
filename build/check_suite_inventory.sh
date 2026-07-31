@@ -50,7 +50,19 @@ test -d "$DRUSE_ROOT/build" || fail "build/ does not exist"
 #                             process descriptor limit, thousands of sockets) is
 #                             not a gate property; running it on every push
 #                             would make the gate's cost depend on the machine.
-DRUSE_ORPHAN_ALLOWED=" wp118-accept-multishot g76-scale-sockets "
+#   nbio-timeout           -- NOT IN THIS REPOSITORY, and the exemption is the
+#                             finding. It is a real regression guard (audit B4,
+#                             the io_uring bounded tick, three @(test)
+#                             procedures) and it was a real orphan. It was wired
+#                             into build/check.sh on 2026-07-31 and taken out
+#                             the same day: the directory is excluded through
+#                             `.git/info/exclude`, which is per-clone and
+#                             unversioned, so naming it in the gate made the
+#                             gate pass here and fail on every fresh clone.
+#                             A green local run is not a green build. Committing
+#                             the suite is an owner decision (OQ-34); until then
+#                             it cannot be gated, and saying so beats a skip.
+DRUSE_ORPHAN_ALLOWED=" wp118-accept-multishot g76-scale-sockets nbio-timeout "
 
 DRUSE_ORPHANS=""
 for DRUSE_SUITE_DIR in "$DRUSE_ROOT"/tests/*/ "$DRUSE_ROOT"/tests/*/*/; do
@@ -101,3 +113,47 @@ if test -n "$DRUSE_ORPHANS"; then
 fi
 
 echo "PASS: every test suite is either gated or deliberately exempt"
+
+# --- THE GATE MAY ONLY NAME PATHS THE REPOSITORY ACTUALLY HAS ----------------
+#
+# The rule that would have caught the mistake above before it was pushed.
+#
+# `build/check.sh` runs on machines that do not have this working copy: a fresh
+# clone, GitHub Actions, the VPS verifier. A path that exists here and not in
+# the repository makes the gate pass locally and fail everywhere else, and the
+# local pass is what the author sees. That is rule 4 with the machine as the
+# hidden variable — the run is green for a reason it does not name, and the
+# reason is "this directory happens to exist on this disk".
+#
+# This repository has a whole cluster in that position, excluded through
+# `.git/info/exclude` (per-clone, unversioned): tests/nbio-timeout,
+# experiments/23-accept-stall, experiments/24-shutdown-race, ops/campaign/ and
+# planning/verification-campaign-plan.md. Every one is real work; none of it is
+# in the repository; and until 2026-07-31 nothing said so.
+#
+# Skipped when git is unavailable or this is not a work tree — the check needs
+# the index to answer its question, and guessing is worse than abstaining.
+if command -v git >/dev/null 2>&1 &&
+   git -C "$DRUSE_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+
+  DRUSE_UNTRACKED_REFS=""
+  while IFS= read -r suite; do
+    test -n "$suite" || continue
+    test -e "$DRUSE_ROOT/tests/$suite" || continue
+    git -C "$DRUSE_ROOT" ls-files --error-unmatch "tests/$suite" >/dev/null 2>&1 && continue
+    DRUSE_UNTRACKED_REFS="$DRUSE_UNTRACKED_REFS
+  tests/$suite — named in build/check.sh, absent from the repository"
+  done < <(
+    sed -n '/^for DRUSE_UNGATED in/,/; do$/p' "$DRUSE_ROOT/build/check.sh" |
+    sed 's/^for DRUSE_UNGATED in//; s/; do$//; s/\\$//' | tr ' ' '\n' | grep -v '^$'
+  )
+
+  if test -n "$DRUSE_UNTRACKED_REFS"; then
+    fail "the gate names test suites that are not in the repository:$DRUSE_UNTRACKED_REFS
+
+They exist in this working copy and nowhere else, so build/check.sh passes here
+and fails on a fresh clone, in CI, and on the VPS verifier. Commit the suite, or
+take it out of the gate and exempt it above with the reason."
+  fi
+  echo "PASS: every suite the gate names is tracked in the repository"
+fi

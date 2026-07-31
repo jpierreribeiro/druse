@@ -2,8 +2,9 @@
 #
 # Regenerate the ADR-020 leak-shape measurement from committed code.
 #
-# This exists because planning/verification-campaign-plan.md requires every
-# reported number to be regenerable from a committed script, and ADR-020's
+# This exists because this project requires every reported number to be
+# regenerable from a committed script (a rule whose own document is not in the
+# repository -- OQ-34 -- so it is restated here), and ADR-020's
 # "8,250 bytes per recovered fault" is not: it came from an uncommitted WP13
 # prototype of a REJECTED recovery fence, in a /tmp directory that no longer
 # exists. See README.md — this measures the quantity the decision turns on, and
