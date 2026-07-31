@@ -38,6 +38,15 @@ bench/              export-ignore
 ops/                export-ignore
 tests/              export-ignore
 
+# Vendored snapshots NOTHING IN A RELEASE CAN IMPORT. `web/` and `examples/`
+# import exactly one thing from vendor/ -- `druse:vendor/odin-http`. The other
+# two are imported only by `bench/` and `tests/`, both already excluded here, so
+# shipping them was 300 KB and 21 files of code a consumer cannot reach. Proven
+# by building `examples/02-json-api` against a tree containing only web/,
+# examples/, vendor/odin-http and odin-version.txt.
+vendor/nbio/            export-ignore
+vendor/uring_buf_ring/  export-ignore
+
 # Working copies and agent scratch.
 bundle/             export-ignore
 tina/               export-ignore

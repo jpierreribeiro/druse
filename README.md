@@ -189,13 +189,8 @@ examples/                Compiling programs (all built by the gate)
 
 ## Status
 
-**Ready for `v0.10.0`, not yet tagged.** The six release gates are green and
-the public ledger is frozen at 82 symbols, but **the tag does not exist** — the
-latest tags are `v0.9.0-pilot` and `v0.9.1-pilot`. This paragraph used to
-announce v0.10.0 as released, which was a release note written ahead of the
-release; cutting the tag is an owner decision (`CONTRIBUTING.md`) and it has not
-been taken. Corrected rather than made true, because a text edit is the easier
-of the two to undo. What
+**Released: `v0.10.0`** — a pre-1.0 public release, no longer marked a pilot.
+Two controlled pilots came before it, `v0.9.0-pilot` and `v0.9.1-pilot`. What
 each release earned, and the one gap in its evidence, is recorded in
 [`planning/release-readiness.md`](planning/release-readiness.md); notable
 changes are in [`CHANGELOG.md`](CHANGELOG.md).
@@ -373,8 +368,7 @@ What exists today is a production-minded HTTP microframework for JSON APIs,
 with explicit operational boundaries and a bootstrap transport intended to be
 replaced by the official Odin HTTP package after that real implementation is
 available and passes the same conformance corpus. The frozen contract now
-will carry `v0.10.0` when it is cut, pre-1.0, where a breaking change moves the
-MINOR and `1.0` waits on accrued real-world use rather than on another gate.
+carries a version: `v0.10.0`, pre-1.0, where a breaking change moves the MINOR and `1.0` waits on accrued real-world use rather than on another gate.
 
 ## Supported platform and toolchain
 
@@ -439,8 +433,9 @@ vulnerability.
 people: the public API is frozen and the build enforces it, and growing it
 requires measured evidence rather than agreement.
 
-Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md); the latest tag
-is `v0.9.1-pilot` and `v0.10.0` is prepared but not cut. What happens next is planned in
+Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md), and the current
+release is `v0.10.0` — read its **Breaking** section before upgrading from a
+pilot tag. What happens next is planned in
 [`planning/roadmap.md`](planning/roadmap.md).
 
 **Consuming Druse.** Odin has no package manager
