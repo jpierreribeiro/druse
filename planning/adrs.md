@@ -658,6 +658,20 @@ the stop API at the same time.
   `build/check_wp21_controls.sh` control 7 builds a faulting program and a clean
   baseline and asserts the first dies by signal while the second exits 0. Nothing
   in the gate measures the leak.
+- **The SHAPE is reproducible, and now is — `experiments/26-adr020-leak-shape`,
+  measured 2026-07-31.** The historical constant cannot be re-measured: it
+  measured option (C), the fence this ADR rejected and nobody ever built. The
+  quantity the decision actually turns on can be, and was — two arms of 20,000
+  requests each through `web.test_request` under a tracking allocator, one
+  releasing a request-scoped 8 KiB buffer and one not. Result: **8,192.0 bytes
+  per request, 0.0 residue, 0.0% linearity drift**, with 163,840,000 bytes still
+  live at the end and nothing reclaimed. Committed script, committed output
+  (`RESULT-2026-07-31.txt`) — which is what `verification-campaign-plan.md`
+  requires and what this ADR could not previously offer.
+  **It also reconciles 8,250 against 8,192.** They count different things and
+  are consistent: 8,192 is the one skipped free; 8,250 is ~58 bytes/request
+  higher because the fence skipped EVERY `defer` in the frame, not one. Quote
+  either, and say which.
 - **Doc impact.** `knowledge-base/03-development-phases.md` §Phase 2 scope and
   Test Gate are amended; `planning/phase-2-plan.md` WP21 drops to zero symbols.
 - **Reversibility.** HIGH — nothing is exported, so Phase 4 may add a last-gasp

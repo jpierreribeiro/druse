@@ -36,8 +36,21 @@ DRUSE_REAL_OUTPUT="$(DRUSE_ODIN_BIN="${DRUSE_ODIN_BIN:-}" \
   fail "pre-push gate rejected the pinned toolchain"
 grep -q "toolchain commit: $DRUSE_EXPECTED_COMMIT" <<<"$DRUSE_REAL_OUTPUT" ||
   fail "check output did not report the pinned commit"
-grep -q "PASS=10 FAIL=0 SKIP=0" <<<"$DRUSE_REAL_OUTPUT" ||
-  fail "check output did not report all prototype passes"
+# A PINNED COUNT ROTS, and this line is the proof: it read `PASS=10` while the
+# tree had produced `PASS=15` for a long time, so it would have failed on any
+# run -- and it never ran, because nothing executed this file (see the header
+# note on build/check_gate_inventory.sh). It is the fifth instance of the
+# failure check.sh already records: "FOUR were broken, and had been for as long
+# as nobody had looked."
+#
+# So the assertion stops pinning a number it cannot maintain and asserts the
+# property it actually wanted: the prototypes ran, and none of them failed.
+# `experiments/run_checks.sh` now closes its own set, so "how many" is its
+# question to answer, not this file's.
+grep -qE "PASS=[0-9]+ FAIL=0 SKIP=0" <<<"$DRUSE_REAL_OUTPUT" ||
+  fail "check output did not report a clean prototype sweep (expected PASS=<n> FAIL=0 SKIP=0)"
+grep -q "PASS=0 FAIL=0 SKIP=0" <<<"$DRUSE_REAL_OUTPUT" &&
+  fail "the prototype sweep reported zero passes; run_checks.sh ran nothing, which is not the same as everything passing"
 
 if ! ODIN_ROOT=/tmp/druse-invalid-ambient-odin-root \
   DRUSE_ODIN_BIN="${DRUSE_ODIN_BIN:-/tmp/druse-toolchain/odin}" \
