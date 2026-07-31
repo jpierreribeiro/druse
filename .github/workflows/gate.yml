@@ -70,13 +70,19 @@ jobs:
           export DRUSE_ODIN_BIN="$HOME/odin/odin"
           bash build/check.sh
 
-  # The README says, honestly, that macOS and Windows are UNTESTED. This job
-  # does not make them tested -- the gate is Linux by construction: raw sockets,
-  # `nm`, `taskset`, kernel counters. What it does is replace "nobody has
-  # proven it" with a smaller claim that is proven: the library and the examples
-  # COMPILE, on every push, on both.
+  # WHAT THIS JOB PROVES, and it is the opposite of what it was written to prove.
+  #
+  # It was added expecting green: "the library compiles on macOS and Windows,
+  # even if nothing else is tested there". The first run said otherwise --
+  # vendor/odin-http imports `core:sys/linux` and stands up an io_uring loop per
+  # lane, so the build stops at `sched_yield` and `setsockopt_base`. Druse is
+  # Linux by CONSTRUCTION, not by lack of testing.
+  #
+  # So the job stays, inverted in meaning: it is the executable proof of the
+  # README's platform claim. If a future transport makes these pass, that is a
+  # signal worth having, and the README sentence should change with it.
   portability:
-    name: compiles (${{ matrix.os }})
+    name: does not build (${{ matrix.os }}), by construction
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     # NON-BLOCKING, on purpose. This job depends on a third-party action and on

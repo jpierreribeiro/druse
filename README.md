@@ -108,8 +108,14 @@ Stated plainly, because a framework that hides its edges wastes your time:
 
 ## Platform
 
-Tested on Linux x86-64. macOS and Windows compile in CI, but nothing beyond
-compilation is proven there, so treat them as unproven rather than supported.
+**Linux x86-64 only, and by construction rather than by omission.** The vendored
+bootstrap transport imports `core:sys/linux` and sets up an `io_uring` event
+loop per Handler lane, so macOS and Windows do not compile at all: CI proves it
+on every push by trying, and the build stops at `sched_yield` and
+`setsockopt_base`.
+
+This is not a gap waiting on testing. It lifts when the bootstrap transport is
+replaced by the official Odin HTTP package, not before.
 
 ## Performance
 
