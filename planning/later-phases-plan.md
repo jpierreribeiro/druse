@@ -332,8 +332,8 @@ needs to become public API.
 | WP | Capability | Notes and constraints |
 |---|---|---|
 | P4-1 | Concurrency model and thread safety | must resolve audit A-4 (package-level transport globals) and A-14 (registration during dispatch). Today `serve` is single-threaded by construction; whether that changes is *the* Phase-4 architectural decision |
-| P4-2 | Lifecycle: stop, shutdown with an absolute deadline, admission stop, exactly-once cleanup | audit A-5; there is no stop today. **Adds public surface — owner approval** |
-| P4-3 | Per-server state replacing the globals | ADR-018; prerequisite for two servers or any embedded use |
+| P4-2 | Lifecycle: stop, shutdown with an absolute deadline, admission stop, exactly-once cleanup | audit A-5; there is no stop today. **Adds public surface — owner approval** — **DONE (WP44): `web.stop`, `web.is_draining` and `Limits.max_drain_time` ship** |
+| P4-3 | Per-server state replacing the globals | ADR-018; prerequisite for two servers or any embedded use — **PART DONE (WP43): `g_config` is gone; `g_server` remains. Did not complete in Phase 4. ADR-018 accepted 2026-07-31; the remainder is WP123 and needs `web.stats`/`web.refused_connections` to take a server, so it pays G-09** |
 | P4-4 | Connection lifetime: keep-alive, drain-or-close, staged close | C-3; the close obligation appears three times in RFC 9112 §6.3, and §9.6's staged close is what makes the client actually receive the 400 |
 | P4-5 | Limits: connections, queue depth, header count and size, request line, minimum ingress rate | the slowloris mitigation is a minimum ingress rate; OWASP names it and gives no numbers, so Druse must pick and justify its own |
 | P4-6 | Deterministic load shedding | bounded admission before any adaptive controller (research item 11 stays after this) |

@@ -328,7 +328,7 @@ could not keep.
 equivalent. That is the intended deployment, not a workaround.
 
 Evidence for every statement in this section:
-`planning/phase-2-prototype-recovery.md`.
+`planning/history/phase-2-prototype-recovery.md`.
 
 ---
 

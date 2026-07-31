@@ -97,9 +97,10 @@ toolchain version is part of the contract and is recorded in
 Stated plainly, because a framework that hides its edges wastes your time:
 
 - **TLS.** Druse does not terminate TLS and will not. Put it behind a proxy.
-- **One server per process.** `web.serve` owns the process's listening socket
-  and blocks; `web.stats()` and `web.refused_connections()` take no server
-  argument, so a second server in the same process would make them ambiguous.
+- **One server per process.** `web.stats()` and `web.refused_connections()` take
+  no server argument, so a second server in the same process would make them
+  ambiguous — and those signatures are frozen. ADR-018 is accepted and WP123
+  owns the fix.
 - **Recoverable panic.** Odin has none, so a faulting handler aborts the
   process. A supervisor is mandatory, not a nicety. Read
   [`docs/operations.md`](docs/operations.md) before deploying.
@@ -114,9 +115,11 @@ loop per Handler lane, so the library is not portable in its current form.
 
 On macOS this is verified: CI builds an example on every push and the compile
 stops at `sched_yield` and `setsockopt_base`, which `core:sys/linux` declares
-and no other target does. CI asserts that failure and its cause, so a future
-transport that made the build succeed would turn the job red and send someone
-back to this paragraph.
+and no other target does. CI asserts that failure **and its cause**, and the
+assertion blocks — so a build that succeeded, or one that failed for some other
+reason, turns the workflow red and sends someone back to this paragraph. The
+only tolerated step is installing the unpinned nightly toolchain; if that
+breaks, the assertion is skipped and says so rather than passing silently.
 
 Windows is expected to fail the same way and is **not yet confirmed**: the first
 CI runs there died on a workflow bug before reaching any Druse source.

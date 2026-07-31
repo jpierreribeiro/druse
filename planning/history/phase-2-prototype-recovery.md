@@ -735,6 +735,20 @@ Measured. 20,000 requests, R-c fence installed, one skipped `defer` per fault
 - **~9.2 KiB of resident memory per fault** ((205,844 − 25,480) KiB ÷ 20,000).
 - Growth is perfectly linear and unbounded. Nothing reclaims it.
 
+> **Note added 2026-07-31 — 8,250 here, 8,192 in the matrix at the end of this
+> document, and both are right.** This figure is the arithmetic **mean over the
+> whole 20,000-request soak**, so it carries the per-request allocator overhead
+> that rides along with the leak. The matrix figure is the **single 8 KiB buffer**
+> the skipped `defer` failed to release — the leak's identified cause, not its
+> measured total. Quote whichever you mean, and say which.
+>
+> **Neither is reproducible from this repository.** Everything below lived in
+> `/tmp/wp13-probe/` and was never committed; the directory is gone. This
+> document predates the rule now in `planning/verification-campaign-plan.md`
+> that every reported number must be regenerable from a committed script, and it
+> does not meet it. ADR-020 does not rest on the constant — it rests on the shape
+> in §9: linear, unbounded, and invisible to the supervisor.
+
 At a modest 1,000 requests/second against one faulting route, that is about
 **8 MB/s**; a 4 GiB container is exhausted in roughly **8 minutes**, while
 answering `500` the entire time and never signalling a supervisor.

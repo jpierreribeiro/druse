@@ -85,13 +85,22 @@ jobs:
     name: does not build (${{ matrix.os }}), by construction
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    # STILL NON-BLOCKING, but for a smaller reason than before. The job now
-    # asserts its own expected outcome, so a red here is a real signal -- either
-    # the platform claim went stale, or the third-party action and the UNPINNED
-    # nightly it needs broke. Only the second is noise, and it is the reason the
-    # flag stays: infrastructure for platforms this project does not pin must
-    # not redden a commit whose gate is green.
-    continue-on-error: true
+    # BLOCKING, and the tolerance moved down to the one step that earns it.
+    #
+    # This job used to carry `continue-on-error: true` at the job level. The
+    # argument was real -- the third-party action and the UNPINNED nightly it
+    # needs are infrastructure for platforms this project does not pin, and they
+    # must not redden a commit whose gate is green. But the flag does not
+    # distinguish noise from signal: it also swallowed the CAUSE ASSERTION added
+    # after the Windows episode, so a job that went red because the documented
+    # reason had stopped matching would have passed the workflow anyway. Fixing
+    # "passes for the wrong reason" by introducing "fails where nobody has to
+    # look" is not a fix (planning/diagnosability.md rule 4, and its corollary:
+    # an advisory assertion is not an assertion).
+    #
+    # So the tolerance is now on the toolchain install ALONE. If that breaks,
+    # the assertion is skipped and says so out loud; if it succeeds, the
+    # assertion blocks. Noise is tolerated exactly where noise lives.
     strategy:
       fail-fast: false
       matrix:
@@ -99,10 +108,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # THE ONE TOLERATED STEP. `release: latest` is an unpinned nightly fetched
+      # by a third-party action; when it breaks, that is noise about someone
+      # else's infrastructure and not a fact about Druse.
       - name: Install Odin (nightly, unpinned on this platform)
+        id: toolchain
+        continue-on-error: true
         uses: laytan/setup-odin@v2
         with:
           release: latest
+
+      # The skip is ANNOUNCED. A check that quietly does not run reads exactly
+      # like a check that ran and passed, which is the failure this whole job
+      # exists to stop making.
+      - name: Report a skipped assertion (toolchain unavailable)
+        if: steps.toolchain.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::warning::The portability assertion did NOT run on ${{ matrix.os }}:"
+          echo "::warning::installing the unpinned Odin nightly failed, so there was no"
+          echo "::warning::compiler to assert with. This says nothing about the platform"
+          echo "::warning::claim in README's Platform section -- it was not tested."
 
       # Deliberately narrower than the Linux job, and the narrowness is the
       # point: a green here means "it builds", not "it works". Claiming more
@@ -127,6 +153,7 @@ jobs:
       # It never reached a single line of Druse. Every mutation control in
       # build/ checks the diagnostic and not just the exit status; so does this.
       - name: Assert the library does NOT build here, for the documented reason
+        if: steps.toolchain.outcome == 'success'
         shell: bash
         run: |
           set -uo pipefail

@@ -102,23 +102,30 @@ only the `Content-Length`/`Transfer-Encoding` safety rules above are.
 | `Expect: 100-continue` | **yes** (body read; C6) | per `Connection:` | served on keep-alive |
 | `Expect:` unknown expectation | **no** | closes | never |
 
-## What the bootstrap does not do yet
+## What the bootstrap does not do
 
 These are **safe** limitations — the unsafe direction is always rejection, never
 silent acceptance:
 
-- configurable timeouts and body limit — **Phase 3**;
-- graceful shutdown with deadlines — **Phase 4** (Phase 1 stops accepting,
-  stops the loop, and releases the server's resources);
-- HTTP/2, TLS, streaming bodies — later phases.
+- **HTTP/2** — a later phase, unscheduled;
+- **TLS** — not "later": Druse does not terminate TLS **and will not**. It is
+  delegated to the reverse proxy by decision (ADR-046), so a second adapter is
+  not expected to bring it either. `docs/operations.md` §1.
+
+Shipped since this list was first written, and no longer limitations:
+configurable timeouts and body limits (`web.limits`, Phase 3 and WP46/ADR-031),
+graceful shutdown with a bounded drain (`web.stop` and `Limits.max_drain_time`,
+WP44), and streaming bodies in both directions (Phase 7 and 7.5). A second
+adapter is expected to honour all three.
 
 ## Vendored-backend patches
 
-The bootstrap uses a vendored snapshot of `laytan/odin-http`, carrying five
-documented patches — two of which fix **remote denial-of-service crashes** the
-corpus found (`Content-Length: -1` and a chunk without CRLF each killed the
-server process). See `vendor/odin-http/VENDOR.md` for the full list, the
-rationale for each, and the update procedure.
+The bootstrap uses a vendored snapshot of `laytan/odin-http`, carrying
+twenty-four documented patches, ten of them security-motivated. WP9's corpus
+found two **remote denial-of-service crashes** among them (`Content-Length: -1`
+and a chunk without CRLF each killed the server process); the Phase-6-freeze
+scan later found five more. See `vendor/odin-http/VENDOR.md` for the full list,
+the rationale for each, and the update procedure.
 
 ## Adding a new adapter
 

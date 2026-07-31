@@ -85,5 +85,5 @@ it mid-drain undoes the whole point.
 
 A fault in a handler aborts the process — a panic, a failed assertion, an
 out-of-bounds index. Odin has no recoverable panic (ADR-020), so no setting
-changes this. Run under a supervisor with `Restart=always`, and run more than
+changes this. Run under a supervisor with `Restart=on-failure`, and run more than
 one replica.

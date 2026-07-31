@@ -1432,6 +1432,33 @@ grep -q 'bash build/check.sh' "$DRUSE_ROOT/.github/workflows/gate.yml" ||
   fail "the workflow no longer runs build/check.sh; a green badge would promise something weaker than this gate"
 echo "PASS: the public workflow runs the same gate this script is"
 
+# --- the supervisor contract: the shipped unit and the documents agree -------
+#
+# Same class of rule as the block above, and it belongs here for the same
+# reason: it is about repository artefacts, not about the library.
+#
+# `ops/deploy/druse.service` is COPIED VERBATIM by the operator, and until
+# 2026-07-31 nothing ever read it. Ten documents drifted to `Restart=always`
+# against a unit shipping `Restart=on-failure`, and docs/operations.md
+# contradicted itself between its §1 excerpt and its checklist. The positive
+# case below is not evidence on its own -- 0b1fea8 is what a positive case with
+# a typo in it proves -- so the gate MUTATES a throwaway copy and requires red.
+echo "--- The supervisor contract: unit and documents agree ---"
+bash "$DRUSE_ROOT/build/check_supervisor_contract.sh" "$DRUSE_ROOT"
+
+DRUSE_SUPERVISOR_PROBE="$(mktemp -d)"
+trap 'rm -rf "$DRUSE_SUPERVISOR_PROBE"' EXIT
+cp -r "$DRUSE_ROOT/ops" "$DRUSE_ROOT/docs" "$DRUSE_SUPERVISOR_PROBE/"
+sed -i 's/^Restart=on-failure/Restart=always/' \
+  "$DRUSE_SUPERVISOR_PROBE/ops/deploy/druse.service"
+if bash "$DRUSE_ROOT/build/check_supervisor_contract.sh" \
+     "$DRUSE_SUPERVISOR_PROBE" >/dev/null 2>&1; then
+  fail "BROKEN CONTROL: the supervisor contract check passed against a unit mutated to Restart=always while the documents still say on-failure. It is not detecting drift, so its green result above means nothing."
+fi
+echo "PASS: the supervisor contract check detects a mutated unit (negative control)"
+rm -rf "$DRUSE_SUPERVISOR_PROBE"
+trap - EXIT
+
 echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"
 

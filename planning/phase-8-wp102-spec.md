@@ -158,7 +158,7 @@ review (plan §8 non-goal). Concretely:
 client ──TLS──▶ Caddy (reverse proxy, proxy_buffering off, XFF)
                   │  http, keep-alive
                   ▼
-              druse-board  (systemd: Restart=always, TimeoutStopSec > max_drain_time)
+              druse-board  (systemd: Restart=on-failure, TimeoutStopSec > max_drain_time)
                   │  bounded pool (crystals db/postgres)
                   ▼
               PostgreSQL  (dedicated instance; migrations run as a deploy STEP, never on boot)
@@ -166,7 +166,7 @@ client ──TLS──▶ Caddy (reverse proxy, proxy_buffering off, XFF)
 
 - Reverse proxy: **Caddy** (already on the VPS; the app uses a dedicated high
   port, never the CI/Caddy config in place).
-- Supervisor: **systemd**, `Restart=always`, `TimeoutStopSec` set above the
+- Supervisor: **systemd**, `Restart=on-failure`, `TimeoutStopSec` set above the
   app's `max_drain_time` so the framework drain runs before the kill (the
   Hardening H-4 rule; matches `docs/operations.md`).
 - Memory: a cgroup sized from the corrected C-04 concurrent response campaign;

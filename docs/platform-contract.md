@@ -32,7 +32,7 @@ production-readiness audit).
 | Sockets | One owner per connection (the lane); close cancels the outstanding receive before freeing (WP58). Non-blocking I/O via `core:nbio`. | `vendor/odin-http/server.odin` |
 | Files & symlinks | Static serving rejects `..`, percent-encoded separators, NUL, dotfiles and symlinks (final component; intermediate components too after F7). `os.read_entire_file_from_path`; whole-file buffered read. | `web/static.odin`, `web/path_policy.odin` |
 | Atomicity | Migrations (data Crystal) use advisory locking and fail closed on concurrent apply; `CREATE TABLE IF NOT EXISTS` races are tolerated (`42P07`/`23505`). | data Crystal |
-| Process under systemd | `Restart=always`, `TimeoutStopSec` is the outer bound for a stuck handler; logs to stdout/stderr (whichever sink the app installs). | `docs/operations.md` |
+| Process under systemd | `Restart=on-failure`, `TimeoutStopSec` is the outer bound for a stuck handler; logs to stdout/stderr (whichever sink the app installs). | `docs/operations.md` |
 
 ## Guarantees that depend on this profile
 

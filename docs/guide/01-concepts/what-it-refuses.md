@@ -79,7 +79,7 @@ middleware, and no amount of wrapping produces one.
 
 **What it costs you.** One bad index in one handler stops every in-flight
 request on that process. You must run under a supervisor with
-`Restart=always`, and you must run more than one replica.
+`Restart=on-failure`, and you must run more than one replica.
 
 **What is guaranteed instead**, and it is the half that people miss: a handler
 that returns *without committing a response* is finalized to the standardized

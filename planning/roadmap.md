@@ -144,6 +144,14 @@ A-4); trusted-proxy handling with ADR-013 accepted; fuzzing and a soak test in
 CI; observability using **low-cardinality route identity**, never raw paths;
 an operations document.
 
+**Exit criterion partially unmet, recorded 2026-07-31.** "Per-server state
+replaces the transport globals" shipped only in part: WP43 removed `g_config`,
+WP44 shipped `stop`, and the process-wide `g_server` slot stayed. Phase 4 froze
+without this being noticed. The remainder now needs a **public** change
+(`web.stats` and `web.refused_connections` gaining a server argument), which is
+why it could not be finished quietly inside the phase. ADR-018 is accepted and
+**WP123** owns it.
+
 ### Phase 5 — Close the drain, ship the table stakes
 
 **Rescoped 2026-07-21** by owner amendment (`phase-5-spec.md` §1). The original
@@ -201,6 +209,26 @@ multi-user product using only public, pinned contracts. Repeated migrations,
 deploys, reconnects, concurrency, large attachments, fault drills and a human/
 agent usability study become the evidence for future API improvements and any
 1.0 discussion.
+
+### Scheduled, not yet assigned to a phase
+
+**WP123 — per-server state replaces `g_server`.** ADR-018, accepted by the owner
+on 2026-07-31, closing a Phase-4 exit criterion that Phase 4 froze without
+meeting. WP43 removed `g_config`; what remains is one process-wide slot in
+`web/internal/transport`, and the reason it cannot be finished internally is
+that `web.stats` and `web.refused_connections` take no server argument. Changing
+those is **public surface on a frozen contract**, so WP123 pays G-09 in full and
+carries the owner approval ADR-018 always required. `web.stop` needs no
+signature change — it was given its `^App` parameter for exactly this.
+
+The proving test is the one that cannot be written today: **two servers in one
+process, each answering its own routes.** Seven test suites currently document
+the single global slot as their reason for running sequentially; they are the
+inventory of what WP123 touches.
+
+Not placed in a phase because Phase 9 (WP114–WP121, I/O architecture) is in
+flight and WP122 is reserved for the CPU-diagnosis lever. Until WP123 lands, one
+server per process remains true and documented as such.
 
 ## Release and adoption track
 

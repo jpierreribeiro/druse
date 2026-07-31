@@ -28,7 +28,7 @@ Every clause names the work package that implements it and the test or
 measurement that will prove it, because G-08 forbids claiming a behaviour
 before a test delivers it. Where a number is quoted, its source is the recorded
 WP12/WP13/WP14 evidence (`planning/phase-2-prototype-middleware.md`,
-`planning/phase-2-prototype-recovery.md`, `planning/phase-1-freeze.md`
+`planning/history/phase-2-prototype-recovery.md`, `planning/phase-1-freeze.md`
 amendments 1–2), which carries the verbatim commands and outputs.
 
 §9 of this document now supersedes `planning/phase-2-plan.md` §3 as the ledger
