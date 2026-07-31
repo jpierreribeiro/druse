@@ -90,6 +90,19 @@ check 17-ingest-arms                 test "large-body ingest arms E/F/G/H"
 # own run.sh produces the number.
 check 26-adr020-leak-shape check "ADR-020 leak shape (builds; run it via its own run.sh)"
 
+# COMPILE-ONLY for the same reason: these are long-running stress harnesses, not
+# checks. Running them here would put a fault campaign inside a pre-push gate.
+#
+# They were NOT IN THE REPOSITORY until 2026-07-31 -- excluded through
+# `.git/info/exclude`, per-clone and unversioned -- while `tests/nbio-timeout`
+# named them as the evidence path for three transport fixes in 44bdcda. Cited
+# evidence nobody who cloned this could run. They had also stopped compiling,
+# still importing `uruquim:web` from before the rename to Druse, which is what
+# happens to code no instrument ever builds. Committed under OQ-34, and now
+# built on every gate run so the next rename cannot rot them unnoticed.
+check 23-accept-stall      check "accept-stall harness (builds)"
+check 24-shutdown-race     check "shutdown-race harness (builds)"
+
 # Also compile-only, and also unchecked until 2026-07-31. These five DO build
 # today; that is a fact nothing was establishing, which is the point. They are
 # not `run` because they are labs and arms whose output is a study rather than a
@@ -118,19 +131,7 @@ check 15-blocking-boundary           check "blocking boundary (builds)"
 #   as it was ON PURPOSE: `count_concepts.sh` measured concepts-per-CRUD across
 #   these three implementations, and editing the source would change the thing
 #   that was measured. A frozen artefact, not live code.
-#
-# 23-accept-stall, 24-shutdown-race -- NOT IN THE REPOSITORY, and that is the
-#   finding rather than the exemption. `tests/nbio-timeout` names them as the
-#   evidence path for the other three transport fixes in 44bdcda ("races [that]
-#   need the stress harnesses in experiments/23-accept-stall and
-#   experiments/24-shutdown-race"), and `ops/deploy` era notes cite them too --
-#   but they are excluded through `.git/info/exclude`, which is per-clone and
-#   unversioned. They exist in whichever working copy created them and nowhere
-#   else, so nobody who clones this repository can run the evidence it cites.
-#   They are exempted here rather than checked because a `check` line would fail
-#   on every fresh clone, CI included. Committing them, or removing the
-#   citation, is an owner decision and is recorded in planning/open-questions.md.
-DRUSE_EXP_EXEMPT="11-usage-lab/c-crud-phase3 23-accept-stall 24-shutdown-race"
+DRUSE_EXP_EXEMPT="11-usage-lab/c-crud-phase3"
 
 DRUSE_EXP_UNLISTED=""
 for DRUSE_EXP_PKG in $(find "$HERE" -name '*.odin' -printf '%h\n' | sort -u); do

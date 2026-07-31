@@ -50,19 +50,7 @@ test -d "$DRUSE_ROOT/build" || fail "build/ does not exist"
 #                             process descriptor limit, thousands of sockets) is
 #                             not a gate property; running it on every push
 #                             would make the gate's cost depend on the machine.
-#   nbio-timeout           -- NOT IN THIS REPOSITORY, and the exemption is the
-#                             finding. It is a real regression guard (audit B4,
-#                             the io_uring bounded tick, three @(test)
-#                             procedures) and it was a real orphan. It was wired
-#                             into build/check.sh on 2026-07-31 and taken out
-#                             the same day: the directory is excluded through
-#                             `.git/info/exclude`, which is per-clone and
-#                             unversioned, so naming it in the gate made the
-#                             gate pass here and fail on every fresh clone.
-#                             A green local run is not a green build. Committing
-#                             the suite is an owner decision (OQ-34); until then
-#                             it cannot be gated, and saying so beats a skip.
-DRUSE_ORPHAN_ALLOWED=" wp118-accept-multishot g76-scale-sockets nbio-timeout "
+DRUSE_ORPHAN_ALLOWED=" wp118-accept-multishot g76-scale-sockets "
 
 DRUSE_ORPHANS=""
 for DRUSE_SUITE_DIR in "$DRUSE_ROOT"/tests/*/ "$DRUSE_ROOT"/tests/*/*/; do
@@ -125,11 +113,13 @@ echo "PASS: every test suite is either gated or deliberately exempt"
 # hidden variable — the run is green for a reason it does not name, and the
 # reason is "this directory happens to exist on this disk".
 #
-# This repository has a whole cluster in that position, excluded through
+# This repository HAD a whole cluster in that position, excluded through
 # `.git/info/exclude` (per-clone, unversioned): tests/nbio-timeout,
 # experiments/23-accept-stall, experiments/24-shutdown-race, ops/campaign/ and
-# planning/verification-campaign-plan.md. Every one is real work; none of it is
-# in the repository; and until 2026-07-31 nothing said so.
+# planning/verification-campaign-plan.md — the last being where the rule
+# "every reported number must be regenerable from a committed script" is
+# written. All were committed on 2026-07-31 (OQ-34). This check is what makes
+# the next one impossible to miss rather than something to remember.
 #
 # Skipped when git is unavailable or this is not a work tree — the check needs
 # the index to answer its question, and guessing is worse than abstaining.
