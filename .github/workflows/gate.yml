@@ -85,11 +85,12 @@ jobs:
     name: does not build (${{ matrix.os }}), by construction
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    # NON-BLOCKING, on purpose. This job depends on a third-party action and on
-    # an UNPINNED nightly for platforms the project does not pin -- both are
-    # infrastructure that can break for reasons that say nothing about Druse.
-    # A red here must not put a red badge on a commit whose gate is green,
-    # because a badge that cries wolf is a badge people stop reading.
+    # STILL NON-BLOCKING, but for a smaller reason than before. The job now
+    # asserts its own expected outcome, so a red here is a real signal -- either
+    # the platform claim went stale, or the third-party action and the UNPINNED
+    # nightly it needs broke. Only the second is noise, and it is the reason the
+    # flag stays: infrastructure for platforms this project does not pin must
+    # not redden a commit whose gate is green.
     continue-on-error: true
     strategy:
       fail-fast: false
@@ -107,11 +108,29 @@ jobs:
       # point: a green here means "it builds", not "it works". Claiming more
       # from a compile would be the kind of overreach the README's platform
       # section exists to avoid.
-      - name: Compile the library and the examples
+      # THE EXPECTED OUTCOME IS A COMPILE FAILURE, so the step asserts it.
+      #
+      # Naming the job "does not build" while still letting a failed compile
+      # fail the job leaves two permanently red squares on every run, and two
+      # permanent reds are how people learn to stop reading the third. The red
+      # was the CORRECT verdict, which is exactly why it must not look like an
+      # incident.
+      #
+      # So this passes when the build fails, and FAILS when the build succeeds
+      # -- because a success would mean the transport no longer binds
+      # core:sys/linux, the README's platform sentence has gone stale, and
+      # somebody should find that out from CI rather than from a bug report.
+      - name: Assert the library does NOT build here
         shell: bash
         run: |
-          set -euo pipefail
-          odin build examples/01-hello-world -collection:druse=. -out:hello
-          odin build examples/02-json-api    -collection:druse=. -out:jsonapi
-          odin build examples/03-route-params -collection:druse=. -out:params
-          echo "library and three examples compiled on ${{ matrix.os }}"
+          set -uo pipefail
+          if odin build examples/01-hello-world -collection:druse=. -out:hello 2>build.log; then
+            echo "::error::examples/01-hello-world COMPILED on ${{ matrix.os }}."
+            echo "::error::That is good news and a stale document: README's Platform section says"
+            echo "::error::Druse is Linux by construction because vendor/odin-http imports"
+            echo "::error::core:sys/linux. Re-check that claim and update it before this job is"
+            echo "::error::flipped back to expecting a green build."
+            exit 1
+          fi
+          echo "the build failed here, as the Platform section states. First lines:"
+          head -5 build.log
