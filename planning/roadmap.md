@@ -222,9 +222,17 @@ carries the owner approval ADR-018 always required. `web.stop` needs no
 signature change — it was given its `^App` parameter for exactly this.
 
 The proving test is the one that cannot be written today: **two servers in one
-process, each answering its own routes.** Seven test suites currently document
-the single global slot as their reason for running sequentially; they are the
-inventory of what WP123 touches.
+process, each answering its own routes.** Eleven test suites currently name the
+process-global server slot — as the reason they run serially, or as the thing
+they reach through — and they are the inventory of what WP123 touches:
+
+```
+grep -rlE "g_server|process-global server|one server per process" tests/*/*.odin
+```
+
+`c01-async-ops`, `c03-fault-campaign`, `c04-response-size`, `c05-saturation`,
+`c06-proxy-contract`, `h3-server-stats`, `m9-attribution`, `wp41-fault`,
+`wp58-drain`, `wp7_5-c2-upload`, `wp9-wire`.
 
 Not placed in a phase because Phase 9 (WP114–WP121, I/O architecture) is in
 flight and WP122 is reserved for the CPU-diagnosis lever. Until WP123 lands, one

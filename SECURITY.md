@@ -48,11 +48,14 @@ opposite:
   or to walk past the trust boundary, **is a vulnerability**. Without
   `trust_proxies` the connection's peer address is used and the header is
   ignored;
-- **limits that do not bound.** `web.limits` sets `max_body`,
-  `max_request_line`, `max_headers`, `max_request_time`, `max_write_time`,
-  `max_response_bytes`, `max_idle_time`, `max_connections`, `reserved_conns` and
-  `max_drain_time`. A remote client that exceeds one of these without being
-  refused is in scope;
+- **limits that do not bound.** `web.limits` configures the request budget —
+  `max_body`, `max_request_line`, `max_headers`, `max_json_nodes`,
+  `max_request_time`, `max_write_time`, `max_response_bytes`, `max_idle_time`,
+  `max_connections`, `reserved_conns`, `max_drain_time`, `max_handlers`. A
+  remote client that exceeds one of these without being refused is in scope,
+  and so is a bound that can be walked past rather than merely exceeded —
+  `max_json_nodes` in particular exists because a body inside `max_body` can
+  still be structurally hostile;
 - **drain that does not drain.** `web.stop` begins a graceful shutdown and
   `web.is_draining` reports it. A request admitted after the drain began, or a
   readiness probe still reporting ready after `stop` returned, is in scope.

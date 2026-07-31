@@ -120,9 +120,19 @@ Neither supersedes the other. Quote 8,192 for "what one skipped free costs" and
 
 ## Reading the output
 
-The per-request figure exceeds 8,192 because the allocator's own bookkeeping for
-the leaked block is leaked with it. The gap between the two is printed
-separately so it is attributable rather than absorbed into a headline number.
+The **residue** line is a control, not a finding. `current_memory_allocated`
+counts requested bytes, and this experiment models exactly one skipped free, so
+the per-request figure should land on `LEAK_BYTES` exactly and the residue
+should be `0.0`. It does, and it is. A non-zero residue would mean the two arms
+differ by something besides the modelled buffer — the measurement leaking on its
+own account — and the number would have to be discarded rather than explained.
+
+(An earlier draft of this file predicted the figure would *exceed* 8,192,
+reasoning from the historical 8,250. That was wrong, and the reason it was wrong
+is the finding: the extra ~58 bytes belong to the fence's other skipped defers,
+not to allocator overhead on this one. The prediction is recorded rather than
+quietly deleted, because a measurement that matched a wrong expectation would
+have been much harder to notice than one that contradicted it.)
 
 The linearity line is the actual claim under test: it projects the first
 sampling interval across the whole run and reports the drift. A bounded leak —

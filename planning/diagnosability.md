@@ -19,7 +19,7 @@ one of them is in the history:
 | `28c977e` | one fix was guarded by an unrun suite |
 | `086eb9e` | wp90-deadlines was never a flake |
 | `a439618` | two falsified records |
-| `2bcc62c` | a green job asserted the build fails; it failed on a flag of ours |
+| `ee7449c` | a green job asserted the build fails; it failed on a flag of ours |
 
 The answer this project invented is the **mutation control**: break the code on
 purpose, require the test to go red. Forty-one of them run in the gate. That
@@ -149,10 +149,17 @@ limit. The full diagnostic is printed either way, so a human can see what
 actually happened.
 
 This rule is where the repository's existing practice was already correct and
-merely unwritten: roughly twenty controls under `build/` match an expected
-diagnostic rather than an exit status, and `gate.yml` cites that body of
-practice as its own justification. Rule 4 makes it the standard instead of a
-habit.
+merely unwritten. The idiom is even named in the codebase — the failure message
+is literally *"failed for the WRONG reason"* — and it appears at **26 sites
+across 17 scripts** under `build/`, countable at any time with:
+
+```
+grep -ric "for the wrong reason" build/*.sh
+```
+
+`gate.yml` cites that body of practice as its own justification. Rule 4 makes it
+the standard instead of a habit, and extends it from `build/` to every
+expected-failure assertion in the repository.
 
 **Corollary — an advisory assertion is not an assertion.** A check that cannot
 fail the run it belongs to has been downgraded to a log line. Where infrastructure

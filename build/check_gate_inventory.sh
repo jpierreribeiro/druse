@@ -65,8 +65,6 @@ test -f "$GATE" || fail "build/check.sh is missing; there is no gate to take inv
 #                              does run. Nothing else in this file may be
 #                              exempted for "it is slow" or "it is awkward" --
 #                              recursion is the only reason accepted here.
-#   check_gate_inventory.sh -- this file; invoked by check.sh, listed here so it
-#                              does not have to reason about itself.
 #   check_wp67_controls.sh  -- a deliberate forwarder, not a control. WP67's RED
 #                              anatomy was consumed by WP68; the file survives
 #                              only so a run that walks every historical control
@@ -82,7 +80,7 @@ test -f "$GATE" || fail "build/check.sh is missing; there is no gate to take inv
 #                              measures nothing at all". The soundness of the
 #                              instrument is gated instead, by tests/wp26-bench,
 #                              which finishes in milliseconds and DOES run.
-DRUSE_LINT_ONLY_ALLOWED=" check.sh check_test.sh check_gate_inventory.sh check_wp67_controls.sh check_wp26_bench.sh "
+DRUSE_LINT_ONLY_ALLOWED=" check.sh check_test.sh check_wp67_controls.sh check_wp26_bench.sh "
 
 # --- the set the gate actually runs ------------------------------------------
 #
@@ -95,16 +93,25 @@ DRUSE_LINT_ONLY_ALLOWED=" check.sh check_test.sh check_gate_inventory.sh check_w
 
 DRUSE_EXECUTED=""
 
-# Shape 1: a real invocation — `bash` and the path on the same line, the line is
-# not a comment, and it is not the `bash -n` lint. Mentioning a script in prose
-# does not run it: the first draft of this check counted check.sh's own comment
-# about `build/check_test.sh` as an invocation and therefore cleared the very
-# script whose absence prompted the check.
+# Shape 1: a real invocation — `bash` and the path on the same line, where the
+# line is not a comment, not the `bash -n` lint, and not a `grep`.
+#
+# Every one of those four exclusions was earned by a false positive:
+#   comments   -- the first draft counted check.sh's own PROSE about
+#                 `build/check_test.sh` as an invocation, clearing the very
+#                 script whose absence prompted this file.
+#   `bash -n`  -- the whole point; parsing is not running.
+#   `grep`     -- check.sh asserts the CI workflow still calls the gate with
+#                 `grep -q 'bash build/check.sh' .github/workflows/gate.yml`.
+#                 That line names a script and contains the word bash, so it
+#                 cleared check.sh as "executed" — a check about a file passing
+#                 as an invocation of it.
 while IFS= read -r script; do
   name="$(basename "$script")"
   if grep -F "build/$name" "$GATE" |
        grep -v '^[[:space:]]*#' |
        grep -v 'bash -n' |
+       grep -v 'grep' |
        grep -q '\bbash\b'; then
     DRUSE_EXECUTED="$DRUSE_EXECUTED $name"
   fi
@@ -147,5 +154,9 @@ the suite it is named after stopped detecting. Wire it into build/check.sh, or
 add it to DRUSE_LINT_ONLY_ALLOWED in $0 with the reason it does not run."
 fi
 
-DRUSE_COUNT="$(printf '%s' "$DRUSE_EXECUTED" | wc -w)"
-echo "PASS: every control script in build/ is executed by the gate ($DRUSE_COUNT run, 5 exempt on the record)"
+# The tallies are COMPUTED, not written down. A hand-maintained count is the
+# thing check_test.sh's `PASS=10` turned out to be: a number that was true once.
+DRUSE_COUNT="$(printf '%s' "$DRUSE_EXECUTED" | tr ' ' '\n' | grep -c .)"
+DRUSE_EXEMPT_COUNT="$(printf '%s' "$DRUSE_LINT_ONLY_ALLOWED" | tr ' ' '\n' | grep -c .)"
+DRUSE_TOTAL="$(ls "$ROOT"/build/check*.sh | wc -l)"
+echo "PASS: every control script in build/ is accounted for — $DRUSE_TOTAL files, $DRUSE_COUNT executed by the gate, $DRUSE_EXEMPT_COUNT exempt with a stated reason"
