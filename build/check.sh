@@ -1416,6 +1416,22 @@ echo "PASS: the previously ungated evidence suites run in the gate"
 # The nine fixes merged in 44bdcda were controlled by hand at merge time. This
 # asks whether anything in the tree still notices if they are reverted — the
 # multipart one was guarded only by a suite CI did not run until this session.
+# The public gate must exist and must run THIS script.
+#
+# It lives here, not in check_docs.sh, and the reason is a failure worth
+# recording: it was in check_docs.sh first, and check_docs.sh is run by other
+# controls against THROWAWAY COPIES of the tree that carry docs/ but not
+# .github/. Those copies then failed a check about repository infrastructure,
+# and check_wp21_controls.sh reported BROKEN PROBE -- correctly, because its
+# baseline could no longer pass. A rule about the repository belongs in the
+# script that only ever runs against the repository.
+echo "--- The public gate exists and runs this script ---"
+test -f "$DRUSE_ROOT/.github/workflows/gate.yml" ||
+  fail "the GitHub Actions gate workflow is missing; the README's build badge would be a claim with nothing behind it"
+grep -q 'bash build/check.sh' "$DRUSE_ROOT/.github/workflows/gate.yml" ||
+  fail "the workflow no longer runs build/check.sh; a green badge would promise something weaker than this gate"
+echo "PASS: the public workflow runs the same gate this script is"
+
 echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"
 

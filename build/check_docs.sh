@@ -388,27 +388,6 @@ if git -C "$DRUSE_ROOT" grep -I -n -i -E "$DRUSE_REMOVED_PRODUCT_PATTERN" -- .; 
 fi
 echo "docs: discarded speculative product remains absent"
 
-# ---------------------------------------------------------------------------
-# 8. GitHub Actions runs the SAME gate, and the workflow must exist.
-#
-# This assertion used to be the opposite: it FAILED if .github/workflows was
-# present, on a recorded owner decision that the gate is local and on the VPS.
-# The decision was reversed on 2026-07-31 for a reason that did not exist when
-# it was taken: the repository is public, so Actions is free and unmetered, and
-# the cost that motivated the ban is gone. The pre-push hook and the VPS timer
-# both stay; this is a third repetition on hardware neither of them controls,
-# and it is the only one a reader can see.
-#
-# The check is inverted rather than deleted, because "we run the same gate in
-# public" is a claim that can rot silently. If the workflow is removed or stops
-# invoking check.sh, the badge would keep whatever colour it last had.
-# ---------------------------------------------------------------------------
-DRUSE_WORKFLOW="$DRUSE_ROOT/.github/workflows/gate.yml"
-if ! test -f "$DRUSE_WORKFLOW"; then
-  fail "the GitHub Actions gate workflow is missing; the README's build badge would be a claim with nothing behind it"
-fi
-grep -q 'bash build/check.sh' "$DRUSE_WORKFLOW" ||
-  fail "the workflow no longer runs build/check.sh; a green badge would mean something weaker than the local gate"
 
 
 # ---------------------------------------------------------------------------
