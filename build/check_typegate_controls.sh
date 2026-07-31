@@ -112,11 +112,23 @@ grep -qF 'JSON_TYPE_GATE :: #config(DRUSE_JSON_TYPE_GATE, true)' \
   fail "the measured per-type validation gate must remain the adopted default"
 echo "CONTROL 0 -> the adopted default is pinned in the source"
 
+# --- 0b. the own-marshal default, pinned the same way ------------------------
+# Adopted on the 2026-07-30 measurements: p50 265 -> 154 us, ceiling 26,716 ->
+# 65,336/s, and 360 -> 150 us against six peers on the byte-identical row, where
+# it also holds the shortest tail of the seven. A default with no assertion is a
+# default that walks back on the next refactor and nobody notices.
+grep -qF 'JSON_OWN_MARSHAL :: #config(DRUSE_JSON_OWN_MARSHAL, true)' \
+  "$DRUSE_ROOT/web/json_encode.odin" ||
+  fail "the measured Druse-owned marshal walk must remain the adopted default"
+echo "CONTROL 0b -> the own-marshal default is pinned in the source"
+
 # --- 1 & 2. the positive cases -----------------------------------------------
 BASE="$(mutant_collection baseline)"
 assert_green "$BASE" "" baseline-on "1: gate ON, NUM-001 green as shipped"
 assert_green "$BASE" "-define:DRUSE_JSON_TYPE_GATE=false" baseline-off \
   "2: gate OFF, the rollback is green too"
+assert_green "$BASE" "-define:DRUSE_JSON_OWN_MARSHAL=false" baseline-stdlib \
+  "2b: own marshal OFF, the stdlib path is still green"
 
 # --- 3. the walk stops recognising floats ------------------------------------
 # The single defect the gate could introduce: answering "cannot hold a float"
