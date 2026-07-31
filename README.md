@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="docs/assets/druse.png" alt="Druse" width="200">
-</p>
+<img align="right" width="159px" src="docs/assets/druse.png">
 
 # Druse
 
