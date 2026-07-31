@@ -4,6 +4,11 @@
 
 An Odin microframework for real-world JSON APIs.
 
+On a 4,310-byte JSON response, measured against six other frameworks at an
+equal offered rate: **150 µs p50, fourth of seven — and 384 µs p99, the
+shortest tail of the seven.** [The table is below](#where-it-lands-against-other-frameworks),
+and every server in it is committed here.
+
 **Simple by default, explicit when needed, data-oriented underneath.**
 
 **Positioning:** internally data-oriented and allocator-aware; externally simple,
@@ -61,7 +66,48 @@ get_user :: proc(ctx: ^web.Context) {
 }
 ```
 
+## Where it lands against other frameworks
+
+**This is the reproducible one, so it comes first.** Equal offered rate, every
+server committed in this repository, every binary hashed in the artefact.
+
+`/json/medium/int`, a 64-record document. All seven answer the **same 4,310
+bytes** — the summariser flags the row as not like-for-like if they do not.
+20,000 requests per second offered, 5 alternating repeats of 10 s, AWS
+c5.2xlarge, server on CPUs 0-3 and the load generator on 4-7.
+
+| framework/runtime | p50 | p99 | failures |
+|---|---:|---:|---:|
+| Axum 0.8.9 / Rust | 120 µs | 1,066 µs | 0 |
+| fasthttp 1.72 / Go | 133 µs | 993 µs | 0 |
+| Fiber 3.4 / Go | 133 µs | 964 µs | 0 |
+| **Druse / Odin** | **150 µs** | **384 µs** | **0** |
+| Gin 1.12 / Go | 156 µs | 492 µs | 0 |
+| Go `net/http` | 156 µs | 504 µs | 0 |
+| Fastify 5.8 / Node | past its knee | — | 0 |
+
+Fourth of seven on the median, **first on the tail** — a p99 2.5x shorter than
+fasthttp's and 2.8x shorter than Axum's. That shape is the lane architecture:
+no internal queue and no scheduler arbitrating, so the worst case is bounded
+rather than long.
+
+**This row moved by 2.4x on 2026-07-30**, and the before-number matters as much
+as the after: the same build measured **360 µs and last place** until the JSON
+encoder was replaced, with 22 admission failures the other six did not have.
+What changed is
+[`docs/reports/2026-07-30-own-marshal.md`](docs/reports/2026-07-30-own-marshal.md).
+
+Reproduce it with `bench/application_matrix/run-openload-matrix.sh`; the peers
+are in `bench/application_matrix/peers/`, the manifest and per-campaign
+checksums in [`evidence/`](evidence/).
+
 ## Minimal HTTP benchmark
+
+**Read the table above before this one.** This section is older, narrower, and
+— as the paragraph after its table says at length — **not reproducible from
+this checkout**: no peer server is committed, no orchestrator pins worker
+counts or affinity, and no raw output is kept. It is retained as a recorded
+observation of the transport path, not as evidence you can regenerate.
 
 This is a deliberately narrow transport benchmark, not a claim that a
 four-byte response represents a complete application. Each server returned
@@ -106,53 +152,6 @@ an equal-offered-rate comparison. Treat the table as a recorded observation on
 one box, not as a reproducible result, until the peers and an orchestrator are
 committed.
 
-### And the JSON row it does not measure, which is reproducible
-
-The `/ping` table above is a transport benchmark and says so. The application
-matrix answers the other half, at an **equal offered rate** rather than at each
-server's own attained throughput, and — unlike the table above — **every server
-in it is committed and every binary is hashed in the artefact.**
-
-`/json/medium/int`, a 64-record document. All seven answer the **same 4,310
-bytes**; the summariser flags the row as not like-for-like if they do not.
-20,000 requests per second offered, 5 alternating repeats, 10 s each, AWS
-c5.2xlarge, server on CPUs 0–3 and the generator on 4–7.
-
-| framework/runtime | p50 | p99 | failures |
-|---|---:|---:|---:|
-| Axum 0.8.9 / Rust | 120 µs | 1,066 µs | 0 |
-| fasthttp 1.72 / Go | 133 µs | 993 µs | 0 |
-| Fiber 3.4 / Go | 133 µs | 964 µs | 0 |
-| **Druse / Odin** | **150 µs** | **384 µs** | **0** |
-| Gin 1.12 / Go | 156 µs | 492 µs | 0 |
-| Go `net/http` | 156 µs | 504 µs | 0 |
-| Fastify 5.8 / Node | past its knee | — | 0 |
-
-Fourth of seven on the median, **first on the tail** — 2.5× shorter than
-fasthttp's p99 and 2.8× shorter than Axum's. That shape is the lane
-architecture: no internal queue and no scheduler deciding, so the worst case is
-bounded rather than long.
-
-**This row moved by 2.4× on 2026-07-30** and the honesty of the before-number
-matters as much as the after: the same build measured **360 µs and last place**
-before the JSON encoder was replaced, with 22 admission failures the other six
-did not have. What changed is
-[`docs/reports/2026-07-30-own-marshal.md`](docs/reports/2026-07-30-own-marshal.md).
-
-Reproduce it with `bench/application_matrix/run-openload-matrix.sh`; the peers
-are in `bench/application_matrix/peers/`, the raw runs and the manifest are in
-[`evidence/2026-07-30-own-marshal/`](evidence/2026-07-30-own-marshal/).
-
-What this table does **not** measure: JSON encode/decode, routing-heavy
-applications, middleware chains, request bodies, streaming throughput, TLS,
-connection churn, memory per connection, or application/database work. Use it
-as evidence about the minimum HTTP transport path, not as a universal framework
-ranking.
-
-No allocator configuration, no transport selection, no manual context assembly.
-The systems-level machinery exists — it lives behind the API, available through
-an explicit advanced surface when needed.
-
 ## Transport direction
 
 The future Odin `core:net/http` (expected to build on `core:nbio`) is the
@@ -190,8 +189,13 @@ examples/                Compiling programs (all built by the gate)
 
 ## Status
 
-**Released: `v0.10.0`** — a pre-1.0 public release, no longer marked a pilot.
-Two controlled pilots came before it, `v0.9.0-pilot` and `v0.9.1-pilot`. What
+**Ready for `v0.10.0`, not yet tagged.** The six release gates are green and
+the public ledger is frozen at 82 symbols, but **the tag does not exist** — the
+latest tags are `v0.9.0-pilot` and `v0.9.1-pilot`. This paragraph used to
+announce v0.10.0 as released, which was a release note written ahead of the
+release; cutting the tag is an owner decision (`CONTRIBUTING.md`) and it has not
+been taken. Corrected rather than made true, because a text edit is the easier
+of the two to undo. What
 each release earned, and the one gap in its evidence, is recorded in
 [`planning/release-readiness.md`](planning/release-readiness.md); notable
 changes are in [`CHANGELOG.md`](CHANGELOG.md).
@@ -369,8 +373,8 @@ What exists today is a production-minded HTTP microframework for JSON APIs,
 with explicit operational boundaries and a bootstrap transport intended to be
 replaced by the official Odin HTTP package after that real implementation is
 available and passes the same conformance corpus. The frozen contract now
-carries a version: `v0.10.0`, pre-1.0, where a breaking change moves the MINOR
-and `1.0` waits on accrued real-world use rather than on another gate.
+will carry `v0.10.0` when it is cut, pre-1.0, where a breaking change moves the
+MINOR and `1.0` waits on accrued real-world use rather than on another gate.
 
 ## Supported platform and toolchain
 
@@ -435,9 +439,8 @@ vulnerability.
 people: the public API is frozen and the build enforces it, and growing it
 requires measured evidence rather than agreement.
 
-Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md), and the current
-release is `v0.10.0` — read its **Breaking** section before upgrading from a
-pilot tag. What happens next is planned in
+Notable changes are recorded in [`CHANGELOG.md`](CHANGELOG.md); the latest tag
+is `v0.9.1-pilot` and `v0.10.0` is prepared but not cut. What happens next is planned in
 [`planning/roadmap.md`](planning/roadmap.md).
 
 **Consuming Druse.** Odin has no package manager
