@@ -104,6 +104,18 @@ stop_server() {
   fail "port $PORT is still held after stopping the server"
 }
 
+# The per-request stream, and why it is OPTIONAL here and mandatory in the soak.
+#
+# openload writes one row per request. At the rates this sweep reaches that is
+# 3 million rows and ~324 MB PER RUN, and a full sweep filled a 29 GB disk and
+# died mid-campaign on 2026-07-31. The soak needs the stream because its whole
+# job is attributing individual failures; a ceiling sweep needs the aggregate,
+# and the aggregate is in the JSON beside it.
+#
+# Default OFF, because the failure mode of leaving it on is losing the campaign.
+# Set DRUSE_BENCH_RAW=1 when a run is small enough to want per-request detail.
+RAW_FLAG="${DRUSE_BENCH_RAW:-}"
+
 SERVERS=(druse nethttp gin fiber fasthttp)
 
 for repeat in $(seq 1 "$REPEATS"); do
@@ -122,7 +134,7 @@ for repeat in $(seq 1 "$REPEATS"); do
       taskset -c "$LOAD_CPUS" "$OUT/bin/openload" \
         -url "http://127.0.0.1:$PORT$ENDPOINT" -method GET \
         -rate "$rate" -duration "${SECONDS_PER_RUN}s" -connections 128 -timeout 5s \
-        -raw "$OUT/runs/$server-$rate-r$repeat.csv" \
+        ${RAW_FLAG:+-raw "$OUT/runs/$server-$rate-r$repeat.csv"} \
         >"$OUT/runs/$server-$rate-r$repeat.json" \
         2>"$OUT/runs/$server-$rate-r$repeat.err" || true
       sleep 1
