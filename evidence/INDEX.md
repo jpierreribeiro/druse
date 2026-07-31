@@ -14,6 +14,7 @@ Conclusões consolidadas, revisão por revisão:
 | Histórico local antes do pull | — | `archives/uruquim-main-local-d2d3a97.bundle` | `6d9d90cc57bd58d2d9216f7ec3b0b553b36a7c9b3c2b7fb185ed7f102549846d` |
 | JSON fused-target AWS | `2026-07-29-json-fused-target-aws/README.md` | `2026-07-29-json-fused-target-aws/uruquim-json-target-20260729.bundle` | `8c5cea9bd25019fae768f4ab0175508f0eded80035058fccae9f5774091d66f3` |
 | Integração e gate de produção | `2026-07-29-integration-gate/README.md` | `2026-07-29-integration-gate/source-9b46a46.bundle` | `e3d07c1c1992ef1aaeba54efc20746c1ee6fa2010640fbb3992df772270d9852` |
+| Release candidate | `2026-07-29-release-candidate/` | `archives/uruquim-release-candidate-20260729.tar.gz` | `d6625e16ab80fb2f3b7ecd5fe39534ab770abdab711c841c4b46c8a6b494b84b` |
 | Offload bloqueante seletivo | `2026-07-29-selective-blocking-offload/README.md` | `2026-07-29-selective-blocking-offload/source.bundle` | `c57bc29f3017912f90db8002aa60e79eb2e9884ac7d35f917c618d62e72cb070` |
 
 ## Campanhas de 2026-07-28 a 2026-07-30, sem arquivo separado
