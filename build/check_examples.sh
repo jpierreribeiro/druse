@@ -48,6 +48,30 @@ DRUSE_EXPECTED_EXAMPLES="01-hello-world
 
 test -d "$DRUSE_EXAMPLES" || fail "examples/ does not exist"
 
+# EXACT MEANS BOTH DIRECTIONS, and until 2026-07-31 it only meant one.
+#
+# Everything below iterates $DRUSE_EXPECTED_EXAMPLES, so a directory added to
+# examples/ and not added to that list was never compiled, never scanned for
+# forbidden imports, and never scanned for future-phase API -- while this file's
+# own header said "the example set is EXACT" and the gate reported the examples
+# green. That is a check whose name promises more than its body delivers
+# (planning/diagnosability.md rule 4): it means "the eleven I listed compile",
+# and it reads as "the examples compile".
+#
+# So the set is now closed from both ends. Adding an example means adding it
+# here, which is the point -- the list is the contract the docs cite.
+for DRUSE_FOUND in "$DRUSE_EXAMPLES"/*/; do
+  DRUSE_FOUND="$(basename "$DRUSE_FOUND")"
+  case "
+$DRUSE_EXPECTED_EXAMPLES
+" in
+    *"
+$DRUSE_FOUND
+"*) ;;
+    *) fail "examples/$DRUSE_FOUND/ exists but is not in DRUSE_EXPECTED_EXAMPLES, so nothing compiles it or scans it. Add it to the list in $0, or delete it. An unlisted example is a program shipped in the repository that the gate has never built." ;;
+  esac
+done
+
 for DRUSE_NAME in $DRUSE_EXPECTED_EXAMPLES; do
   test -d "$DRUSE_EXAMPLES/$DRUSE_NAME" ||
     fail "examples/$DRUSE_NAME/ is missing; the examples are a contract (WP10 D3, extended by WP24 and WP37)"

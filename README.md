@@ -7,7 +7,7 @@ when needed, data-oriented underneath.
 
 [![gate](https://github.com/jpierreribeiro/druse/actions/workflows/gate.yml/badge.svg?branch=main)](https://github.com/jpierreribeiro/druse/actions/workflows/gate.yml)
 [![release](https://img.shields.io/github/v/tag/jpierreribeiro/druse?label=release&sort=semver)](https://github.com/jpierreribeiro/druse/tags)
-[![licence](https://img.shields.io/badge/licence-BSD--3--Clause-blue)](LICENSE)
+[![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 [![Odin](https://img.shields.io/badge/Odin-dev--2026--07a-orange)](odin-version.txt)
 
 More about the API is in the [documentation](docs/), and the fastest way in is
@@ -163,4 +163,4 @@ the build enforces it, and growing it requires measured evidence rather than
 agreement. [`CONTRIBUTING.md`](CONTRIBUTING.md) explains both, and
 [`SECURITY.md`](SECURITY.md) covers reporting.
 
-Licensed under [BSD-3-Clause](LICENSE).
+Licensed under the [MIT License](LICENSE).
