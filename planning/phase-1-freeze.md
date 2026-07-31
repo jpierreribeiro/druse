@@ -2890,3 +2890,85 @@ allocator, so `response_commit_owned` frees the same thing either way.
 remove the `when JSON_OWN_MARSHAL` block from `web/respond.odin` and the two
 ENC3 blocks from `build/check.sh`. Nothing else moves: the flag is off, so no
 shipped behaviour depends on any of it.
+
+## Amendment 43 — the Druse-owned marshal walk becomes the default, no ledger growth
+
+**Date: 2026-07-30. Authority: the owner, on the measurements below. Ledger
+effect: none; application remains 80 and test-support remains 2.** No public
+name, signature, field or enum member moves; `JSON_OWN_MARSHAL` is `@(private)`
+and applications cannot see it. **Dependency effect: none.**
+
+**What changes.** `web/json_encode.odin`'s `DRUSE_JSON_OWN_MARSHAL` defaults to
+`true`. JSON responses whose payload type the walk covers completely are now
+emitted by Druse; everything else — maps, enumerated arrays, fixed-capacity
+arrays, non-platform endianness, non-UTF-8 strings, and any struct whose
+`json:"…"` tag carries flags — still goes to the stdlib, decided once per
+instantiation before a byte is written.
+
+**Why, in numbers.** Three independent instruments, all in
+`docs/reports/2026-07-30-own-marshal.md`:
+
+| | control | own marshal |
+|---|---:|---:|
+| p50 below the knee | 265 µs | **154 µs (−41.9%)** |
+| ceiling past the knee | 26,716/s | **65,336/s (+144.6%)** |
+| CPU for the same 10,000 req/s | 2.99× | **1×** |
+
+and against six peers at an equal offered rate, on the row where all seven
+answer the same 4,310 bytes:
+
+| | p50 | p99 |
+|---|---:|---:|
+| axum | 120 µs | 1,066 µs |
+| fasthttp / fiber | 133 µs | 993 / 964 µs |
+| **druse** | **150 µs** | **384 µs** |
+| gin / net/http | 156 µs | 492 / 504 µs |
+
+**Fourth of seven on the median and first on the tail**, from last place and
+360 µs before the change. The 22 admission failures that build carried on that
+row went to zero: a lane freed 2.4× sooner stops pushing a four-lane pool into
+refusal, so the `eof_on_fresh_conn` refusals were a symptom of the encoder.
+
+**Why the measurement is trusted.** Two A/B campaigns were **discarded before
+this one**, and the reason is recorded rather than buried: at 30,000/s and again
+at 45,000/s the own-marshal arm served 100% of the offered rate, so its goodput
+column reported the generator's setting and not the server's capacity. Only at
+70,000/s are both arms queueing. The lesson generalises: a column heading is
+also a claim, and a change that MOVES the knee falsifies the heading while every
+flag stays green. Read goodput and p50 together.
+
+A third run — the six-framework matrix — was discarded for a single
+`unclassified` failure, per `planning/diagnosability.md` rule 3. The cause was
+nameable (`http: server closed idle connection`, the keep-alive reuse race), so
+it was named: the generator gained a `server_closed_idle_conn` class and the
+matrix was re-run. "Benign" is not a licence to leave a cause unclassified.
+
+**Why it is safe.** Equivalence is proven at four levels, not asserted:
+`tests/enc1-quoted-string` over every rune in the Unicode range and every byte,
+in both escape spellings; `tests/enc3-own-marshal` over whole documents with the
+coverage claim **pinned in the test**, so a widened claim fails rather than
+silently costing the fast path; `experiments/25-marshal-parity` over 36
+documents plus the rejection set; and the A/B harness's own byte-identity check
+on the wire, which refuses to measure variants that answer different bytes.
+
+Payloads outside the subset pay nothing and gain nothing: the emitter for them
+is the stdlib, so their bytes are equal by construction rather than by test.
+
+**Evidence, executable.** `build/check_typegate_controls.sh` control 0b pins
+this default verbatim in the source — a default with no assertion is a default
+that walks back on the next refactor — and control 2b proves the stdlib
+rollback is still green. `build/check.sh` additionally runs the whole WP6 public
+contract under `-define:DRUSE_JSON_OWN_MARSHAL=false`.
+
+**Rollback.** `-define:DRUSE_JSON_OWN_MARSHAL=false` restores the stdlib
+marshaller, kept for one release, matching the dedicated-accept, `JSON_FUSED_*`
+and validation-gate rollouts. Removing it later means deleting the `when`/`else`
+pair in `web/respond.odin`, controls 0b and 2b, and the both-states WP6 block
+together.
+
+**What this does not close.** `reflect::struct_tag_lookup` is now the largest
+single symbol in the encode profile at 16.29% of that build's CPU — but rescaled
+by the CPU-time ratio it is 5.45% against the control's 6.25%, essentially
+unchanged. It became dominant by attrition, which is what makes it the next
+target rather than a regression. `web/json_decode.odin` already solved the same
+problem inbound with a per-type descriptor table.

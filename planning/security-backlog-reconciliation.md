@@ -53,6 +53,48 @@ recorded as indirect and the reason stated.**
 
 ---
 
+## 2. The attack-lab series (F-001 … F-007), reconciled 2026-07-30
+
+A **second, separate** series, and the reason this section exists is that it had
+no ledger at all. §1 reconciles the 14 findings of the 2026-07-22
+`/claude-security` scan. F-001…F-007 came from the raw-socket attack-lab
+sessions of 2026-07-23 and 2026-07-28, were written up in `docs/reports/`, and
+were never rowed, never pinned, never gated. Their fixes were real; their
+*protection* was a report.
+
+The numbering does not collide with §1 (`F1`…`F14` vs `F-001`…`F-007`), but the
+two series overlap in substance: **F-001 is the same defect as F3**, found twice
+by two methods. That is recorded rather than deduplicated — two independent
+findings of one bug is information about the coverage, not a bookkeeping error.
+
+<!-- attacklab-findings: 7 -->
+
+| # | Finding | Severity | Status in the tree | Pinning test |
+|---|---|---|---|---|
+| **F-001** | negative / overflow chunk-size kills the process | HIGH (DoS) | ✅ fixed — `vendor/odin-http/body.odin:264`, patch 14 | ✅ `wp9_raw_wire_corpus` — corpus case "negative chunk size is rejected". Same defect as §1 F3 |
+| **F-002** | use-after-free: deferred dispatch retains an Exchange in the freed connection arena | HIGH (CWE-416) | ✅ fixed 2026-07-23 — the `next_tick` retry was REMOVED, not made safe; the path now answers 503 + `Retry-After` while the response state is still valid (`odin_http_adapter.odin`, marker `DRUSE FIX (F-002)`) | ✅ **NEW: `build/check_c05_controls.sh`** — asserts the marker, the 503, the `Retry-After` (Closure H-4) and that the adapter has exactly ONE `next_tick_poly` site (the stream pump). All four assertions proven to go red under mutation |
+| **F-003** | accept starvation / event-loop wedge under sustained lane saturation | HIGH (availability) | ✅ fixed — patch 27 bounded the accept-cancel spin, patch 28 **removed** it; the wedge is impossible by construction rather than by a bound | ✅ `build/check_c05_controls.sh` — fails if the spin returns, with the reason in the message; behavioural twin `tests/c05-saturation/saturation_test.odin` |
+| **F-004** | stream pump holds a zero-copy ring slice across an async send | HIGH *if triggered* | ⊘ **never reproduced.** Filed as a design concern with the guard that appears to save it, explicitly "not as a live exploit" | n/a — there is no defect to pin. Recorded so the next reader does not re-open it as an unfixed HIGH |
+| **F-005** | oversized header block dropped silently instead of answered | LOW-MED | ✅ fixed — `vendor/odin-http/server.odin:1703` answers `431 Request Header Fields Too Large` and closes | ◑ **no dedicated case.** The behaviour is on the raw-wire path where the corpus lives; a case belongs there and is not yet written. Recorded as a gap rather than claimed |
+| **F-006** | cookie `Max-Age` integer overflow | LOW here | ◑ **unguarded, deliberately.** `vendor/odin-http/cookie.odin:148` still parses without a range check | n/a — the code path is the CLIENT cookie parser. Druse is a server and never runs it; the report says so and rates it LOW for that reason. It becomes real only if a future work package uses the vendored client |
+| **F-007** | spool admission slot leak when `begin` fails after `admit` | LOW (CWE-772) | ✅ fixed — and NOT where the report proposed. `ingest.begin` calls `release_slot(a)` on the `os.open` failure (marker "ingest audit F2"), so every caller benefits rather than one call site. The other failure return (`!a.initialized`) cannot leak: `admit` refuses on the same guard *before* incrementing | ◑ pinned by construction, argued above rather than asserted. A test would need a spool directory made unwritable mid-run |
+
+**Five fixed, one never a defect, one unreachable-by-construction. Three pinned
+by a named control, one (F-002) newly pinned here, three recorded as indirect
+with the reason.**
+
+**The gap this section closes.** F-002's fix was validated "ad-hoc, ASan+debug
+build" — 20 manual rounds — and then carried no test for a week. §0 of this
+document states the rule it was violating: *a fix with no named test is a fix
+that can regress in silence.* The control added on 2026-07-30 is that test.
+
+**The gap it does NOT close.** F-005 has no raw-wire corpus case. It is written
+down here rather than quietly counted as pinned, because the whole point of a
+reconciliation is that the unpinned rows are visible.
+
+
+---
+
 ## 2. What H-1 added
 
 Two tests, both through the ordinary request path so a regression is caught

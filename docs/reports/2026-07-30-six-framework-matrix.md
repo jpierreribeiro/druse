@@ -6,6 +6,33 @@ frameworks the 2026-07-25 study named as the ones to beat — Axum for encode,
 Fastify as the scripting baseline — were absent from it because the host had
 neither toolchain.
 
+> ## SUPERSEDED FOR THE JSON ROWS — 2026-07-30, later the same day
+>
+> **Everything below measures a Druse that no longer exists.** It ran with the
+> stdlib JSON marshaller; the per-type validation gate and the Druse-owned
+> marshal walk were both adopted as defaults hours after these numbers were
+> taken, and the JSON rows moved by 2.4×.
+>
+> | `/json/medium/int` | this report | after |
+> |---|---:|---:|
+> | Druse p50 | 360 µs | **150 µs** |
+> | Druse p99 | 1,292 µs | **384 µs** |
+> | Druse failures | 22 | **0** |
+> | rank of seven | last | **4th on p50, 1st on p99** |
+>
+> The replacement is
+> [`2026-07-30-own-marshal.md`](2026-07-30-own-marshal.md), whose matrix also
+> adds **fasthttp** as a seventh peer — this report's Fiber row runs on fasthttp
+> but is not fasthttp, and reading one as the other is the substitution the
+> withdrawn `/json/medium` row was withdrawn for.
+>
+> **What is NOT superseded:** the method, the small-response rows (`health`,
+> `json-small`, `extract` — untouched by the encoder), and the finding that
+> named the gap in the first place. This report is what motivated the work that
+> obsoleted it, and it is kept rather than edited so the before-number stays
+> auditable. A report whose numbers moved is corrected in the open, not
+> quietly.
+
 ## Verdict in one paragraph
 
 **On small responses Druse is third of six**, within 10–13 µs of Axum and Fiber

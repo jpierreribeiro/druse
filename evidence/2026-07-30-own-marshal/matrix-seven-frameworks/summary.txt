@@ -1,0 +1,83 @@
+open-loop application matrix — offered 20,000/s, 5 repeats, 10s each
+commit 2bdfaaf  kernel Linux 6.17.0-1017-aws x86_64 GNU/Linux
+
+### decode-medium
+  server      goodput/s  % offered   B/resp    p50 us    p99 us  failures  classes
+  axum           20,000     100.0%        0       158       358         0  
+  druse          17,756      88.8%        0   637,979 1,252,128       283  {'request_write_failed': 122, 'eof_on_fresh_conn': 58, 'peer_reset': 80, 'broken_pipe': 16, 'server_closed_idle_conn': 5, 'dial_other': 2}  <- did not serve the offered rate; latency here is a queue
+  fasthttp       19,999     100.0%        0       325     5,035         0  
+  fastify         9,973      49.9%        0 5,265,291 9,962,978         0    <- did not serve the offered rate; latency here is a queue
+  fiber          20,000     100.0%        0       403     6,776         0  
+  gin            16,508      82.5%        0 1,067,153 2,087,704         0    <- did not serve the offered rate; latency here is a queue
+  nethttp        16,172      80.9%        0 1,153,151 2,339,888         0    <- did not serve the offered rate; latency here is a queue
+
+### extract
+  server      goodput/s  % offered   B/resp    p50 us    p99 us  failures  classes
+  axum           20,000     100.0%       39       103     1,061         0  
+  druse          20,000     100.0%       39       105     1,087         0  
+  fasthttp       20,000     100.0%       39        97     1,158         0  
+  fastify        13,964      69.8%      106 2,259,190 4,283,523         0    <- did not serve the offered rate; latency here is a queue
+  fiber          20,000     100.0%       39        98     1,146         0  
+  gin            20,000     100.0%       39       123     1,124         0  
+  nethttp        20,000     100.0%       39       123     1,115         0  
+
+  !! RESPONSE SIZES DIFFER on extract — this row is NOT a like-for-like comparison:
+       axum             39 B/resp    +0.0%
+       druse            39 B/resp    +0.0%
+       fasthttp         39 B/resp    +0.0%
+       fiber            39 B/resp    +0.0%
+       gin              39 B/resp    +0.0%
+       nethttp          39 B/resp    +0.0%
+       fastify         106 B/resp  +171.8%
+     A latency or goodput difference here is partly a payload difference. Equalise the response before publishing the row.
+
+### health
+  server      goodput/s  % offered   B/resp    p50 us    p99 us  failures  classes
+  axum           20,000     100.0%        2        91     1,179         0  
+  druse          20,000     100.0%        2       101     1,074         0  
+  fasthttp       20,000     100.0%        2        94     1,203         0  
+  fastify        20,000     100.0%        2       140   132,271         0  
+  fiber          20,000     100.0%        2        95     1,187         0  
+  gin            20,000     100.0%        2       118     1,122         0  
+  nethttp        20,000     100.0%        2       118     1,126         0  
+
+### json-medium
+  server      goodput/s  % offered   B/resp    p50 us    p99 us  failures  classes
+  axum           20,000     100.0%    4,438       123     1,061         0  
+  druse          20,000     100.0%    5,398       264       609         0  
+  fasthttp       20,000     100.0%    4,438       144       625         0  
+  fastify        15,757      78.8%    4,438 1,390,104 2,669,129         0    <- did not serve the offered rate; latency here is a queue
+  fiber          20,000     100.0%    4,438       144       751         0  
+  gin            20,000     100.0%    4,438       164       512         0  
+  nethttp        20,000     100.0%    4,438       164       510         0  
+
+  !! RESPONSE SIZES DIFFER on json-medium — this row is NOT a like-for-like comparison:
+       axum          4,438 B/resp    +0.0%
+       fasthttp      4,438 B/resp    +0.0%
+       fastify       4,438 B/resp    +0.0%
+       fiber         4,438 B/resp    +0.0%
+       gin           4,438 B/resp    +0.0%
+       nethttp       4,438 B/resp    +0.0%
+       druse         5,398 B/resp   +21.6%
+     A latency or goodput difference here is partly a payload difference. Equalise the response before publishing the row.
+
+### json-medium-int
+  server      goodput/s  % offered   B/resp    p50 us    p99 us  failures  classes
+  axum           20,000     100.0%    4,310       120     1,066         0  
+  druse          20,000     100.0%    4,310       150       384         0  
+  fasthttp       20,000     100.0%    4,310       133       993         0  
+  fastify        16,100      80.5%    4,310 1,215,036 2,397,804         0    <- did not serve the offered rate; latency here is a queue
+  fiber          20,000     100.0%    4,310       133       964         0  
+  gin            20,000     100.0%    4,310       156       492         0  
+  nethttp        20,000     100.0%    4,310       156       504         0  
+
+### json-small
+  server      goodput/s  % offered   B/resp    p50 us    p99 us  failures  classes
+  axum           20,000     100.0%       62        92     1,176         0  
+  druse          20,000     100.0%       62       100     1,070         0  
+  fasthttp       20,000     100.0%       62        95     1,168         0  
+  fastify        20,000     100.0%       62       139     1,421         0  
+  fiber          20,000     100.0%       62        95     1,171         0  
+  gin            20,000     100.0%       62       119     1,129         0  
+  nethttp        20,000     100.0%       62       120     1,143         0  
+

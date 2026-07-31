@@ -33,6 +33,32 @@ for DRUSE_N in $(seq 1 14); do
     fail "finding F$DRUSE_N has no row in the reconciliation"
 done
 
+# --- The attack-lab series (F-001..F-007) is reconciled too --------------------
+#
+# A second series, from the 2026-07-23 and 2026-07-28 raw-socket sessions. It
+# had no ledger until 2026-07-30: the fixes were real and their protection was a
+# report, which is the exact failure mode 0 of the doc names. These assertions
+# keep the rows from quietly disappearing again.
+DRUSE_AL_DECLARED="$(sed -n 's/^<!-- attacklab-findings: \([0-9]\+\) -->$/\1/p' "$DRUSE_DOC")"
+test -n "$DRUSE_AL_DECLARED" || fail "the 'attacklab-findings' marker is gone; the F-001..F-007 series has no reconciled record"
+DRUSE_AL_ROWS="$(grep -cE '^\| \*\*F-[0-9]{3}\*\* \|' "$DRUSE_DOC" || true)"
+test "$DRUSE_AL_ROWS" -eq "$DRUSE_AL_DECLARED" ||
+  fail "the attack-lab section has $DRUSE_AL_ROWS rows but declares $DRUSE_AL_DECLARED"
+test "$DRUSE_AL_DECLARED" -eq 7 ||
+  fail "the attack lab produced 7 findings; the reconciliation carries $DRUSE_AL_DECLARED"
+for DRUSE_N in 001 002 003 004 005 006 007; do
+  grep -qE "^\| \*\*F-$DRUSE_N\*\* \|" "$DRUSE_DOC" ||
+    fail "finding F-$DRUSE_N has no row in the attack-lab reconciliation"
+done
+
+# F-002 is the one whose fix had no test for a week. Its control must exist and
+# must still be wired into the gate; a row that names a control the gate does
+# not run is a row that reassures without protecting.
+grep -q 'DRUSE FIX (F-002)' "$DRUSE_ROOT/build/check_c05_controls.sh" ||
+  fail "check_c05_controls.sh no longer pins F-002; the use-after-free fix is back to having no named test"
+grep -q 'check_c05_controls.sh' "$DRUSE_ROOT/build/check.sh" ||
+  fail "the C-05 controls are no longer run by the gate, so the F-002 pin does not execute"
+
 # --- The pinning tests named in the doc exist in the tree ---------------------
 # The 12 directly-pinned findings each name a test function; that function must
 # exist. A dropped test is a fix that can regress in silence.
@@ -70,4 +96,5 @@ grep -qi 'no public injection path' <<<"$DRUSE_FLAT" ||
 
 echo "h1: all 14 findings reconciled; 12 pinned by an existing named test, 2 (F8, F12) indirect with a stated reason"
 echo "h1: the F7 intermediate-symlink and F13 decoy-boundary tests exist"
+echo "h1: the attack-lab series F-001..F-007 is reconciled; F-002 is pinned by check_c05_controls.sh and that control is wired into the gate"
 echo "PASS: H-1 security-backlog reconciliation"

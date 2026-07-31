@@ -71,8 +71,8 @@ echo "building..."
 # from, because "which Go compiled the peer" is part of what a comparison means.
 peer_build="local"
 if [ -n "${DRUSE_BENCH_PEER_BIN:-}" ]; then
-  cp "$DRUSE_BENCH_PEER_BIN"/{nethttp,gin,fiber} "$OUT/bin/" ||
-    fail "DRUSE_BENCH_PEER_BIN=$DRUSE_BENCH_PEER_BIN does not hold nethttp, gin and fiber"
+  cp "$DRUSE_BENCH_PEER_BIN"/{nethttp,gin,fiber,fasthttp} "$OUT/bin/" ||
+    fail "DRUSE_BENCH_PEER_BIN=$DRUSE_BENCH_PEER_BIN does not hold nethttp, gin, fiber and fasthttp"
   peer_build="prebuilt:$DRUSE_BENCH_PEER_BIN"
 else
   (cd "$MATRIX/peers/go" && go build -o "$OUT/bin/" ./cmd/...) ||
@@ -110,7 +110,7 @@ fi
   echo "go=$(go version 2>&1)"
   echo "go_peers=$peer_build"
   if [ "$peer_build" != local ]; then
-    echo "go_peers_sha256=$(sha256sum "$OUT/bin/nethttp" "$OUT/bin/gin" "$OUT/bin/fiber" | awk '{printf "%s ", $1}')"
+    echo "go_peers_sha256=$(sha256sum "$OUT/bin/nethttp" "$OUT/bin/gin" "$OUT/bin/fiber" "$OUT/bin/fasthttp" | awk '{printf "%s ", $1}')"
   fi
   echo "node=$("${NODE_BIN:-node}" --version 2>&1 || echo absent)"
   echo "cargo=$(cargo --version 2>&1 || echo absent)"
@@ -146,7 +146,7 @@ start_server() { # name -> writes $OUT/server.pid
   fi
   case "$1" in
     druse)   taskset -c "$SERVER_CPUS" "$OUT/bin/druse" "$LANES" >"$OUT/runs/$1-server.log" 2>&1 & ;;
-    nethttp|gin|fiber)
+    nethttp|gin|fiber|fasthttp)
              taskset -c "$SERVER_CPUS" "$OUT/bin/$1" >"$OUT/runs/$1-server.log" 2>&1 & ;;
     axum)    taskset -c "$SERVER_CPUS" "$OUT/bin/axum" >"$OUT/runs/$1-server.log" 2>&1 & ;;
     fastify) (cd "$MATRIX/peers/fastify" && taskset -c "$SERVER_CPUS" "$NODE_BIN" server.mjs) \
@@ -206,7 +206,7 @@ measure() { # server endpoint-spec repeat
     2>"$OUT/runs/$server-$name-r$repeat.err" || true
 }
 
-SERVERS=(druse nethttp gin fiber)
+SERVERS=(druse nethttp gin fiber fasthttp)
 [ "$have_axum" = 1 ] && SERVERS+=(axum)
 [ "$have_fastify" = 1 ] && SERVERS+=(fastify)
 

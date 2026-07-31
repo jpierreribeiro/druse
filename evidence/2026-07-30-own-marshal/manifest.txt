@@ -38,3 +38,13 @@ cpu_time_ratio=0.3346 (control spends 2.99x the CPU for the same 10,000 req/s)
 # Overhead column of perf-self.txt, all of which are kept. Re-running is the
 # reproduction path, not re-reading a 34 MB stream.
 dropped=openload, server, load.csv, perf.data, perf-script.txt, runs/*.csv
+
+# The seven-framework matrix, added after the A/B: druse (own marshal ON),
+# axum, fasthttp, fiber, gin, net/http, fastify, 20,000/s offered, 5 repeats,
+# alternating order. fasthttp is NEW as a peer -- README's headline claim
+# ("91.7% of fasthttp") rested on a table the README itself says cannot be
+# regenerated from the checkout. This one can.
+matrix_dir=matrix-seven-frameworks/
+matrix_servers=druse axum fasthttp fiber gin nethttp fastify
+matrix_row=/json/medium/int, 4,310 bytes, identical across all seven
+matrix_result=druse p50 150us (4th of 7), p99 384us (1st of 7), 0 failures

@@ -163,6 +163,47 @@ grep -q 'HTTP 503 responses were emitted before a request was parsed' \
     fail "the pre-request HTTP mutant failed for the wrong reason"
   }
 
+# --- F-002: the lane-admission refusal must stay a REFUSAL, not a retry -------
+#
+# The 2026-07-23 attack lab found a use-after-free here: on a failed
+# `handler_lane_enter` the adapter deferred itself with `nbio.next_tick_poly`,
+# and the Exchange it retained lives in the connection's temp arena, which
+# `connection_close` frees wholesale. A client that dropped a contended
+# connection made the retry dereference freed memory — ASan-confirmed, a
+# reliable SEGV at odin_http_adapter.odin:265.
+#
+# The fix removed the retry rather than making it lifetime-safe, because a
+# deferred dispatch can never be safe there. It was validated ad hoc with 20
+# rounds of the original trigger and then had NO named test for seven days.
+# This is that test. It is static rather than behavioural because reproducing
+# the race needs a contended pool plus a client RST at a precise instant; what
+# it pins is the property the fix rests on, which is that nothing defers.
+#
+# NOTE the distinction from the control above, because they look contradictory
+# and are not: THAT one forbids the ACCEPTOR from writing 503 before a request
+# is parsed (no request, no response). THIS one requires `dispatch_exchange` to
+# answer 503 AFTER the request is parsed and the lane pool is full — there the
+# request exists and a load-shed 503 is the correct answer.
+DRUSE_ADAPTER="$DRUSE_ROOT/web/internal/transport/odin_http_adapter.odin"
+
+grep -q 'DRUSE FIX (F-002)' "$DRUSE_ADAPTER" ||
+  fail "the F-002 marker is gone from the adapter; the use-after-free fix has no anchor left in the source"
+
+# The refusal branch, spelled out. A retry would not need any of these.
+grep -q 'res.status = http.Status.Service_Unavailable' "$DRUSE_ADAPTER" ||
+  fail "the lane-admission refusal no longer answers 503 (F-002). A deferred retry is a use-after-free: the Exchange lives in the connection temp arena and connection_close frees it wholesale."
+
+grep -q 'http.headers_set(&res.headers, "Retry-After", "1")' "$DRUSE_ADAPTER" ||
+  fail "the lane-admission 503 lost its Retry-After (Closure H-4). A 503 with no 'when' turns into an immediate retry onto the same contended pool."
+
+# And the property the whole fix rests on: the failure path defers nothing. The
+# stream pump legitimately uses next_tick_poly, so this counts occurrences
+# rather than banning the symbol — one, in the pump.
+DRUSE_NEXT_TICK_USES="$(grep -c 'nbio.next_tick_poly' "$DRUSE_ADAPTER" || true)"
+test "$DRUSE_NEXT_TICK_USES" -eq 1 ||
+  fail "the adapter has $DRUSE_NEXT_TICK_USES next_tick_poly call sites; F-002 left exactly one (the stream pump). A second is how the deferred dispatch came back."
+
+echo "c05: F-002 stays fixed — the lane-admission path refuses with 503 + Retry-After and defers nothing"
 echo "c05: the six outcomes stay distinguishable; first observed refusal is reported without pretending its ordering is deterministic"
 echo "c05: the accept-cancel spin is GONE (PATCH 28) — the wedge is impossible by construction, not merely bounded (F-C05-1 superseded)"
 echo "c05: acceptor saturation is transport-only and counted; restoring pre-request HTTP makes the corpus RED"

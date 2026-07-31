@@ -116,6 +116,46 @@ The writing cluster — the four `io` symbols plus the vtable adapter they drive
 the stdlib pays writing every brace, comma and integer through the same
 `io.Writer`.
 
+## Against six peers, at an equal offered rate
+
+The A/B compares Druse with itself. It cannot say whether 154 µs is fast. This
+does: the same build, in the application matrix, against every peer the host can
+run — and with **fasthttp added as a seventh server**, because the README's
+headline claim is a fasthttp comparison and Fiber, though it runs on fasthttp,
+is not fasthttp.
+
+`/json/medium/int`, 20,000/s offered, 5 alternating repeats. All seven answer
+the same **4,310 bytes**; the summariser flags the row otherwise. Zero failures
+of any class across the row, and zero `unclassified` — the run before this one
+was discarded for a single unclassified failure, per
+`planning/diagnosability.md` rule 3.
+
+| server | p50 | p99 | failures |
+|---|---:|---:|---:|
+| axum | 120 µs | 1,066 µs | 0 |
+| fasthttp | 133 µs | 993 µs | 0 |
+| fiber | 133 µs | 964 µs | 0 |
+| **druse** | **150 µs** | **384 µs** | **0** |
+| gin | 156 µs | 492 µs | 0 |
+| net/http | 156 µs | 504 µs | 0 |
+| fastify | past its knee | — | 0 |
+
+**Fourth of seven on the median, first on the tail.** The p99 is 2.5× shorter
+than fasthttp's and 2.8× shorter than Axum's, which is the lane architecture
+showing: no internal queue, no scheduler arbitrating, so the worst case is
+bounded rather than long.
+
+**The same build measured 360 µs and last place before this change**, with 22
+admission failures the other six did not have. Those went to zero, and the
+mechanism is one sentence: a lane freed 2.4× sooner stops pushing a four-lane
+pool into refusal. The `eof_on_fresh_conn` failures were a symptom of the
+encoder, not of the acceptor — which also means the `max_handlers` auto-sizing
+question (ADR-048's open item) is now being asked of a much cheaper handler.
+
+**fasthttp and Fiber both measured 133 µs.** They coincide on this workload,
+which validates treating them as separate rows and simultaneously shows why the
+separation was necessary: coincidence is a measurement, not an assumption.
+
 ## The next lever is this project's own code, and it is not what it looks like
 
 `reflect::struct_tag_lookup` is now the largest single symbol in the own-marshal

@@ -106,6 +106,43 @@ an equal-offered-rate comparison. Treat the table as a recorded observation on
 one box, not as a reproducible result, until the peers and an orchestrator are
 committed.
 
+### And the JSON row it does not measure, which is reproducible
+
+The `/ping` table above is a transport benchmark and says so. The application
+matrix answers the other half, at an **equal offered rate** rather than at each
+server's own attained throughput, and — unlike the table above — **every server
+in it is committed and every binary is hashed in the artefact.**
+
+`/json/medium/int`, a 64-record document. All seven answer the **same 4,310
+bytes**; the summariser flags the row as not like-for-like if they do not.
+20,000 requests per second offered, 5 alternating repeats, 10 s each, AWS
+c5.2xlarge, server on CPUs 0–3 and the generator on 4–7.
+
+| framework/runtime | p50 | p99 | failures |
+|---|---:|---:|---:|
+| Axum 0.8.9 / Rust | 120 µs | 1,066 µs | 0 |
+| fasthttp 1.72 / Go | 133 µs | 993 µs | 0 |
+| Fiber 3.4 / Go | 133 µs | 964 µs | 0 |
+| **Druse / Odin** | **150 µs** | **384 µs** | **0** |
+| Gin 1.12 / Go | 156 µs | 492 µs | 0 |
+| Go `net/http` | 156 µs | 504 µs | 0 |
+| Fastify 5.8 / Node | past its knee | — | 0 |
+
+Fourth of seven on the median, **first on the tail** — 2.5× shorter than
+fasthttp's p99 and 2.8× shorter than Axum's. That shape is the lane
+architecture: no internal queue and no scheduler deciding, so the worst case is
+bounded rather than long.
+
+**This row moved by 2.4× on 2026-07-30** and the honesty of the before-number
+matters as much as the after: the same build measured **360 µs and last place**
+before the JSON encoder was replaced, with 22 admission failures the other six
+did not have. What changed is
+[`docs/reports/2026-07-30-own-marshal.md`](docs/reports/2026-07-30-own-marshal.md).
+
+Reproduce it with `bench/application_matrix/run-openload-matrix.sh`; the peers
+are in `bench/application_matrix/peers/`, the raw runs and the manifest are in
+[`evidence/2026-07-30-own-marshal/`](evidence/2026-07-30-own-marshal/).
+
 What this table does **not** measure: JSON encode/decode, routing-heavy
 applications, middleware chains, request bodies, streaming throughput, TLS,
 connection churn, memory per connection, or application/database work. Use it

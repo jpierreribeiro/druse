@@ -60,6 +60,7 @@ const (
 	classBodyRead      failureClass = "response_body_read"
 	classBodyClose     failureClass = "response_body_close"
 	classBrokenPipe    failureClass = "broken_pipe"
+	classIdleClosed    failureClass = "server_closed_idle_conn"
 	classRequestBuild  failureClass = "request_build"
 	classUnclassified  failureClass = "unclassified"
 )
@@ -173,6 +174,18 @@ func classify(err error, phase string, reused bool, wrote bool) (failureClass, s
 			return classEOFReused, text
 		}
 		return classEOFFresh, text
+	}
+
+	// The keep-alive reuse race, and it is NAMED rather than tolerated. Go's
+	// transport picks an idle connection, the server closes it in the same
+	// instant, and the request never reaches the wire. It is inherent to
+	// keep-alive and every server in a matrix is exposed to it -- but
+	// `planning/diagnosability.md` rule 3 is explicit that a cause which cannot
+	// be named invalidates the RUN, not the row, so "benign" is not a licence to
+	// leave it unclassified. It earned this class by appearing once in the
+	// 2026-07-30 six-framework matrix and invalidating that whole campaign.
+	if strings.Contains(text, "server closed idle connection") {
+		return classIdleClosed, text
 	}
 
 	if timedOut {

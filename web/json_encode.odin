@@ -67,11 +67,28 @@ import "core:reflect"
 import "core:strconv"
 import "core:strings"
 
-// The own-marshal path, behind a build flag until an A/B says it earns the
-// default. It is NOT adopted: `docs/reports/` carries no end-to-end number for
-// it yet, and the recorded lesson is that a symbol's share of a profile is not
-// the gain available from removing it.
-@(private) JSON_OWN_MARSHAL :: #config(DRUSE_JSON_OWN_MARSHAL, false)
+// The own-marshal path — ADOPTED as the default on 2026-07-30, with a
+// build-time rollback for one release (the discipline `DRUSE_DEDICATED_ACCEPT`,
+// the three `JSON_FUSED_*` flags and the per-type validation gate were all
+// adopted under).
+//
+// Adopted on three measurements, not on the profile share that motivated it:
+//
+//	p50 below the knee    265 -> 154 us   (-41.9%)
+//	ceiling past the knee  26,716 -> 65,336/s  (+144.6%)
+//	CPU for the same 10,000 req/s   2.99x less
+//
+// and, against six peers on `/json/medium/int` where all seven answer the same
+// 4,310 bytes: 360 -> 150 us, from last place to fourth of seven — while
+// holding the SHORTEST TAIL of the seven at p99 384 us, against 964 for Fiber,
+// 993 for fasthttp and 1,066 for Axum. The 22 admission failures that build
+// carried on that row went to zero, because a lane freed 2.4x sooner stops
+// pushing a four-lane pool into refusal.
+//
+// `build/check_typegate_controls.sh` is what makes the adoption an executable
+// fact rather than a comment: control 0b pins this default literally, and 2b
+// proves the stdlib rollback is still green.
+@(private) JSON_OWN_MARSHAL :: #config(DRUSE_JSON_OWN_MARSHAL, true)
 @(private) JSON_OWN_WALK_MAX_DEPTH :: 32
 
 // json_own_supports answers whether the fast walk covers `id` COMPLETELY —
