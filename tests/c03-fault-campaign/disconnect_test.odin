@@ -151,6 +151,10 @@ c03_a_contended_lane_refuses_with_503_and_stays_alive :: proc(t: ^testing.T) {
 		"positive control: a healthy request must be served before the contention starts",
 	)
 
+	// Read the acceptor's refusal counter BEFORE the contention, so the delta
+	// below attributes only what this burst caused.
+	refusals_before := web.stats().saturation_refusals
+
 	contenders := make([]Contender, CONTENDERS)
 	defer delete(contenders)
 	for &c in contenders {
@@ -169,6 +173,10 @@ c03_a_contended_lane_refuses_with_503_and_stays_alive :: proc(t: ^testing.T) {
 	}
 	g_contenders = nil
 
+	// The acceptor's own refusal is counted BEFORE the outcomes are read, so a
+	// contender that met it can be attributed rather than guessed at.
+	saturation_refusals := web.stats().saturation_refusals - refusals_before
+
 	ok_count, refused_count, bad := 0, 0, 0
 	for c in contenders {
 		switch c.status {
@@ -181,10 +189,11 @@ c03_a_contended_lane_refuses_with_503_and_stays_alive :: proc(t: ^testing.T) {
 		}
 	}
 	fmt.printf(
-		"[c03] B4 contended lane   200=%d 503=%d malformed_or_hung=%d (of %d)\n",
+		"[c03] B4 contended lane   200=%d 503=%d no_reply=%d acceptor_refused=%d (of %d)\n",
 		ok_count,
 		refused_count,
 		bad,
+		saturation_refusals,
 		CONTENDERS,
 	)
 
@@ -192,16 +201,37 @@ c03_a_contended_lane_refuses_with_503_and_stays_alive :: proc(t: ^testing.T) {
 	returned := stop_server(&server)
 
 	testing.expect(t, returned, "the server must shut down after lane contention")
-	// The contract: every answer is one of the two the design permits. A 0 here
-	// is a hang or a truncated reply, a -1 is a refused connect, and either
-	// would mean contention costs a client its request rather than costing it
-	// a retry.
+	// THE CONTRACT, and it has THREE permitted answers, not two.
+	//
+	// 200 and 503 are the obvious ones: served, or refused after the request was
+	// read. The third is the acceptor's own refusal, and it looks like nothing
+	// at all from a client — `docs/operations.md` 6 says so in as many words:
+	// when every Handler lane is active a newly accepted socket is "closed
+	// before an HTTP request is parsed", deliberately, because "the acceptor
+	// must not manufacture a 503 for a request it has never read". A client
+	// meeting that gets an EOF with no reply, which `get_status` reports as 0
+	// or -1 -- indistinguishable, from the outside, from a hang.
+	//
+	// This assertion used to demand `bad == 0` and it held for a year, because
+	// it never ran anywhere the acceptor could saturate. The first CI run, on a
+	// 2-vCPU runner where `max_handlers` sits at its floor of 4 against these 8
+	// contenders, put 3 of 8 into that third outcome and the suite called it a
+	// defect. It was the documented design.
+	//
+	// So the outcomes are ATTRIBUTED rather than accepted: every answer that is
+	// neither 200 nor 503 must be covered by the server's own count of acceptor
+	// refusals over the same window. That keeps the teeth -- a hang or a
+	// truncated reply is still a failure, because the counter will not have
+	// risen for it -- while no longer calling a documented refusal a defect.
+	// It is `planning/diagnosability.md` rule 1 applied to a test: record the
+	// cause, do not count the event.
 	testing.expectf(
 		t,
-		bad == 0,
-		"%d of %d contended requests got neither 200 nor 503 — contention must cost a retry, never a request",
+		bad <= saturation_refusals,
+		"%d of %d contended requests got neither 200 nor 503, but the acceptor only refused %d over the same window; the rest were a hang or a truncated reply, and contention must cost a retry, never a request",
 		bad,
 		CONTENDERS,
+		saturation_refusals,
 	)
 	testing.expectf(
 		t,
