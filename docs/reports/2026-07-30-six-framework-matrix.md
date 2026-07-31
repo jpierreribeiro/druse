@@ -36,9 +36,9 @@ neither toolchain.
 ## Verdict in one paragraph
 
 **On small responses Druse is third of six**, within 10–13 µs of Axum and Fiber
-and ahead of Gin, net/http and Fastify. **On nested JSON encode it is last of
-the four that serve the offered rate**, which is the gap
-`2026-07-30-nested-json-knee.md` measured at about 2.3× below saturation.
+and ahead of Gin, net/http and Fastify. **On nested JSON encode it was last of
+the four that serve the offered rate** — a 2.3× gap that is now closed; see the
+banner at the top and [`2026-07-30-own-marshal.md`](2026-07-30-own-marshal.md).
 **On the decode path it delivers more than Gin, net/http and Fastify** — only
 Axum and Fiber serve that endpoint fully, and Druse leads the remaining three.
 Axum wins or ties every endpoint.
@@ -77,7 +77,18 @@ standard-library-family servers.
 size check added this morning flagged it automatically; the previous matrix had
 no such check and I had to find the equivalent defect by hand.
 
-## Nested JSON encode — the known gap, at scale
+## Nested JSON encode — the gap as it was, and it is closed
+
+> **THESE NUMBERS ARE SUPERSEDED.** Read them as the before-state, not as the
+> current one. On the same endpoint and host, with the per-type validation gate
+> and the Druse-owned marshal walk both adopted hours later, Druse measures
+> **150 µs p50** against Axum's 121 and fasthttp's 133 — fourth of seven and
+> **first on the tail** at 384 µs p99 — with a ceiling of **65,336/s**, not the
+> ~20,800/s below. The section is kept unedited because it is what motivated
+> the work, and a before-number that quietly becomes an after-number is not a
+> before-number at all. Current figures:
+> [`2026-07-30-own-marshal.md`](2026-07-30-own-marshal.md).
+
 
 `/json/medium/int`, 4,310 bytes byte-identical across all six:
 

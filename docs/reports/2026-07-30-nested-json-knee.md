@@ -1,5 +1,13 @@
 # Nested JSON: the knee, and what a request actually costs — 2026-07-30
 
+> **SUPERSEDED, same day.** The 2.3× gap and the ~20,800/s ceiling below are the
+> before-state. This report is what identified the encode path as the cost, and
+> the work it motivated landed hours later: on the same endpoint and host, Druse
+> now measures **150 µs p50** against 121–156 for five peers and a ceiling of
+> **65,336/s**. Kept unedited so the number that justified the work stays
+> auditable. Current figures:
+> [`2026-07-30-own-marshal.md`](2026-07-30-own-marshal.md).
+
 ## Verdict
 
 On a nested JSON document that all four servers answer **byte for byte
