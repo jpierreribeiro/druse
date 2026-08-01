@@ -17,8 +17,9 @@
 # drift, and the drift is invisible precisely because every individual document
 # reads plausibly.
 #
-# WHAT IT ASSERTS. The unit is the single source of truth. Every `Restart=` and
-# `LimitMEMLOCK=` token in the tree's own prose must agree with it. LimitMEMLOCK
+# WHAT IT ASSERTS. The unit and runtime profile are the deploy source of truth.
+# Every `Restart=`, `LimitMEMLOCK=` and `LimitNOFILE=` token in the tree's own
+# prose must agree with them. LimitMEMLOCK
 # is compared BY VALUE, not by string, because `64M` and `67108864` are the same
 # limit and a string compare would report a false drift (that exact mismatch
 # existed when this control was written).
@@ -32,6 +33,8 @@ set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 UNIT="$ROOT/ops/deploy/druse.service"
+PROFILE="$ROOT/ops/deploy/runtime-limits.example"
+PREFLIGHT="$ROOT/ops/deploy/check-runtime-limits.sh"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -40,6 +43,9 @@ fail() {
 
 test -f "$UNIT" ||
   fail "the canonical systemd unit ops/deploy/druse.service is missing; docs/operations.md tells the operator to copy it"
+test -f "$PROFILE" || fail "the canonical runtime profile ops/deploy/runtime-limits.example is missing"
+test -x "$PREFLIGHT" || fail "ops/deploy/check-runtime-limits.sh is missing or not executable"
+bash -n "$PREFLIGHT" || fail "ops/deploy/check-runtime-limits.sh does not parse"
 
 # --- what the unit actually ships -------------------------------------------
 
@@ -50,6 +56,30 @@ unit_value() {
 
 UNIT_RESTART="$(unit_value Restart)"
 UNIT_MEMLOCK="$(unit_value LimitMEMLOCK)"
+UNIT_NOFILE="$(unit_value LimitNOFILE)"
+UNIT_MEMORY_MAX="$(unit_value MemoryMax)"
+UNIT_TIMEOUT_STOP="$(unit_value TimeoutStopSec)"
+
+profile_value() {
+  sed -n "s/^[[:space:]]*$1=[[:space:]]*//p" "$PROFILE" | tail -n 1
+}
+
+PROFILE_NOFILE="$(profile_value DRUSE_EXPECTED_NOFILE)"
+PROFILE_MEMLOCK="$(profile_value DRUSE_MEMLOCK_FLOOR_BYTES)"
+PROFILE_MEMORY_MAX="$(profile_value DRUSE_MEMORY_MAX_BYTES)"
+PROFILE_TIMEOUT_STOP="$(profile_value DRUSE_TIMEOUT_STOP_SEC)"
+PROFILE_DRAIN="$(profile_value DRUSE_MAX_DRAIN_TIME_SEC)"
+PROFILE_SPOOL="$(profile_value DRUSE_SPOOL_DIR)"
+
+for pair in \
+  "DRUSE_EXPECTED_NOFILE:$PROFILE_NOFILE" \
+  "DRUSE_MEMLOCK_FLOOR_BYTES:$PROFILE_MEMLOCK" \
+  "DRUSE_MEMORY_MAX_BYTES:$PROFILE_MEMORY_MAX" \
+  "DRUSE_TIMEOUT_STOP_SEC:$PROFILE_TIMEOUT_STOP" \
+  "DRUSE_MAX_DRAIN_TIME_SEC:$PROFILE_DRAIN" \
+  "DRUSE_SPOOL_DIR:$PROFILE_SPOOL"; do
+  test -n "${pair#*:}" || fail "runtime-limits.example is missing ${pair%%:*}"
+done
 
 test -n "$UNIT_RESTART" ||
   fail "ops/deploy/druse.service declares no Restart=; a faulting handler aborts the process (ADR-020) and the supervisor restarting it IS the recovery mechanism"
@@ -82,6 +112,46 @@ as_bytes() {
     *)     echo "$v" ;;
   esac
 }
+
+test -n "$UNIT_NOFILE" || fail "ops/deploy/druse.service declares no LimitNOFILE="
+test "$UNIT_NOFILE" = "$PROFILE_NOFILE" ||
+  fail "unit LimitNOFILE=$UNIT_NOFILE disagrees with profile DRUSE_EXPECTED_NOFILE=$PROFILE_NOFILE"
+test "$(as_bytes "$UNIT_MEMLOCK")" = "$PROFILE_MEMLOCK" ||
+  fail "unit LimitMEMLOCK=$UNIT_MEMLOCK disagrees with profile floor $PROFILE_MEMLOCK bytes"
+test "$(as_bytes "$UNIT_MEMORY_MAX")" = "$PROFILE_MEMORY_MAX" ||
+  fail "unit MemoryMax=$UNIT_MEMORY_MAX disagrees with profile DRUSE_MEMORY_MAX_BYTES=$PROFILE_MEMORY_MAX"
+test "$UNIT_TIMEOUT_STOP" = "$PROFILE_TIMEOUT_STOP" ||
+  fail "unit TimeoutStopSec=$UNIT_TIMEOUT_STOP disagrees with profile DRUSE_TIMEOUT_STOP_SEC=$PROFILE_TIMEOUT_STOP"
+test "$PROFILE_TIMEOUT_STOP" -gt "$PROFILE_DRAIN" ||
+  fail "profile TimeoutStopSec=$PROFILE_TIMEOUT_STOP must be greater than max_drain_time=$PROFILE_DRAIN"
+
+grep -Fxq 'EnvironmentFile=/etc/druse/runtime-limits' "$UNIT" ||
+  fail "unit does not load the canonical /etc/druse/runtime-limits profile"
+grep -Fxq 'ExecStartPre=/usr/local/libexec/druse/check-runtime-limits.sh' "$UNIT" ||
+  fail "unit does not run check-runtime-limits.sh before ExecStart"
+grep -Fxq 'StateDirectory=druse' "$UNIT" ||
+  fail "unit does not create the canonical writable state/spool directory"
+UNIT_WRITE_PATHS="$(unit_value ReadWritePaths)"
+case ":$UNIT_WRITE_PATHS:" in
+  *":$PROFILE_SPOOL:"*) ;;
+  *) fail "unit ReadWritePaths=$UNIT_WRITE_PATHS does not include profile spool $PROFILE_SPOOL" ;;
+esac
+
+# Verify the systemd structure where the host provides the verifier.  Replace
+# only example executable paths so this does not depend on an installed app.
+if command -v systemd-analyze >/dev/null 2>&1; then
+  VERIFY_DIR="$(mktemp -d)"
+  trap 'rm -rf "$VERIFY_DIR"' EXIT
+  sed \
+    -e 's#^EnvironmentFile=.*#EnvironmentFile=-/dev/null#' \
+    -e 's#^ExecStartPre=.*#ExecStartPre=/bin/true#' \
+    -e 's#^ExecStart=.*#ExecStart=/bin/true#' \
+    "$UNIT" > "$VERIFY_DIR/druse.service"
+  systemd-analyze verify "$VERIFY_DIR/druse.service" >/dev/null 2>&1 ||
+    fail "systemd-analyze verify rejects ops/deploy/druse.service"
+  rm -rf "$VERIFY_DIR"
+  trap - EXIT
+fi
 
 # --- every prose mention must agree ------------------------------------------
 #
@@ -121,11 +191,20 @@ for f in "${SCAN[@]}"; do
     DRIFT="$DRIFT
   ${f#$ROOT/}:$line says LimitMEMLOCK=$value ($(as_bytes "$value") bytes)"
   done < <(grep -n "LimitMEMLOCK=" "$f" 2>/dev/null || true)
+
+  while IFS= read -r hit; do
+    line="${hit%%:*}"
+    value="$(printf '%s' "${hit#*:}" | sed -n 's/.*LimitNOFILE=\([0-9]*\).*/\1/p')"
+    test -n "$value" || continue
+    test "$value" = "$UNIT_NOFILE" && continue
+    DRIFT="$DRIFT
+  ${f#$ROOT/}:$line says LimitNOFILE=$value"
+  done < <(grep -n "LimitNOFILE=" "$f" 2>/dev/null || true)
 done
 
 if test -n "$DRIFT"; then
   fail "the shipped unit and the documents disagree about the supervisor contract.
-ops/deploy/druse.service ships Restart=$UNIT_RESTART and LimitMEMLOCK=$UNIT_MEMLOCK ($(as_bytes "$UNIT_MEMLOCK") bytes).
+ops/deploy/druse.service ships Restart=$UNIT_RESTART, LimitMEMLOCK=$UNIT_MEMLOCK ($(as_bytes "$UNIT_MEMLOCK") bytes), and LimitNOFILE=$UNIT_NOFILE.
 These disagree:$DRIFT
 
 The unit is the source of truth — the operator copies it verbatim. Change the
@@ -133,7 +212,7 @@ documents, or change the unit deliberately and let this control tell you every
 document that has to move with it."
 fi
 
-echo "PASS: ops/deploy/druse.service ships Restart=$UNIT_RESTART, LimitMEMLOCK=$UNIT_MEMLOCK, and every document in the tree agrees"
+echo "PASS: unit/profile agree on Restart=$UNIT_RESTART, LimitMEMLOCK=$UNIT_MEMLOCK, LimitNOFILE=$UNIT_NOFILE, MemoryMax=$UNIT_MEMORY_MAX, TimeoutStopSec=$UNIT_TIMEOUT_STOP, spool=$PROFILE_SPOOL, and every document agrees"
 
 # --- the OTHER shipped operational artefacts ---------------------------------
 #

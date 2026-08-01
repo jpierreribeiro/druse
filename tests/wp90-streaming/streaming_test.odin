@@ -16,6 +16,12 @@
 //   - a client disconnect mid-stream refuses the producer and releases the
 //     registry slot (proven by reopening under max_streams = 1);
 //   - a buffered route on the same server is untouched.
+//
+// The fixed listener ports deliberately sit BELOW Linux's default ephemeral
+// range (32768..60999).  The old 51920..51925 values collided with an ordinary
+// browser's outbound source port and made the bind test fail even though no
+// process was listening there — an established wildcard-conflicting socket is
+// enough.  These are test listeners, never a product default.
 package test_wp90_streaming
 
 import "core:net"
@@ -147,10 +153,10 @@ recv_until :: proc(sock: net.TCP_Socket, builder: ^strings.Builder, marker: stri
 @(test)
 wp90b_chunks_arrive_incrementally_and_close_terminates :: proc(t: ^testing.T) {
 	lab: Lab
-	testing.expect(t, start_lab(&lab, 51920), "transport must start")
+	testing.expect(t, start_lab(&lab, 21920), "transport must start")
 	defer stop_lab(&lab)
 
-	sock, ok := dial(51920)
+	sock, ok := dial(21920)
 	testing.expect(t, ok)
 	defer net.close(sock)
 	request := "GET /stream HTTP/1.1\r\nHost: localhost\r\n\r\n"
@@ -194,10 +200,10 @@ wp90b_chunks_arrive_incrementally_and_close_terminates :: proc(t: ^testing.T) {
 @(test)
 wp90b_a_buffered_route_is_untouched :: proc(t: ^testing.T) {
 	lab: Lab
-	testing.expect(t, start_lab(&lab, 51921), "transport must start")
+	testing.expect(t, start_lab(&lab, 21921), "transport must start")
 	defer stop_lab(&lab)
 
-	sock, ok := dial(51921)
+	sock, ok := dial(21921)
 	testing.expect(t, ok)
 	defer net.close(sock)
 	request := "GET /plain HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
@@ -214,10 +220,10 @@ wp90b_a_buffered_route_is_untouched :: proc(t: ^testing.T) {
 @(test)
 wp90b_disconnect_mid_stream_refuses_the_producer_and_frees_the_slot :: proc(t: ^testing.T) {
 	lab: Lab
-	testing.expect(t, start_lab(&lab, 51922), "transport must start")
+	testing.expect(t, start_lab(&lab, 21922), "transport must start")
 	defer stop_lab(&lab)
 
-	sock, ok := dial(51922)
+	sock, ok := dial(21922)
 	testing.expect(t, ok)
 	request := "GET /stream HTTP/1.1\r\nHost: localhost\r\n\r\n"
 	_, _ = net.send_tcp(sock, transmute([]u8)string(request))
@@ -248,7 +254,7 @@ wp90b_disconnect_mid_stream_refuses_the_producer_and_frees_the_slot :: proc(t: ^
 
 	// With max_streams = 1, a NEW stream can only open if the dead one's slot
 	// was retired — release is proven, not assumed.
-	sock2, ok2 := dial(51922)
+	sock2, ok2 := dial(21922)
 	testing.expect(t, ok2)
 	defer net.close(sock2)
 	_, _ = net.send_tcp(sock2, transmute([]u8)string(request))
@@ -269,10 +275,10 @@ wp90b_a_final_event_survives_an_immediate_close :: proc(t: ^testing.T) {
 	// web.stream_close usable for a bounded stream that ends with a final
 	// message (a job result, a done marker).
 	lab: Lab
-	testing.expect(t, start_lab(&lab, 51925), "transport must start")
+	testing.expect(t, start_lab(&lab, 21925), "transport must start")
 	defer stop_lab(&lab)
 
-	sock, ok := dial(51925)
+	sock, ok := dial(21925)
 	testing.expect(t, ok)
 	defer net.close(sock)
 	_, _ = net.send_tcp(sock, transmute([]u8)string("GET /stream HTTP/1.1\r\nHost: localhost\r\n\r\n"))

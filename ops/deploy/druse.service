@@ -9,7 +9,8 @@
 # to a cgroup, restart to the supervisor, and the io_uring locked-memory limit
 # that a resource-starved start needs.
 #
-# Copy to /etc/systemd/system/druse.service, edit the three marked values, then:
+# Copy the unit, runtime-limits.example and check-runtime-limits.sh to the paths
+# named below; edit ExecStart/User for the application, then:
 #   systemctl daemon-reload && systemctl enable --now druse
 #
 # Diagnosing a fault: with systemd-coredump installed, `coredumpctl gdb druse`
@@ -38,13 +39,20 @@ StartLimitBurst=5
 StartLimitIntervalSec=10s
 
 [Service]
-# --- EDIT THESE THREE (systemd has NO trailing-comment syntax; keep values clean) ---
+# --- EDIT THESE TWO (systemd has NO trailing-comment syntax; keep values clean) ---
 # ExecStart: your compiled binary.
 ExecStart=/usr/local/bin/your-app
 # User: a dedicated unprivileged user.
 User=druse
-# MemoryMax: the C-04 cgroup bound. Size it by the rule below.
-MemoryMax=1G
+
+# One canonical profile is consumed by the application and the preflight.  The
+# application must map the DRUSE_* values it owns into web.Limits/Upload_Config;
+# examples/10-config-and-health shows that boundary.  The preflight runs after
+# systemd applies this unit's rlimits/cgroup and creates StateDirectory, but
+# before ExecStart can bind a socket.
+EnvironmentFile=/etc/druse/runtime-limits
+ExecStartPre=/usr/local/libexec/druse/check-runtime-limits.sh
+StateDirectory=druse
 
 # Restart on fault. A faulting handler exits non-zero; on-failure restarts it and
 # leaves a clean `systemctl stop` alone. RestartSec paces the loop so a crashing
@@ -68,12 +76,20 @@ TimeoutStopSec=30
 # counts. Raise it if you raise max_handlers a lot.
 LimitMEMLOCK=64M
 
-# MemoryMax is the AGGREGATE memory guard the matrix delegates here. Size it by
-# the C-04 rule (docs/operations.md): with web.Limits.max_response_bytes set, it
-# is max_connections × max_response_bytes + baseline; unset, it is
-# max_connections × (largest response your handlers build). Prefer setting
-# max_response_bytes so this number is one you control. Exceeding MemoryMax is an
-# OOM kill — which Restart=on-failure then recovers.
+# R1-WP02 measured 22 baseline FDs with eight handlers: stdio 3, listener 1,
+# and two FDs (io_uring + eventfd) for each of eight lanes plus the acceptor.
+# The canonical profile derives 1213 after max connections, live spools,
+# auxiliary FDs and margin; 2048 is the explicit process limit checked before
+# bind.  Raising capacity without updating the profile makes preflight fail.
+LimitNOFILE=2048
+
+# MemoryMax is the AGGREGATE memory guard the matrix delegates here.  Three
+# eight-lane slow-reader runs peaked at 325264 KiB for 8 MiB responses; the
+# profile requires 200% headroom above that measured peak.  max_response_bytes
+# bounds a committed response, not allocations already made while constructing
+# it, arbitrary handler temporaries, allocator high-water or aggregate process
+# memory.  Exceeding MemoryMax is an OOM kill — Restart=on-failure recovers.
+MemoryMax=1G
 
 # Hardening: least privilege, so a compromised handler has the smallest blast
 # radius. Drop or relax these only where your app genuinely needs the access.
@@ -81,8 +97,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-# If your app writes files (e.g. the upload spool dir), list them here:
-# ReadWritePaths=/var/lib/your-app
+ReadWritePaths=/var/lib/druse
 
 [Install]
 WantedBy=multi-user.target

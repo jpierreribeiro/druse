@@ -1571,9 +1571,20 @@ if bash "$DRUSE_ROOT/build/check_supervisor_contract.sh" \
      "$DRUSE_SUPERVISOR_PROBE" >/dev/null 2>&1; then
   fail "BROKEN CONTROL: the supervisor contract check passed against a unit mutated to Restart=always while the documents still say on-failure. It is not detecting drift, so its green result above means nothing."
 fi
-echo "PASS: the supervisor contract check detects a mutated unit (negative control)"
+sed -i 's/^Restart=always/Restart=on-failure/' \
+  "$DRUSE_SUPERVISOR_PROBE/ops/deploy/druse.service"
+sed -i '/^LimitNOFILE=/d' \
+  "$DRUSE_SUPERVISOR_PROBE/ops/deploy/druse.service"
+if bash "$DRUSE_ROOT/build/check_supervisor_contract.sh" \
+     "$DRUSE_SUPERVISOR_PROBE" >/dev/null 2>&1; then
+  fail "BROKEN CONTROL: the supervisor contract check passed after LimitNOFILE was removed. It is not guarding the R1 resource budget."
+fi
+echo "PASS: the supervisor contract check detects Restart drift and a missing LimitNOFILE (negative controls)"
 rm -rf "$DRUSE_SUPERVISOR_PROBE"
 trap - EXIT
+
+echo "--- R1 runtime budget: derived limits and pre-bind negative controls ---"
+bash "$DRUSE_ROOT/build/check_r1_resource_controls.sh" "$DRUSE_ROOT"
 
 echo "--- R1 real-process shutdown: signals, sockets, exit status and supervisor bound ---"
 env DRUSE_ODIN_BIN="$DRUSE_COMPILER" \

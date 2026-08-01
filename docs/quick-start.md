@@ -209,7 +209,12 @@ The four that will surprise you first, so nothing does:
 
 Druse is usable for building and testing a JSON API today, and for a
 controlled pilot behind a reverse proxy under a supervisor. Read
-`docs/operations.md` before exposing it to real traffic.
+`docs/operations.md` before exposing it to real traffic. For that pilot, use
+the three canonical deployment artifacts together:
+`ops/deploy/druse.service`, `ops/deploy/runtime-limits.example`, and
+`ops/deploy/check-runtime-limits.sh`; the last one refuses insufficient file
+descriptors/memlock, an unbounded cgroup, an invalid shutdown deadline, or an
+unwritable spool before the application binds.
 
 ## Next
 
