@@ -1,0 +1,4 @@
+fds=22
+threads=9
+io_uring=9
+eventfd=9

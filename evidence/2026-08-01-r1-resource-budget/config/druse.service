@@ -1,0 +1,103 @@
+# Druse — canonical systemd unit (item 1a).
+#
+# A faulting handler ABORTS the process — Odin has no recoverable panic (ADR-020),
+# so a nil dereference, a failed assertion or an out-of-bounds index in your
+# handler ends the program. The supervisor restarting it IS the recovery
+# mechanism; there is no other one. This unit is that supervisor, and it also
+# encodes the rest of the mandatory topology the readiness matrix
+# (planning/closure-readiness-matrix.md) delegates to the platform: total memory
+# to a cgroup, restart to the supervisor, and the io_uring locked-memory limit
+# that a resource-starved start needs.
+#
+# Copy the unit, runtime-limits.example and check-runtime-limits.sh to the paths
+# named below; edit ExecStart/User for the application, then:
+#   systemctl daemon-reload && systemctl enable --now druse
+#
+# Diagnosing a fault: with systemd-coredump installed, `coredumpctl gdb druse`
+# opens the core of the crash with the faulting handler on the stack — which
+# request killed the process, named precisely. See docs/operations.md §"Diagnosing
+# a handler fault". This is why the core installs NO crash signal handler of its
+# own (ADR-047): the coredump is safer and more informative than a breadcrumb.
+
+[Unit]
+Description=Druse HTTP service
+After=network-online.target
+Wants=network-online.target
+
+# The crash-loop backstop, stated rather than inherited. `RestartSec` in
+# [Service] only PACES a restart loop; what ENDS one is the start limit, and
+# systemd applies a default (5 starts in 10s) whether or not you write it down.
+# Inheriting it silently is how an operator finds out mid-incident that the
+# service stopped being restarted and nothing said so. These ARE the defaults,
+# made visible and tunable: after 5 starts inside 10s the unit gives up and
+# enters `failed`, where `systemctl status druse` reports it and an alert on
+# unit state can fire. Raise StartLimitBurst if your restarts are legitimately
+# bursty; StartLimitIntervalSec=0 disables the backstop and restarts forever.
+# These belong in [Unit]: systemd moved them out of [Service] in v230, and a
+# copy left in [Service] is silently ignored.
+StartLimitBurst=5
+StartLimitIntervalSec=10s
+
+[Service]
+# --- EDIT THESE TWO (systemd has NO trailing-comment syntax; keep values clean) ---
+# ExecStart: your compiled binary.
+ExecStart=/usr/local/bin/your-app
+# User: a dedicated unprivileged user.
+User=druse
+
+# One canonical profile is consumed by the application and the preflight.  The
+# application must map the DRUSE_* values it owns into web.Limits/Upload_Config;
+# examples/10-config-and-health shows that boundary.  The preflight runs after
+# systemd applies this unit's rlimits/cgroup and creates StateDirectory, but
+# before ExecStart can bind a socket.
+EnvironmentFile=/etc/druse/runtime-limits
+ExecStartPre=/usr/local/libexec/druse/check-runtime-limits.sh
+StateDirectory=druse
+
+# Restart on fault. A faulting handler exits non-zero; on-failure restarts it and
+# leaves a clean `systemctl stop` alone. RestartSec paces the loop so a crashing
+# binary does not spin the CPU.
+# The crash-loop backstop lives in [Unit], NOT here — systemd moved
+# StartLimitBurst/StartLimitIntervalSec out of [Service] in v230, and a copy left
+# in this section is silently ignored. See the top of the file.
+Restart=on-failure
+RestartSec=1
+
+# The shutdown outer bound. It MUST be longer than web.Limits.max_drain_time
+# (default 10s) — the drain deadline is only real if it expires before the kill —
+# and shorter than your orchestrator's grace period. web.serve returns when the
+# drain finishes; if a blocked handler outlasts the drain, this kill is the bound.
+TimeoutStopSec=30
+
+# io_uring pins memory against RLIMIT_MEMLOCK: one event loop is set up per
+# Handler lane per server. A too-low limit makes serve fail to acquire its loop
+# (F-C03-2) — now a clean, restartable serve failure rather than a crash, but a
+# failure nonetheless. Give it real headroom; 64M is ample for the default lane
+# counts. Raise it if you raise max_handlers a lot.
+LimitMEMLOCK=64M
+
+# R1-WP02 measured 22 baseline FDs with eight handlers: stdio 3, listener 1,
+# and two FDs (io_uring + eventfd) for each of eight lanes plus the acceptor.
+# The canonical profile derives 1213 after max connections, live spools,
+# auxiliary FDs and margin; 2048 is the explicit process limit checked before
+# bind.  Raising capacity without updating the profile makes preflight fail.
+LimitNOFILE=2048
+
+# MemoryMax is the AGGREGATE memory guard the matrix delegates here.  Three
+# eight-lane slow-reader runs peaked at 325264 KiB for 8 MiB responses; the
+# profile requires 200% headroom above that measured peak.  max_response_bytes
+# bounds a committed response, not allocations already made while constructing
+# it, arbitrary handler temporaries, allocator high-water or aggregate process
+# memory.  Exceeding MemoryMax is an OOM kill — Restart=on-failure recovers.
+MemoryMax=1G
+
+# Hardening: least privilege, so a compromised handler has the smallest blast
+# radius. Drop or relax these only where your app genuinely needs the access.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/druse
+
+[Install]
+WantedBy=multi-user.target

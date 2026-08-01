@@ -1,0 +1,39 @@
+Aug 01 20:04:41 jp-Latitude-5400 systemd[1401]: Started druse-r1-crash-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.
+Aug 01 20:04:41 jp-Latitude-5400 resource-server[2976273]: /home/jp/Desktop/uruquim-odin/tests/r1-resource-budget/server/main.odin(85:3) runtime assertion: R1-WP02 deliberate startup crash-loop drill
+Aug 01 20:04:42 jp-Latitude-5400 systemd-coredump[2976277]: Process 2976273 (resource-server) of user 1000 dumped core.
+                                                            
+                                                            Stack trace of thread 2976273:
+                                                            #0  0x00005e6e88fe18af n/a (/tmp/druse-r1-resource-zXMnnD/resource-server + 0x298af)
+                                                            #1  0x00007f434342a28b __libc_start_main_impl (libc.so.6 + 0x2a28b)
+                                                            #2  0x00005e6e88fe0065 n/a (/tmp/druse-r1-resource-zXMnnD/resource-server + 0x28065)
+                                                            ELF object binary architecture: AMD x86-64
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Main process exited, code=dumped, status=4/ILL
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Failed with result 'core-dump'.
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Scheduled restart job, restart counter is at 1.
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: Started druse-r1-crash-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.
+Aug 01 20:04:42 jp-Latitude-5400 resource-server[2976312]: /home/jp/Desktop/uruquim-odin/tests/r1-resource-budget/server/main.odin(85:3) runtime assertion: R1-WP02 deliberate startup crash-loop drill
+Aug 01 20:04:42 jp-Latitude-5400 systemd-coredump[2976315]: Process 2976312 (resource-server) of user 1000 dumped core.
+                                                            
+                                                            Stack trace of thread 2976312:
+                                                            #0  0x0000602b453318af n/a (/tmp/druse-r1-resource-zXMnnD/resource-server + 0x298af)
+                                                            #1  0x00007e7e98c2a28b __libc_start_main_impl (libc.so.6 + 0x2a28b)
+                                                            #2  0x0000602b45330065 n/a (/tmp/druse-r1-resource-zXMnnD/resource-server + 0x28065)
+                                                            ELF object binary architecture: AMD x86-64
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Main process exited, code=dumped, status=4/ILL
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Failed with result 'core-dump'.
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Scheduled restart job, restart counter is at 2.
+Aug 01 20:04:42 jp-Latitude-5400 systemd[1401]: Started druse-r1-crash-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.
+Aug 01 20:04:42 jp-Latitude-5400 resource-server[2976350]: /home/jp/Desktop/uruquim-odin/tests/r1-resource-budget/server/main.odin(85:3) runtime assertion: R1-WP02 deliberate startup crash-loop drill
+Aug 01 20:04:43 jp-Latitude-5400 systemd-coredump[2976353]: Process 2976350 (resource-server) of user 1000 dumped core.
+                                                            
+                                                            Stack trace of thread 2976350:
+                                                            #0  0x000062221c2d68af n/a (/tmp/druse-r1-resource-zXMnnD/resource-server + 0x298af)
+                                                            #1  0x00007ed0f182a28b __libc_start_main_impl (libc.so.6 + 0x2a28b)
+                                                            #2  0x000062221c2d5065 n/a (/tmp/druse-r1-resource-zXMnnD/resource-server + 0x28065)
+                                                            ELF object binary architecture: AMD x86-64
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Main process exited, code=dumped, status=4/ILL
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Failed with result 'core-dump'.
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Scheduled restart job, restart counter is at 3.
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Start request repeated too quickly.
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: druse-r1-crash-2975655.service: Failed with result 'core-dump'.
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: Failed to start druse-r1-crash-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.

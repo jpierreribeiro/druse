@@ -1,0 +1,8 @@
+Running as unit: druse-r1-memlock-2975655.service; invocation ID: 319666b0c2b84c2a98df9349bfc805a9
+ERROR: druse runtime preflight: effective memlock=16384 bytes is below derived/floor requirement 67108864 for 9 event loops
+Finished with result: exit-code
+Main processes terminated with: code=exited/status=1
+Service runtime: 24ms
+CPU time consumed: 21ms
+Memory peak: 264.0K
+Memory swap peak: 0B

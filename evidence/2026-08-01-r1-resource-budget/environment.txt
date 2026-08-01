@@ -1,0 +1,13 @@
+Linux jp-Latitude-5400 6.8.0-86-generic #87-Ubuntu SMP PREEMPT_DYNAMIC Mon Sep 22 18:03:36 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+/home/jp/.local/bin/odin version dev-2026-07-nightly:819fdc7
+systemd 255 (255.4-1ubuntu8.11)
+cpus=8
+page_size=4096
+nofile_soft=1024
+nofile_hard=1048576
+memlock_soft_kib=3052280
+memlock_hard_kib=3052280
+               total        used        free      shared  buff/cache   available
+Mem:     25004298240 13215150080  2449874944  1433567232 11542859776 11789148160
+Swap:              0           0           0
+0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-36e60893-e53b-4324-8d39-8dd8e04d3f97.scope

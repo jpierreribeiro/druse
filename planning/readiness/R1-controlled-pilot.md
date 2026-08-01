@@ -1,7 +1,7 @@
 # R1 — plano para piloto controlado
 
-**Status:** EM EXECUÇÃO — R1-WP01 implementado; promoção continua bloqueada
-pelos R1-WP02–R1-WP07.
+**Status:** EM EXECUÇÃO — R1-WP01 e R1-WP02 implementados; promoção continua
+bloqueada pelos R1-WP03–R1-WP07.
 **Objetivo:** permitir tráfego interno e não crítico, com perda tolerável,
 rollback imediato e domínio de falha conhecido.
 **Não autoriza:** produção crítica, exposição direta sem proxy, SLO externo ou
@@ -38,7 +38,7 @@ e voltar a R0; não executar uma campanha “informativa” e depois promovê-la
 | ID | Estado | Evidência |
 |---|---|---|
 | R1-WP01 | implementado; gate dedicado verde | `evidence/2026-08-01-r1-shutdown/` |
-| R1-WP02 | pendente | orçamento de recursos ainda não medido |
+| R1-WP02 | implementado; gate e drill systemd verdes | `evidence/2026-08-01-r1-resource-budget/` |
 | R1-WP03 | pendente | proxy real ainda não escolhido/provado |
 | R1-WP04 | pendente | perfil normativo ainda não consolidado |
 | R1-WP05 | pendente | runbooks do piloto ainda não criados |
@@ -189,6 +189,27 @@ boot ou o deploy deve usar um arquivo canônico consumido pelo app e preflight.
 - `LimitNOFILE` aparece na unit e no checker;
 - texto não promete que `max_response_bytes` evita OOM durante construção;
 - runbook contém diagnóstico para bind, memlock, OOM, crash loop e spool.
+
+#### Resultado executado em 2026-08-01
+
+O perfil controlado ficou fixado em um listener/processo, 1.024 conexões,
+oito handlers, resposta de 8 MiB, `LimitNOFILE=2048`, `LimitMEMLOCK=64M`,
+`MemoryMax=1G` e `TimeoutStopSec=30`. A derivação e os resultados brutos estão
+em `evidence/2026-08-01-r1-resource-budget/`:
+
+- 22 FDs e nove threads em repouso; orçamento total derivado de 1.213 FDs;
+- pico de 316.908 KiB no run válido com oito slow readers, abaixo de 1 GiB
+  mesmo após aplicar 200% de headroom;
+- oito probes recusados na saturação e recovery para 200 após liberar slots;
+- quota de spool respondeu 503, deixou zero temporários e recuperou para 201;
+- preflight systemd recusou `LimitMEMLOCK` reduzido a 16 KiB antes do bind;
+- OOM do cgroup reiniciou uma vez, crash loop parou em `failed` com três
+  restarts, e stop limpo terminou com zero restarts.
+
+O run também congelou uma limitação de plataforma: Linux 6.8 não contabilizou
+os mapas do io_uring em `VmLck`, embora o host kernel 7.0 registrado anteriormente
+os contabilize. Por isso 64 MiB permanece piso conservador do perfil, e não uma
+promessa universal de bytes por lane.
 
 ## 5. Etapa C — proxy real
 

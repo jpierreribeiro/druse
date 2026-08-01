@@ -1,0 +1,2 @@
+invocation=ops/verification/run-resource-drill.sh --output /home/jp/Desktop/uruquim-odin/evidence/2026-08-01-r1-resource-budget 
+build=/home/jp/.local/bin/odin build tests/r1-resource-budget/server -collection:druse=.
