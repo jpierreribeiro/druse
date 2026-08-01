@@ -1,0 +1,354 @@
+# R1 — plano para piloto controlado
+
+**Status:** PLANO.
+**Objetivo:** permitir tráfego interno e não crítico, com perda tolerável,
+rollback imediato e domínio de falha conhecido.
+**Não autoriza:** produção crítica, exposição direta sem proxy, SLO externo ou
+declaração de estabilidade geral.
+
+## 1. Entrada obrigatória
+
+R1 só começa quando R0 fornecer:
+
+- correção de AUD-P0-001 e teste de regressão determinístico;
+- lifecycle de `App` decidido e guardado;
+- meta-controle WP24 atualizado;
+- commit limpo, binários identificados e `build/check.sh` integral verde;
+- zero P0 aberto.
+
+Criar `evidence/YYYY-MM-DD-r1-entry/manifest.txt` com a identidade descrita em
+`README.md` deste diretório. Se qualquer requisito faltar, registrar `BLOCKED`
+e voltar a R0; não executar uma campanha “informativa” e depois promovê-la.
+
+## 2. Entregáveis
+
+| ID | Entregável | Tipo |
+|---|---|---|
+| R1-WP01 | contrato real de shutdown e drill de processo | análise + implementação + teste |
+| R1-WP02 | unit systemd e preflight de recursos | operação + teste |
+| R1-WP03 | topologia de proxy real | integração + campanha |
+| R1-WP04 | documentação normativa reconciliada | documentação + gate semântico |
+| R1-WP05 | perfil suportado e runbook do piloto | contrato + operação |
+| R1-WP06 | exercício de implantação, crash e rollback | campanha |
+| R1-WP07 | freeze e decisão de promoção | freeze |
+
+## 3. Etapa A — contrato de shutdown
+
+### R1-WP01 — distinguir drain de transporte de término de processo
+
+**Achado:** AUD-P1-002.
+
+#### Perguntas da análise
+
+1. Quanto tempo passa entre sinal, `is_draining=true`, fim de admissão e retorno
+   de `web.serve`?
+2. Quais estados são forçados por `max_drain_time` e quais dependem do handler?
+3. O que ocorre com keep-alive, slow reader, stream e upload quando o prazo
+   termina?
+4. Como o processo reporta um handler que nunca retorna?
+5. Qual componente possui o prazo absoluto: framework, aplicação ou supervisor?
+
+#### Arquivos a revisar
+
+- `web/lifecycle.odin`
+- `web/serve.odin`
+- `web/internal/transport/odin_http_adapter.odin`
+- `vendor/odin-http/server.odin`
+- `tests/wp58-drain/`
+- `tests/wp95-drain/`
+- `examples/09-graceful-shutdown/`
+- `docs/operations.md`
+- `docs/guide/06-cookbook/graceful-shutdown.md`
+- `ops/deploy/druse.service`
+
+#### Arquivos previstos
+
+- criar `tests/r1-process-shutdown/` para o contrato sem systemd;
+- criar `ops/verification/run-shutdown-drill.sh` para o exercício real;
+- criar `build/check_r1_shutdown_controls.sh`;
+- atualizar os documentos e o exemplo listados acima.
+
+O teste de package não deve fingir ser o drill. O primeiro prova estados e
+ordem em processo filho; o segundo prova signal delivery, supervisor, exit code
+e kill externo no ambiente de implantação.
+
+#### Matriz mínima
+
+| Braço | Trabalho em voo | Resultado esperado |
+|---|---|---|
+| S0 | nenhum | readiness false imediatamente; `serve` retorna limpo |
+| S1 | keep-alive idle | conexão fecha; processo sai antes do limite externo |
+| S2 | handler curto ativo | resposta termina dentro do drain |
+| S3 | slow reader | deadline de escrita/drain encerra o socket e incrementa métrica correta |
+| S4 | stream aberto | admission fecha, frame final quando possível, force-close no prazo |
+| S5 | upload em spool | nova admission recusada; temporário limpo ou ownership persistido |
+| S6 | handler bloqueado | `max_drain_time` não é chamado de preempção; supervisor mata no limite externo |
+| S7 | stop repetido/coincidente | hook e cleanup exatamente uma vez |
+| S8 | dois Apps | parar A não altera readiness, stats ou tráfego de B |
+
+#### Controles
+
+- mutar a publicação de `draining` para depois do shutdown e exigir falha de
+  ordem;
+- retirar o hook de stream/upload e exigir que S4/S5 falhem pelo mecanismo;
+- retirar `TimeoutStopSec` do fixture de supervisor e exigir que S6 seja
+  recusado pelo checker;
+- controle positivo do signal handler sem alocação/mutex;
+- nenhuma asserção de tempo sem margem registrada e relógio monotônico.
+
+#### Aceite
+
+- a documentação usa “drain de transporte com deadline” e afirma explicitamente
+  que handler arbitrário não é preemptível;
+- todos os braços produzem exit/status e timeline explicáveis;
+- `TimeoutStopSec > max_drain_time` é verificado automaticamente;
+- o drill bloqueado prova a ação do supervisor, não um timeout do harness;
+- logs/evidência não carregam request body, header ou token.
+
+## 4. Etapa B — unidade operacional e recursos
+
+### R1-WP02 — fechar FDs, memlock, memória e restart
+
+**Achados:** AUD-P1-005 e AUD-P1-006.
+
+#### Análises antes da edição
+
+- contar FDs de baseline por processo, listener, lane/event loop, conexão e
+  arquivo de spool;
+- medir locked memory por `max_handlers` e número de servidores;
+- medir pico de memória com respostas concorrentes e slow readers;
+- decidir o perfil canônico: valores de `max_connections`, `max_handlers`,
+  `max_response_bytes`, `MemoryMax`, `LimitNOFILE` e `LimitMEMLOCK`;
+- decidir se um ou vários listeners compartilham o mesmo processo no piloto.
+
+Para múltiplos servidores, o orçamento é agregado. A fórmula inicial a provar é:
+
+```text
+LimitNOFILE >= soma(max_connections por servidor)
+               + listeners
+               + FDs fixos medidos
+               + FDs de spool/log/telemetria
+               + margem operacional explícita
+```
+
+Não transformar essa fórmula em constante antes da medição.
+
+#### Arquivos previstos
+
+- modificar `ops/deploy/druse.service`;
+- criar `ops/deploy/check-runtime-limits.sh`;
+- criar `ops/deploy/runtime-limits.example` se a unit não puder expressar a
+  configuração da aplicação;
+- modificar `build/check_supervisor_contract.sh`;
+- modificar `docs/operations.md` e `docs/quick-start.md` apenas por referência;
+- criar `ops/verification/run-resource-drill.sh`;
+- preservar resultados em `evidence/YYYY-MM-DD-r1-resource-budget/`.
+
+#### Preflight
+
+O preflight deve falhar antes do bind quando:
+
+- soft nofile não cobre orçamento + margem;
+- memlock não cobre lanes configuradas;
+- `TimeoutStopSec <= max_drain_time`;
+- diretório de spool não existe, não é gravável ou está fora de
+  `ReadWritePaths`;
+- `MemoryMax` está ausente no perfil produtivo;
+- limites críticos continuam herdados sem aceite explícito.
+
+Evitar parser paralelo da configuração. Se Druse não expõe os valores
+resolvidos fora do processo, o binário de aplicação deve emitir um manifesto de
+boot ou o deploy deve usar um arquivo canônico consumido pelo app e preflight.
+
+#### Drills
+
+- atingir `max_connections` e provar recusa/recovery;
+- provocar memlock insuficiente e exigir falha de serve observável;
+- provocar OOM no cgroup e provar restart/backoff/alerta;
+- preencher spool até limite controlado e provar cleanup/alerta;
+- iniciar crash loop e provar `StartLimitBurst` levando a `failed`;
+- executar stop limpo e provar que `Restart=on-failure` não relança.
+
+#### Aceite
+
+- unit passa verificação estrutural e, onde disponível, `systemd-analyze verify`;
+- números canônicos derivam de uma medição preservada;
+- `LimitNOFILE` aparece na unit e no checker;
+- texto não promete que `max_response_bytes` evita OOM durante construção;
+- runbook contém diagnóstico para bind, memlock, OOM, crash loop e spool.
+
+## 5. Etapa C — proxy real
+
+### R1-WP03 — tornar a topologia delegada auditável
+
+**Achado:** AUD-P1-004.
+
+#### Decisão de entrada
+
+Escolher um proxy de referência e fixar versão/hash. Caddy é um bom candidato
+por configuração pequena; se a implantação real usar Nginx, HAProxy ou outro,
+esse proxy real também precisa de um braço. O fixture C-06 continua no gate
+rápido e não é substituído.
+
+#### Arquivos previstos
+
+- criar `ops/proxy/<proxy>/` com configuração completa e versão;
+- criar `ops/verification/run-real-proxy-contract.sh`;
+- criar `build/check_proxy_config.sh` para invariantes estáticos;
+- atualizar `planning/closure-proxy-contract.md`;
+- atualizar `docs/operations.md` para apontar à configuração versionada;
+- preservar `evidence/YYYY-MM-DD-r1-real-proxy/`.
+
+Não versionar chave privada. O harness gera CA/certificados efêmeros e preserva
+apenas certificados públicos, fingerprints e comandos.
+
+#### Matriz mínima
+
+| Área | Braços/asserções |
+|---|---|
+| TLS | cadeia válida aceita; self-signed/host errado recusados |
+| protocolo | HTTP/2 cliente→proxy; HTTP/1.1 keep-alive proxy→Druse |
+| pooling | muitas requisições cliente com número de conexões upstream medido |
+| streaming | primeiro byte direto, buffering off e buffering on |
+| limites | header/body/timeouts menores e maiores em cada camada, sem respostas ambíguas |
+| identidade | XFF confiável, spoof direto, cadeia com múltiplos hops |
+| saturação | recusa TCP upstream traduzida/propagada conforme contrato; retries limitados |
+| shutdown | SIGTERM durante conexões upstream reutilizadas; sem enviar tráfego após not-ready |
+| headers | HSTS/CSP/secure cookies pertencem à camada que conhece TLS/aplicação |
+
+#### Aceite
+
+- configuração sem buffering para endpoints de stream;
+- IP do cliente nunca deriva de header vindo de peer não confiável;
+- duplicação de limites tem owner e precedência documentados;
+- nenhuma retry storm; número máximo de tentativas e métodos retryable fixados;
+- proxy e Druse têm logs correlacionáveis sem vazar dados sensíveis;
+- campanha repetível a partir do repositório.
+
+## 6. Etapa D — documentação normativa
+
+### R1-WP04 — uma fonte de verdade para capabilities
+
+**Achado:** AUD-P1-007.
+
+#### Estratégia
+
+Criar `docs/supported-profile.md` como documento normativo curto. Outros
+documentos apontam para ele e evitam repetir listas. Onde repetição for
+necessária, um checker compara a afirmação com a fonte normativa.
+
+#### Arquivos a reconciliar
+
+- `README.md`
+- `SECURITY.md`
+- `docs/ai-context.md`
+- `docs/canonical-patterns.md`
+- `docs/operations.md`
+- `docs/platform-contract.md`
+- `docs/standards-registry.md`
+- `planning/release-readiness.md`
+- `planning/wp123-per-server-state-spec.md`
+- `vendor/odin-http/VENDOR.md`
+- `planning/vendor-policy.md`
+
+#### Conteúdo obrigatório do perfil
+
+- plataforma e toolchain;
+- HTTP suportado e responsabilidades do proxy;
+- modelo síncrono/lane e comportamento de saturação;
+- shutdown cooperativo e supervisor;
+- domínio de falha recomendado;
+- multi-server: capacidade até 16, sem confundir com recomendação operacional;
+- limites default-on/default-off;
+- memória, response cap e cgroup;
+- protocolos/features fora do escopo;
+- política de versão e suporte;
+- status de druse-crystals como contexto opcional.
+
+#### Gate semântico
+
+Criar `build/check_supported_profile.sh` e ligá-lo a `build/check.sh`. Controles
+negativos mínimos:
+
+- reintroduzir “graceful shutdown não existe”;
+- reintroduzir “não há API pública de upload”;
+- reintroduzir “apenas um servidor por processo”;
+- remover o teto 16;
+- afirmar que response cap evita OOM;
+- alterar número de patches sem atualizar a fonte canônica;
+- anunciar HTTP/2, TLS nativo ou runtime não Linux.
+
+Cada mutante precisa falhar na afirmação correspondente, não em link quebrado.
+
+### R1-WP05 — perfil e runbook do piloto
+
+Criar:
+
+- `docs/runbooks/pilot-deployment.md`;
+- `docs/runbooks/incident-response.md`;
+- `docs/runbooks/rollback.md`;
+- checklist de entrada/saída versionado em `ops/verification/`.
+
+O perfil do piloto deve fixar carga máxima inicial, rotas permitidas, dados não
+críticos, janela, owner de plantão, dashboards, alertas, rollback e critérios de
+abort. Não usar o piloto como soak disfarçado.
+
+## 7. Etapa E — exercício do piloto
+
+### R1-WP06 — deploy, crash, drain e rollback
+
+Executar em ambiente semelhante ao destino:
+
+1. instalar binário por hash;
+2. verificar preflight e unit;
+3. iniciar atrás do proxy real;
+4. executar smoke funcional e wire subset;
+5. aplicar carga baixa representativa;
+6. executar stop/drain normal;
+7. injetar fault de handler e verificar core/restart;
+8. executar rollback para o artefato anterior;
+9. verificar integridade e tráfego após rollback.
+
+O rollback precisa trocar artefato e configuração juntos. Migração de dados
+irreversível está fora de R1; se existir, o piloto não pode depender dela.
+
+Preservar:
+
+- timelines UTC do proxy, service manager e aplicação;
+- hashes antes/depois;
+- exit status/signal e `systemctl show`;
+- resultados de health/readiness;
+- decisão final e qualquer intervenção manual.
+
+## 8. R1-WP07 — freeze
+
+### Comandos mínimos
+
+```sh
+bash build/check.sh
+bash build/check_supported_profile.sh
+bash build/check_supervisor_contract.sh
+bash build/check_r1_shutdown_controls.sh
+bash build/check_proxy_config.sh
+```
+
+Os drills que exigem systemd/proxy rodam no host de verificação e seus manifests
+citam o mesmo commit/binário do gate local.
+
+### Critérios de saída
+
+- zero P0/P1 sem mitigação aceita;
+- full gate verde em clone limpo;
+- shutdown e supervisor provados em todos os braços;
+- recursos e unit fechados por preflight;
+- proxy real provado;
+- documentos normativos coerentes e mutation-tested;
+- rollback executado;
+- piloto limitado, alertado e com owner.
+
+### Resultado permitido
+
+- **PROMOTE TO R1:** piloto interno não crítico;
+- **HOLD:** evidência incompleta ou risco sem aceite;
+- **ROLL BACK TO R0:** regressão funcional, gate vermelho ou identidade do
+  candidato quebrada.
