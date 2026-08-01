@@ -1,10 +1,12 @@
 // Druse example 09 — Graceful shutdown.
 //
-// A production server must stop WITHOUT dropping the requests already in flight
-// — every rolling deploy sends it a signal and expects the in-flight work to
-// finish. The framework installs no signal handler for you (that would fight
-// your process manager); it gives you `web.stop`, which is safe to call from a
-// signal handler, and `web.is_draining`, which a readiness probe reads.
+// A production server needs a bounded, observable drain. A rolling deploy sends
+// a signal, admission closes, and cooperative in-flight work may finish before
+// the transport deadline. A synchronous handler blocked in arbitrary user or C
+// code cannot be preempted; the supervisor's kill timeout is the absolute outer
+// bound. The framework installs no signal handler for you (that would fight your
+// process manager); it gives you `web.stop`, which is safe to call from a signal
+// handler, and `web.is_draining`, which a readiness probe reads.
 //
 // Build and run it from the repository root:
 //
@@ -16,8 +18,10 @@
 //	kill -TERM <pid>                   # begins the graceful drain
 //	curl http://localhost:8080/ready   # 503 while draining
 //
-// On the signal, in-flight requests finish and the server drains within
-// `Limits.max_drain_time`; `web.serve` then returns and `main` ends.
+// On the signal, the transport drains within `Limits.max_drain_time` and
+// `web.serve` returns after cooperative handlers release their lanes. Keep the
+// supervisor's `TimeoutStopSec` greater than that drain deadline: a handler that
+// never returns requires the supervisor to terminate the process.
 package main
 
 import "base:runtime"

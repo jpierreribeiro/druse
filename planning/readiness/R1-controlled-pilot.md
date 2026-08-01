@@ -1,6 +1,7 @@
 # R1 — plano para piloto controlado
 
-**Status:** PLANO.
+**Status:** EM EXECUÇÃO — R1-WP01 implementado; promoção continua bloqueada
+pelos R1-WP02–R1-WP07.
 **Objetivo:** permitir tráfego interno e não crítico, com perda tolerável,
 rollback imediato e domínio de falha conhecido.
 **Não autoriza:** produção crítica, exposição direta sem proxy, SLO externo ou
@@ -31,6 +32,18 @@ e voltar a R0; não executar uma campanha “informativa” e depois promovê-la
 | R1-WP05 | perfil suportado e runbook do piloto | contrato + operação |
 | R1-WP06 | exercício de implantação, crash e rollback | campanha |
 | R1-WP07 | freeze e decisão de promoção | freeze |
+
+### Estado de execução em 2026-08-01
+
+| ID | Estado | Evidência |
+|---|---|---|
+| R1-WP01 | implementado; gate dedicado verde | `evidence/2026-08-01-r1-shutdown/` |
+| R1-WP02 | pendente | orçamento de recursos ainda não medido |
+| R1-WP03 | pendente | proxy real ainda não escolhido/provado |
+| R1-WP04 | pendente | perfil normativo ainda não consolidado |
+| R1-WP05 | pendente | runbooks do piloto ainda não criados |
+| R1-WP06 | pendente | deploy/crash/rollback ainda não exercitados |
+| R1-WP07 | bloqueado pelos anteriores | nenhuma promoção autorizada |
 
 ## 3. Etapa A — contrato de shutdown
 

@@ -1,0 +1,14 @@
+date=2026-08-01
+timezone=America/Bahia
+branch=r1/controlled-pilot
+base_commit=73534857faf3eee1edc0ac598c2be03a77ea8876
+r0_lifecycle_commit=885243786944afc8acd6e717da1c673695a03948
+r0_evidence_commit=73534857faf3eee1edc0ac598c2be03a77ea8876
+toolchain=dev-2026-07-nightly:819fdc7
+kernel=Linux_6.8.0-86-generic_x86_64
+r0_full_gate_exit=0
+r0_wp24_controls_exit=0
+r0_wp123_controls_exit=0
+r0_open_p0=0
+r1_entry=OPEN
+production_authorized=false

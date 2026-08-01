@@ -10,3 +10,7 @@ tests/wp61-public-surface/fixture/
 /*-response-surface
 /*-query-opt
 /*-stream-live
+
+# Python helpers used by operational drills.
+__pycache__/
+*.py[cod]
