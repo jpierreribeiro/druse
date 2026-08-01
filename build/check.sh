@@ -1657,7 +1657,7 @@ done
 # the artefact NAMES the cause. It was added after a 12-hour run counted 674
 # transport failures and could explain none of them.
 echo "--- soak instrument: a failure it observes is a failure it can name ---"
-bash "$DRUSE_ROOT/build/check_soak_controls.sh"
+env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_soak_controls.sh"
 
 # The benchmark summary must notice when two servers did not do the same work.
 # It did not, once, and a comparison of four servers went out in which one
