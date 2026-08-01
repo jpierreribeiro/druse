@@ -1,7 +1,8 @@
 # Graceful shutdown
 
-A production server must stop **without dropping requests already in flight**.
-Every rolling deploy sends a signal and expects in-flight work to finish.
+A production server needs a bounded, observable drain. Every rolling deploy
+sends a signal; admission closes and cooperative in-flight work may finish
+before the transport deadline.
 
 Druse installs no signal handler — that would fight your process manager. It
 gives you `web.stop`, safe to call from a handler, and `web.is_draining`, which
@@ -79,8 +80,11 @@ kill -TERM <pid>                   # begins the graceful drain
 curl http://localhost:8080/ready   # 503 while draining
 ```
 
-On the signal, in-flight requests finish and the server drains within
-`Limits.max_drain_time`. `web.serve` then returns and `main` ends.
+On the signal, the transport drains within `Limits.max_drain_time`.
+`web.serve` returns after cooperative handlers release their lanes. A
+synchronous handler blocked in arbitrary user or C code cannot be preempted, so
+keep the supervisor's `TimeoutStopSec` greater than `max_drain_time`: the
+supervisor owns the absolute process deadline.
 
 ## What to notice
 
@@ -96,6 +100,13 @@ balancer and the liveness probe to your supervisor.
 **Everything after `web.serve` runs on the way out.** `serve` blocks, then
 returns, and your deferred destroys execute. Close the pool after it returns,
 never before.
+
+The repository's real-process drill sends POSIX signals, holds sockets in each
+shutdown state and checks process exit codes:
+
+```text
+bash ops/verification/run-shutdown-drill.sh
+```
 
 ## Next
 

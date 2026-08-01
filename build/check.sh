@@ -103,6 +103,7 @@ bash -n "$DRUSE_ROOT/build/check_wp68_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_wp70_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_wp71_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_wp72_controls.sh"
+bash -n "$DRUSE_ROOT/build/check_r1_shutdown_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_vendor_policy.sh"
 bash -n "$DRUSE_ROOT/build/check_wp38_controls.sh"
 bash -n "$DRUSE_ROOT/build/install-hooks.sh"
@@ -1573,6 +1574,10 @@ fi
 echo "PASS: the supervisor contract check detects a mutated unit (negative control)"
 rm -rf "$DRUSE_SUPERVISOR_PROBE"
 trap - EXIT
+
+echo "--- R1 real-process shutdown: signals, sockets, exit status and supervisor bound ---"
+env DRUSE_ODIN_BIN="$DRUSE_COMPILER" \
+  bash "$DRUSE_ROOT/build/check_r1_shutdown_controls.sh" "$DRUSE_ROOT"
 
 echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"

@@ -298,6 +298,18 @@ nothing could cancel. Cancelling it fixed both.
 lanes can continue and observe stop, but teardown cannot free state still used
 by arbitrary application code. The supervisor remains the outer bound.
 
+The R1 process drill exercises this contract with real signals and sockets:
+
+```sh
+bash ops/verification/run-shutdown-drill.sh
+```
+
+Its S0–S8 arms cover readiness publication, idle keep-alive, short in-flight
+work, slow readers, detached streams, upload spools, a non-returning handler,
+repeated signals and two independent Apps. S6 deliberately ends with
+supervisor-equivalent `SIGKILL`/137; that result proves the limitation instead
+of pretending `max_drain_time` can preempt application code.
+
 ---
 
 ## 5. Multiple servers per process
