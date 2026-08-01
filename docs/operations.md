@@ -300,13 +300,18 @@ by arbitrary application code. The supervisor remains the outer bound.
 
 ---
 
-## 5. One server per process
+## 5. Multiple servers per process
 
 **More than one server in a process is supported** (WP123 / ADR-018), up to
 sixteen concurrent. Every server-wide accessor names the App whose server it is
 asking about — `web.stats(&app)`, `web.refused_connections(&app)`,
 `web.stop(&app)`, `web.is_draining(&app)` — so two listeners report and drain
 separately.
+
+Each concurrent `web.serve` must use a different App. Reusing one App would
+give two transport lifetimes only one place to publish their handle, so the
+second call is rejected before bind. A failed bind may be retried with the same
+App; an App that has entered drain through `web.stop` cannot restart.
 
 **Still scale horizontally for capacity.** One process per server, many
 processes, remains the deployment shape: a faulting handler aborts the process,

@@ -151,6 +151,11 @@ web.stats(&admin).responses_sent   // that listener's, separately
 web.stop(&admin)                   // drains the admin listener; the API keeps serving
 ```
 
+**Each concurrent `web.serve` requires a different App.** A second active call
+with the same App returns before binding instead of replacing the first
+server's handle. A failed bind releases that active claim and may be retried;
+an App for which `web.stop` was requested remains draining and cannot restart.
+
 **One process still runs at most sixteen concurrent servers**, which is a bound
 on a topology rather than on a workload: a seventeenth `serve` returns without
 binding. The ordinary case is two.

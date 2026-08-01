@@ -2,7 +2,7 @@
 # WP123 / ADR-018 — the per-server state, under control.
 #
 # The freeze, public-api and docs gates already pin the two changed arities and
-# the prose. This gate pins the two things none of them can see:
+# the prose. This gate pins the four things none of them can see:
 #
 #   1. THE SUITE IS SENSITIVE. `tests/wp123-two-servers` is green against the
 #      real implementation — but so is a suite that asserts nothing about which
@@ -18,7 +18,19 @@
 #      teardown, which is why the run below is bounded by `timeout` and a hang
 #      counts as red rather than as a stalled gate).
 #
-#   2. VENDOR PATCH 43 IS LOAD-BEARING. The backend shutdown hook is what makes
+#   2. RETIRING IS NOT FREE. A row stops accepting readers at the beginning of
+#      retire, but cannot accept another publisher until every old reader has
+#      left and the old pointers have been cleared. `claimed` and `live` are
+#      deliberately separate state. A focused internal fixture holds a reader
+#      inside while another server publishes; a mutation that gates publishers
+#      on `live` must make that fixture fail on the named slot-reuse assertion.
+#
+#   3. ONE ACTIVE SERVE OWNS ONE APP. Multiple servers in a process require
+#      multiple Apps. A private CAS control proves concurrent callers elect one
+#      owner; a socket suite proves the loser returns before bind, the winner
+#      retains its stop handle, bind failure can retry, and drain cannot restart.
+#
+#   4. VENDOR PATCH 43 IS LOAD-BEARING. The backend shutdown hook is what makes
 #      `web.stop` async-signal-safe: it moved `stream.drain_begin` off the
 #      caller's thread — where it took two mutexes a SIGTERM handler could
 #      deadlock on — and onto the first lane to observe `closing`. Nothing in
@@ -38,6 +50,9 @@ DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DRUSE_REGISTRY_REL="web/internal/transport/server_registry.odin"
 DRUSE_ADAPTER_REL="web/internal/transport/odin_http_adapter.odin"
 DRUSE_SUITE="$DRUSE_ROOT/tests/wp123-two-servers/two_servers_test.odin"
+DRUSE_LIFETIME_SUITE="$DRUSE_ROOT/tests/wp123-registry-lifetime/registry_internal_test.odin"
+DRUSE_APP_INTERNAL_SUITE="$DRUSE_ROOT/tests/r0-app-serve-lifecycle/app_internal_test.odin"
+DRUSE_APP_SOCKET_SUITE="$DRUSE_ROOT/tests/r0-app-serve-lifecycle/socket"
 DRUSE_DRAIN_SUITE="$DRUSE_ROOT/tests/wp95-drain/drain_test.odin"
 
 fail() {
@@ -63,6 +78,9 @@ DRUSE_TMP="$(mktemp -d -t druse-wp123-controls-XXXXXXXX)"
 trap 'rm -rf "$DRUSE_TMP"' EXIT
 
 test -f "$DRUSE_SUITE" || fail "tests/wp123-two-servers is missing; it is the suite this work package exists to turn green"
+test -f "$DRUSE_LIFETIME_SUITE" || fail "tests/wp123-registry-lifetime is missing; it proves a retiring slot cannot be reused while an old reader remains"
+test -f "$DRUSE_APP_INTERNAL_SUITE" || fail "the same-App serve ownership control is missing"
+test -f "$DRUSE_APP_SOCKET_SUITE/socket_test.odin" || fail "the same-App socket lifecycle suite is missing"
 test -f "$DRUSE_ROOT/$DRUSE_REGISTRY_REL" || fail "$DRUSE_REGISTRY_REL is missing"
 
 # ---------------------------------------------------------------------------
@@ -132,7 +150,92 @@ fi
 echo "wp123: the two-server suite goes red when the registry is collapsed to one slot"
 
 # ---------------------------------------------------------------------------
-# 2. Mutation B — disarm vendor patch 43 (the backend shutdown hook).
+# 2. Mutation B — conflate retiring with free.
+# ---------------------------------------------------------------------------
+# First run the focused lifetime regression against the shipped transport. The
+# fixture lives outside the package because these helpers stay private; copying
+# it beside the exact sources is the same boundary discipline as WP71.
+DRUSE_LIFETIME_BASELINE="$DRUSE_TMP/lifetime-baseline"
+mkdir "$DRUSE_LIFETIME_BASELINE"
+cp "$DRUSE_ROOT"/web/internal/transport/*.odin "$DRUSE_LIFETIME_BASELINE/"
+cp "$DRUSE_LIFETIME_SUITE" "$DRUSE_LIFETIME_BASELINE/"
+
+env ODIN_ROOT="$DRUSE_ODIN_ROOT" timeout 30 "$DRUSE_ODIN" test \
+  "$DRUSE_LIFETIME_BASELINE" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  "-out:$DRUSE_TMP/lifetime-baseline-test" >/dev/null
+echo "wp123: a retiring slot stays claimed until its old readers leave"
+
+DRUSE_LIFETIME_MUTANT="$DRUSE_TMP/lifetime-mutant"
+cp -a "$DRUSE_LIFETIME_BASELINE" "$DRUSE_LIFETIME_MUTANT"
+python3 - "$DRUSE_LIFETIME_MUTANT/server_registry.odin" <<'PY'
+import sys
+path = sys.argv[1]
+src = open(path).read()
+old = "\t\tif sync.atomic_load(&e.claimed) {"
+new = "\t\tif sync.atomic_load(&e.live) { // MUTANT: retiring is mistaken for free"
+if src.count(old) != 1:
+    sys.exit("WP123-CONTROL-FAIL: the publisher claim check no longer matches the retiring-slot mutation; re-derive it")
+open(path, "w").write(src.replace(old, new, 1))
+PY
+
+if env ODIN_ROOT="$DRUSE_ODIN_ROOT" timeout 30 "$DRUSE_ODIN" test \
+  "$DRUSE_LIFETIME_MUTANT" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  "-out:$DRUSE_TMP/lifetime-mutant-test" >"$DRUSE_TMP/lifetime-mutant.log" 2>&1; then
+  fail "the lifetime fixture PASSED when publishers treated live=false as a free slot; the original slot-reuse race is no longer under control"
+fi
+grep -q 'RETIRING-SLOT-REUSED' "$DRUSE_TMP/lifetime-mutant.log" ||
+  fail "the retiring-slot mutant went red for an unrelated reason. It must fail because a publisher reused the row while an old reader remained. See $DRUSE_TMP/lifetime-mutant.log"
+echo "wp123: the lifetime fixture goes red on RETIRING-SLOT-REUSED when claimed and live are conflated"
+
+# ---------------------------------------------------------------------------
+# 3. Mutation C — let more than one active serve own the same App.
+# ---------------------------------------------------------------------------
+DRUSE_APP_BASELINE="$DRUSE_TMP/app-baseline"
+mkdir "$DRUSE_APP_BASELINE"
+cp "$DRUSE_ROOT"/web/*.odin "$DRUSE_APP_BASELINE/"
+cp "$DRUSE_APP_INTERNAL_SUITE" "$DRUSE_APP_BASELINE/"
+
+env ODIN_ROOT="$DRUSE_ODIN_ROOT" timeout 30 "$DRUSE_ODIN" test \
+  "$DRUSE_APP_BASELINE" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  "-out:$DRUSE_TMP/app-baseline-test" >/dev/null
+env ODIN_ROOT="$DRUSE_ODIN_ROOT" timeout 30 "$DRUSE_ODIN" test \
+  "$DRUSE_APP_SOCKET_SUITE" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  "-out:$DRUSE_TMP/app-socket-test" >/dev/null
+echo "wp123: one active serve owns an App; bind retry and terminal drain are socket-proven"
+
+DRUSE_APP_MUTANT="$DRUSE_TMP/app-mutant"
+cp -a "$DRUSE_APP_BASELINE" "$DRUSE_APP_MUTANT"
+python3 - "$DRUSE_APP_MUTANT/concurrency.odin" <<'PY'
+import sys
+path = sys.argv[1]
+src = open(path).read()
+old = """\tif _, claimed := sync.atomic_compare_exchange_strong(&a.private.serve_active, 0, 1); !claimed {
+\t\treturn false
+\t}"""
+new = """\tsync.atomic_store(&a.private.serve_active, 1) // MUTANT: every concurrent caller wins"""
+if src.count(old) != 1:
+    sys.exit("WP123-CONTROL-FAIL: the App serve claim no longer matches its multi-winner mutation; re-derive it")
+open(path, "w").write(src.replace(old, new, 1))
+PY
+
+if env ODIN_ROOT="$DRUSE_ODIN_ROOT" timeout 30 "$DRUSE_ODIN" test \
+  "$DRUSE_APP_MUTANT" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  "-out:$DRUSE_TMP/app-mutant-test" >"$DRUSE_TMP/app-mutant.log" 2>&1; then
+  fail "the same-App ownership fixture PASSED when every concurrent serve won the claim"
+fi
+grep -q 'SERVE-CLAIM-MULTIPLE-WINNERS' "$DRUSE_TMP/app-mutant.log" ||
+  fail "the same-App claim mutant went red for an unrelated reason. See $DRUSE_TMP/app-mutant.log"
+grep -q 'Each concurrent `web.serve` requires a different App' "$DRUSE_ROOT/docs/canonical-patterns.md" ||
+  fail "the same-App limitation is absent from the canonical patterns"
+echo "wp123: the App ownership fixture goes red on SERVE-CLAIM-MULTIPLE-WINNERS when the CAS is removed"
+
+# ---------------------------------------------------------------------------
+# 4. Mutation D — disarm vendor patch 43 (the backend shutdown hook).
 # ---------------------------------------------------------------------------
 rm -rf "$DRUSE_TMP/tree2"
 cp -a "$DRUSE_ROOT" "$DRUSE_TMP/tree2"
@@ -154,7 +257,7 @@ grep -q 'FORCE-CLOSED' "$DRUSE_TMP/hook.log" ||
 echo "wp123: tests/wp95-drain goes red — on the force-close assertion — when vendor patch 43 is disarmed"
 
 # ---------------------------------------------------------------------------
-# 3. The signal-safe claim is structural, not a comment.
+# 5. The signal-safe claim is structural, not a comment.
 # ---------------------------------------------------------------------------
 # `request_stop` is what a SIGTERM handler runs. It must take no lock: the
 # defect this work package fixed was a mutex here plus two more inside the

@@ -44,6 +44,20 @@ serve :: proc(a: ^App, port: int) {
 		return
 	}
 
+	// R0: one active transport lifetime owns one App. Multiple servers in one
+	// process remain supported, but each requires its own App; otherwise their
+	// on_server callbacks would race to replace one handle and `stop` could only
+	// name the last publisher. Reuse Serve_Listen_Failed because Framework_Error
+	// is frozen and, operationally, this call refuses before binding just like a
+	// listen failure. A bind failure releases the claim through the defer, so the
+	// same non-draining App can retry. Once stop publishes draining, it cannot.
+	if !app_claim_serve(a) {
+		framework_report(App, .Serve_Listen_Failed)
+		framework_observe_app(App, a, .Serve_Listen_Failed)
+		return
+	}
+	defer app_release_serve(a)
+
 	// WP70: finish lazy App-lifetime construction before the adapter creates
 	// any lane, then publish the App as immutable. Every request sees this same
 	// snapshot; late configuration is refused rather than raced.
@@ -109,6 +123,12 @@ serve_publish_handle :: proc(user: rawptr, h: transport.Server_Handle) {
 		return
 	}
 	sync.atomic_store(&a.private.server, h)
+	// `stop` can race the interval after this serve claimed the App but before
+	// the transport had a handle to stop. Publish first, then honour a drain that
+	// already landed; a later stop reads this same handle itself.
+	if h != transport.SERVER_HANDLE_NONE && sync.atomic_load(&a.private.draining) != 0 {
+		transport.request_stop(h)
+	}
 }
 
 // serve_dispatch is the bridge the transport calls per request. It builds a

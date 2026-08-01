@@ -86,6 +86,13 @@ App_Internal :: struct {
 	// No route or policy storage is mutated once `serving` becomes non-zero.
 	dispatched: u32,
 	serving:    u32,
+	// R0 — exactly one active `serve` call may own an App. This differs from
+	// `serving`: the snapshot bit is monotonic and keeps configuration frozen
+	// after the first attempt, while this claim is released after a bind failure
+	// or an ordinary return so a non-draining App can retry. A second concurrent
+	// caller is refused before it reaches the transport and before it can replace
+	// the server handle below.
+	serve_active: u32,
 	// WP123 / ADR-018 — the handle of the server THIS App is running, or
 	// `SERVER_HANDLE_NONE` when it is not running one.
 	//

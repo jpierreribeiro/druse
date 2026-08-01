@@ -44,6 +44,33 @@ app_prepare_serving :: proc(a: ^App) {
 	sync.atomic_store(&a.private.serving, 1)
 }
 
+// app_claim_serve gives one call ownership of this App's transport lifetime.
+//
+// The draining checks close both sides of the race with `stop`: one before the
+// CAS rejects an App already draining; one after it catches a stop that landed
+// between the first check and the claim. A stop after the second check is
+// handled by `serve_publish_handle`, which immediately requests stop once the
+// transport publishes its handle.
+@(private)
+app_claim_serve :: proc(a: ^App) -> bool {
+	if sync.atomic_load(&a.private.draining) != 0 {
+		return false
+	}
+	if _, claimed := sync.atomic_compare_exchange_strong(&a.private.serve_active, 0, 1); !claimed {
+		return false
+	}
+	if sync.atomic_load(&a.private.draining) != 0 {
+		sync.atomic_store(&a.private.serve_active, 0)
+		return false
+	}
+	return true
+}
+
+@(private)
+app_release_serve :: proc(a: ^App) {
+	sync.atomic_store(&a.private.serve_active, 0)
+}
+
 // Late configuration must not poison the live snapshot: writing `poisoned`
 // while lanes read it would merely replace one race with another. Refuse the
 // mutation, report it, and leave the published App byte-identical.
