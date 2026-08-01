@@ -38,6 +38,27 @@ fail() {
 
 command -v go >/dev/null 2>&1 || fail "go is required to build the load generator"
 
+# --- 0. The soak SERVER compiles ---------------------------------------------
+# This gate built the Go load generator and never the Odin server it points at,
+# so `ops/soak/soak-server` was outside every gate in the repository: a public
+# signature change broke it in SILENCE, and the silence lasted until somebody
+# started a campaign. WP123 is where that happened — `web.stats()` gained an
+# argument and this file was the one call site no check would have caught.
+#
+# A compile, not a run: the run is the campaign, and the campaign is not a gate.
+if test -n "${DRUSE_COMPILER:-}"; then
+  DRUSE_SOAK_ODIN="$DRUSE_COMPILER"
+elif command -v odin >/dev/null 2>&1; then
+  DRUSE_SOAK_ODIN="$(command -v odin)"
+else
+  DRUSE_SOAK_ODIN=""
+fi
+test -n "$DRUSE_SOAK_ODIN" || fail "odin compiler not found; the soak server would go unchecked"
+env ODIN_ROOT="$(cd "$(dirname "$(readlink -f "$DRUSE_SOAK_ODIN")")" && pwd)" \
+  "$DRUSE_SOAK_ODIN" check "$SOAK/soak-server" "-collection:druse=$DRUSE_ROOT" ||
+  fail "ops/soak/soak-server does not compile. It is the instrument that produces release evidence and it is in no other gate, so a break here is invisible until a campaign starts."
+echo "PASS (soak): the soak server compiles against the current public surface"
+
 # A port nothing listens on. The failure is caused, not waited for, so the
 # control is deterministic and takes under a second.
 CLOSED_PORT=9
