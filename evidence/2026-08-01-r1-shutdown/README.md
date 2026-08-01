@@ -48,6 +48,13 @@ O gate integral também passou sobre este worktree: 1.738 linhas e 126.952
 bytes, preservados em `raw/full-gate.log`, SHA-256
 `2833065e4ac3a9778aa8c7dd5ccb9ff0e92ded995c2ace86eea29b671a92101f`.
 
+A primeira tentativa de pre-push encontrou uma race pré-existente no oracle
+WP87: três testes paralelos compartilhavam globals de resultado, e o braço de
+body oversized podia sobrescrever o resultado do JSON válido. O oracle foi
+isolado com um `app_with_state` por teste; a suíte corrigida passou 30/30
+repetições paralelas e `build/check_wp87_controls.sh` permaneceu verde. Esse
+bloqueio do hook e a correção fazem parte da evidência, não foram contornados.
+
 ## Limitação provada
 
 `max_drain_time` limita o transporte; não preempta um `Handler` síncrono preso

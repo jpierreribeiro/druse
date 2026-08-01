@@ -1,0 +1,6 @@
+pre-push attempt 1: FAIL
+failed assertion: wp87_oracle_typed_body_binding_is_pinned — a well-formed body binds
+cause: parallel oracle tests shared file-level result globals
+correction: one Oracle_State per test through web.app_with_state
+wp87 repeated parallel suite: 30/30 PASS
+build/check_wp87_controls.sh: PASS
