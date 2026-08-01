@@ -1,0 +1,3 @@
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: Started druse-r1-clean-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.
+Aug 01 20:04:43 jp-Latitude-5400 systemd[1401]: Stopping druse-r1-clean-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server...
+Aug 01 20:04:44 jp-Latitude-5400 systemd[1401]: Stopped druse-r1-clean-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.

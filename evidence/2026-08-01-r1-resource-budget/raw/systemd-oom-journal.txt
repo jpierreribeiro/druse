@@ -1,0 +1,6 @@
+Aug 01 20:04:40 jp-Latitude-5400 systemd[1401]: Started druse-r1-oom-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.
+Aug 01 20:04:40 jp-Latitude-5400 systemd[1401]: druse-r1-oom-2975655.service: A process of this unit has been killed by the OOM killer.
+Aug 01 20:04:40 jp-Latitude-5400 systemd[1401]: druse-r1-oom-2975655.service: Main process exited, code=killed, status=9/KILL
+Aug 01 20:04:40 jp-Latitude-5400 systemd[1401]: druse-r1-oom-2975655.service: Failed with result 'oom-kill'.
+Aug 01 20:04:40 jp-Latitude-5400 systemd[1401]: druse-r1-oom-2975655.service: Scheduled restart job, restart counter is at 1.
+Aug 01 20:04:40 jp-Latitude-5400 systemd[1401]: Started druse-r1-oom-2975655.service - /tmp/druse-r1-resource-zXMnnD/resource-server.

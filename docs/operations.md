@@ -54,13 +54,19 @@ there will not be. **This is also how Gin is deployed in practice** — the
 difference is that this document writes the boundary down instead of leaving it
 folklore.
 
-**The canonical unit is `ops/deploy/druse.service`** — copy it, edit three
-values, `systemctl enable --now`. It encodes the whole mandatory topology in one
-place: `Restart=on-failure` (the recovery), `TimeoutStopSec` (the shutdown outer
-bound, kept longer than `max_drain_time`), `MemoryMax` (the C-04 cgroup bound),
-and — easy to forget and load-bearing — **`LimitMEMLOCK`**, because io_uring pins
-memory per Handler lane and a too-low limit makes `serve` fail to acquire its
-event loop (F-C03-2). The essentials:
+**The canonical deployment has three files:** `ops/deploy/druse.service`,
+`ops/deploy/runtime-limits.example` (install as `/etc/druse/runtime-limits`) and
+`ops/deploy/check-runtime-limits.sh` (install under `/usr/local/libexec`). Copy
+them, edit only `ExecStart` and `User`, then `systemctl enable --now`. The
+environment file is consumed by both your application and the preflight; the
+application maps its `DRUSE_*` values into `web.Limits`/`Upload_Config`, as
+`tests/r1-resource-budget/server` demonstrates. The preflight runs before bind
+and refuses an inherited or contradictory deployment.
+
+Together they encode `Restart=on-failure` (recovery), `TimeoutStopSec` (the
+shutdown outer bound), `MemoryMax` (the cgroup bound), **`LimitNOFILE`** (the
+derived connection/event-loop/spool budget) and **`LimitMEMLOCK`** (the
+kernel-dependent io_uring floor). The essentials:
 
 ```ini
 [Unit]
@@ -69,12 +75,43 @@ StartLimitIntervalSec=10s  # know the loop stops; [Unit], not [Service], since v
 
 [Service]
 ExecStart=/usr/local/bin/your-app
+EnvironmentFile=/etc/druse/runtime-limits
+ExecStartPre=/usr/local/libexec/druse/check-runtime-limits.sh
+StateDirectory=druse
 Restart=on-failure
 RestartSec=1
 TimeoutStopSec=30      # > Limits.max_drain_time (10s default), < orchestrator grace
 LimitMEMLOCK=64M       # io_uring locked memory, per lane; raise with max_handlers
-MemoryMax=1G           # the C-04 aggregate bound — see §"What the framework bounds"
+LimitNOFILE=2048       # canonical formula requires 1213; 835 FDs of further room
+MemoryMax=1G           # measured concurrent peak + explicit headroom
+ReadWritePaths=/var/lib/druse
 ```
+
+The R1 profile fixes one listener, 1,024 connections, eight handler lanes,
+seven simultaneous spool files and an 8 MiB response cap. Baseline was 22 FDs:
+three stdio FDs plus one listener and two FDs for each handler/acceptor event
+loop. Adding connections, spools, 32 auxiliary FDs and a margin of 128 derives
+1,213; `LimitNOFILE=2048` is checked against that formula before bind.
+
+The nine io_uring loops mapped 1,880,064 bytes on Linux 6.8, which did not
+charge those mappings to `VmLck`; a recorded kernel 7.0 host did enforce
+`RLIMIT_MEMLOCK` and failed under a small budget. This kernel-dependent behavior
+is why the supported profile retains a conservative `LimitMEMLOCK=64M` floor
+instead of advertising a false per-lane universal constant.
+
+Three runs with eight concurrent 8 MiB responses retained by slow readers
+peaked at 308,320, 324,804 and 325,264 KiB RSS. `MemoryMax=1G` exceeds the
+largest peak plus 200% headroom. This is a measured pilot profile, not a general
+capacity claim: increasing listeners, handlers or response size makes the
+preflight demand a new measurement. In particular, `max_response_bytes` checks
+a committed body; it does **not** prevent allocations already made while the
+handler constructs that body and cannot guarantee against OOM.
+
+Run the deterministic preflight/mutation controls locally with
+`bash build/check_r1_resource_controls.sh`. Run the resource campaign on the
+target-like systemd host with `bash ops/verification/run-resource-drill.sh`;
+the latter owns saturation, memlock, cgroup OOM, spool, crash-loop and clean-stop
+evidence.
 
 **`Restart=on-failure`, not `always`, and the difference matters.** A faulting
 handler exits non-zero, so `on-failure` recovers it — including an OOM kill. A
@@ -483,8 +520,8 @@ hook in the vendored backend is a numbered `BRIDGE` patch, deletable when
 
 1. Reverse proxy in front, terminating TLS, with its own timeouts and body caps.
 2. Supervisor with `Restart=on-failure` and a `TimeoutStopSec` you chose.
-3. `web.limits` set explicitly, including `max_connections` below your
-   file-descriptor limit.
+3. Install the canonical runtime profile/preflight; set `web.limits` from the
+   same environment and keep its derived `LimitNOFILE`/`LimitMEMLOCK` green.
 4. `web.trust_proxies` naming your proxy's network — or nothing at all, never a
    guess.
 5. `web.secure_headers` on, CSP and HSTS at the proxy.

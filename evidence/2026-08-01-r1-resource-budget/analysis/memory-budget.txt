@@ -1,0 +1,5 @@
+baseline_kib=4608
+peak_kib=316908
+peak_bytes=324513792
+required_with_headroom=973541376
+memory_max=1073741824

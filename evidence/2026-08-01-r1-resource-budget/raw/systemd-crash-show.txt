@@ -1,0 +1,5 @@
+Result=core-dump
+NRestarts=3
+ActiveState=failed
+SubState=failed
+StartLimitBurst=3

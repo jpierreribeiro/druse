@@ -1,0 +1,12 @@
+campaign=R1-WP02-resource-budget
+start_utc=2026-08-01T23:04:26Z
+commit=1fcfbb2f05a8f1ac68cf3922698ebe4bea914b42
+tree=af74090e61e57de46ac129b2171a3b5bb7d6b057
+compiler=/home/jp/.local/bin/odin
+compiler_sha256=6fea037515fee6c4e681a67fe86818998241f15abbadd8df67899d9f0ff32b12
+profile_sha256=f253c5fbe7954bcc1df9a4919058eeaef4d242c63046dd8dd4e053e2593fa700
+systemd_arms=1
+server_sha256=f5a47c74d30d4017888fd77db45072a9ee44923df9cda484f776d5231a50711e
+client_sha256=974db9d8b3f1b842d8309849a289d3c4c62445a525fc2546b0c4c054cf1b95ef
+end_utc=2026-08-01T23:04:44Z
+systemd_result=passed

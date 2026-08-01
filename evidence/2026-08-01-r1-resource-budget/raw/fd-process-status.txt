@@ -1,0 +1,5 @@
+VmPeak:	10042928 kB
+VmSize:	10041900 kB
+VmLck:	       0 kB
+VmRSS:	    4480 kB
+Threads:	9
