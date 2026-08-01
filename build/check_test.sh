@@ -36,8 +36,21 @@ DRUSE_REAL_OUTPUT="$(DRUSE_ODIN_BIN="${DRUSE_ODIN_BIN:-}" \
   fail "pre-push gate rejected the pinned toolchain"
 grep -q "toolchain commit: $DRUSE_EXPECTED_COMMIT" <<<"$DRUSE_REAL_OUTPUT" ||
   fail "check output did not report the pinned commit"
-grep -q "PASS=10 FAIL=0 SKIP=0" <<<"$DRUSE_REAL_OUTPUT" ||
-  fail "check output did not report all prototype passes"
+# A PINNED COUNT ROTS, and this line is the proof: it read `PASS=10` while the
+# tree had produced `PASS=15` for a long time, so it would have failed on any
+# run -- and it never ran, because nothing executed this file (see the header
+# note on build/check_gate_inventory.sh). It is the fifth instance of the
+# failure check.sh already records: "FOUR were broken, and had been for as long
+# as nobody had looked."
+#
+# So the assertion stops pinning a number it cannot maintain and asserts the
+# property it actually wanted: the prototypes ran, and none of them failed.
+# `experiments/run_checks.sh` now closes its own set, so "how many" is its
+# question to answer, not this file's.
+grep -qE "PASS=[0-9]+ FAIL=0 SKIP=0" <<<"$DRUSE_REAL_OUTPUT" ||
+  fail "check output did not report a clean prototype sweep (expected PASS=<n> FAIL=0 SKIP=0)"
+grep -q "PASS=0 FAIL=0 SKIP=0" <<<"$DRUSE_REAL_OUTPUT" &&
+  fail "the prototype sweep reported zero passes; run_checks.sh ran nothing, which is not the same as everything passing"
 
 if ! ODIN_ROOT=/tmp/druse-invalid-ambient-odin-root \
   DRUSE_ODIN_BIN="${DRUSE_ODIN_BIN:-/tmp/druse-toolchain/odin}" \
@@ -108,48 +121,20 @@ for DRUSE_SERIAL_SUITE in wp58-drain; do
 done
 
 echo "test hygiene: no suite silences the logger across its own assertions"
-# NO NEW ORPHANS. A suite in the tree that no gate script runs is not coverage,
-# and several were being cited as coverage anyway — the freeze ledger named
-# tests/wp7_5-c2-upload as the behaviour evidence for three frozen symbols while
-# nothing executed it. Eleven such suites were found; the six with a citation
-# are now in build/check.sh. The five below are excluded ON PURPOSE and are
-# listed here so the exclusion is a decision on record rather than an oversight:
-# the four multishot suites cover machinery with no production consumer at all
-# (audit T6/T7 — wiring their tests into the gate would enforce dead code), and
-# g76-scale-sockets is a scale lab whose resource profile is not a gate
-# property. Anything else new must be wired in or added here deliberately.
-# AUDIT T6 — three of the five entries here are gone, not tolerated.
-# wp115/wp116/wp117 tested the recv-multishot machinery that had zero product
-# consumers; the machinery and the suites were deleted together. wp118 stays
-# ALLOWED and stays in the tree: it proves multishot ACCEPT, which T7 names as
-# the change this project actually indicated, so it is evidence for future work
-# rather than a leftover of abandoned work.
-DRUSE_ORPHAN_ALLOWED=" wp118-accept-multishot g76-scale-sockets "
-DRUSE_ORPHANS=""
-for DRUSE_SUITE_DIR in "$DRUSE_ROOT"/tests/*/ "$DRUSE_ROOT"/tests/*/*/; do
-  test -d "$DRUSE_SUITE_DIR" || continue
-  ls "$DRUSE_SUITE_DIR"*.odin >/dev/null 2>&1 || continue
-  grep -q "@(test)" "$DRUSE_SUITE_DIR"*.odin 2>/dev/null || continue
-  DRUSE_SUITE_NAME="${DRUSE_SUITE_DIR#"$DRUSE_ROOT"/tests/}"
-  DRUSE_SUITE_NAME="${DRUSE_SUITE_NAME%/}"
-  case "$DRUSE_ORPHAN_ALLOWED" in
-    *" $DRUSE_SUITE_NAME "*) continue ;;
-  esac
-  # Several suites are invoked through a loop variable rather than a literal
-  # path — the wp69 lab subdirectories, and the previously-ungated block in
-  # check.sh — so a bare-name match counts as "referenced". This asks whether
-  # anyone THOUGHT about the suite, which is the question worth gating; the
-  # first draft of this check matched only `tests/<name>` and reported three
-  # suites its own sibling loop had just wired in.
-  grep -rq "tests/$DRUSE_SUITE_NAME" "$DRUSE_ROOT/build" 2>/dev/null && continue
-  grep -rq "tests/${DRUSE_SUITE_NAME%%/*}" "$DRUSE_ROOT/build" 2>/dev/null && continue
-  grep -rqF "$DRUSE_SUITE_NAME" "$DRUSE_ROOT/build" 2>/dev/null && continue
-  DRUSE_ORPHANS="$DRUSE_ORPHANS $DRUSE_SUITE_NAME"
-done
-if test -n "$DRUSE_ORPHANS"; then
-  fail "these test suites are in the tree but no gate script runs them:$DRUSE_ORPHANS. A suite nobody runs is not coverage — wire it into build/check.sh, or add it to DRUSE_ORPHAN_ALLOWED here with the reason."
-fi
+# NO NEW ORPHANS — the rule moved out of this file, and that move is the point.
+#
+# This detector was written here, and this file is a META-TEST OF THE GATE: it
+# invokes .githooks/pre-push and build/check.sh several times over, so check.sh
+# can only ever `bash -n` it — calling it from there would recurse. The
+# exclusion is correct. Its consequence was not: a detector built to catch
+# "suites nobody runs" was itself a script nobody ran, on every push for months,
+# and therefore could not detect its own case. tests/nbio-timeout sat in the
+# tree with three @(test) procedures, executed by nothing.
+#
+# So it lives in build/check_suite_inventory.sh now, which build/check.sh runs.
+# This file delegates rather than keeping a second copy: two copies of a rule is
+# how the two drift apart (R-14 — one canonical path, not two).
+bash "$DRUSE_ROOT/build/check_suite_inventory.sh" "$DRUSE_ROOT"
 
 echo "test hygiene: the server-driving suites run serially (one server per process)"
-echo "test hygiene: every test suite is either gated or deliberately exempt"
 echo "PASS: WP0 toolchain and repository baseline"

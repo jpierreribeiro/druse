@@ -156,7 +156,7 @@ State them now, so nothing does later.
 - **A fault in a handler aborts the process.** A panic, a failed assertion or an
   out-of-bounds index takes the server down and the client sees an empty reply.
   There is no recovery middleware and there never will be (ADR-020). Run under a
-  supervisor with `Restart=always`. A handler that *returns without responding*
+  supervisor with `Restart=on-failure`. A handler that *returns without responding*
   is different and safe: it gets the standardized 500.
 - **The write and idle timeouts are off by default.** `Limits.max_request_time`
   bounds arrival and is on. `max_write_time` and `max_idle_time` default to `0`.

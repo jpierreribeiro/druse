@@ -239,6 +239,13 @@ blocker — Phase 1 froze with no open blocker assigned to it — and none is a 
   briefly holds a stack address read non-atomically. Reaching it requires
   deliberately starting two servers. Document the single-server constraint in
   Phase 2; replace with per-server state in Phase 4.
+  **Status, 2026-07-31 — MOSTLY CLOSED, and the residue changed shape.** WP43
+  removed `g_config`, so the cross-wire this entry describes cannot happen; WP70
+  protects `g_server`'s pointer lifetime, so the stack-address read is gone too.
+  What remains is one process-wide slot, and the blocker on removing it is no
+  longer an implementation fact but the **frozen signatures** of `web.stats` and
+  `web.refused_connections`. It did not land in Phase 4 as this entry directed.
+  ADR-018 is now accepted and **WP123** owns the remainder.
 - **R-21** Three request-local scratch arrays are aliased by the committed
   response, and safety rests on six hand-written `committed` guards rather than
   on `response_commit`. Phase 2 adds responders, which is exactly the scenario

@@ -153,6 +153,34 @@ Suspended_Lane_State :: proc(s: ^Server) -> (active, active_with_lane_accept: in
 	return
 }
 
+// WAIT FOR THE DEDICATED ACCEPTOR TO BE ARMED, rather than sampling once.
+//
+// `Suspended_Lane_State` reads `s.backend.accept`, which the ACCEPT LOOP writes
+// on its own thread. `Wait_Entered` only proves a HANDLER entered — the
+// semaphore it waits on is posted by the handler, and nothing orders that
+// against the acceptor re-arming. Sampling immediately after it therefore reads
+// a cross-thread field at an arbitrary instant.
+//
+// On this project's 8-core workstation the acceptor has always re-armed by
+// then, so the single sample passed for years. On a 2-core GitHub runner it had
+// not, and `wp71_vendor_suspend` went red the first time CI ever reached it
+// (2026-08-01, PR #155 — earlier runs died at c04 before getting this far).
+//
+// The claim being tested is "the dedicated acceptor REMAINS ARMED while another
+// lane is free", which is a statement about a state the server reaches, not
+// about a particular nanosecond. So it is waited for, with a bound: if the
+// acceptor never arms, this still fails, and fails for the right reason.
+Wait_Dedicated_Accept :: proc(s: ^Server, timeout := 2 * time.Second) -> bool {
+	deadline := time.tick_now()
+	for time.duration_seconds(time.tick_since(deadline)) < time.duration_seconds(timeout) {
+		if s.backend.accept != nil {
+			return true
+		}
+		time.sleep(2 * time.Millisecond)
+	}
+	return s.backend.accept != nil
+}
+
 Release :: proc(s: ^Server, count: int) {
 	if count > 0 {
 		sync.sema_post(&s.release, count)

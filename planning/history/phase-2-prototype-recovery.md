@@ -735,6 +735,34 @@ Measured. 20,000 requests, R-c fence installed, one skipped `defer` per fault
 - **~9.2 KiB of resident memory per fault** ((205,844 − 25,480) KiB ÷ 20,000).
 - Growth is perfectly linear and unbounded. Nothing reclaims it.
 
+> **Note added 2026-07-31 — 8,250 here, 8,192 in the matrix at the end of this
+> document, and both are right.** This figure is the arithmetic **mean over the
+> whole 20,000-request soak**, so it carries the per-request allocator overhead
+> that rides along with the leak. The matrix figure is the **single 8 KiB buffer**
+> the skipped `defer` failed to release — the leak's identified cause, not its
+> measured total. Quote whichever you mean, and say which.
+>
+> **Neither is reproducible from this repository.** Everything below lived in
+> `/tmp/wp13-probe/` and was never committed; the directory is gone. This
+> document predates the project's standing rule — every reported number must be
+> regenerable from a committed script — and it does not meet it. (The rule's own
+> document, `planning/verification-campaign-plan.md`, is not in the repository
+> either; see OQ-34. It is restated here rather than pointed at.) ADR-020 does not rest on the constant — it rests on the shape
+> in §9: linear, unbounded, and invisible to the supervisor.
+>
+> **The shape has since been re-measured from committed code, and the two
+> figures turn out to be consistent rather than contradictory.**
+> `experiments/26-adr020-leak-shape` drives 20,000 requests per arm through
+> `web.test_request` under a tracking allocator, leaking one request-scoped 8 KiB
+> buffer in the faulting arm. It reports **8,192.0 bytes per request, 0.0
+> residue, 0.0% linearity drift** — the shape confirmed, to the byte.
+>
+> That result names the ~58-byte gap this note could only flag: the R-c fence
+> skipped **every** `defer` between the fault site and itself, so 8,250 counts
+> the buffer *plus* the request's other deferred frees, while 8,192 counts the
+> buffer alone. Only a real fence produces the larger figure, and there is no
+> fence, so it stays unreproducible — but it is no longer unexplained.
+
 At a modest 1,000 requests/second against one faulting route, that is about
 **8 MB/s**; a 4 GiB container is exhausted in roughly **8 minutes**, while
 answering `500` the entire time and never signalling a supervisor.

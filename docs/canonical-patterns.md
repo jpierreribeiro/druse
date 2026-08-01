@@ -138,14 +138,21 @@ constructors, and there are no others.
 
 ## Exactly one server per process
 
-`web.serve` is blocking, and the transport keeps per-process state. Running two
-servers in one process is **not supported**: they cross-wire dispatch. One
-process, one `web.serve`.
+Running two servers in one process is **not supported**. One process, one
+`web.serve`.
 
-There is also no stop procedure. `web.serve` returns when the process ends.
-Graceful shutdown with a deadline is Phase 4, and it will add public API — so
-today, run under a supervisor that can restart the process, and do not build a
-control plane that assumes it can stop the server from inside.
+The reason is the public contract, not a cross-wire. `web.stats` and
+`web.refused_connections` take no server argument and so could not say which
+server they describe; those signatures are frozen. (The per-request
+configuration stopped living in a package global in WP43, so the older
+"they cross-wire dispatch" wording is out of date wherever you still find it.)
+ADR-018 is accepted and WP123 owns the fix.
+
+**There is a stop procedure**: `web.stop(&app)` begins a graceful drain, safe to
+call from a signal handler, and `web.is_draining(&app)` reports it for a
+readiness probe. The drain is bounded by `Limits.max_drain_time` (10 s by
+default). Still run under a supervisor — a faulting handler aborts the process
+and nothing in the framework can catch that.
 
 ## Reading the request
 

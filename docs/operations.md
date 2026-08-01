@@ -63,6 +63,10 @@ memory per Handler lane and a too-low limit makes `serve` fail to acquire its
 event loop (F-C03-2). The essentials:
 
 ```ini
+[Unit]
+StartLimitBurst=5      # these two ARE systemd's defaults, written down so you
+StartLimitIntervalSec=10s  # know the loop stops; [Unit], not [Service], since v230
+
 [Service]
 ExecStart=/usr/local/bin/your-app
 Restart=on-failure
@@ -71,6 +75,16 @@ TimeoutStopSec=30      # > Limits.max_drain_time (10s default), < orchestrator g
 LimitMEMLOCK=64M       # io_uring locked memory, per lane; raise with max_handlers
 MemoryMax=1G           # the C-04 aggregate bound — see §"What the framework bounds"
 ```
+
+**`Restart=on-failure`, not `always`, and the difference matters.** A faulting
+handler exits non-zero, so `on-failure` recovers it — including an OOM kill. A
+deliberate `systemctl stop` exits cleanly and is left alone, which is what you
+want when you are the one stopping it. **And restarting is not infinite:**
+systemd gives up after `StartLimitBurst` starts inside `StartLimitIntervalSec`
+and parks the unit in `failed`. That backstop applies whether or not you write
+it down, so the unit writes it down — a crash-looping binary that has stopped
+being restarted is something you want to learn from an alert, not from a
+graph of zero traffic. Alert on unit state, not just on the process being up.
 
 ### Diagnosing a handler fault
 
@@ -171,6 +185,10 @@ reads and writes remain asynchronous and do not consume a Handler unit. A
 blocking database call consumes one unit; health remains live while at least
 one unit is free. Full saturation is an explicit boundary, not hidden
 preemption.
+
+This is for ordinary blocking dependencies, **not a CPU scheduler**. If your
+handlers are CPU-bound, size `max_handlers` deliberately and scale with more
+processes rather than raising it.
 
 `App_State` is application-owned. Mutable values shared by Handlers need a
 lock, atomics or a thread-safe service; immutable configuration does not.
@@ -284,17 +302,25 @@ by arbitrary application code. The supervisor remains the outer bound.
 
 ## 5. One server per process
 
-`web.serve` blocks and the transport keeps per-process state. **Two servers in
-one process is not supported.** Scale horizontally: one process per server, many
-processes.
+**Two servers in one process is not supported.** Scale horizontally: one process
+per server, many processes.
 
-The server uses **bounded synchronous Handler concurrency**. Slow socket I/O
-remains asynchronous; application code occupies one Handler unit until it
-returns. `max_handlers = 0` derives a bounded 4..32 capacity from the processor
-count, while `1` preserves the former deterministic compatibility model.
+**Why, precisely — because the reason has changed and the old one is still
+quoted in places.** It is no longer that a second server would cross-wire
+dispatch: the per-request configuration now travels with the server rather than
+in a package global, and has done since WP43. What remains is one process-wide
+slot holding the running server, and — the part that actually blocks the fix —
+**a frozen public contract**. `web.stats` and `web.refused_connections` take no
+server argument, so with two servers running they could not say which one they
+describe, and changing a frozen signature is not something this project does
+without paying G-09 in full.
 
-This is for ordinary blocking dependencies, not a CPU scheduler. If handlers
-are CPU-bound, size `max_handlers` deliberately and scale with more processes.
+`web.stop` is the exception that shows the shape of the fix: it takes the `App`
+by pointer already, precisely so that it would not need a new signature when
+this day came.
+
+ADR-018 is **accepted** and **WP123** owns the remaining work. Until it lands,
+run one server per process.
 
 ---
 
@@ -439,7 +465,7 @@ hook in the vendored backend is a numbered `BRIDGE` patch, deletable when
 ## 9. A deployment checklist
 
 1. Reverse proxy in front, terminating TLS, with its own timeouts and body caps.
-2. Supervisor with `Restart=always` and a `TimeoutStopSec` you chose.
+2. Supervisor with `Restart=on-failure` and a `TimeoutStopSec` you chose.
 3. `web.limits` set explicitly, including `max_connections` below your
    file-descriptor limit.
 4. `web.trust_proxies` naming your proxy's network — or nothing at all, never a
@@ -478,7 +504,7 @@ the topology those limitations make mandatory:
 * **Run behind a reverse proxy.** TLS is delegated to it by decision, and the
   proxy's own timeouts are a second, independent bound on a slow client. §7 and
   the C-06 contract.
-* **Run under a supervisor with `Restart=always` and a kill timeout.** A
+* **Run under a supervisor with `Restart=on-failure` and a kill timeout.** A
   faulting handler aborts the process by construction — Odin has no recoverable
   panic (ADR-020) — and a handler blocked in foreign code cannot be preempted,
   so the supervisor's kill is the outer bound on shutdown. Keep

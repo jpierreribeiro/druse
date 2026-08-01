@@ -61,7 +61,8 @@ README.md, odinfmt.json, .editorconfig, .gitignore — repo tooling
 
 ## Local patches
 
-**Twenty-three.** Five added by WP9 (transport conformance), one each by WP45,
+**Twenty-four**, numbered 1..24 in the table below. Five added by WP9 (transport
+conformance), one each by WP45,
 WP46 (ADR-031) and WP47, three by WP59's drain repair, one by WP70's multi-lane
 lifecycle repair, one by WP71's Handler-capacity mapping, five security
 hardening fixes from the Phase-6-freeze scan: two chunked-body process crashes
@@ -70,8 +71,15 @@ bare-CR header-injection sink and an obs-fold tab that could desync a proxy —
 four by WP90 (ADR-039/F9/streaming): the response write deadline with
 its send-cancellation and RST abort, the idle keep-alive timeout,
 accept-error tolerance, and the three detached-stream hooks;
-and one by WP7.5-C1 (streaming inbound body): the read-side twin of WP90's
-detached-stream pump, delivering a request body one bounded window at a time.
+one by WP7.5-C1 (streaming inbound body): the read-side twin of WP90's
+detached-stream pump, delivering a request body one bounded window at a time;
+and one (patch 24) by the C-05 saturation contract under dedicated accept —
+an all-lanes-active refusal that closes the accepted socket without writing
+HTTP, because the acceptor has not parsed a request and its old raw 503 reached
+a Go `net/http` client as an unsolicited response.
+
+**Ten of the twenty-four are security-motivated**: WP9's five and the
+Phase-6-freeze scan's five.
 All are minimal and fix a security issue, an upstream defect,
 a lifecycle defect or a capacity the server had no way to bound. Each is marked
 in source with `DRUSE PATCH`, recorded below, and covered by executable

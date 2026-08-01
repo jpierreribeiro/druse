@@ -53,8 +53,20 @@ grep -q 'after_small := rss_bytes()' "$DRUSE_SUITE" ||
   fail "the suite no longer reads RSS after the small-response phase — the leak half of the measurement is gone"
 grep -q 'after_big := rss_bytes()' "$DRUSE_SUITE" ||
   fail "the suite no longer reads RSS after the big-response phase — the retention half of the measurement is gone"
-grep -q 'grew < LEAK_THRESHOLD_BYTES' "$DRUSE_SUITE" ||
-  fail "the leak assertion is gone; the suite would then print numbers and assert nothing"
+grep -q 'live_retained < LEAK_THRESHOLD_BYTES' "$DRUSE_SUITE" ||
+  fail "the retention assertion is gone; the suite would then print numbers and assert nothing"
+# RSS MUST STILL BE PRINTED, and must NOT be what the suite asserts on. It was
+# the assertion until 2026-07-31 and could not resolve what it claimed: identical
+# code measured -11.9 MiB here and +2.04 MiB on a CI runner, with 1.84 MiB of
+# variance between runs on that same runner -- 92% of the old threshold. The
+# number stays visible because an operator watching a process sees RSS; it stops
+# being the verdict because it is a property of the machine.
+grep -q 'REPORTED, not asserted' "$DRUSE_SUITE" ||
+  fail "the RSS figure is no longer marked as reported-not-asserted; either it stopped being printed, or it has quietly become a verdict again"
+grep -q 'grew < LEAK_THRESHOLD_BYTES' "$DRUSE_SUITE" &&
+  fail "RSS is being asserted against the threshold again. It cannot resolve the claim -- see the note above the assertion in the suite, and OQ-35."
+grep -q 'current_memory_allocated' "$DRUSE_SUITE" ||
+  fail "the suite no longer samples live allocator bytes; the retention assertion would have nothing honest to stand on"
 
 # --- 2. The baseline is honest -----------------------------------------------
 grep -q 'scratch\[i\] = u8(i)' "$DRUSE_SUITE" || fail "$(cat <<'EOF'
@@ -117,6 +129,45 @@ grep -q 'arena_free_all retained oversize blocks' <<<"$DRUSE_OUT" || {
   fail "the arena semantic mutant failed for the wrong reason"
 }
 
+# --- 6. The retention assertion can actually go RED --------------------------
+#
+# The mutation above proves the ARENA semantic detects. This one proves the new
+# LIVE-BYTES assertion detects, which is a different claim and needs its own
+# control: an assertion that cannot fail is what commit 0b1fea8 was.
+#
+# The mutant allocates each small response body from the CONNECTION allocator
+# instead of the per-request temp allocator, so nothing frees it -- the shape of
+# a real per-request leak. 1600 responses then retain far more than the 512 KiB
+# threshold and a working assertion must go red.
+#
+# Worth stating: this leak is INVISIBLE to the RSS assertion this replaced. On
+# this class of machine RSS FALLS by ~12 MiB across the same phase, so the old
+# threshold would have passed a mutant that retains megabytes.
+cp -R "$DRUSE_ROOT/tests/c04-response-size" "$DRUSE_TMP/leakmutant"
+sed -i 's|body := make(\[\]u8, SMALL_BYTES, context.temp_allocator)|body := make([]u8, SMALL_BYTES, g_server.allocator) // C04 negative control: retention deliberately introduced|' \
+  "$DRUSE_TMP/leakmutant/soak_test.odin"
+grep -q 'negative control: retention deliberately introduced' "$DRUSE_TMP/leakmutant/soak_test.odin" ||
+  fail "the retention mutation no longer applies to the suite's small handler"
+
+set +e
+DRUSE_LEAK_OUT="$(
+  env ODIN_ROOT="$DRUSE_ODIN_ROOT" "$DRUSE_ODIN" test \
+    "$DRUSE_TMP/leakmutant" \
+    "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+    "-out:$DRUSE_TMP/c04-leakmutant" 2>&1
+)"
+DRUSE_LEAK_RC=$?
+set -e
+test "$DRUSE_LEAK_RC" -ne 0 || {
+  echo "$DRUSE_LEAK_OUT" >&2
+  fail "each small response body was made to leak and the suite stayed GREEN. The retention assertion is not detecting, so its green result on the real suite means nothing."
+}
+grep -q 'the server still holds' <<<"$DRUSE_LEAK_OUT" || {
+  echo "$DRUSE_LEAK_OUT" >&2
+  fail "the retention mutant went red for the WRONG reason: it did not fail on the retention assertion. Check whether it compiled at all before doubting the framework."
+}
+
+echo "c04: a per-request leak is detected by the live-bytes assertion (negative control)"
 echo "c04: the two-phase RSS measurement is intact (large-response high-water then small-response stability)"
 echo "c04: the baseline excludes the client's own scratch buffer"
 echo "c04: production free_all is wired; growing arena releases oversize blocks -> GREEN; call removed in copied semantic mutant -> RED"

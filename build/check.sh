@@ -1388,9 +1388,20 @@ env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
 # `tests/h2-graceful-acquire` is the evidence in the closure record that a
 # server which cannot acquire its event loop fails gracefully instead of
 # aborting. All eleven orphans were run and pass; the six with a citation are
-# wired in here. The four multishot suites and g76-scale-sockets are left out
-# deliberately and listed in build/check_test.sh, which now fails on any NEW
-# orphan.
+# wired in here. wp118-accept-multishot and g76-scale-sockets are left out
+# deliberately, with their reasons, in build/check_suite_inventory.sh — which
+# this gate RUNS, and which fails on any new orphan.
+#
+# `nbio-timeout` took three tries, and the middle one is the lesson. It was a
+# genuine orphan -- three @(test) procedures the orphan detector could not see,
+# because the detector lived in build/check_test.sh, which this gate only
+# parses. Wiring it in made the gate pass here and fail on every fresh clone,
+# because the suite was excluded through `.git/info/exclude` and existed in one
+# working copy and nowhere else: a green local run standing in for a green
+# build, which is diagnosability rule 4 with the machine as the hidden variable.
+# It was taken back out, and then COMMITTED (OQ-34), which is what should have
+# happened first. build/check_suite_inventory.sh now refuses any suite the gate
+# names that git does not track, so this cannot recur silently.
 #
 # THREADS=1 for the ones that drive a server: one server per process.
 echo "--- Previously ungated suites: multipart, HEAD framing, ingest, upload ---"
@@ -1399,6 +1410,7 @@ for DRUSE_UNGATED in \
   head-content-length \
   ingest-leak \
   h2-graceful-acquire \
+  nbio-timeout \
   wp7_5-c1-inbound-stream \
   wp7_5-c2-upload; do
   env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
@@ -1431,6 +1443,105 @@ test -f "$DRUSE_ROOT/.github/workflows/gate.yml" ||
 grep -q 'bash build/check.sh' "$DRUSE_ROOT/.github/workflows/gate.yml" ||
   fail "the workflow no longer runs build/check.sh; a green badge would promise something weaker than this gate"
 echo "PASS: the public workflow runs the same gate this script is"
+
+# --- the platform claim and the assertion that proves it say the same thing ---
+#
+# The portability job passes only when the compile failure names one of four
+# tokens, and README's Platform section quotes those tokens in prose. They were
+# duplicated with nothing keeping them together: editing the README's sentence
+# would fail nothing, and that paragraph is exactly where CI is supposed to send
+# a reader. A claim and its proof drifting apart is the subject of
+# planning/diagnosability.md, one layer out.
+#
+# `sched_yield` and `setsockopt_base` are the two symbols the README names, and
+# the two a real Windows run reported for the first time on 2026-07-31 (PR #155)
+# after the assertion was made to match the cause. If the transport stops
+# binding them, both places move together, and this says so.
+echo "--- The platform claim and its CI assertion agree ---"
+for druse_symbol in sched_yield setsockopt_base; do
+  grep -q "$druse_symbol" "$DRUSE_ROOT/.github/workflows/gate.yml" ||
+    fail "the portability job no longer matches '$druse_symbol', but README's Platform section still names it as a symbol the compile stops at. One of the two is now false."
+  grep -q "$druse_symbol" "$DRUSE_ROOT/README.md" ||
+    fail "README's Platform section no longer names '$druse_symbol', but the portability job still accepts it as proof of the platform claim. The paragraph CI sends a reader back to must name what CI actually checked."
+done
+echo "PASS: README and the portability assertion name the same symbols"
+
+# --- the supervisor contract: the shipped unit and the documents agree -------
+#
+# Same class of rule as the block above, and it belongs here for the same
+# reason: it is about repository artefacts, not about the library.
+#
+# `ops/deploy/druse.service` is COPIED VERBATIM by the operator, and until
+# 2026-07-31 nothing ever read it. Ten documents drifted to `Restart=always`
+# against a unit shipping `Restart=on-failure`, and docs/operations.md
+# contradicted itself between its §1 excerpt and its checklist. The positive
+# case below is not evidence on its own -- 0b1fea8 is what a positive case with
+# a typo in it proves -- so the gate MUTATES a throwaway copy and requires red.
+# --- inventories: nothing in build/ or tests/ is unaccounted for -------------
+#
+# Two questions the gate could not answer about itself until 2026-07-31, both
+# found by asking what a green run actually proves (diagnosability rule 4):
+#
+#   1. Is every control script in build/ EXECUTED, or only `bash -n`'d? Seventeen
+#      were wired into a loop after an audit found four of them broken; nothing
+#      stopped the next one from being forgotten.
+#   2. Is every suite in tests/ RUN? A detector for this existed -- inside
+#      check_test.sh, which this gate only parses, because check_test.sh invokes
+#      this gate several times and calling it from here would recurse. So the
+#      detector never ran, and tests/nbio-timeout sat unexecuted with three
+#      @(test) procedures. The detector now lives in its own file, here.
+#
+# Cheap, no compiler, so they run early and fail fast.
+echo "--- Inventory: every control script in build/ is executed ---"
+bash "$DRUSE_ROOT/build/check_gate_inventory.sh" "$DRUSE_ROOT"
+
+echo "--- Inventory: every test suite is gated or exempt on the record ---"
+bash "$DRUSE_ROOT/build/check_suite_inventory.sh" "$DRUSE_ROOT"
+
+# Both inventories are checks about omissions, so a green result from either is
+# worth exactly what its negative control is worth. Mutate a copy and require
+# red -- 0b1fea8 is what a positive case with a typo in it proves.
+DRUSE_INV_PROBE="$(mktemp -d)"
+trap 'rm -rf "$DRUSE_INV_PROBE"' EXIT
+cp -r "$DRUSE_ROOT/build" "$DRUSE_ROOT/tests" "$DRUSE_INV_PROBE/"
+printf '#!/usr/bin/env bash\necho unwired\n' \
+  > "$DRUSE_INV_PROBE/build/check_zz_negative_control.sh"
+
+# The orphan probe's name is BUILT AT RUNTIME and never appears as a literal in
+# any file. It has to be: the probe copies build/ wholesale, so a name written
+# literally here would travel into the copy, and check_suite_inventory.sh would
+# find it "referenced" and clear it -- the control would pass by describing
+# itself. That happened on the first attempt, which is why the name is $$.
+DRUSE_ORPHAN_PROBE="zz-orphan-$$"
+mkdir -p "$DRUSE_INV_PROBE/tests/$DRUSE_ORPHAN_PROBE"
+printf 'package test_zz\nimport "core:testing"\n@(test)\nzz :: proc(t: ^testing.T) {}\n' \
+  > "$DRUSE_INV_PROBE/tests/$DRUSE_ORPHAN_PROBE/zz_test.odin"
+
+if bash "$DRUSE_ROOT/build/check_gate_inventory.sh" "$DRUSE_INV_PROBE" >/dev/null 2>&1; then
+  fail "BROKEN CONTROL: the gate inventory passed against a build/ containing a control script nothing invokes. It is not detecting unwired scripts, so its green result above means nothing."
+fi
+if bash "$DRUSE_ROOT/build/check_suite_inventory.sh" "$DRUSE_INV_PROBE" >/dev/null 2>&1; then
+  fail "BROKEN CONTROL: the suite inventory passed against a tests/ containing a suite no gate script runs. It is not detecting orphans, so its green result above means nothing."
+fi
+echo "PASS: both inventories detect an unwired script and an orphan suite (negative controls)"
+rm -rf "$DRUSE_INV_PROBE"
+trap - EXIT
+
+echo "--- The supervisor contract: unit and documents agree ---"
+bash "$DRUSE_ROOT/build/check_supervisor_contract.sh" "$DRUSE_ROOT"
+
+DRUSE_SUPERVISOR_PROBE="$(mktemp -d)"
+trap 'rm -rf "$DRUSE_SUPERVISOR_PROBE"' EXIT
+cp -r "$DRUSE_ROOT/ops" "$DRUSE_ROOT/docs" "$DRUSE_SUPERVISOR_PROBE/"
+sed -i 's/^Restart=on-failure/Restart=always/' \
+  "$DRUSE_SUPERVISOR_PROBE/ops/deploy/druse.service"
+if bash "$DRUSE_ROOT/build/check_supervisor_contract.sh" \
+     "$DRUSE_SUPERVISOR_PROBE" >/dev/null 2>&1; then
+  fail "BROKEN CONTROL: the supervisor contract check passed against a unit mutated to Restart=always while the documents still say on-failure. It is not detecting drift, so its green result above means nothing."
+fi
+echo "PASS: the supervisor contract check detects a mutated unit (negative control)"
+rm -rf "$DRUSE_SUPERVISOR_PROBE"
+trap - EXIT
 
 echo "--- Merged-fix mutation controls (44bdcda stays guarded) ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_merged_fix_mutations.sh"

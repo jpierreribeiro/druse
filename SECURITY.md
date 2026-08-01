@@ -38,29 +38,60 @@ In scope, and treated seriously:
 - leaking request data (paths, queries, headers, bodies, tokens) into a log, an
   error envelope, or a framework event.
 
+Also in scope, and called out because an earlier version of this file said the
+opposite:
+
+- **client-address spoofing.** `web.trust_proxies` opts an application into
+  reading `X-Forwarded-For`, and `web.client_ip` then walks that header from the
+  right, stopping at the first hop that is not a trusted prefix (ADR-037). A way
+  to make `client_ip` return an attacker-chosen address from an untrusted peer,
+  or to walk past the trust boundary, **is a vulnerability**. Without
+  `trust_proxies` the connection's peer address is used and the header is
+  ignored;
+- **limits that do not bound.** `web.limits` configures the request budget —
+  `max_body`, `max_request_line`, `max_headers`, `max_json_nodes`,
+  `max_request_time`, `max_write_time`, `max_response_bytes`, `max_idle_time`,
+  `max_connections`, `reserved_conns`, `max_drain_time`, `max_handlers`. A
+  remote client that exceeds one of these without being refused is in scope,
+  and so is a bound that can be walked past rather than merely exceeded —
+  `max_json_nodes` in particular exists because a body inside `max_body` can
+  still be structurally hostile;
+- **drain that does not drain.** `web.stop` begins a graceful shutdown and
+  `web.is_draining` reports it. A request admitted after the drain began, or a
+  readiness probe still reporting ready after `stop` returned, is in scope.
+
 Out of scope, because they are documented limitations rather than defects:
 
-- **there is no shutdown or stop.** `web.serve` blocks until the process is
-  signalled. Lifecycle work is Phase 4;
-- **there are no configurable timeouts** and no connection or queue limits.
-  These are Phase 3 and Phase 4;
-- **only one server per process is supported.** Starting a second concurrently
-  is not supported and is known to misbehave; see `planning/post-phase1-audit.md`
+- **only one server per process is supported.** `web.stats` and
+  `web.refused_connections` take no server argument, so a second concurrent
+  server would make them ambiguous; those signatures are frozen. ADR-018 is
+  accepted and WP123 owns the fix. Background: `planning/history/post-phase1-audit.md`
   finding A-4;
-- **no TLS.** Run Druse behind a reverse proxy that terminates TLS;
-- **no trusted-proxy handling.** Druse does not read `Forwarded` or
-  `X-Forwarded-For`, so it cannot be tricked by them — but it also cannot tell
-  you the original client address. Phase 4, ADR-013;
+- **no TLS, and there will not be.** Run Druse behind a reverse proxy that
+  terminates TLS. In-process TLS would import an enormous attack surface into a
+  framework whose value is a small, frozen, gate-enforced one, and the proxy
+  holding the certificate is also the thing that should assert HSTS — a
+  framework behind it asserting HSTS on a cleartext hop is asserting something
+  it cannot know. ADR-046, and `docs/operations.md` §1;
+- **no HSTS, no CSP, and no cookie API.** `web.secure_headers` emits exactly
+  `nosniff`, `DENY` and `no-referrer`. A CSP not written for your application
+  breaks it, and HSTS belongs to whatever terminates TLS; set both at your
+  proxy. Druse sets no cookies, so there is nothing for it to mark `Secure` or
+  `HttpOnly` — if you set cookies, you own their attributes. "Druse does not
+  send header X" is therefore not a vulnerability;
 - panics abort the process. Odin has no recoverable panic; see
   `planning/phase-2-plan.md` FINDING-A.
 
 A report that Druse is unsuitable for direct exposure to the public internet
-is not a vulnerability — the README says so already.
+is not a vulnerability — `docs/operations.md` §1 says so already, and the
+supported topology is a reverse proxy under a supervisor.
 
 ## Supported versions
 
-There is no release yet, so **only the current `main` is supported.** No
-backports exist and no version is designated long-term.
+Releases exist — the latest is `v0.10.0`, pre-1.0 — but **only the latest tag
+and the current `main` are supported.** No backports exist, nothing is
+designated long-term, and a fix lands on `main` rather than being carried to an
+older tag.
 
 Druse is built against a single pinned Odin toolchain, recorded in
 `odin-version.txt`. A report against a different toolchain is welcome but may be
@@ -71,8 +102,8 @@ version does not have.
 
 Druse vendors the root server package of
 [`laytan/odin-http`](https://github.com/laytan/odin-http) under `vendor/`, at a
-pinned commit, with five local security patches recorded in
-`vendor/odin-http/VENDOR.md`.
+pinned commit, with twenty-four local patches recorded in
+`vendor/odin-http/VENDOR.md` — ten of them security-motivated.
 
 If the problem is in that upstream package, please tell us as well as upstream —
 the vendored copy is patched independently and may need its own fix.
@@ -83,3 +114,10 @@ Phase 1's transport conformance work (WP9) found and fixed two remotely
 triggerable crashes and one request-smuggling vector before any release. The
 raw-wire corpus that proves those fixes lives in `tests/wp9-wire/` and runs on
 every build.
+
+The Phase-6-freeze security scan found five more in the vendored transport, all
+fixed and all recorded in `vendor/odin-http/VENDOR.md`: two chunked-body
+process crashes (a negative chunk size, and a trailer field parsed while the
+header map was marked read-only), a `Content-Length` overflow that could desync
+a proxy, a bare carriage return that escaped the header-injection sanitiser, and
+an obs-fold horizontal tab accepted where a space would have been rejected.

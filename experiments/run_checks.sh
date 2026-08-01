@@ -85,6 +85,75 @@ check 16-stream-topology/candidate-c test "stream topology candidate C (detached
 check 16-stream-topology/candidate-d test "stream topology candidate D (SSE-specific API)"
 check 17-ingest-arms                 test "large-body ingest arms E/F/G/H"
 
+# COMPILE-ONLY, because this is a long-running measurement rather than a check:
+# running it here would put a 20,000-request sweep inside a pre-push gate. Its
+# own run.sh produces the number.
+check 26-adr020-leak-shape check "ADR-020 leak shape (builds; run it via its own run.sh)"
+
+# COMPILE-ONLY for the same reason: these are long-running stress harnesses, not
+# checks. Running them here would put a fault campaign inside a pre-push gate.
+#
+# They were NOT IN THE REPOSITORY until 2026-07-31 -- excluded through
+# `.git/info/exclude`, per-clone and unversioned -- while `tests/nbio-timeout`
+# named them as the evidence path for three transport fixes in 44bdcda. Cited
+# evidence nobody who cloned this could run. They had also stopped compiling,
+# still importing `uruquim:web` from before the rename to Druse, which is what
+# happens to code no instrument ever builds. Committed under OQ-34, and now
+# built on every gate run so the next rename cannot rot them unnoticed.
+check 23-accept-stall      check "accept-stall harness (builds)"
+check 24-shutdown-race     check "shutdown-race harness (builds)"
+
+# Also compile-only, and also unchecked until 2026-07-31. These five DO build
+# today; that is a fact nothing was establishing, which is the point. They are
+# not `run` because they are labs and arms whose output is a study rather than a
+# verdict -- the studies are recorded in planning/, and re-running them here
+# would put a measurement campaign in a pre-push gate.
+check 11-usage-lab/a-crud-unguarded  check "usage lab A, unguarded CRUD (builds)"
+check 11-usage-lab/b-crud-guarded    check "usage lab B, guarded CRUD (builds)"
+check 12-concurrency-arms/consumer   check "concurrency arms consumer (builds)"
+check 14-json-failure-anatomy        check "JSON failure anatomy (builds)"
+check 15-blocking-boundary           check "blocking boundary (builds)"
+
+# ---------------------------------------------------------------------------
+# THE SET IS CLOSED, and it was not until 2026-07-31.
+#
+# Everything above is an explicit list, so an experiment added to the tree and
+# not added here was checked by nothing -- the same asymmetry
+# build/check_examples.sh had, one directory over. Eight packages were in that
+# position and five of them did not compile.
+#
+# An exclusion needs a reason, for the reason exclusions always need one: an
+# omission and a decision look identical from outside.
+# ---------------------------------------------------------------------------
+#
+# 11-usage-lab/c-crud-phase3 -- a WP0-era usage prototype, written against
+#   `web.state` before it gained `#optional_ok`, so it no longer compiles. Left
+#   as it was ON PURPOSE: `count_concepts.sh` measured concepts-per-CRUD across
+#   these three implementations, and editing the source would change the thing
+#   that was measured. A frozen artefact, not live code.
+DRUSE_EXP_EXEMPT="11-usage-lab/c-crud-phase3"
+
+DRUSE_EXP_UNLISTED=""
+for DRUSE_EXP_PKG in $(find "$HERE" -name '*.odin' -printf '%h\n' | sort -u); do
+  DRUSE_EXP_NAME="${DRUSE_EXP_PKG#"$HERE"/}"
+  test "$DRUSE_EXP_NAME" = "$DRUSE_EXP_PKG" && continue
+  case "$DRUSE_EXP_NAME" in */probes) continue ;; esac
+  case " $DRUSE_EXP_EXEMPT " in *" $DRUSE_EXP_NAME "*) continue ;; esac
+  # A `check` line names the package; a parent-directory line covers a package
+  # reached through a subdirectory argument.
+  grep -q "^check $DRUSE_EXP_NAME[[:space:]]" "$HERE/run_checks.sh" && continue
+  grep -q "^check ${DRUSE_EXP_NAME%%/*}[[:space:]]" "$HERE/run_checks.sh" && continue
+  DRUSE_EXP_UNLISTED="$DRUSE_EXP_UNLISTED $DRUSE_EXP_NAME"
+done
+if test -n "$DRUSE_EXP_UNLISTED"; then
+  echo "FAIL: these experiment packages are in the tree but nothing checks them:$DRUSE_EXP_UNLISTED"
+  echo "      Add a 'check' line above, or add it to DRUSE_EXP_EXEMPT with the reason."
+  echo "      An unchecked experiment is code that stops compiling and nobody finds out."
+  FAIL=$((FAIL+1))
+else
+  echo "PASS: every experiment package is checked or exempt on the record"
+fi
+
 echo "============================================"
 echo "PASS=$PASS FAIL=$FAIL SKIP=$SKIP"
 [ $FAIL -eq 0 ] || exit 1

@@ -197,7 +197,7 @@ dispatcher.
   the WP8 driver behaviour — a handler that commits no response is finalized
   to a standardized 500 — and documentation stating plainly that a panic aborts
   the process. A "last-gasp responder" is deferred to Phase 4 and must never be
-  called recovery. Evidence: `planning/phase-2-prototype-recovery.md`
+  called recovery. Evidence: `planning/history/phase-2-prototype-recovery.md`
 - logger middleware
 - request ID middleware
 - typed framework-error observer/policy for centralized logging and optional

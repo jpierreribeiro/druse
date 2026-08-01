@@ -46,13 +46,21 @@ sessão resolve.
 | **ADR-028** — estado por requisição | **Não existe.** O "porteiro" valida e o valor é passado adiante como parâmetro comum; o custo de revalidação é aceito e documentado. Reabre só com um programa real, medido neste repositório, que não consiga ser escrito de forma limpa. |
 | **ADR-010** — API avançada | Fica desenhada, **não lançada**, até um usuário externo real pedir. Nunca aparece no Quick Start. |
 | **ADR-013** — proxies confiáveis | Por padrão, vale o endereço da conexão; confiar em proxy é configuração explícita do operador. Detalhes de API ficam para a Fase 4. |
-| **CI no GitHub** | **Continua sem CI** — o gate roda local/VPS, decisão reconfirmada pelo dono em 2026-07-20. |
+| **CI no GitHub** — ⚠️ **superada; ver a nota abaixo da tabela** | **Continua sem CI** — o gate roda local/VPS, decisão reconfirmada pelo dono em 2026-07-20. |
 | **Fase 3, todas as aprovações** | Resolvidas de antemão no plano (§2b do `phase-3-plan.md`): diagnóstico de conflito com poison (WP30); nenhuma normalização de caminho, permanente, params crus (WP31a); HEAD e OPTIONS automáticos, sem 501 (WP32a); acessor de rota aprovado (WP34); limites configuráveis com runtime derivado no boot e registro-durante-serving rejeitado (WP36); WP37 só implementa o ADR-004; o freeze (WP38) é aprovado pelo próprio gate — e qualquer violação para e volta ao dono. |
 | **Fase 4, escopo** — ⚠️ **parcialmente revertida em 2026-07-21, ver a tabela da Fase 5 abaixo** | Plano rascunhado (`phase-4-plan.md`, §2b): CORS, uploads e arquivos estáticos ficam **fora do núcleo** (pacotes opcionais futuros) — *esta parte foi revertida*; TLS é terminado no proxy reverso — esse é o jeito suportado de rodar; a decisão de concorrência fica **deliberadamente aberta** até haver protótipos e medição (ADR-030, procedimento já escrito). O rascunho é obrigatoriamente re-revisado contra os resultados da Fase 3 antes de começar. |
 
 Toda pré-aprovação é condicional: se o trabalho de especificação de um pacote
 contradisser o que foi decidido, o agente **para e registra o achado** em vez
 de seguir.
+
+**Nota (2026-07-31) — a linha "CI no GitHub" está superada pelos fatos.** Existe
+`.github/workflows/gate.yml`, ele roda `build/check.sh`, e o próprio
+`build/check.sh` hoje **exige** que esse workflow exista — falha se o arquivo
+sumir ou deixar de chamar o gate, porque senão o badge do README prometeria algo
+sem nada atrás. O gate local/VPS continua sendo o gate; o do GitHub é o mesmo
+gate em público. Nenhum documento da árvore registrava a mudança, e ela fica
+registrada aqui.
 
 ---
 
@@ -114,6 +122,24 @@ Justificativa registrada: o contador removido só podia relatar zero — nenhum
 consumidor viável dependia dele — e deixá-lo ao lado de um contador vivo daria
 aos operadores um número que por construção não se move (R-14: um caminho
 canônico, não dois).
+
+## Decisões do dono (2026-07-31) — três registros que envelheceram
+
+Estas três saem de uma auditoria de **registro**, não de código: nos três casos
+a implementação está certa e o que ficou para trás foi o que a árvore diz sobre
+ela. O gatilho foi a pergunta do dono sobre o que um CI verde prova — ver a
+regra 4 de `planning/diagnosability.md`.
+
+| Decisão | O que ficou decidido, em uma linha |
+|---|---|
+| **ADR-018 — estado por servidor** | **ACEITO**, com o WP123 agendado. É a aprovação do dono que o próprio ADR-018 exigia ("requires owner approval when implemented"). O WP43 já removeu o `g_config`; resta o `g_server`. O WP123 muda **assinatura pública congelada** — `web.stats` e `web.refused_connections` passam a receber o servidor — e paga **G-09 por inteiro**. O `web.stop` **não** muda: receber `^App` desde o WP44 foi exatamente o que comprou essa saída. Até o WP123 entregar, a limitação continua verdadeira; o que muda hoje é a **razão** registrada — contrato congelado, não o global removido. |
+| **`Restart=` reconcilia na direção da unidade** | `ops/deploy/druse.service` entrega `Restart=on-failure` e está **certa**: uma falha sai não-zero, `on-failure` reinicia, e um `systemctl stop` deliberado fica em paz. Dez documentos diziam `always` — incluindo duas linhas do próprio `docs/operations.md`, que contradizia a si mesmo. Os documentos mudam, não a unidade. A partir de agora um controle no gate confere os dois, com controle negativo. |
+| **Os 8.250 bytes ficam registrados, não reproduzidos** | O número que justifica a política de processo imutável (ADR-020) vem de um protótipo que viveu inteiramente em `/tmp/wp13-probe/` e nunca foi commitado; nenhum script o recria, o que contraria a regra permanente do projeto — todo número publicado tem de ser regenerável por um script commitado. (O documento dessa regra, `planning/verification-campaign-plan.md`, também não está no repositório; ver OQ-34.) A decisão **não reabre** — a forma do vazamento (linear, ilimitada, sem sinalizar o supervisor) é o argumento, e ela se sustenta sem o valor exato. O que muda é o registro dizer a verdade sobre a origem do número. |
+| **A licença é MIT** | Decidido pelo dono em 2026-07-31, resolvendo um conflito que a auditoria achou: `LICENSE` e `CHANGELOG.md` diziam **MIT**, o `README.md` dizia **BSD-3-Clause** no badge e no rodapé. O `LICENSE` estava certo e não muda; o README foi corrigido. Não confundir com as duas menções a BSD-3 em `phase-1-freeze.md`, que são corretas e falam do `$ODIN_ROOT/LICENSE` — a licença do **Odin**, não a do Druse. |
+
+Matéria reservada: mudar `LICENSE` para sempre no dono, e este registro é a
+decisão dele. Nenhum arquivo de licença foi alterado — o conflito era de
+documentação, não de licenciamento.
 
 ## Fila de decisões abertas
 

@@ -190,7 +190,7 @@ The four that will surprise you first, so nothing does:
 - **A fault in a handler aborts the process.** A panic, a failed assertion or an
   out-of-bounds index takes the server down; the client sees an empty reply.
   There is no recovery middleware and there never will be — Odin has no
-  recoverable panic (ADR-020). Run under a supervisor with `Restart=always`.
+  recoverable panic (ADR-020). Run under a supervisor with `Restart=on-failure`.
   What Druse *does* guarantee is the other half: a handler that returns
   without responding gets the standardized 500. See `docs/errors.md`.
 - **The write and idle timeouts are OFF by default.** `Limits.max_request_time`

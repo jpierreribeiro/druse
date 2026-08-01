@@ -16,6 +16,21 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+  # A WEEKLY TICK, because two of the things this workflow depends on rot on
+  # someone else's schedule rather than on ours.
+  #
+  # The portability job installs `release: latest` -- an UNPINNED nightly, by
+  # necessity, since this project pins a toolchain for Linux and not for the
+  # platforms it does not support. That nightly, and the third-party action that
+  # fetches it, can break at any time. Without a schedule the first notice would
+  # be somebody's pull request going red for a reason that has nothing to do
+  # with their change, which is the surest way to teach people to ignore a red
+  # square. The runner images move underneath us the same way.
+  #
+  # Monday 06:00 UTC: one run a week, arriving before the week's work rather
+  # than during it.
+  schedule:
+    - cron: '0 6 * * 1'
 
 # A newer push makes an older run pointless. Cancel it rather than paying for
 # an answer about a commit nobody is waiting on.
@@ -85,13 +100,22 @@ jobs:
     name: does not build (${{ matrix.os }}), by construction
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    # STILL NON-BLOCKING, but for a smaller reason than before. The job now
-    # asserts its own expected outcome, so a red here is a real signal -- either
-    # the platform claim went stale, or the third-party action and the UNPINNED
-    # nightly it needs broke. Only the second is noise, and it is the reason the
-    # flag stays: infrastructure for platforms this project does not pin must
-    # not redden a commit whose gate is green.
-    continue-on-error: true
+    # BLOCKING, and the tolerance moved down to the one step that earns it.
+    #
+    # This job used to carry `continue-on-error: true` at the job level. The
+    # argument was real -- the third-party action and the UNPINNED nightly it
+    # needs are infrastructure for platforms this project does not pin, and they
+    # must not redden a commit whose gate is green. But the flag does not
+    # distinguish noise from signal: it also swallowed the CAUSE ASSERTION added
+    # after the Windows episode, so a job that went red because the documented
+    # reason had stopped matching would have passed the workflow anyway. Fixing
+    # "passes for the wrong reason" by introducing "fails where nobody has to
+    # look" is not a fix (planning/diagnosability.md rule 4, and its corollary:
+    # an advisory assertion is not an assertion).
+    #
+    # So the tolerance is now on the toolchain install ALONE. If that breaks,
+    # the assertion is skipped and says so out loud; if it succeeds, the
+    # assertion blocks. Noise is tolerated exactly where noise lives.
     strategy:
       fail-fast: false
       matrix:
@@ -99,10 +123,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # THE ONE TOLERATED STEP. `release: latest` is an unpinned nightly fetched
+      # by a third-party action; when it breaks, that is noise about someone
+      # else's infrastructure and not a fact about Druse.
       - name: Install Odin (nightly, unpinned on this platform)
+        id: toolchain
+        continue-on-error: true
         uses: laytan/setup-odin@v2
         with:
           release: latest
+
+      # The skip is ANNOUNCED. A check that quietly does not run reads exactly
+      # like a check that ran and passed, which is the failure this whole job
+      # exists to stop making.
+      - name: Report a skipped assertion (toolchain unavailable)
+        if: steps.toolchain.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::warning::The portability assertion did NOT run on ${{ matrix.os }}:"
+          echo "::warning::installing the unpinned Odin nightly failed, so there was no"
+          echo "::warning::compiler to assert with. This says nothing about the platform"
+          echo "::warning::claim in README's Platform section -- it was not tested."
 
       # Deliberately narrower than the Linux job, and the narrowness is the
       # point: a green here means "it builds", not "it works". Claiming more
@@ -120,17 +161,136 @@ jobs:
       # -- because a success would mean the transport no longer binds
       # core:sys/linux, the README's platform sentence has gone stale, and
       # somebody should find that out from CI rather than from a bug report.
-      - name: Assert the library does NOT build here
+      # THE EXPECTED OUTCOME IS A COMPILE FAILURE, and it must fail for the
+      # RIGHT REASON. The first version of this step asserted only that the
+      # build failed, and on Windows it "passed" because `-out:hello` is missing
+      # an extension there -- a bug in this workflow, not a portability limit.
+      # It never reached a single line of Druse. Every mutation control in
+      # build/ checks the diagnostic and not just the exit status; so does this.
+      - name: Assert the library does NOT build here, for the documented reason
+        if: steps.toolchain.outcome == 'success'
         shell: bash
         run: |
           set -uo pipefail
-          if odin build examples/01-hello-world -collection:druse=. -out:hello 2>build.log; then
+          out="hello"
+          [ "${{ runner.os }}" = "Windows" ] && out="hello.exe"
+
+          if odin build examples/01-hello-world -collection:druse=. -out:"$out" 2>build.log; then
             echo "::error::examples/01-hello-world COMPILED on ${{ matrix.os }}."
-            echo "::error::That is good news and a stale document: README's Platform section says"
-            echo "::error::Druse is Linux by construction because vendor/odin-http imports"
-            echo "::error::core:sys/linux. Re-check that claim and update it before this job is"
-            echo "::error::flipped back to expecting a green build."
+            echo "::error::Good news and a stale document: README's Platform section says Druse is"
+            echo "::error::Linux by construction because vendor/odin-http binds core:sys/linux."
+            echo "::error::Re-check that claim and update it before flipping this job green-on-build."
             exit 1
           fi
-          echo "the build failed here, as the Platform section states. First lines:"
-          head -5 build.log
+
+          echo "--- the build failed, as the Platform section states. Diagnostic: ---"
+          cat build.log
+
+          # The documented cause is the Linux syscall surface the vendored
+          # transport binds. Anything else means this job is reporting a broken
+          # runner, a bad flag or a missing toolchain as if it were portability.
+          if grep -qE "is not declared by 'linux'|core:sys/linux|sched_yield|setsockopt_base" build.log; then
+            echo "cause matches the documented one: the transport binds Linux syscalls."
+          else
+            echo "::error::The build failed, but NOT for the reason the README documents."
+            echo "::error::This job would have reported a workflow bug as a portability limit."
+            echo "::error::Fix the step, or update the Platform section to match reality."
+            exit 1
+          fi
+
+  # WHAT A RELEASE ACTUALLY SHIPS, checked on the tag rather than assumed.
+  #
+  # GitHub attaches a `git archive` tarball to every tag, and `.gitattributes`
+  # decides what goes in it -- 20 `export-ignore` rules that strip evidence/,
+  # planning/, tests/, build/, ops/ and the rest, taking the archive from the
+  # repository's full weight down to about 2 MB of library, docs and examples.
+  #
+  # Nothing verified that. Two things could go wrong quietly and only be found
+  # by whoever downloaded the release: a new directory of internal material
+  # could ship because nobody added its export-ignore line, or a path something
+  # DEPENDS ON could stop shipping because somebody added one. The second is the
+  # dangerous one -- a tarball that is missing `vendor/odin-http` or `web/` is a
+  # release that does not build, and the gate above would still be green,
+  # because the gate runs against the repository and not against the artefact.
+  #
+  # So this job builds the artefact and uses it: extract, then compile an
+  # example against the extracted tree ALONE. That is the only assertion that
+  # catches both failures at once.
+  release-archive:
+    name: the release tarball is complete and builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch the pinned Odin toolchain
+        run: |
+          set -euo pipefail
+          release="$(sed -n 's/^release=//p' odin-version.txt)"
+          asset="$(sed -n 's/^linux_amd64_asset=//p' odin-version.txt)"
+          want="$(sed -n 's/^linux_amd64_sha256=//p' odin-version.txt)"
+          curl -fsSL -o "$asset" \
+            "https://github.com/odin-lang/Odin/releases/download/$release/$asset"
+          got="$(sha256sum "$asset" | cut -d' ' -f1)"
+          if [ "$want" != "$got" ]; then
+            echo "::error::toolchain checksum mismatch. want $want, got $got"
+            exit 1
+          fi
+          mkdir -p "$HOME/odin"
+          tar -xzf "$asset" -C "$HOME/odin" --strip-components=1
+          chmod +x "$HOME/odin/odin"
+
+      - name: Build the archive GitHub would attach
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rel
+          git archive --format=tar HEAD | tar -x -C /tmp/rel
+          echo "archive size: $(du -sh /tmp/rel | cut -f1)"
+          echo "top level:"; ls /tmp/rel
+
+      # THE EXCLUSIONS HOLD. Every export-ignore line is read from the file
+      # rather than restated here, so adding a rule cannot drift from its check.
+      - name: Nothing export-ignored is in the archive
+        run: |
+          set -euo pipefail
+          leaked=""
+          while read -r path; do
+            test -n "$path" || continue
+            if [ -e "/tmp/rel/$path" ]; then leaked="$leaked $path"; fi
+          done < <(grep -E '^[^#[:space:]]+[[:space:]]+export-ignore' .gitattributes |
+                     awk '{print $1}' | sed 's:/$::')
+          if [ -n "$leaked" ]; then
+            echo "::error::these paths are marked export-ignore but are in the tarball:$leaked"
+            echo "::error::A release would ship internal material. Check .gitattributes."
+            exit 1
+          fi
+          echo "all export-ignore rules held"
+
+      # AND THE INCLUSIONS HOLD, which is the half that bites harder: an
+      # over-eager export-ignore produces a tarball that cannot build, and no
+      # other job would notice, because every other job runs against the repo.
+      - name: The extracted archive builds on its own
+        run: |
+          set -euo pipefail
+          export ODIN_ROOT="$HOME/odin"
+          export PATH="$HOME/odin:$PATH"
+          for required in web vendor/odin-http examples LICENSE README.md odin-version.txt; do
+            test -e "/tmp/rel/$required" || {
+              echo "::error::the tarball is missing $required, so the release does not build"
+              exit 1
+            }
+          done
+          "$HOME/odin/odin" build /tmp/rel/examples/01-hello-world \
+            -collection:druse=/tmp/rel -out:/tmp/rel-hello
+          test -x /tmp/rel-hello
+          echo "an example compiled against the extracted tarball alone"
+
+      - name: Keep the archive with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: druse-release-tree
+          path: /tmp/rel
+          retention-days: 14

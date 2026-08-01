@@ -133,7 +133,7 @@ defects than anything else here.
 A fault in a handler — a panic, a failed assertion, an out-of-bounds index —
 **aborts the process**. Odin has no recoverable panic, so there is no recovery
 middleware and there never will be. Run under a supervisor with
-`Restart=always`.
+`Restart=on-failure`.
 
 A handler that *returns without responding* is different and safe: it gets a
 standardized 500.

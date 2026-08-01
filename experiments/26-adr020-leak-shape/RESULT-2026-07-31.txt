@@ -1,0 +1,36 @@
+REQUESTS=20000 SAMPLE_EVERY=5000 LEAK_BYTES=8192
+  arm Clean: 5000/20000 requests, 1095357 bytes live
+  arm Clean: 10000/20000 requests, 2189109 bytes live
+  arm Clean: 15000/20000 requests, 2824109 bytes live
+  arm Clean: 20000/20000 requests, 4376613 bytes live
+clean arm done
+  arm Leaking: 5000/20000 requests, 42055357 bytes live
+  arm Leaking: 10000/20000 requests, 84109109 bytes live
+  arm Leaking: 15000/20000 requests, 125704109 bytes live
+  arm Leaking: 20000/20000 requests, 168216613 bytes live
+leaking arm done
+ADR-020 leak shape — live bytes held, by arm
+
+    reqs             clean           leaking        difference
+00005000  0000000001095357  0000000042055357  0000000040960000
+00010000  0000000002189109  0000000084109109  0000000081920000
+00015000  0000000002824109  0000000125704109  0000000122880000
+00020000  0000000004376613  0000000168216613  0000000163840000
+
+leaked bytes per request: 8192.0  (over 20000 requests)
+the modelled skipped deallocation: 8192 bytes
+residue beyond the modelled buffer: 0.0 bytes per request (control: expect 0.0)
+
+linearity: first interval 40960000 bytes, final total 163840000, perfect-linear projection 163840000 (0.0% drift)
+
+ADR-020 rests on this shape — linear and unreclaimed — not on the constant.
+
+On the historical numbers, which this run does NOT reproduce and does explain:
+  8,192  the single 8 KiB buffer one skipped `defer` fails to release.
+         This experiment models exactly that, and measures exactly that.
+  8,250  the WP13 figure, ~58 bytes/request higher, because the REJECTED R-c
+         fence skipped EVERY `defer` between the fault site and the fence —
+         the buffer plus the request's other deferred frees. That fence was
+         never implemented, its prototype lived in /tmp and is gone, so the
+         number cannot be re-measured. The two figures are consistent; they
+         count different things, and neither supersedes the other.

@@ -403,10 +403,15 @@ ADR-013 remain owned by later gates and cannot expand earlier scope.
 
 ## Proposals recorded after the Phase-1 freeze
 
-**Status of every entry below: PROPOSED.** None is accepted. They are recorded
-so the owning work package inherits the reasoning instead of rediscovering it,
-and each requires the owner's approval before it may be marked accepted. See
+**Every entry below was recorded as PROPOSED.** They are recorded so the owning
+work package inherits the reasoning instead of rediscovering it, and each
+requires the owner's approval before it may be marked accepted. See
 `post-phase1-audit.md` and `odin-fit-audit.md` for the evidence.
+
+**An entry that has since been resolved carries its outcome in its own heading**
+and states it in a paragraph before the retained proposal text — ADR-015
+(superseded), ADR-016 (resolved), ADR-018 (accepted). Read the heading, not this
+paragraph, for any single entry's status. ADR-017 is the only one still open.
 
 ### ADR-015 (SUPERSEDED by ADR-021) — test-support grows by procedure group
 
@@ -464,7 +469,48 @@ adds responders.
 
 Internal only; no public surface change; no owner approval required.
 
-### ADR-018 (PROPOSED) — per-server state replaces the transport globals
+### ADR-018 (ACCEPTED 2026-07-31) — per-server state replaces the transport globals
+
+- **Status.** **ACCEPTED** (owner, 2026-07-31). Half of it already shipped as
+  WP43; the remainder is owned by **WP123**, which is what this acceptance
+  authorises. The owner approval the original text demanded is hereby given, for
+  the public change named under "What is left" below.
+- **Owner.** WP43 (done, 2026-07-21) and WP123 (scheduled; spec at
+  `planning/wp123-per-server-state-spec.md`, which fixes the App as the
+  per-server handle so no new public type is ratified, and names the proving
+  test — two servers in one process, each answering its own routes).
+
+**What changed since the proposal was written.** The Context below is kept for
+the record but is **no longer accurate**. WP43 removed `g_config` entirely: a
+server's `Config` now travels with the backend handler in a `Server_Runtime`
+that lives in `serve`'s own frame, so there is no slot for a second server to
+overwrite and the cross-wire the proposal described cannot happen. `g_server`
+also no longer holds the address of a stack local unprotected — WP70 protects
+its whole pointer lifetime, and WP43 collapsed it into one mutex-guarded record.
+
+**What is left, and why it did not ship in Phase 4.** One package-level variable
+remains: `g_server: Server_Global` in `web/internal/transport/odin_http_adapter.odin`,
+a single slot holding the running server, its stream registry and its ingest
+admission. WP43 kept it deliberately, because `request_stop` asks a process-wide
+question that only WP44's public surface could answer properly, and removing it
+then would have meant inventing half of WP44 inside an internal package. WP44
+then shipped `stop` and froze it. So the blocker is no longer an implementation
+fact — it is the **frozen public contract**:
+
+- `stop :: proc(a: ^App)` **does not need to change.** It was given its `^App`
+  parameter for exactly this future (`web/lifecycle.odin`), and that foresight
+  pays off here.
+- `refused_connections :: proc() -> int` and `stats :: proc() -> Server_Stats`
+  (`web/observability.odin`) **do** have to change: they take no server argument,
+  so with two servers in one process they would be ambiguous. That is a change
+  to a frozen signature, and it carries **G-09 in full** (all eight items,
+  `planning/public-api-guardrails.md`).
+
+**The limitation stands until WP123 lands.** One server per process remains true
+and documented; what the documents must now say is *why* — the frozen contract,
+not the removed global.
+
+**Original proposal text, retained for the record.**
 
 **Context.** The adapter keeps package-level `g_server`/`g_config`. A second
 `serve()` overwrites `g_config`, so the first server begins answering with the
@@ -593,7 +639,45 @@ the stop API at the same time.
   the client sees `curl: (52) Empty reply from server` — and the process falls
   over for a supervisor to restart. That is standard behaviour for a serious
   runtime, and it is accepted deliberately rather than discovered later.
-- **Evidence.** `planning/phase-2-prototype-recovery.md`.
+- **Evidence.** `planning/history/phase-2-prototype-recovery.md`.
+- **Provenance of the 8,250 figure, recorded 2026-07-31 — read this before
+  quoting the number.** It is **not reproducible from this repository.** It comes
+  from a WP13 prototype that lived entirely in `/tmp/wp13-probe/` and was never
+  committed; that directory is long gone, and no script in the tree recreates it.
+  This predates — and does not satisfy — the project's standing rule that **every
+  number reaching a report must be regenerable from a committed script, and raw
+  artifacts committed rather than only prose**. (That rule is written down in
+  `planning/verification-campaign-plan.md`, which is itself NOT in the
+  repository — excluded per-clone through `.git/info/exclude`, see OQ-34. The
+  rule is restated here so it survives the pointer.) Two further cautions: the source
+  document gives **8,250 B** in prose (`§9`, the arithmetic mean over a
+  20,000-request soak: (167,751,057 − 2,751,057) ÷ 20,000) and **8,192 B** in its
+  comparison matrix (the single 8 KiB buffer released by the skipped `defer`) —
+  they measure different things and neither supersedes the other, so cite the one
+  you mean. **The decision does not rest on the exact value.** What decides it is
+  the *shape*: the leak is linear, unbounded, reclaims nothing, and — the part
+  that makes it a security property rather than a performance one — the process
+  keeps answering 500s and never signals its supervisor, so nothing restarts it
+  until the kernel OOM-kills it and takes every in-flight request with it. That
+  shape is argued in the source document's §9 and does not depend on the
+  constant. **What CI actually proves** is the abort itself:
+  `build/check_wp21_controls.sh` control 7 builds a faulting program and a clean
+  baseline and asserts the first dies by signal while the second exits 0. Nothing
+  in the gate measures the leak.
+- **The SHAPE is reproducible, and now is — `experiments/26-adr020-leak-shape`,
+  measured 2026-07-31.** The historical constant cannot be re-measured: it
+  measured option (C), the fence this ADR rejected and nobody ever built. The
+  quantity the decision actually turns on can be, and was — two arms of 20,000
+  requests each through `web.test_request` under a tracking allocator, one
+  releasing a request-scoped 8 KiB buffer and one not. Result: **8,192.0 bytes
+  per request, 0.0 residue, 0.0% linearity drift**, with 163,840,000 bytes still
+  live at the end and nothing reclaimed. Committed script, committed output
+  (`RESULT-2026-07-31.txt`) — a regenerable number backed by its raw output,
+  which is what this ADR could not previously offer.
+  **It also reconciles 8,250 against 8,192.** They count different things and
+  are consistent: 8,192 is the one skipped free; 8,250 is ~58 bytes/request
+  higher because the fence skipped EVERY `defer` in the frame, not one. Quote
+  either, and say which.
 - **Doc impact.** `knowledge-base/03-development-phases.md` §Phase 2 scope and
   Test Gate are amended; `planning/phase-2-plan.md` WP21 drops to zero symbols.
 - **Reversibility.** HIGH — nothing is exported, so Phase 4 may add a last-gasp
@@ -688,7 +772,7 @@ counter-recommendation, not the WP15 recommendation. The option analysis below
 is retained verbatim as presented; each entry's Status line records the
 outcome. Evidence citations refer to
 `planning/phase-2-prototype-middleware.md` (WP12) and
-`planning/phase-2-prototype-recovery.md` (WP13), which carry the verbatim
+`planning/history/phase-2-prototype-recovery.md` (WP13), which carry the verbatim
 commands and outputs.
 
 ## ADR-022 — the post-`next` promise: B1 or B3

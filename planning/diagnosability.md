@@ -7,7 +7,7 @@ in the gate that fails when the property is absent.
 
 ## The property, and why it is not the one we already had
 
-This project has been bitten seven times by tests that did not work, and every
+This project has been bitten eight times by tests that did not work, and every
 one of them is in the history:
 
 | Commit | What it was |
@@ -19,6 +19,7 @@ one of them is in the history:
 | `28c977e` | one fix was guarded by an unrun suite |
 | `086eb9e` | wp90-deadlines was never a flake |
 | `a439618` | two falsified records |
+| `ee7449c` | a green job asserted the build fails; it failed on a flag of ours |
 
 The answer this project invented is the **mutation control**: break the code on
 purpose, require the test to go red. Forty-one of them run in the gate. That
@@ -41,7 +42,14 @@ that did exist could not be joined to each other.
 
 Nobody was careless. The standard was missing.
 
-## The three rules
+There is a third question, and it went unasked longer than either of the others
+because a green result does not prompt anyone to ask anything:
+
+> **Attribution** — when it *passes*, is it passing for the reason it names?
+
+Rule 4 below is that question, with the episode that forced it.
+
+## The four rules
 
 ### 1. No discard
 
@@ -105,6 +113,59 @@ A criterion of the form "at most X% of *events*" is the shape that hides cause b
 construction. Every one of them in this repository is suspect until it has been
 read against this rule.
 
+### 4. No unattributed pass
+
+**An assertion that an outcome is expected must match the CAUSE of that outcome,
+not only its exit status.**
+
+Rules 1 to 3 all concern an instrument that goes red. This one concerns an
+instrument that goes **green**, which is harder, because green is the state
+nobody investigates.
+
+> A green result proves **the assertion you wrote was satisfied**. It does not
+> prove **the thing you wanted to prove**. Those two coincide only when the
+> assertion names the cause.
+
+The episode. `.github/workflows/gate.yml` runs a portability job whose expected
+outcome is a **compile failure**: Druse is Linux by construction, because the
+vendored transport binds `core:sys/linux`, and the job is the executable proof
+of the README's platform claim. It asserted that the build fails. It was green.
+It was green on Windows because `-out:hello` is missing an extension there, so
+the Odin driver rejected the output path **before compiling a single line of
+Druse**. A workflow bug of ours was being reported as a portability limit, and
+the exit status could not tell the two apart because a failure is a failure.
+
+What makes this rule distinct from falsifiability: a mutation control would not
+have caught it. Break the transport and the job stays green — it was already
+green for a reason unrelated to the transport. The assertion was falsifiable and
+diagnosable and still wrong, because it never named what it was asserting about.
+
+The fix, and the shape to copy (`gate.yml`): after observing the expected
+failure, `grep` the diagnostic for the tokens the documented cause would
+produce — here `is not declared by 'linux'`, `core:sys/linux`, `sched_yield`,
+`setsockopt_base` — and **fail loudly when they are absent**, with a message
+that says the run would otherwise have reported a workflow bug as a portability
+limit. The full diagnostic is printed either way, so a human can see what
+actually happened.
+
+This rule is where the repository's existing practice was already correct and
+merely unwritten. The idiom is even named in the codebase — the failure message
+is literally *"failed for the WRONG reason"* — and it appears at **26 sites
+across 17 scripts** under `build/`, countable at any time with:
+
+```
+grep -ric "for the wrong reason" build/*.sh
+```
+
+`gate.yml` cites that body of practice as its own justification. Rule 4 makes it
+the standard instead of a habit, and extends it from `build/` to every
+expected-failure assertion in the repository.
+
+**Corollary — an advisory assertion is not an assertion.** A check that cannot
+fail the run it belongs to has been downgraded to a log line. Where infrastructure
+noise is the reason for tolerating failure, isolate the noisy step and let the
+assertion itself block.
+
 ## How it is enforced
 
 Each instrument that falls under this standard carries a control in the gate
@@ -115,7 +176,11 @@ that proves the property, in the shape `build/check_*_controls.sh` already uses:
 - one or more **mutations** of the instrument that remove the diagnostic and
   must be detected;
 - where an analyser computes the verdict, a case proving it **refuses** an
-  artefact whose failures carry no cause.
+  artefact whose failures carry no cause;
+- for rule 4, a case proving the instrument **refuses a pass obtained for the
+  wrong cause** — feed it an expected-shaped outcome whose diagnostic does not
+  match, and require it to go red. An expected-failure assertion with no such
+  case is unexamined.
 
 The positive case is not decoration. Without it, a typo in an assertion lets
 every mutation "pass" against any artefact at all — which is exactly how
@@ -132,9 +197,15 @@ Anything that produces a verdict, a published number, or release evidence:
 - the soak (`ops/soak/`) — **done**, and the model for the rest;
 - the JSON/HWM measurement harness;
 - the benchmark matrices under `bench/`;
-- every gate script whose criterion is a tolerance rather than a fact.
+- every gate script whose criterion is a tolerance rather than a fact;
+- **every assertion whose expected outcome is a failure** — rule 4's scope, and
+  the one that reaches outside `build/` into `.github/workflows/gate.yml`. The
+  shipped operational artefacts belong here too: `ops/deploy/druse.service` was
+  read by nothing for months while ten documents drifted away from its
+  `Restart=` value, which is the same defect one layer out — an artefact whose
+  correctness no instrument ever asserted.
 
-The audit of the remaining instruments against these three rules is tracked
+The audit of the remaining instruments against these four rules is tracked
 separately. An instrument that has not been audited is not thereby compliant; it
 is unexamined, and the difference matters.
 

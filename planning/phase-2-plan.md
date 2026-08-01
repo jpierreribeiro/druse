@@ -308,7 +308,7 @@ the observer, any documentation change, any change to `web/` or `build/`.
   does not go through `panic`)? Which `defer`s are skipped in each candidate,
   and can the resulting leak be measured?
 * **Likely files.** `/tmp/druse-p2-recovery/**`; repository output
-  `planning/phase-2-prototype-recovery.md`.
+  `planning/history/phase-2-prototype-recovery.md`.
 * **RED tests.** A program that panics inside a handler must first be shown to
   kill the process **today** — that is the baseline any candidate must beat.
   (Already demonstrated above; the prototype re-runs it as its control.)
