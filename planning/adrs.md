@@ -469,16 +469,27 @@ adds responders.
 
 Internal only; no public surface change; no owner approval required.
 
-### ADR-018 (ACCEPTED 2026-07-31) — per-server state replaces the transport globals
+### ADR-018 (DELIVERED 2026-08-01) — per-server state replaces the transport globals
 
-- **Status.** **ACCEPTED** (owner, 2026-07-31). Half of it already shipped as
-  WP43; the remainder is owned by **WP123**, which is what this acceptance
-  authorises. The owner approval the original text demanded is hereby given, for
-  the public change named under "What is left" below.
-- **Owner.** WP43 (done, 2026-07-21) and WP123 (scheduled; spec at
-  `planning/wp123-per-server-state-spec.md`, which fixes the App as the
-  per-server handle so no new public type is ratified, and names the proving
-  test — two servers in one process, each answering its own routes).
+- **Status.** **DELIVERED.** Accepted by the owner 2026-07-31; shipped
+  2026-08-01. Half had already shipped as WP43; **WP123** finished it, under the
+  approval this acceptance gave. What actually landed is recorded as
+  **Amendment 44** in `planning/phase-1-freeze.md` — read that for the shape of
+  the change, and this entry for why it was owed.
+- **Owner.** WP43 (done, 2026-07-21) and WP123 (done, 2026-08-01; spec at
+  `planning/wp123-per-server-state-spec.md`). The proving test the spec named —
+  two servers in one process, each answering its own routes — is
+  `tests/wp123-two-servers`, and it is red against a one-slot implementation.
+- **Two corrections to the spec, made in the doing.** There were **seven**
+  readers of the process-wide slot, not four: the streaming boundary
+  (`stream_push`/`stream_end`/`stream_live`) reads it too, reached from
+  `web.stream_send`/`stream_close`/`stream_live`, which take a `Stream` by value
+  from any thread with neither a Context nor an App in hand. And the spec fixed
+  "the App as the per-server handle", which is true of the public surface but not
+  of the mechanism: the App holds a generation-checked HANDLE into a
+  process-wide registry, because what the transport needed was never lookup but
+  LIFETIME — the runtime lives in `serve`'s stack frame, and a raw pointer to it
+  held past `serve` is a use-after-free no signature can prevent.
 
 **What changed since the proposal was written.** The Context below is kept for
 the record but is **no longer accurate**. WP43 removed `g_config` entirely: a

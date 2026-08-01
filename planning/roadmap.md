@@ -147,10 +147,11 @@ an operations document.
 **Exit criterion partially unmet, recorded 2026-07-31.** "Per-server state
 replaces the transport globals" shipped only in part: WP43 removed `g_config`,
 WP44 shipped `stop`, and the process-wide `g_server` slot stayed. Phase 4 froze
-without this being noticed. The remainder now needs a **public** change
+without this being noticed. The remainder needed a **public** change
 (`web.stats` and `web.refused_connections` gaining a server argument), which is
-why it could not be finished quietly inside the phase. ADR-018 is accepted and
-**WP123** owns it.
+why it could not be finished quietly inside the phase. **Closed 2026-08-01 by
+WP123** (Amendment 44), outside the phase it belonged to and paying G-09 in
+full.
 
 ### Phase 5 — Close the drain, ship the table stakes
 
@@ -212,18 +213,28 @@ agent usability study become the evidence for future API improvements and any
 
 ### Scheduled, not yet assigned to a phase
 
-**WP123 — per-server state replaces `g_server`.** Spec:
-[`wp123-per-server-state-spec.md`](wp123-per-server-state-spec.md). ADR-018,
-accepted by the owner on 2026-07-31, closing a Phase-4 exit criterion that
-Phase 4 froze without meeting. WP43 removed `g_config`; what remains is one process-wide slot in
-`web/internal/transport`, and the reason it cannot be finished internally is
-that `web.stats` and `web.refused_connections` take no server argument. Changing
-those is **public surface on a frozen contract**, so WP123 pays G-09 in full and
-carries the owner approval ADR-018 always required. `web.stop` needs no
-signature change — it was given its `^App` parameter for exactly this.
+**WP123 — per-server state replaces `g_server`. DELIVERED 2026-08-01.** Spec:
+[`wp123-per-server-state-spec.md`](wp123-per-server-state-spec.md); the record
+of what shipped is Amendment 44 in
+[`phase-1-freeze.md`](phase-1-freeze.md). ADR-018, accepted by the owner on
+2026-07-31, closing a Phase-4 exit criterion that Phase 4 froze without meeting.
+WP43 removed `g_config`; WP123 removed the process-wide slot, replacing it with a
+generation-keyed table of live servers. `web.stats` and `web.refused_connections`
+gained an `^App` — **public surface on a frozen contract**, so it paid G-09 in
+full. `web.stop` needed no signature change: it was given its `^App` parameter
+for exactly this.
 
-The proving test is the one that cannot be written today: **two servers in one
-process, each answering its own routes.** Eleven test suites currently name the
+Two things were found in the doing that the spec did not anticipate. There were
+**seven** readers of the slot, not four — the streaming surface
+(`stream_send`/`stream_close`/`stream_live`) reads it from any thread with
+neither a Context nor an App in hand, which is why the private half of `Stream`
+had to carry the server. And `web.stop` was **not async-signal-safe** while being
+documented three times as if it were; that was fixed here rather than deferred,
+because this is the work package that made the claim testable.
+
+The proving test was the one that could not be written before: **two servers in
+one process, each answering its own routes** — `tests/wp123-two-servers`, green
+under the parallel runner, red when the registry is collapsed back to one slot. Eleven test suites currently name the
 process-global server slot — as the reason they run serially, or as the thing
 they reach through — and they are the inventory of what WP123 touches:
 
