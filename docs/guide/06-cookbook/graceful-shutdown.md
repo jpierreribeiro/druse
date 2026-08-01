@@ -44,7 +44,8 @@ main :: proc() {
 	// requests the server is about to refuse. This is what `is_draining` is for.
 	web.get(&app, "/ready", proc(ctx: ^web.Context) {
 		// The handler reads the App through the same package global the signal
-		// handler uses: with one server per process, the App is the process.
+		// handler uses: this process runs one server, and this App is it. A
+		// process running two would give each its own `stop` (ADR-018).
 		if web.is_draining(&app) {
 			web.text(ctx, web.Status(503), "draining")
 			return

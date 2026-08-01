@@ -1426,7 +1426,15 @@ bash "$DRUSE_ROOT/build/check_wp123_controls.sh"
 # happened first. build/check_suite_inventory.sh now refuses any suite the gate
 # names that git does not track, so this cannot recur silently.
 #
-# THREADS=1 for the ones that drive a server: one server per process.
+# THREADS=1 for the ones that drive a server, and the REASON changed under this
+# line without the line changing with it. It used to be "one server per
+# process": `web.stop` acted on a process-global slot, so any test stopping any
+# App stopped everyone's server. WP123 ended that. These suites are still
+# serialized, for two reasons it did not touch — each keeps a test-local
+# `g_server` of its own, and the repository has no port allocator, so they share
+# hand-kept candidate lists. Neither is a framework constraint, and neither was
+# measured away; see `tests/wp123-two-servers` for what parallel now looks like
+# when a suite is written for it.
 echo "--- Previously ungated suites: multipart, HEAD framing, ingest, upload ---"
 for DRUSE_UNGATED in \
   multipart-content \

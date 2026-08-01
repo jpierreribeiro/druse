@@ -10,7 +10,8 @@
 #   2  `use` AFTER the protected route      -> the example MUST fail loudly
 #   3  the ownership table deleted          -> the docs gate MUST reject it
 #   4  an ownership COLUMN dropped          -> the docs gate MUST reject it
-#   5  the single-server rule (R-10) deleted-> the docs gate MUST reject it
+#   5  the multi-server contract (R-10) gone-> the docs gate MUST reject it
+#   5b the multi-server BOUND removed       -> the docs gate MUST reject it
 #   6  POSITIVE: all seven examples still build and the docs gate is green
 #
 # CONTROL 2 IS THE ONE THAT MATTERS MOST. WP12 D-12.5 measured a mis-ordered

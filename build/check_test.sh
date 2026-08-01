@@ -148,5 +148,5 @@ echo "test hygiene: no suite silences the logger across its own assertions"
 # how the two drift apart (R-14 — one canonical path, not two).
 bash "$DRUSE_ROOT/build/check_suite_inventory.sh" "$DRUSE_ROOT"
 
-echo "test hygiene: the server-driving suites run serially (one server per process)"
+echo "test hygiene: the two-server suites run in PARALLEL — a stop reaches only its own App's server (WP123)"
 echo "PASS: WP0 toolchain and repository baseline"
