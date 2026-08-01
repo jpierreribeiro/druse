@@ -50,10 +50,10 @@ request_id assigns every request an ID, honours a well-formed client value, and 
 ## `stats`
 
 ```odin
-stats :: proc() -> Server_Stats
+stats :: proc(a: ^App) -> Server_Stats
 ```
 
-stats returns the running server's write-side counters, or the zero value when no server is running. It allocates nothing and reads ten integers under one lock, so the snapshot is coherent.
+stats returns THIS APPLICATION's server's write-side counters, or the zero value when this App is not running one.
 
 Taught in [`05-recipes/observe-the-framework.md`](../guide/05-recipes/observe-the-framework.md).
 
@@ -68,7 +68,7 @@ Server_Stats is the write-side accounting `web.stats` returns (Closure H-3).
 ## `refused_connections`
 
 ```odin
-refused_connections :: proc() -> int
+refused_connections :: proc(a: ^App) -> int
 ```
 
-refused_connections reports how many connections this process has refused for admission (WP47's `Limits.max_connections`) since the server started.
+refused_connections reports how many connections THIS APPLICATION's server has refused for admission (WP47's `Limits.max_connections`) since it started.

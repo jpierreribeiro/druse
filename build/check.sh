@@ -1360,21 +1360,44 @@ rm -rf "$DRUSE_ROOT/tests/wp61-public-surface/fixture"
 # not a test result. The bound is generous — the suite's own phases take about
 # four seconds — so a timeout means genuinely stuck, never slow.
 echo "--- WP58/59 drain deadline: stop returns with connections held open (odin test) ---"
-# ONE SERVER PER PROCESS, so this suite runs SEQUENTIALLY — the same rule
-# tests/c03-fault-campaign carries, and for the same reason. `web.stop` sets its
-# App's drain bit and then calls `transport.request_stop()`, which acts on the
-# process-global server WITHOUT consulting the App it was handed. This package
-# holds two tests, and `wp65_is_draining_is_false_until_stop` calls `stop` twice
-# on a serverless App; under the parallel runner those calls shut down the
-# server `wp58_drain_anatomy` is measuring, and its eight keep-alive dials find
-# nothing ("expected held to be 8, got 0"). Measured on a 4-vCPU host: 3 failures
-# in 15 runs with the default runner, 0 in 15 with THREADS=1.
+# RUNS PARALLEL SINCE WP123, and that is an assertion rather than a default.
+# This suite used to need `-define:ODIN_TEST_THREADS=1`: `web.stop` acted on the
+# process-global server without consulting the App it was handed, so
+# `wp65_is_draining_is_false_until_stop` — which stops a SERVERLESS App twice —
+# shut down the server `wp58_drain_anatomy` was measuring, and its eight
+# keep-alive dials found nothing ("expected held to be 8, got 0"). Measured then
+# on a 4-vCPU host: 3 failures in 15 runs parallel, 0 in 15 serialized.
+#
+# WP123 gave every App its own server handle, so a stop on an App that never
+# served reaches nothing. Re-measured on the same host after the change: 15
+# parallel runs, 15 green. Running it parallel is now the CONTROL — serializing
+# it again would hide a regression in exactly the state this package changed,
+# and `build/check_test.sh` fails if anyone does.
 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
   timeout 120 \
   "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/wp58-drain" \
-  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  "-collection:druse=$DRUSE_ROOT" \
   -out:"$DRUSE_BIN_TMP/wp58-drain" \
   || fail "the drain suite failed or timed out; a timeout means the drain is stuck, which is the defect it exists to catch"
+
+# ---------------------------------------------------------------------------
+# WP123 / ADR-018 — two servers in one process, each answering for itself.
+#
+# The suite the work package exists to turn green, and the one that would have
+# been meaningless before it: each of its four tests starts TWO servers through
+# `web.serve` and asserts that the counters, the stop, the stream registry and
+# the upload admission belong to the App each was asked about. Deliberately
+# PARALLEL (see build/check_test.sh) — running the tests concurrently is the
+# capability this bought, and serializing them would prove nothing about it.
+echo "--- WP123 two servers in one process, reporting and draining separately (odin test) ---"
+env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  timeout 120 \
+  "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/wp123-two-servers" \
+  "-collection:druse=$DRUSE_ROOT" \
+  -out:"$DRUSE_BIN_TMP/wp123-two-servers" \
+  || fail "two servers in one process did not report or drain independently; a timeout means a stop reached the wrong server and the other is still blocked in serve"
+
+bash "$DRUSE_ROOT/build/check_wp123_controls.sh"
 
 # ---------------------------------------------------------------------------
 # Suites that were in the tree but in no gate script.
@@ -1403,7 +1426,15 @@ env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
 # happened first. build/check_suite_inventory.sh now refuses any suite the gate
 # names that git does not track, so this cannot recur silently.
 #
-# THREADS=1 for the ones that drive a server: one server per process.
+# THREADS=1 for the ones that drive a server, and the REASON changed under this
+# line without the line changing with it. It used to be "one server per
+# process": `web.stop` acted on a process-global slot, so any test stopping any
+# App stopped everyone's server. WP123 ended that. These suites are still
+# serialized, for two reasons it did not touch — each keeps a test-local
+# `g_server` of its own, and the repository has no port allocator, so they share
+# hand-kept candidate lists. Neither is a framework constraint, and neither was
+# measured away; see `tests/wp123-two-servers` for what parallel now looks like
+# when a suite is written for it.
 echo "--- Previously ungated suites: multipart, HEAD framing, ingest, upload ---"
 for DRUSE_UNGATED in \
   multipart-content \

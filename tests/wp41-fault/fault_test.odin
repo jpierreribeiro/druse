@@ -80,7 +80,7 @@ start_server :: proc(s: ^Server) -> bool {
 			return true
 		}
 
-		transport.request_stop()
+		transport.request_stop(transport.server_current())
 		thread.join(s.thread)
 		thread.destroy(s.thread)
 		s.thread = nil
@@ -93,7 +93,7 @@ stop_server :: proc(s: ^Server) {
 	if s.thread == nil {
 		return
 	}
-	transport.request_stop()
+	transport.request_stop(transport.server_current())
 	thread.join(s.thread)
 	thread.destroy(s.thread)
 	s.thread = nil
@@ -676,7 +676,7 @@ start_deadline_server :: proc(s: ^Server, nanos: i64, ports: []int) -> bool {
 			return true
 		}
 
-		transport.request_stop()
+		transport.request_stop(transport.server_current())
 		thread.join(s.thread)
 		thread.destroy(s.thread)
 		s.thread = nil

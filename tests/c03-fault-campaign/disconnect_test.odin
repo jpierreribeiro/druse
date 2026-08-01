@@ -153,7 +153,7 @@ c03_a_contended_lane_refuses_with_503_and_stays_alive :: proc(t: ^testing.T) {
 
 	// Read the acceptor's refusal counter BEFORE the contention, so the delta
 	// below attributes only what this burst caused.
-	refusals_before := web.stats().saturation_refusals
+	refusals_before := web.stats(&server.app).saturation_refusals
 
 	contenders := make([]Contender, CONTENDERS)
 	defer delete(contenders)
@@ -175,7 +175,7 @@ c03_a_contended_lane_refuses_with_503_and_stays_alive :: proc(t: ^testing.T) {
 
 	// The acceptor's own refusal is counted BEFORE the outcomes are read, so a
 	// contender that met it can be attributed rather than guessed at.
-	saturation_refusals := web.stats().saturation_refusals - refusals_before
+	saturation_refusals := web.stats(&server.app).saturation_refusals - refusals_before
 
 	ok_count, refused_count, bad := 0, 0, 0
 	for c in contenders {

@@ -212,7 +212,7 @@ wp8_real_server_serves_and_stops :: proc(t: ^testing.T) {
 		}
 
 		// Stop this server (whether or not it was the working one) and join.
-		transport.request_stop()
+		transport.request_stop(transport.server_current())
 		thread.join(fixture.thread)
 		thread.destroy(fixture.thread)
 		fixture.thread = nil

@@ -69,7 +69,15 @@ stop :: proc(a: ^App) {
 	// probe racing the signal can never see "still ready" after the refusal has
 	// begun. Atomic store: `stop` is safe from a signal handler.
 	sync.atomic_store(&a.private.draining, 1)
-	transport.request_stop()
+	// WP123 — THIS App's server, not "the" server. Before ADR-018 the transport
+	// held one slot for the whole process, so a `stop` on App A stopped whichever
+	// server had started last; the `^App` above was taken for symmetry and then
+	// ignored. It is now the thing that answers the question.
+	//
+	// Both reads are atomic and neither takes a lock, which is what finally makes
+	// the signal-handler contract in this file's header TRUE rather than
+	// documented — see `transport.request_stop`.
+	transport.request_stop(sync.atomic_load(&a.private.server))
 }
 
 // is_draining reports whether `stop` has been requested on this application.

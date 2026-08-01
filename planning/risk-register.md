@@ -239,13 +239,21 @@ blocker — Phase 1 froze with no open blocker assigned to it — and none is a 
   briefly holds a stack address read non-atomically. Reaching it requires
   deliberately starting two servers. Document the single-server constraint in
   Phase 2; replace with per-server state in Phase 4.
-  **Status, 2026-07-31 — MOSTLY CLOSED, and the residue changed shape.** WP43
-  removed `g_config`, so the cross-wire this entry describes cannot happen; WP70
-  protects `g_server`'s pointer lifetime, so the stack-address read is gone too.
-  What remains is one process-wide slot, and the blocker on removing it is no
-  longer an implementation fact but the **frozen signatures** of `web.stats` and
-  `web.refused_connections`. It did not land in Phase 4 as this entry directed.
-  ADR-018 is now accepted and **WP123** owns the remainder.
+  **Status, 2026-08-01 — CLOSED.** WP43 removed `g_config`, so the cross-wire
+  this entry describes cannot happen; WP70 protected `g_server`'s pointer
+  lifetime. WP123 removed the last process-wide slot, replacing it with a
+  generation-keyed registry of live servers, and paid the G-09 cost this entry
+  named: `web.stats` and `web.refused_connections` take the App whose server they
+  describe (Amendment 44). It did not land in Phase 4 as this entry directed —
+  it landed 2026-08-01, outside any phase.
+
+  **What the closure also fixed, and it was not on this register.** `web.stop`
+  took a mutex and drove two more inside the drains, while being documented three
+  times over as callable from a SIGTERM handler. A signal delivered to a thread
+  already holding any of the three deadlocked the process on the stop path, and
+  the window was widest when the server was busiest. Worth noticing as a register
+  finding in its own right: the entry above tracked the state that was SHARED and
+  never asked what was taken to read it.
 - **R-21** Three request-local scratch arrays are aliased by the committed
   response, and safety rests on six hand-written `committed` guards rather than
   on `response_commit`. Phase 2 adds responders, which is exactly the scenario

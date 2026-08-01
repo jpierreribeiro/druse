@@ -104,20 +104,32 @@ if test "$DRUSE_BLIND_FILTER" -gt 0; then
   fail "a test logger filter drops EVERY .Error record. That includes core:testing's own assertion failures, so the suite is green whatever it asserts (this is what tests/wp9-wire did). Filter by origin or by message marker, never by level alone."
 fi
 
-# ONE SERVER PER PROCESS. `web.stop` calls `transport.request_stop()`, which
-# shuts down the process-global server regardless of which App it was given, so
-# a package holding a server-driving test alongside ANY test that calls `stop`
-# is unsound under the parallel runner. Both such packages must be invoked
-# serially, and the invocation is what has to be checked — the suites cannot
-# enforce it themselves.
+# A STOP REACHES ONLY ITS OWN SERVER (WP123 / ADR-018), and this check is the
+# INVERSE of the one it replaces.
+#
+# It used to require that `tests/wp58-drain` run with
+# `-define:ODIN_TEST_THREADS=1`, because `web.stop` shut down the process-global
+# server regardless of which App it was handed: a sibling test's stop killed the
+# server the other test was measuring. Measured then: 3 failures in 15 parallel
+# runs ("expected held to be 8, got 0"), 0 in 15 serialized.
+#
+# WP123 removed the shared slot — `web.stop(&app)` now names one server — so the
+# requirement is not merely obsolete, it is BACKWARDS: leaving it in place would
+# make the codebase defend the defect's workaround. Re-measured on the same
+# suite after the change: 15 parallel runs, 15 green, 0 failures.
+#
+# What replaces it is the claim that made the deletion legal. The suite must run
+# PARALLEL, so that a stop reaching the wrong server shows up here instead of
+# being hidden by serialization — the workaround, restored, would silence the
+# very regression this now catches.
 DRUSE_CHECK_JOINED="$(awk '{ if (sub(/\\$/, "")) { buf = buf $0; next } print buf $0; buf = "" }' \
   "$DRUSE_ROOT/build/check.sh")"
-for DRUSE_SERIAL_SUITE in wp58-drain; do
-  DRUSE_INVOCATION="$(grep -E "\" test \".*tests/$DRUSE_SERIAL_SUITE\"" <<<"$DRUSE_CHECK_JOINED" || true)"
+for DRUSE_PARALLEL_SUITE in wp58-drain wp123-two-servers; do
+  DRUSE_INVOCATION="$(grep -E "\" test \".*tests/$DRUSE_PARALLEL_SUITE\"" <<<"$DRUSE_CHECK_JOINED" || true)"
   test -n "$DRUSE_INVOCATION" ||
-    fail "build/check.sh no longer runs tests/$DRUSE_SERIAL_SUITE"
-  grep -q 'ODIN_TEST_THREADS=1' <<<"$DRUSE_INVOCATION" ||
-    fail "tests/$DRUSE_SERIAL_SUITE runs under the PARALLEL runner. Its sibling test calls web.stop, which shuts down the process-global server the other test is measuring — measured 3 failures in 15 runs ('expected held to be 8, got 0'), 0 in 15 when serialized. Restore -define:ODIN_TEST_THREADS=1."
+    fail "build/check.sh no longer runs tests/$DRUSE_PARALLEL_SUITE"
+  grep -q 'ODIN_TEST_THREADS=1' <<<"$DRUSE_INVOCATION" &&
+    fail "tests/$DRUSE_PARALLEL_SUITE was serialized with -define:ODIN_TEST_THREADS=1. Since WP123 a stop reaches only the server its App started, and running these suites in PARALLEL is what proves it — serializing them hides exactly the regression they exist to catch. If they became flaky, the fault is in the per-server state, not in the runner."
 done
 
 echo "test hygiene: no suite silences the logger across its own assertions"
@@ -136,5 +148,5 @@ echo "test hygiene: no suite silences the logger across its own assertions"
 # how the two drift apart (R-14 — one canonical path, not two).
 bash "$DRUSE_ROOT/build/check_suite_inventory.sh" "$DRUSE_ROOT"
 
-echo "test hygiene: the server-driving suites run serially (one server per process)"
+echo "test hygiene: the two-server suites run in PARALLEL — a stop reaches only its own App's server (WP123)"
 echo "PASS: WP0 toolchain and repository baseline"

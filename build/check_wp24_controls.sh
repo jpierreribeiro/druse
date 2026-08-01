@@ -10,7 +10,8 @@
 #   2  `use` AFTER the protected route      -> the example MUST fail loudly
 #   3  the ownership table deleted          -> the docs gate MUST reject it
 #   4  an ownership COLUMN dropped          -> the docs gate MUST reject it
-#   5  the single-server rule (R-10) deleted-> the docs gate MUST reject it
+#   5  the multi-server contract (R-10) gone-> the docs gate MUST reject it
+#   5b the multi-server BOUND removed       -> the docs gate MUST reject it
 #   6  POSITIVE: all seven examples still build and the docs gate is green
 #
 # CONTROL 2 IS THE ONE THAT MATTERS MOST. WP12 D-12.5 measured a mis-ordered
@@ -41,6 +42,15 @@ if test -z "$DRUSE_W24_ODIN"; then
   echo "WP24 CONTROLS -> BLOCKED: no Odin toolchain found (set DRUSE_ODIN_BIN). NOTHING RAN." >&2
   exit 2
 fi
+# RESOLVE THE SYMLINK FIRST. `ODIN_ROOT` must be the directory holding `base/`
+# and `core/`, and that is where the compiler LIVES — not where the name that
+# reached it lives. A `~/.local/bin/odin` symlinking into an unpacked toolchain
+# is the ordinary install, and taking the dirname of the link gave an ODIN_ROOT
+# with no `base/`: the probe below died with "Cannot find the library collection
+# 'base'" and SIGILL, reported here as "the probe program did not build" — a
+# broken-environment message wearing a broken-code message's clothes. Every other
+# control script in build/ already resolves the link; this one did not.
+DRUSE_W24_ODIN="$(readlink -f "$DRUSE_W24_ODIN")"
 DRUSE_W24_ODIN_DIR="$(cd "$(dirname "$DRUSE_W24_ODIN")" && pwd)"
 
 DRUSE_W24_TMP="$(mktemp -d -t druse-wp24-controls-XXXXXXXX)"
@@ -211,9 +221,16 @@ PYEOF
 assert_mutated "ownership column dropped" "$T/docs/canonical-patterns.md" "$H"
 must_reject_docs "$T" "4: an ownership column dropped" "Who cleans up|four"
 
-# --- 5. the single-server rule (R-10) deleted --------------------------------
-# A limitation that stops being written down does not stop existing; the reader
-# simply assumes it shipped.
+# --- 5. the multi-server contract (R-10) deleted ------------------------------
+# This control used to delete the SINGLE-server rule and require rejection. WP123
+# made two servers in one process supported, so that mutation now weakens
+# nothing — and a control that cannot fail is worse than none, because it reads
+# as coverage. It is replaced by the successor claim rather than dropped.
+#
+# A capability that stops being written down is one the reader will not use; a
+# capability written down without its LIMIT is one the reader will exceed. So
+# there are two mutations here where there was one, and the second is the one
+# that would have rotted quietly.
 T="$(tree_copy nor10)"
 assert_docs_green "$T" "5: R-10 deleted"
 H="$(md5sum "$T/docs/canonical-patterns.md" | cut -d' ' -f1)"
@@ -221,14 +238,32 @@ python3 - "$T/docs/canonical-patterns.md" <<'PYEOF'
 import sys
 p = sys.argv[1]
 s = open(p).read()
-old = "## Exactly one server per process"
+old = "## More than one server in a process"
 assert old in s, "pattern not found"
 s = s.replace(old, "## Serving", 1)
-s = s.replace("Running two\nservers in one process is **not supported**", "Running two\nservers in one process is fine", 1)
+s = s.replace("two servers in one process", "this", 1)
+s = s.replace("multiple servers", "this", 1)
 open(p, 'w').write(s)
 PYEOF
 assert_mutated "R-10 deleted" "$T/docs/canonical-patterns.md" "$H"
-must_reject_docs "$T" "5: the single-server constraint deleted" "single-server|R-10|one server per process"
+must_reject_docs "$T" "5: the multi-server contract deleted" "multi-server|R-10"
+
+# 5b. The contract kept, its BOUND removed. "Supported" with no ceiling stated
+# reads as unlimited, and the seventeenth `serve` in a process returns without
+# binding — a failure the reader was never told to expect.
+T="$(tree_copy nobound)"
+assert_docs_green "$T" "5b: the bound removed"
+H="$(md5sum "$T/docs/canonical-patterns.md" | cut -d' ' -f1)"
+python3 - "$T/docs/canonical-patterns.md" <<'PYEOF'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+old = "at most sixteen concurrent servers"
+assert old in s, "pattern not found"
+open(p, 'w').write(s.replace(old, "as many concurrent servers as it needs", 1))
+PYEOF
+assert_mutated "the bound removed" "$T/docs/canonical-patterns.md" "$H"
+must_reject_docs "$T" "5b: the multi-server bound removed" "BOUND|bound|sixteen"
 
 # --- 6. POSITIVE control -----------------------------------------------------
 # Controls 3-5 are all satisfied by deleting the documentation, and control 1

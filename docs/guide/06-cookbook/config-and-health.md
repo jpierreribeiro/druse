@@ -69,6 +69,17 @@ main :: proc() {
 		web.text(ctx, .OK, "ready")
 	})
 
+	// The write-side counters, as ten integers your existing scraper differences.
+	// They are this App's server's own: `web.stats` reads the server THIS App
+	// started, so a second listener in the same process reports separately rather
+	// than both reporting whichever one happened to start last.
+	//
+	// Every field is an integer, which is what keeps this inside the redaction
+	// policy's permitted set — no request-derived byte can reach a scraper here.
+	web.get(&app, "/metrics", proc(ctx: ^web.Context) {
+		web.ok(ctx, web.stats(&app))
+	})
+
 	posix.signal(.SIGTERM, on_signal)
 	posix.signal(.SIGINT, on_signal)
 

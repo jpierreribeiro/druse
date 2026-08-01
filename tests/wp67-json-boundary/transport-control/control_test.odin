@@ -174,7 +174,7 @@ wp68_client_type_error_is_identical_on_memory_and_socket :: proc(t: ^testing.T) 
 
 	raw, ok := send_wrong_type(s.port)
 	if s.thread != nil {
-		transport.request_stop()
+		transport.request_stop(transport.server_current())
 		thread.join(s.thread)
 		thread.destroy(s.thread)
 		s.thread = nil

@@ -108,31 +108,14 @@ render_peer :: proc(addr: net.Address, allocator: mem.Allocator) -> string {
 // travels WITH the handler rather than beside it. No vendored change was needed
 // — the capability was there and unused.
 //
-// WHAT IS STILL A GLOBAL, and it is stated rather than hidden: `g_server`, read
-// by `request_stop`. That one is a genuinely process-wide question today
-// ("stop the running server") and it is WP44 that gives it a proper answer, by
-// making a server a thing a caller HOLDS. Removing it here would mean inventing
-// half of WP44's public surface in an internal package. WP70 protects its whole
-// pointer lifetime while retaining the documented one-server-per-process rule.
-@(private)
-Server_Global :: struct {
-	mutex:  sync.Mutex,
-	server: ^http.Server,
-	// WP90b — the running server's stream registry, for the same reason the
-	// server pointer is here (one server per process; readable without a
-	// request in hand). Tests reach it through `stream_registry_current`.
-	streams: ^stream.Registry,
-	// Phase 7.5-C2 — the running server's large-body ingest admission, here for
-	// the same reason: `request_stop` must drain it (refuse new spools) without a
-	// request in hand. Nil when upload is not enabled.
-	admission: ^ingest.Admission,
-}
-
-// The one ratified process-global server lifetime (WP43), now one protected
-// record rather than a pointer plus an ungoverned second package global.
-@(private)
-g_server: Server_Global
-
+// WHAT IS NO LONGER A GLOBAL (WP123). `g_server` — a SINGLE slot holding the
+// running server's backend pointer, stream registry and upload admission — used
+// to live here, and every process-wide question went through it. It is gone.
+// The process-wide record is now a TABLE of live servers keyed by a stale-safe
+// handle, in `server_registry.odin`, and this file declares no package variable
+// at all. The reasoning for why a global still exists at all — lifetime, not
+// lookup — is in that file's header, where its subject belongs.
+//
 // Server_Runtime is the per-server state the handler needs. It lives in
 // `serve`'s frame and is reached through the backend handler's `user_data`, so
 // its lifetime is exactly the server's — no allocation, no teardown, and no way
@@ -140,6 +123,9 @@ g_server: Server_Global
 @(private)
 Server_Runtime :: struct {
 	config: Config,
+	// WP123 — this run's registry handle, so a dispatch that opens a detached
+	// stream can mint a token naming THIS server rather than "the" server.
+	handle: Server_Handle,
 	// WP90b — the detached-stream registry (WP88/WP89 machinery) and the
 	// per-slot owner links. Links are indexed by registry slot, allocated
 	// once at serve and freed after it: slot reuse is link reuse, and the
@@ -256,13 +242,48 @@ serve :: proc(cfg: Config) -> Serve_Error {
 	defer ingest.admission_destroy(&runtime.admission)
 
 	s: http.Server
-	sync.lock(&g_server.mutex)
-	g_server.server = &s
-	g_server.streams = &runtime.streams
+
+	// WP123 — REGISTER THIS RUN, and register it BEFORE the listen so that a
+	// failed listen releases a handle rather than leaking a slot.
+	//
+	// The admission pointer is nil unless upload is enabled, exactly as the old
+	// single slot left it nil: a zero `Admission` is not a drainable one, and
+	// `request_stop` distinguishes the two by the pointer rather than by
+	// re-reading the config.
+	admission: ^ingest.Admission
 	if cfg.upload_enabled {
-		g_server.admission = &runtime.admission
+		admission = &runtime.admission
 	}
-	sync.unlock(&g_server.mutex)
+	handle, published := server_publish(rawptr(&s), &runtime.streams, admission)
+	if !published {
+		return .Too_Many_Servers
+	}
+	runtime.handle = handle
+
+	// WP123 / patch 43 — the framework's own drain, run by the backend at the top
+	// of its shutdown rather than by whoever called `stop`. Armed before any lane
+	// exists, so no lane can reach its shutdown with this unset.
+	s.on_shutdown = runtime_drain
+	s.on_shutdown_user = rawptr(&runtime)
+
+	// The caller learns its server's identity through the same `user` pointer
+	// `on_ready` already travels on — no new channel, and no `web` type named
+	// here. It is published BEFORE the listen and withdrawn on every exit path,
+	// so a handle a caller holds is never one this frame has stopped honouring.
+	if cfg.on_server != nil {
+		cfg.on_server(cfg.user, handle)
+	}
+	// REGISTERED LAST, SO IT RUNS FIRST. Odin runs deferred blocks LIFO, and the
+	// registry entry must stop naming the runtime BEFORE the two defers above
+	// destroy what it names — `server_retire` returns only once every reader has
+	// left, which is precisely the guarantee that makes the destroys below safe
+	// while `stream_send` runs on another thread.
+	defer {
+		if cfg.on_server != nil {
+			cfg.on_server(cfg.user, SERVER_HANDLE_NONE)
+		}
+		server_retire(handle)
+	}
 
 	opts := http.Default_Server_Opts
 	handler_concurrency := resolve_handler_concurrency(cfg.max_handlers)
@@ -314,11 +335,6 @@ serve :: proc(cfg: Config) -> Serve_Error {
 	}
 
 	if err := http.listen(&s, endpoint, opts); err != nil {
-		sync.lock(&g_server.mutex)
-		g_server.server = nil
-		g_server.streams = nil
-		g_server.admission = nil
-		sync.unlock(&g_server.mutex)
 		return .Listen_Failed
 	}
 
@@ -336,41 +352,44 @@ serve :: proc(cfg: Config) -> Serve_Error {
 	// than the process terminating. Surface it as a clean serve failure.
 	serve_err := http.serve(&s, handler)
 
-	sync.lock(&g_server.mutex)
-	g_server.server = nil
-	g_server.streams = nil
-	g_server.admission = nil
-	sync.unlock(&g_server.mutex)
 	if serve_err != nil {
 		return .Listen_Failed
 	}
 	return .None
 }
 
-// _refused_connections reads the running server's admission-refusal total.
+// _refused_connections reads ONE named server's admission-refusal total.
 //
-// Through `g_server` — the one named global exception (WP43) — because the
-// count belongs to the SERVER rather than to any request, and there is no
-// request in hand when an operator asks for it.
+// Through the registry handle (WP123) rather than through "the" server, because
+// the count belongs to a SERVER rather than to any request and there is no
+// request in hand when an operator asks for it — but there is an App, and the
+// App knows which server it started. A stale or absent handle reads zero, the
+// same answer a stopped server has always given.
 @(private)
-_refused_connections :: proc() -> int {
-	sync.lock(&g_server.mutex)
-	defer sync.unlock(&g_server.mutex)
-	server := g_server.server
+_refused_connections :: proc(h: Server_Handle) -> int {
+	e, ok := server_acquire(h)
+	if !ok {
+		return 0
+	}
+	defer server_leave(e)
+	server := (^http.Server)(e.server)
 	if server == nil {
 		return 0
 	}
 	return sync.atomic_load(&server.refused_total)
 }
 
-// _server_stats reads every write-side counter under the one lock, so the nine
-// numbers are a coherent snapshot rather than nine independently-timed reads.
-// Through `g_server`, like `_refused_connections`, and zero when no server runs.
+// _server_stats reads every write-side counter inside one registry acquisition,
+// so the ten numbers are a coherent snapshot rather than ten independently-timed
+// reads. Zero for a stale or absent handle, like `_refused_connections`.
 @(private)
-_server_stats :: proc() -> Server_Stats {
-	sync.lock(&g_server.mutex)
-	defer sync.unlock(&g_server.mutex)
-	server := g_server.server
+_server_stats :: proc(h: Server_Handle) -> Server_Stats {
+	e, ok := server_acquire(h)
+	if !ok {
+		return Server_Stats{}
+	}
+	defer server_leave(e)
+	server := (^http.Server)(e.server)
 	if server == nil {
 		return Server_Stats{}
 	}
@@ -383,8 +402,8 @@ _server_stats :: proc() -> Server_Stats {
 		write_deadline_aborts = sync.atomic_load(&server.write_deadline_aborts),
 		handler_dwell_ns      = sync.atomic_load(&server.handler_dwell_ns),
 	}
-	if g_server.streams != nil {
-		c := stream.counters(g_server.streams)
+	if e.streams != nil {
+		c := stream.counters(e.streams)
 		out.stream_refused_full = c.refused_stream_full
 		out.stream_refused_budget = c.refused_budget_full
 		out.stream_aborted_slow = c.aborted_slow
@@ -392,33 +411,63 @@ _server_stats :: proc() -> Server_Stats {
 	return out
 }
 
-// request_stop asks the running server to stop. Idempotent and thread-safe: the
-// backend's shutdown is an atomic flag plus an event-loop wake-up, and calling
-// it when no server is running is a no-op.
-request_stop :: proc() {
-	sync.lock(&g_server.mutex)
-	defer sync.unlock(&g_server.mutex)
-	// WP95 — signal the detached-stream registry BEFORE the backend drain, so
-	// admission stops and every live stream's owner lane is woken to flush
-	// its bounded queue and write the terminator. The backend's own
-	// `max_drain_time` then force-closes anything still open, and the
-	// per-connection teardown hook (WP92) releases those slots — so the
-	// stream lifecycle rides the ONE process drain deadline (spec §2), never
-	// a second clock. Admission of new large-body spools stops the same way:
-	// a drained registry refuses `open`, and a Handler that would start a
-	// spool sees the server closing.
-	if g_server.streams != nil {
-		stream.drain_begin(g_server.streams)
+// request_stop asks ONE named server to stop. Idempotent, thread-safe, and — the
+// property this rewrite exists for — ASYNC-SIGNAL-SAFE.
+//
+// WHY THAT MATTERS, AND WHY IT WAS NOT TRUE. `web.stop` is documented three
+// times over as the shape a signal handler needs, with a worked SIGTERM example
+// in `examples/09-graceful-shutdown` and a recipe in `docs/operations.md`. It
+// nonetheless took a mutex here, and then drove two more mutexes inside
+// `stream.drain_begin` and `ingest.admission_drain`. A SIGTERM delivered to a
+// thread that already held any of the three deadlocked the process ON THE STOP
+// PATH — the operator's drain became the hang it was meant to prevent, and the
+// window was widest exactly when the server was busiest, because `stream_push`
+// held that mutex for the whole of a send.
+//
+// What is left here is what a signal handler may do: atomic loads, a
+// compare-exchange, and a write to an eventfd. `http.server_shutdown` is that
+// and nothing more (patch 12 made it a single CAS plus `nbio.wake_up` per lane),
+// and the registry acquisition above it is three atomics.
+//
+// WP95's ORDERING IS PRESERVED AND IS NOW STRUCTURAL. The stream registry and
+// the upload admission must stop admitting BEFORE the backend drain, so every
+// live stream's owner lane is woken to flush its bounded queue and write the
+// terminator, and no new spool starts. That used to be this procedure's job, in
+// this order, by discipline. It is now `runtime_drain`, called by the backend at
+// the top of its own shutdown (patch 43) — on a lane, where taking a lock is
+// ordinary, and BEFORE the drain by construction rather than by whoever calls
+// `stop` remembering to do it first.
+request_stop :: proc(h: Server_Handle) {
+	e, ok := server_acquire(h)
+	if !ok {
+		return
 	}
+	defer server_leave(e)
+	if server := (^http.Server)(e.server); server != nil {
+		http.server_shutdown(server)
+	}
+}
+
+// runtime_drain stops framework-side admission for one server. The backend calls
+// it ONCE, on the first lane to observe `closing`, at the top of its own
+// shutdown — see `request_stop` for why it is not on the caller's thread.
+@(private)
+runtime_drain :: proc(user: rawptr) {
+	runtime := (^Server_Runtime)(user)
+	if runtime == nil {
+		return
+	}
+	// A drained registry refuses `open` and wakes every live stream's owner lane
+	// to flush and terminate; the backend's own `max_drain_time` then force-closes
+	// whatever is still open, and the per-connection teardown hook (WP92) releases
+	// those slots. So the stream lifecycle rides the ONE process drain deadline
+	// (spec §2), never a second clock.
+	stream.drain_begin(&runtime.streams)
 	// Phase 7.5-C2 — stop admitting new large-body spools once drain begins; the
 	// in-flight ones are owned by their request and cancelled at teardown or by
-	// the backend's own max_drain_time.
-	if g_server.admission != nil {
-		ingest.admission_drain(g_server.admission)
-	}
-	server := g_server.server
-	if server != nil {
-		http.server_shutdown(server)
+	// the backend's own max_drain_time. A no-op on a server without upload.
+	if runtime.config.upload_enabled {
+		ingest.admission_drain(&runtime.admission)
 	}
 }
 
@@ -1190,15 +1239,22 @@ copy_response_exhausted :: proc(out: ^Outbound) {
 	out.suppressed_body_len = 0
 }
 
-// stream_registry_current exposes the running server's stream registry, the
-// way `_refused_connections` exposes its admission total: through the one
-// ratified global, for callers with no request in hand. Today its only
-// consumers are the WP90 tests; the WP91 core wiring reaches the registry
-// through the exchange instead.
+// stream_registry_current exposes the SOLE running server's stream registry, for
+// callers with no request and no server in hand. Its only consumers are the
+// WP90/WP91/WP92/WP95 tests, which drive one server per process; the core wiring
+// reaches the registry through the exchange instead.
+//
+// It returns nil when no server runs AND when more than one does — see
+// `server_current`. A test that starts a second server and still calls this is
+// asking a question that has stopped having an answer, and gets nil rather than
+// an arbitrary one of the two.
 stream_registry_current :: proc() -> ^stream.Registry {
-	sync.lock(&g_server.mutex)
-	defer sync.unlock(&g_server.mutex)
-	return g_server.streams
+	e, ok := server_acquire(server_current())
+	if !ok {
+		return nil
+	}
+	defer server_leave(e)
+	return e.streams
 }
 
 // --- WP96: the public streaming boundary (plain integers, no stream type) ---
@@ -1219,19 +1275,39 @@ Push_Result :: enum {
 // stream_begin opens a detached stream bound to the dispatching request's
 // connection and returns its stale-safe identity as plain integers. Called on
 // the connection-owning lane, during dispatch.
-stream_begin :: proc(exchange: rawptr) -> (slot: i32, generation: u64, ok: bool) {
+//
+// WP123 — it returns the SERVER's handle alongside the stream's slot and
+// generation, and that is what makes the three procedures below per-server. A
+// token is only stale-safe against slot reuse WITHIN one registry; before this,
+// nothing in it said WHICH registry, so a `stream_send` in a two-server process
+// resolved against whichever server the single global slot last named.
+stream_begin :: proc(
+	exchange: rawptr,
+) -> (
+	server: Server_Handle,
+	slot: i32,
+	generation: u64,
+	ok: bool,
+) {
+	ex := (^Exchange)(exchange)
+	if ex == nil || ex.runtime == nil {
+		return SERVER_HANDLE_NONE, 0, 0, false
+	}
 	tok, opened := stream_open(exchange)
-	return tok.slot, tok.generation, opened
+	return ex.runtime.handle, tok.slot, tok.generation, opened
 }
 
 // stream_push enqueues bounded output from any thread. The registry is reached
-// through the one-server-per-process global under its mutex, so a concurrent
-// shutdown cannot free it mid-send (serve clears the pointer under the same
-// mutex before destroying the registry).
-stream_push :: proc(slot: i32, generation: u64, data: []u8) -> Push_Result {
-	sync.lock(&g_server.mutex)
-	defer sync.unlock(&g_server.mutex)
-	reg := g_server.streams
+// through the server handle the stream was opened on, and the entry is held for
+// the whole of the send — so a concurrent shutdown cannot free the registry
+// mid-send, because `server_retire` does not return until this call has left.
+stream_push :: proc(h: Server_Handle, slot: i32, generation: u64, data: []u8) -> Push_Result {
+	e, ok := server_acquire(h)
+	if !ok {
+		return .Closed
+	}
+	defer server_leave(e)
+	reg := e.streams
 	if reg == nil {
 		return .Closed
 	}
@@ -1246,27 +1322,31 @@ stream_push :: proc(slot: i32, generation: u64, data: []u8) -> Push_Result {
 	return .Closed
 }
 
-// stream_end closes a detached stream. Idempotent; a stale identity is a
-// safe no-op.
-stream_end :: proc(slot: i32, generation: u64) {
-	sync.lock(&g_server.mutex)
-	defer sync.unlock(&g_server.mutex)
-	reg := g_server.streams
-	if reg == nil {
+// stream_end closes a detached stream. Idempotent; a stale identity — of the
+// stream OR of its server — is a safe no-op.
+stream_end :: proc(h: Server_Handle, slot: i32, generation: u64) {
+	e, ok := server_acquire(h)
+	if !ok {
 		return
 	}
-	_ = stream.close(reg, stream.Token{slot = slot, generation = generation})
+	defer server_leave(e)
+	if e.streams == nil {
+		return
+	}
+	_ = stream.close(e.streams, stream.Token{slot = slot, generation = generation})
 }
 
 // stream_live reports whether the token still names an open, sendable stream —
 // the boundary wrapper for the public `web.stream_live` (corrective WP C4,
-// friction F8-5). No connection or registry means not live.
-stream_live :: proc(slot: i32, generation: u64) -> bool {
-	sync.lock(&g_server.mutex)
-	defer sync.unlock(&g_server.mutex)
-	reg := g_server.streams
-	if reg == nil {
+// friction F8-5). No server, no connection or no registry means not live.
+stream_live :: proc(h: Server_Handle, slot: i32, generation: u64) -> bool {
+	e, ok := server_acquire(h)
+	if !ok {
 		return false
 	}
-	return stream.is_live(reg, stream.Token{slot = slot, generation = generation})
+	defer server_leave(e)
+	if e.streams == nil {
+		return false
+	}
+	return stream.is_live(e.streams, stream.Token{slot = slot, generation = generation})
 }

@@ -75,6 +75,6 @@ four calls.
 
 ## What it costs
 
-Refusals are counted in `web.stats()`: `stream_refused_full`,
+Refusals are counted in `web.stats(&app)`: `stream_refused_full`,
 `stream_refused_budget` and `stream_aborted_slow`. Watch them — see
 [`observe-the-framework.md`](observe-the-framework.md).

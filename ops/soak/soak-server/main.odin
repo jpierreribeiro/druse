@@ -101,7 +101,7 @@ wait_40ms :: proc(ctx: ^web.Context) {
 }
 
 stats :: proc(ctx: ^web.Context) {
-	web.ok(ctx, web.stats())
+	web.ok(ctx, web.stats(&app))
 }
 
 // on_framework_event is the second half of the diagnostic path, and the half

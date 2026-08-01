@@ -5,8 +5,15 @@
 // process up?) and readiness (should traffic be routed here?). Druse's core
 // does neither for you — configuration is your `main`'s job, and the two probes
 // are ordinary handlers — but it gives you the pieces: `web.limits` takes the
-// values you loaded, and `web.is_draining` tells a readiness handler when a
-// shutdown has begun. (Signal wiring is the same shape as example 09.)
+// values you loaded, `web.is_draining` tells a readiness handler when a
+// shutdown has begun, and `web.stats` reports what this server actually sent.
+// (Signal wiring is the same shape as example 09.)
+//
+// EVERY ONE OF THOSE TAKES THE APP, and that is worth noticing rather than
+// skipping past. A process may run more than one server — an application
+// listener beside an admin or metrics listener is the ordinary case — and each
+// of these questions has a different answer for each of them. Passing the App
+// is what makes `/metrics` on this port report THIS port's traffic.
 //
 // Build and run it from the repository root:
 //
@@ -16,6 +23,7 @@
 //
 //	curl http://localhost:9000/health   # 200 while the process runs
 //	curl http://localhost:9000/ready    # 200 while serving, 503 once draining
+//	curl http://localhost:9000/metrics  # this server's write-side counters
 package main
 
 import "base:runtime"
@@ -74,6 +82,17 @@ main :: proc() {
 			return
 		}
 		web.text(ctx, .OK, "ready")
+	})
+
+	// The write-side counters, as ten integers your existing scraper differences.
+	// They are this App's server's own: `web.stats` reads the server THIS App
+	// started, so a second listener in the same process reports separately rather
+	// than both reporting whichever one happened to start last.
+	//
+	// Every field is an integer, which is what keeps this inside the redaction
+	// policy's permitted set — no request-derived byte can reach a scraper here.
+	web.get(&app, "/metrics", proc(ctx: ^web.Context) {
+		web.ok(ctx, web.stats(&app))
 	})
 
 	posix.signal(.SIGTERM, on_signal)

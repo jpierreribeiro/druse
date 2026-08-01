@@ -77,7 +77,13 @@ for DRUSE_F in $DRUSE_LIMIT_FIELDS; do
 done
 
 # --- 3. Metric coverage ------------------------------------------------------
-DRUSE_OBS="$(sed -n 's/^\([a-z_]\+\) :: proc().*$/\1/p' "$DRUSE_ROOT/web/observability.odin")"
+# WP123 — the two public counters now take the App whose server they describe,
+# so the extraction matches `proc(` rather than `proc()`. Pinning the empty
+# parameter list made this check silently unreadable the moment the arity
+# changed, and an extraction that comes back empty is a gate that has stopped
+# looking rather than a surface that has stopped existing — which is exactly
+# what the guard below is here to catch.
+DRUSE_OBS="$(sed -n 's/^\([a-z_]\+\) :: proc(.*$/\1/p' "$DRUSE_ROOT/web/observability.odin")"
 test -n "$DRUSE_OBS" ||
   fail "could not read the public observability surface from web/observability.odin"
 for DRUSE_O in $DRUSE_OBS; do

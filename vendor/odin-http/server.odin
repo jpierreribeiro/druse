@@ -253,6 +253,25 @@ Server :: struct {
 	// DRUSE PATCH 12 (WP70) — BRIDGE. The false-to-true transition also elects
 	// the single shutdown owner; repeated callers return before touching lanes.
 	closing:        Atomic(bool),
+	// DRUSE PATCH 43 (WP123) — THE SHUTDOWN HOOK, and it exists to make a
+	// documented signal-handler contract true.
+	//
+	// The framework has admission of its own to stop when a drain begins — the
+	// detached-stream registry and the large-body upload spooler — and WP95
+	// requires that to happen BEFORE the backend's own drain, so every live
+	// stream's owner lane is woken to flush and terminate inside the one process
+	// drain deadline. The framework used to do it in its own `stop`, on the
+	// caller's thread, taking two mutexes. But `stop` is documented as callable
+	// from a SIGTERM handler, and a mutex on that path deadlocks the process on
+	// exactly the stop it was supposed to perform.
+	//
+	// Called ONCE, by the first lane to observe `closing`, at the top of its own
+	// shutdown — so the ordering WP95 needs is structural rather than the
+	// caller's discipline, and the caller's thread is left doing nothing but a
+	// CAS and an eventfd write.
+	on_shutdown:      proc(user: rawptr),
+	on_shutdown_user: rawptr,
+	shutdown_hooked:  Atomic(bool),
 	// DRUSE PATCH 30 (Closure H-2 follow-up / F-C03-2) — set by a lane that
 	// could not acquire its io_uring event loop, so `serve` returns an error
 	// instead of the process terminating. See `_server_thread_init`.
@@ -611,6 +630,17 @@ server_shutdown :: proc(s: ^Server) {
 
 _server_thread_shutdown :: proc(s: ^Server, loc := #caller_location) {
 	assert_has_td(loc)
+
+	// DRUSE PATCH 43 (WP123) — BRIDGE. The framework's own admission stops HERE,
+	// before this lane touches a connection, and exactly once per server however
+	// many lanes reach this line together. See the field's declaration for why
+	// the caller's thread may not do this itself.
+	if s.on_shutdown != nil {
+		if _, elected := sync.atomic_compare_exchange_strong(&s.shutdown_hooked.raw, false, true);
+		   elected {
+			s.on_shutdown(s.on_shutdown_user)
+		}
+	}
 
 	td.state = .Closing
 	defer delete(td.conns)

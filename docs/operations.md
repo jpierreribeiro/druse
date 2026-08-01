@@ -102,7 +102,7 @@ coredumpctl gdb druse           # opens the last crash; `bt` shows the stack
 The faulting handler is on the stack — the request that killed the process,
 named precisely, with its call chain — which is more than "method + route" and
 does not risk deadlocking inside an async-signal context to get it. Pair it with
-the typed observer (`web.observe`) and `web.stats()` for the failures that do
+the typed observer (`web.observe`) and `web.stats(&app)` for the failures that do
 *not* abort (an uncommitted response is a logged 500, a busy lane is a counted
 503).
 
@@ -138,7 +138,7 @@ web.limits(&app, budget)
 **`max_write_time` at `0` does not mean sends are unbounded.** One of the two
 deadlines always covers a response send: with no write deadline configured,
 `max_request_time` bounds it instead, and the connection is **aborted** and
-counted in `web.stats().write_deadline_aborts`. This is deliberate (audit M4) —
+counted in `web.stats(&app).write_deadline_aborts`. This is deliberate (audit M4) —
 leaving a send unbounded is worse than bounding it with the only number you
 gave us. Before M4 the same thing happened by accident and was logged as
 `request read deadline exceeded`, about a request that had finished arriving
@@ -302,39 +302,39 @@ by arbitrary application code. The supervisor remains the outer bound.
 
 ## 5. One server per process
 
-**Two servers in one process is not supported.** Scale horizontally: one process
-per server, many processes.
+**More than one server in a process is supported** (WP123 / ADR-018), up to
+sixteen concurrent. Every server-wide accessor names the App whose server it is
+asking about — `web.stats(&app)`, `web.refused_connections(&app)`,
+`web.stop(&app)`, `web.is_draining(&app)` — so two listeners report and drain
+separately.
 
-**Why, precisely — because the reason has changed and the old one is still
-quoted in places.** It is no longer that a second server would cross-wire
-dispatch: the per-request configuration now travels with the server rather than
-in a package global, and has done since WP43. What remains is one process-wide
-slot holding the running server, and — the part that actually blocks the fix —
-**a frozen public contract**. `web.stats` and `web.refused_connections` take no
-server argument, so with two servers running they could not say which one they
-describe, and changing a frozen signature is not something this project does
-without paying G-09 in full.
+**Still scale horizontally for capacity.** One process per server, many
+processes, remains the deployment shape: a faulting handler aborts the process,
+so servers sharing one share a fate. Two listeners in one process is for a
+service that genuinely has two ports — an application port and an admin or
+metrics port — not for packing unrelated services together.
 
-`web.stop` is the exception that shows the shape of the fix: it takes the `App`
-by pointer already, precisely so that it would not need a new signature when
-this day came.
-
-ADR-018 is **accepted** and **WP123** owns the remaining work. Until it lands,
-run one server per process.
+*History, because the old advice is still quoted in places.* Two separate things
+made this unsupported. Per-request configuration stopped living in a package
+global in WP43, which ended the cross-wired dispatch. What remained until WP123
+was a single process-wide slot holding "the" running server: the counters, the
+stop and every `stream_send` resolved through it, so the second server to start
+silently answered for the first — and every number stayed individually
+plausible while it did.
 
 ---
 
 ## 6. What to monitor
 
 ```odin
-web.refused_connections()   // running total of admission refusals
-web.stats().saturation_refusals // acceptor refusals while every Handler lane is active
+web.refused_connections(&app)   // running total of admission refusals
+web.stats(&app).saturation_refusals // acceptor refusals while every Handler lane is active
 web.observe(&app, on_framework_error)
 web.use(&app, web.logger)
 web.use(&app, web.request_id)
 ```
 
-* **Lane utilization is your saturation signal — `web.stats().handler_dwell_ns`.**
+* **Lane utilization is your saturation signal — `web.stats(&app).handler_dwell_ns`.**
   A synchronous Handler holds its lane and cannot be preempted, and under
   dedicated accept a request arriving at a busy lane queues silently on that
   lane's socket — no 503, no counter, only latency. The old `lane_collisions`
@@ -355,7 +355,7 @@ web.use(&app, web.request_id)
   Capacity is `lanes ÷ mean handler dwell`. C-05 also showed that the first
   visible refusal is scheduler-dependent, so do not infer a fixed resource
   ordering from a single 503 or admission refusal.
-* **`web.stats().saturation_refusals` counts the acceptor boundary.** It rises
+* **`web.stats(&app).saturation_refusals` counts the acceptor boundary.** It rises
   when every Handler lane is active and a newly accepted socket is closed
   before an HTTP request is parsed. This is deliberately a transport refusal:
   the acceptor must not manufacture a 503 for a request it has never read.
@@ -545,7 +545,7 @@ the topology those limitations make mandatory:
   duration. Under dedicated accept, contention does not answer 503 itself: a
   request contending for a busy lane queues silently on that lane's socket.
   Saturation therefore appears as **rising lane utilization**, which you read
-  from `web.stats().handler_dwell_ns`: utilization approaching 1 means the lane
+  from `web.stats(&app).handler_dwell_ns`: utilization approaching 1 means the lane
   pool is saturated; when **every** lane is blocked the acceptor closes new
   sockets without writing HTTP and increments `saturation_refusals`. Capacity
   is roughly `lanes ÷ mean handler dwell`.

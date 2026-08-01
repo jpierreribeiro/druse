@@ -162,18 +162,23 @@ there by design.
 ### Observability
 
 ```text
-refused_connections() -> int    connections refused for admission, running total
-stats() -> Server_Stats         the write-side counters (Closure H-3)
+refused_connections(a: ^App) -> int  connections refused for admission, running total
+stats(a: ^App) -> Server_Stats      the write-side counters (Closure H-3)
 ```
 
-`web.refused_connections()` returns zero when no server is running and zero
-when nothing was refused — those are deliberately not distinguished. It carries no request data, which is why it
+**Both take the App whose server they describe** (WP123 / ADR-018). A process may
+run more than one server, and each of these has a different answer for each of
+them; before WP123 they read a process-wide slot and reported whichever server
+started last, to every caller, silently.
+
+`web.refused_connections(&app)` returns zero when this App is running no server
+and zero when nothing was refused — those are deliberately not distinguished. It carries no request data, which is why it
 exists at all: **the framework records the route pattern, the method, the
 status, the request ID and its own counts, and never a path, header, body or
 parameter.** Key your metrics on `web.route(ctx)`, never on
 `ctx.request.path`.
 
-`web.stats()` returns a `Server_Stats` — ten running totals for admission,
+`web.stats(&app)` returns a `Server_Stats` — ten running totals for admission,
 saturation and sending. `refused_connections` counts the `max_connections`
 budget; `saturation_refusals` counts sockets closed by the dedicated acceptor
 when every Handler lane is active, before any HTTP request is parsed. The
@@ -182,8 +187,8 @@ remaining fields are `responses_sent`,
 `handler_dwell_ns`, and the three detached-stream counters `stream_refused_full`,
 `stream_refused_budget`, `stream_aborted_slow` (previously reachable from no
 public API, so a slow-consumer abort was counted and then unseeable). Every
-field is an integer, so redaction holds by construction. Zero when no server
-runs, like `refused_connections`.
+field is an integer, so redaction holds by construction. Zero when this App runs
+no server, like `refused_connections`.
 
 **`handler_dwell_ns` is the framework's first saturation signal** (Campaign C).
 It replaced `lane_collisions`, which dedicated accept made misleading rather

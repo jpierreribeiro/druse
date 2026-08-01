@@ -1545,7 +1545,7 @@ or a body, and that property is what let this ship as observability at all.
 
 | Symbol | L | Owner | Compile evidence | Behavior evidence | Docs | Ownership |
 |---|---|---|---|---|---|---|
-| `refused_connections` | A | WP50 | `tests/wp50-public-surface/contract_test.odin::wp50_the_signature_is_pinned` | `tests/wp50-public-surface/contract_test.odin::wp50_with_no_server_the_count_is_zero` | `docs/ai-context.md::web.refused_connections` | reads one integer from the running server through the named `g_server` exception; owns nothing, allocates nothing |
+| `refused_connections` | A | WP50, amended by WP123 | `tests/wp50-public-surface/contract_test.odin::wp50_the_signature_is_pinned` | `tests/wp50-public-surface/contract_test.odin::wp50_with_no_server_the_count_is_zero`, `tests/wp123-two-servers/two_servers_test.odin::wp123_each_server_counts_only_its_own_responses` | `docs/ai-context.md::web.refused_connections` | reads one integer from the server THIS App started, through a generation-checked registry handle; the named `g_server` exception it used to read is gone (Amendment 44). Owns nothing, allocates nothing, takes no lock |
 
 ---
 
@@ -2162,7 +2162,7 @@ hands to whatever it already runs, the smallest thing that discharges the WP50
 
 | Symbol | Ledger | WP | Signature evidence | Behaviour evidence | Doc | Notes |
 |---|---|---|---|---|---|---|
-| `stats` | A | Closure-H3 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/h3-server-stats/server_stats_test.odin::h3_stats_count_real_responses_and_are_zero_without_a_server` | `docs/ai-context.md::web.stats` | eight running totals; zero when no server runs; reads under one lock so the snapshot is coherent |
+| `stats` | A | Closure-H3, amended by WP123 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/h3-server-stats/server_stats_test.odin::h3_stats_count_real_responses_and_are_zero_without_a_server`, `tests/wp123-two-servers/two_servers_test.odin::wp123_each_server_counts_only_its_own_responses` | `docs/ai-context.md::web.stats` | ten running totals; zero when THIS App runs no server; read inside one registry acquisition so the snapshot is coherent, and no lock is taken (Amendment 44) |
 | `Server_Stats` | A | Closure-H3 | `build/phase1-public-signatures.txt` (the frozen row) | `tests/h3-server-stats/server_stats_test.odin::h3_stats_count_real_responses_and_are_zero_without_a_server` | `docs/ai-context.md::Server_Stats` | a struct of eight integers; redaction by construction (no string field); joins buffered-send and stream counters |
 
 **Rollback.** Frozen ledger once shipped; the backend counters they read are
@@ -2972,3 +2972,131 @@ by the CPU-time ratio it is 5.45% against the control's 6.25%, essentially
 unchanged. It became dominant by attrition, which is what makes it the next
 target rather than a regression. `web/json_decode.odin` already solved the same
 problem inbound with a per-type descriptor table.
+
+## Amendment 44 — WP123 / ADR-018: `stats` and `refused_connections` take the App
+
+**Date: 2026-08-01. Authority: the owner, on ADR-018 (accepted 2026-07-31).
+Ledger effect: none; application remains 80 and test-support remains 2. THIS IS
+A BREAKING CHANGE — two frozen signatures gain an argument.**
+
+**What changed.**
+
+	refused_connections :: proc() -> int                (before)
+	refused_connections :: proc(a: ^App) -> int         (after)
+
+	stats :: proc() -> Server_Stats                     (before)
+	stats :: proc(a: ^App) -> Server_Stats              (after)
+
+Nothing else on the public surface moved. `stop` and `is_draining` already took
+the App — WP44 took it "for symmetry", precisely so this day would not need a
+third signature — and they now use it. `Stream` is unchanged in the frozen
+manifest: its `private: Stream_Handle` half is `@(private)` and not pinned, and
+widening it is what makes a send per-server.
+
+**Why, and it is not a naming preference.** The transport held ONE slot for the
+whole process: the running server's backend pointer, its detached-stream
+registry and its upload admission. Every question that had no request in hand
+resolved through it. With one server that is a correct answer. With two it is a
+SILENT wrong one — the second `serve` overwrote the first's pointers, and from
+then on `web.stats` reported the wrong server's traffic, `web.stop(&a)` drained
+`b`, and a `web.stream_send` on a token opened by `a` went looking in `b`'s
+registry and came back `Closed`. Every number stayed individually plausible
+throughout, which is the worst shape a defect can have: nothing anywhere says so.
+
+**Seven readers, not the four the plan expected.** Beyond `_refused_connections`,
+`_server_stats`, `request_stop` and `stream_registry_current`, the streaming
+surface — `stream_push`, `stream_end`, `stream_live` — reads the same slot. Those
+three are reached from `web.stream_send`/`stream_close`/`stream_live`, which take
+a `Stream` BY VALUE, from any thread, with neither a Context nor an App in hand.
+They are the reason the private half of `Stream` had to carry the server.
+
+**A global survives, and it is a different one.** The question was never lookup —
+a caller holding an `^App` could reach a pointer through it. It is LIFETIME. The
+runtime lives in `serve`'s stack frame; a pointer to it held by another thread is
+a use-after-free the moment `serve` returns. What makes that safe is a record
+that OUTLIVES every server and can answer "is the thing this handle names still
+alive?", which a per-server lock — dying with its server — cannot. So the global
+stopped being THE SERVER and became THE REGISTRY OF SERVERS: sixteen slots, each
+with a generation, in `web/internal/transport/server_registry.odin`. That is the
+same stale-safety idiom `web/internal/stream` has used for a detached stream
+since WP88, one layer down, for the same question.
+
+**`web.stop` was not async-signal-safe, and is documented three times as if it
+were.** It took a mutex, then drove two more inside `stream.drain_begin` and
+`ingest.admission_drain`. `examples/09-graceful-shutdown` wires it to SIGTERM and
+`docs/operations.md` gives the recipe. A signal delivered to a thread already
+holding any of the three deadlocked the process ON THE STOP PATH, and the window
+was widest when the server was busiest, because `stream_push` held one for the
+whole of a send. It is fixed here rather than deferred, because this work package
+is what makes the claim testable: `request_stop` is now three atomics and
+`http.server_shutdown` (a CAS plus an eventfd write per lane), and the two drains
+moved to `runtime_drain`, which the backend calls at the top of its own shutdown
+— vendor patch 43. WP95's ordering requirement ("stop framework admission BEFORE
+the backend drain") is thereby structural rather than the caller's discipline.
+
+**`Framework_Error` did not grow, and that is a stated imprecision rather than an
+omission.** A seventeenth concurrent server in one process fails as
+`Serve_Listen_Failed`, though nothing was wrong with the port and no socket was
+touched. The neutral boundary keeps `Too_Many_Servers` distinct for whoever
+raises the cap; growing a frozen public enum for a condition that needs sixteen
+live servers to reach was not worth an amendment to a second contract.
+
+**Two evidence rows in this document were FALSE and are rewritten** (the
+`refused_connections` row and the `stats` row above): one cited "the named
+`g_server` exception", which no longer exists, and both described a lock that is
+no longer taken.
+
+**A control found a suite that was green for the wrong reason.** With the
+registry drain removed entirely, `tests/wp95-drain` stayed FULLY GREEN: its only
+timing assertion was `elapsed < 5s` against a 2 s deadline, which the backend's
+own force-close satisfies. The graceful drain it claimed to prove was never
+exercised. It now asserts the drain finishes INSIDE the deadline (measured: under
+1 s with the hook, 2.597 s without), which is the control for vendor patch 43.
+
+**A second false-green, in the test harness.** `tests/support/web_blocking_lab`'s
+`Start` probed `/health` until it answered 200 — and when another server in the
+process already held the port, `web.serve` returned `Serve_Listen_Failed` at once
+and the probe was answered by the incumbent. `Start` reported success. Measured
+while writing the new suite: four parallel tests all "started" on one port, one
+server answered for all four, and the counters were plausible throughout. `Start`
+now treats a `serve` that returned before readiness as the failure it is.
+
+**Call sites migrated:** 17 — `ops/soak/soak-server/main.odin` (not covered by
+any gate, so it would have broken in silence until the next campaign),
+`tests/wp50-public-surface` (including the signature pin, which is an
+assignment), `tests/h3-server-stats`, `tests/wp90-deadlines`,
+`tests/c05-saturation`, `tests/c03-fault-campaign`, and eleven internal-boundary
+callers of `transport.request_stop`. `examples/10-config-and-health` gains a
+`/metrics` handler, which is item 3 of G-09.
+
+**Gates changed.** `build/check_public_api.sh` §8d drops the `g_server` carve-out
+and gains a second rule for the registry file; its pattern now matches CAPITALS,
+which it never did — `STREAM_CRLF` and `STREAM_TERMINATOR` were invisible to a
+check that reported "no package-level variables" about a file with two.
+`build/check_test.sh` had its serialisation requirement INVERTED: it demanded
+`tests/wp58-drain` run with `ODIN_TEST_THREADS=1` because a sibling's `stop`
+killed the server under test (measured then: 3 failures in 15 parallel runs).
+Re-measured after this change: 15 parallel runs, 15 green. Running it parallel is
+now the control, and serialising it again fails the gate.
+`build/check_docs.sh` no longer requires the single-server constraint in
+`docs/canonical-patterns.md`; it requires the multi-server contract AND its
+bound, because "supported" with no ceiling stated reads as unlimited.
+`build/check_wp123_controls.sh` is new: it collapses the registry to one slot in
+a copy of the tree and requires `tests/wp123-two-servers` to go red, disarms
+patch 43 and requires `tests/wp95-drain` to go red on the force-close assertion,
+and refuses a `request_stop` that takes a lock.
+
+**What this does NOT promise.** Not parallelism across the suite. Nine of the
+thirteen server-driving suites keep a test-local `g_server` of their own, and six
+are serial for a second reason this work package does not touch: shared
+`CANDIDATE_PORTS` lists, with no port allocator in the repository. `wp58-drain`
+was measured and moved; the rest were not, and are not claimed.
+
+**Rollback.** Restore the two zero-argument signatures and the frozen rows;
+replace the registry with a single `Server_Global` and its mutex; revert the
+seven readers, the `Stream_Handle` field and the `on_server` callback; remove
+vendor patch 43 and its ledger row; restore `build/check_public_api.sh` §8d's
+`g_server` carve-out, `build/check_test.sh`'s serialisation requirement and
+`build/check_docs.sh`'s single-server assertion. `tests/wp123-two-servers` and
+the force-close assertion in `tests/wp95-drain` must be deleted with it: neither
+can pass against a one-slot implementation, which is the point of both.

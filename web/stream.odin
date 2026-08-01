@@ -29,8 +29,20 @@ Stream :: struct {
 	private: Stream_Handle,
 }
 
+// WP123 — the handle carries the SERVER as well as the stream.
+//
+// `Stream_Handle` is `@(private)`: it is not in the frozen manifest, which pins
+// only the public shape `Stream :: struct {private: Stream_Handle}`. Widening it
+// therefore changes nothing an application can name — and it is what makes a
+// send per-server. A `(slot, generation)` pair is stale-safe against slot reuse
+// WITHIN one registry; it never said which registry, so before this a
+// `stream_send` in a two-server process resolved against whichever server the
+// transport's single global slot happened to name. That is the same silent
+// cross-wire ADR-018 removes everywhere else, on the one surface that reaches it
+// from any thread with neither a Context nor an App in hand.
 @(private)
 Stream_Handle :: struct {
+	server:     transport.Server_Handle,
 	slot:       i32,
 	generation: u64,
 	live:       bool, // false for the zero value / a failed open
@@ -95,7 +107,7 @@ stream :: proc(ctx: ^Context, content_type := "") -> (s: Stream, ok: bool) {
 	if ctx.private.response.committed {
 		return Stream{}, false
 	}
-	slot, generation, opened := transport.stream_begin(ctx.private.stream_exchange)
+	server, slot, generation, opened := transport.stream_begin(ctx.private.stream_exchange)
 	if !opened {
 		return Stream{}, false
 	}
@@ -110,7 +122,15 @@ stream :: proc(ctx: ^Context, content_type := "") -> (s: Stream, ok: bool) {
 	// caller is unchanged and a proxy-only stream carries no media type.
 	response_commit(&ctx.private.response, .OK, response_stream_headers(ctx, content_type), nil)
 	ctx.private.stream_detached = true
-	return Stream{private = Stream_Handle{slot = slot, generation = generation, live = true}}, true
+	return Stream {
+			private = Stream_Handle {
+				server = server,
+				slot = slot,
+				generation = generation,
+				live = true,
+			},
+		},
+		true
 }
 
 // stream_send enqueues bounded output. Callable from any thread — a Handler
@@ -121,7 +141,7 @@ stream_send :: proc(s: Stream, data: []u8) -> Stream_Send {
 	if !s.private.live {
 		return .Closed
 	}
-	switch transport.stream_push(s.private.slot, s.private.generation, data) {
+	switch transport.stream_push(s.private.server, s.private.slot, s.private.generation, data) {
 	case .Sent:
 		return .Sent
 	case .Full:
@@ -139,7 +159,7 @@ stream_close :: proc(s: Stream) {
 	if !s.private.live {
 		return
 	}
-	transport.stream_end(s.private.slot, s.private.generation)
+	transport.stream_end(s.private.server, s.private.slot, s.private.generation)
 }
 
 // stream_live reports whether this stream is still open and would accept a send
@@ -156,7 +176,7 @@ stream_live :: proc(s: Stream) -> bool {
 	if !s.private.live {
 		return false
 	}
-	return transport.stream_live(s.private.slot, s.private.generation)
+	return transport.stream_live(s.private.server, s.private.slot, s.private.generation)
 }
 
 // response_stream_headers finishes the framework-owned trailing headers for a

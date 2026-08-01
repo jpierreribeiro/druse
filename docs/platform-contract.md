@@ -10,7 +10,7 @@ adapter/operations boundary, not in the public API.
 
 ```text
 - Linux x86-64 (the only platform the gate validates)
-- POSIX process model, one server per process
+- POSIX process model; up to sixteen concurrent servers per process (ADR-018)
 - monotonic clock for all deadlines (request arrival, drain)
 - supervisor-managed recovery (a faulting handler aborts the process; ADR-020)
 - reverse-proxy-managed TLS, compression and edge rate limiting
