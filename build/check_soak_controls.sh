@@ -46,15 +46,31 @@ command -v go >/dev/null 2>&1 || fail "go is required to build the load generato
 # argument and this file was the one call site no check would have caught.
 #
 # A compile, not a run: the run is the campaign, and the campaign is not a gate.
+# THE FOUR-BRANCH CHAIN, and it is copied from the other control scripts rather
+# than shortened. The first edition of this block checked `DRUSE_COMPILER` and
+# then `PATH`, which is what a workstation has — and CI has NEITHER: it exports
+# `DRUSE_ODIN_BIN` and never puts odin on the path. So the gate that was added to
+# stop a silent break went red on its own first CI run, with "odin compiler not
+# found" about a compiler that was right there under another name.
 if test -n "${DRUSE_COMPILER:-}"; then
   DRUSE_SOAK_ODIN="$DRUSE_COMPILER"
+elif test -n "${DRUSE_ODIN_BIN:-}"; then
+  DRUSE_SOAK_ODIN="$DRUSE_ODIN_BIN"
 elif command -v odin >/dev/null 2>&1; then
   DRUSE_SOAK_ODIN="$(command -v odin)"
+elif test -x /tmp/druse-toolchain/odin; then
+  DRUSE_SOAK_ODIN=/tmp/druse-toolchain/odin
 else
   DRUSE_SOAK_ODIN=""
 fi
 test -n "$DRUSE_SOAK_ODIN" || fail "odin compiler not found; the soak server would go unchecked"
-env ODIN_ROOT="$(cd "$(dirname "$(readlink -f "$DRUSE_SOAK_ODIN")")" && pwd)" \
+# Resolve the symlink before taking its directory: ODIN_ROOT must be where the
+# compiler LIVES, not where the name that reached it lives. A ~/.local/bin/odin
+# pointing into an unpacked toolchain is the ordinary install, and the dirname of
+# the link has no base/ — which surfaces as an Internal Compiler Error reported
+# as a build failure. Same fault as vendor gate wp24 carried.
+DRUSE_SOAK_ODIN="$(readlink -f "$DRUSE_SOAK_ODIN")"
+env ODIN_ROOT="$(cd "$(dirname "$DRUSE_SOAK_ODIN")" && pwd)" \
   "$DRUSE_SOAK_ODIN" check "$SOAK/soak-server" "-collection:druse=$DRUSE_ROOT" ||
   fail "ops/soak/soak-server does not compile. It is the instrument that produces release evidence and it is in no other gate, so a break here is invisible until a campaign starts."
 echo "PASS (soak): the soak server compiles against the current public surface"
