@@ -5,6 +5,7 @@
 package web
 // druse:file application
 
+import transport "druse:web/internal/transport"
 import testing "druse:web/testing"
 
 // App owns the application's resources.
@@ -85,6 +86,26 @@ App_Internal :: struct {
 	// No route or policy storage is mutated once `serving` becomes non-zero.
 	dispatched: u32,
 	serving:    u32,
+	// WP123 / ADR-018 — the handle of the server THIS App is running, or
+	// `SERVER_HANDLE_NONE` when it is not running one.
+	//
+	// It is what replaces the transport's single `g_server` slot for every
+	// question that used to be process-wide: `stop`, `stats`,
+	// `refused_connections`, and — through the `Stream` token — every send on a
+	// detached response. A process may now run two servers without the second
+	// one silently answering for the first.
+	//
+	// A handle rather than a pointer, and that is not a detail: the runtime it
+	// names lives in `serve`'s stack frame, so a pointer held by another thread
+	// would be a use-after-free the moment `serve` returned. The handle carries a
+	// generation, so a stale one names nothing and every operation on it is the
+	// documented no-op. It is also ONE machine word, because `stop` is documented
+	// as callable from a signal handler and must read it with a single atomic
+	// load — which a multi-field struct could not offer.
+	//
+	// Written only by the transport's `on_server` callback, from inside `serve`;
+	// read atomically from any thread.
+	server:     transport.Server_Handle,
 	// WP-6.5.3 — `draining` is set once, by `stop`, and read by `is_draining`.
 	// It is the framework's own copy of "a stop was requested", kept so a
 	// readiness handler can answer the orchestrator without reaching into the

@@ -281,10 +281,22 @@ grep -qiE 'strings\.Builder' "$DRUSE_OWNERSHIP" ||
   fail "docs/canonical-patterns.md does not give the strings.Builder analogy for App/Router copying (audit R-3)"
 grep -qiE 'zero value is not a usable App|zero value.*not.*usable' "$DRUSE_OWNERSHIP" ||
   fail "docs/canonical-patterns.md does not state the zero-value App contract (audit R-4)"
-# R-10: exactly one server per process, and no stop until Phase 4.
-grep -qiE 'one server per process|Exactly one server' "$DRUSE_OWNERSHIP" ||
-  fail "docs/canonical-patterns.md does not state the single-server constraint (audit R-10)"
-echo "docs: the ownership table is present with all four questions; R-3, R-4 and R-10 are stated"
+# R-10: the multi-server contract, REPLACING the single-server constraint this
+# check used to require (WP123 / ADR-018).
+#
+# The old assertion — that the document says "one server per process" — has to
+# go, because it stopped being true and a gate pinning a false claim is worse
+# than no gate: it makes the codebase defend the wrong thing. It is replaced
+# rather than deleted, and by a STRICTLY MORE demanding pair. A reader of this
+# document now has to be told two things, and the second is the one that would
+# quietly rot: that more than one server is supported, and that the support is
+# BOUNDED. "Supported" with no ceiling stated reads as unlimited, and the
+# seventeenth `serve` in a process returns without binding.
+grep -qiE 'more than one server|two servers in one process|multiple servers' "$DRUSE_OWNERSHIP" ||
+  fail "docs/canonical-patterns.md does not state the multi-server contract (audit R-10 / ADR-018). WP123 made two servers in one process supported; the document has to say so, because the previous edition said the opposite."
+grep -qiE 'sixteen concurrent servers|at most sixteen' "$DRUSE_OWNERSHIP" ||
+  fail "docs/canonical-patterns.md states that more than one server is supported without stating the BOUND (audit R-10). 'Supported' with no ceiling reads as unlimited; SERVER_TABLE_CAP is 16 and the seventeenth serve returns without binding."
+echo "docs: the ownership table is present with all four questions; R-3, R-4 and the R-10 multi-server bound are stated"
 
 # 6c. The Quick Start must be real, not the WP10 placeholder.
 grep -qiE '^> Placeholder' "$DRUSE_DOCS/quick-start.md" &&

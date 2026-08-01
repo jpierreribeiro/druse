@@ -51,9 +51,12 @@ returned without answering and the standardized 500 went out.
 ## Pull: counters
 
 ```odin
-stats :: proc() -> Server_Stats
-refused_connections :: proc() -> int
+stats :: proc(a: ^App) -> Server_Stats
+refused_connections :: proc(a: ^App) -> int
 ```
+
+Both name the App whose server they describe, so a process running two listeners
+reports on each separately rather than on whichever started last.
 
 `Server_Stats` carries `refused_connections`, `saturation_refusals`, `responses_sent`,
 `response_bytes`, `send_errors`, `write_deadline_aborts`, `handler_dwell_ns`,

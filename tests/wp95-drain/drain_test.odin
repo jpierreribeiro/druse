@@ -104,11 +104,37 @@ wp95_open_streams_terminate_within_the_drain_deadline :: proc(t: ^testing.T) {
 	// Now drain. The deadline is 2s; `serve` must return well inside a
 	// generous ceiling, and every stream slot must be released.
 	began := time.tick_now()
-	transport.request_stop()
+	transport.request_stop(transport.server_current())
 	returned := sync.sema_wait_with_timeout(&lab.serve_done, 6 * time.Second)
 	elapsed := time.tick_since(began)
 	testing.expect(t, returned, "serve must return after drain")
 	testing.expect(t, elapsed < 5 * time.Second, "drain must complete within a bound tied to max_drain_time, not hang")
+
+	// WP123 — THE ASSERTION THAT NAMES THE MECHANISM, and it was missing.
+	//
+	// The bound above is satisfied by the WRONG implementation. If the framework
+	// never signals the stream registry at all, the backend's own
+	// `max_drain_time` force-closes every open stream at 2 s and `serve` returns
+	// comfortably inside 5 s — green, with the graceful path unexercised.
+	// MEASURED: with the drain call removed this suite stayed fully green.
+	//
+	// `stream.drain_begin` is what makes the drain GRACEFUL — it wakes every
+	// owner lane to flush its queue and write the terminator — and the observable
+	// difference is that the drain finishes PROMPTLY instead of at the deadline.
+	// So the assertion is a ceiling well below `max_drain_time`, which only the
+	// woken path can meet.
+	//
+	// It is also the control for vendor patch 43: the registry drain now runs
+	// from the backend's own shutdown rather than from the caller's thread, which
+	// is what makes `web.stop` async-signal-safe. If that hook stops firing, this
+	// is the line that says so.
+	testing.expectf(
+		t,
+		elapsed < time.Second,
+		"the drain took %v, at or past the %v deadline: the streams were FORCE-CLOSED when the deadline expired rather than woken to terminate. The registry drain (stream.drain_begin, run from the backend shutdown hook) did not fire.",
+		elapsed,
+		2 * time.Second,
+	)
 
 	for i in 0 ..< STREAMS {net.close(socks[i])}
 	thread.join(lab.thread)

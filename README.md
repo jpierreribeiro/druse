@@ -99,10 +99,6 @@ toolchain version is part of the contract and is recorded in
 Stated plainly, because a framework that hides its edges wastes your time:
 
 - **TLS.** Druse does not terminate TLS and will not. Put it behind a proxy.
-- **One server per process.** `web.stats()` and `web.refused_connections()` take
-  no server argument, so a second server in the same process would make them
-  ambiguous — and those signatures are frozen. ADR-018 is accepted and WP123
-  owns the fix.
 - **Recoverable panic.** Odin has none, so a faulting handler aborts the
   process. A supervisor is mandatory, not a nicety. Read
   [`docs/operations.md`](docs/operations.md) before deploying.

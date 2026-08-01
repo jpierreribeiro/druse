@@ -232,9 +232,9 @@ wp90_a_stalled_write_is_aborted_at_the_deadline :: proc(t: ^testing.T) {
 	defer stop(&s)
 
 	// Stall past deadline (300ms) + sweep granularity (250ms) + margin.
-	aborts_before := web.stats().write_deadline_aborts
+	aborts_before := web.stats(&s.app).write_deadline_aborts
 	terminated, acted_in, total := stalled_read(51910, 900 * time.Millisecond, 3 * time.Second)
-	aborts_after := web.stats().write_deadline_aborts
+	aborts_after := web.stats(&s.app).write_deadline_aborts
 
 	// THE DIRECT EVIDENCE, asserted first because it is the one that names the
 	// mechanism. The client-side observations below say the connection ended
@@ -246,7 +246,7 @@ wp90_a_stalled_write_is_aborted_at_the_deadline :: proc(t: ^testing.T) {
 	testing.expectf(
 		t,
 		aborts_after > aborts_before,
-		"web.stats().write_deadline_aborts did not move (%d -> %d): the stalled send was never aborted by the deadline. If the client received the whole body, STALL_BYTES no longer exceeds this host's socket buffer pair and the send never stalled at all.",
+		"web.stats(&s.app).write_deadline_aborts did not move (%d -> %d): the stalled send was never aborted by the deadline. If the client received the whole body, STALL_BYTES no longer exceeds this host's socket buffer pair and the send never stalled at all.",
 		aborts_before,
 		aborts_after,
 	)
@@ -378,9 +378,9 @@ wp90_a_stalled_send_without_a_write_deadline_is_a_write_abort :: proc(t: ^testin
 	testing.expect(t, start(&s, 51919, limits), "server must start")
 	defer stop(&s)
 
-	before := web.stats().write_deadline_aborts
+	before := web.stats(&s.app).write_deadline_aborts
 	_, _, total := stalled_read(51919, 2500 * time.Millisecond, 4 * time.Second)
-	after := web.stats().write_deadline_aborts
+	after := web.stats(&s.app).write_deadline_aborts
 
 	testing.expectf(
 		t,

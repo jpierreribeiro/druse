@@ -10,6 +10,7 @@ package web
 // druse:file application
 
 import "core:mem"
+import "core:sync"
 import transport "druse:web/internal/transport"
 
 // serve runs the application's HTTP server on the given port and blocks until
@@ -64,6 +65,7 @@ serve :: proc(a: ^App, port: int) {
 		max_handlers     = a.private.limits.max_handlers,
 		dispatch         = serve_dispatch,
 		user             = a,
+		on_server        = serve_publish_handle,
 	}
 	// Phase 7.5-C2: resolve the App's upload opt-in into transport primitives.
 	// max_concurrent defaults to handler-lanes − 1 (§4.2), floor 1, resolved here
@@ -80,10 +82,33 @@ serve :: proc(a: ^App, port: int) {
 			cfg.upload_max_conc = max(1, lanes - 1)
 		}
 	}
+	// WP123 — `Too_Many_Servers` reports through `Serve_Listen_Failed` too, and
+	// that is a KNOWN IMPRECISION rather than an oversight. `Framework_Error` is
+	// frozen by the Phase-1 contract, so naming the new fault would need an
+	// amendment to a public enum for a condition that requires seventeen
+	// concurrent servers in one process to reach. What the operator observes is
+	// identical either way — nothing is listening on that port — and the neutral
+	// boundary keeps the two distinct for whoever raises the cap.
 	if err := transport.serve(cfg); err != .None {
 		framework_report(App, .Serve_Listen_Failed)
 		framework_observe_app(App, a, .Serve_Listen_Failed)
 	}
+}
+
+// serve_publish_handle records which server this App is running.
+//
+// The transport calls it once with a live handle before the listen and once with
+// `SERVER_HANDLE_NONE` when `serve` returns, so `stop`, `stats` and
+// `refused_connections` name a server for exactly as long as one is running. The
+// store is atomic because `stop` may read it from a signal handler on another
+// thread — the one property that decided the handle would be a single word.
+@(private)
+serve_publish_handle :: proc(user: rawptr, h: transport.Server_Handle) {
+	a := (^App)(user)
+	if a == nil {
+		return
+	}
+	sync.atomic_store(&a.private.server, h)
 }
 
 // serve_dispatch is the bridge the transport calls per request. It builds a

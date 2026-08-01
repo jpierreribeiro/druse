@@ -140,7 +140,7 @@ http_start :: proc(user: rawptr) -> bool {
 			return true
 		}
 
-		transport.request_stop()
+		transport.request_stop(transport.server_current())
 		thread.join(state.thread)
 		thread.destroy(state.thread)
 		state.thread = nil
@@ -204,7 +204,7 @@ http_stop :: proc(user: rawptr) {
 	if state.thread == nil {
 		return
 	}
-	transport.request_stop()
+	transport.request_stop(transport.server_current())
 	thread.join(state.thread)
 	thread.destroy(state.thread)
 	state.thread = nil

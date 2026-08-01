@@ -9,7 +9,7 @@
 // SERVER IS RUNNING — AND UNDER THE PARALLEL RUNNER ONE IS.
 //
 // `web.stop` sets its App's drain bit and then calls
-// `transport.request_stop()`, which shuts down the process-global server
+// `transport.request_stop(transport.server_current())`, which shuts down the process-global server
 // without consulting the App it was handed. So the two `stop` calls below are
 // a no-op only while this test has the process to itself. Run in parallel with
 // `wp58_drain_anatomy`, they shut down the server that test is measuring, and

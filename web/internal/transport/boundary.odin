@@ -152,6 +152,15 @@ Config :: struct {
 	dispatch:         Dispatch_Proc,
 	user:             rawptr,
 	on_ready:         proc(user: rawptr),
+	// WP123 — how the caller learns WHICH server it just started. Called once
+	// with a live handle before the listen, and once with `SERVER_HANDLE_NONE`
+	// when `serve` returns, on the same `user` pointer `on_ready` travels on.
+	//
+	// It exists because every process-wide question this boundary answers —
+	// stop, the counters, a stream send — used to resolve against "the" server
+	// and now resolves against a named one. The core stores the handle on its
+	// App; the boundary never learns that such a thing exists.
+	on_server:        proc(user: rawptr, h: Server_Handle),
 }
 
 // refused_connections reports how many connections this process refused for
@@ -163,8 +172,8 @@ Config :: struct {
 //
 // It is a plain integer and carries no request-derived byte, which is what puts
 // it inside §3.1's permitted set.
-refused_connections :: proc() -> int {
-	return _refused_connections()
+refused_connections :: proc(h: Server_Handle) -> int {
+	return _refused_connections(h)
 }
 
 // Server_Stats is the neutral write-side accounting the public `web.Server_Stats`
@@ -196,8 +205,8 @@ Server_Stats :: struct {
 
 // server_stats reads the running server's write-side counters, or the zero
 // value when no server is running — the same rule as `refused_connections`.
-server_stats :: proc() -> Server_Stats {
-	return _server_stats()
+server_stats :: proc(h: Server_Handle) -> Server_Stats {
+	return _server_stats(h)
 }
 
 // Serve_Error is the neutral outcome of a serve attempt.
@@ -205,6 +214,12 @@ Serve_Error :: enum {
 	None,
 	Invalid_Port,
 	Listen_Failed,
+	// WP123 — more than `SERVER_TABLE_CAP` servers were asked to run at once in
+	// this process. Named separately from `Listen_Failed` because it is a
+	// different fault with a different fix: nothing was wrong with the port, and
+	// no socket was touched. The core currently reports both through the frozen
+	// `Serve_Listen_Failed` event (see the note at its mapping in `web/serve.odin`).
+	Too_Many_Servers,
 }
 
 // `serve`, `request_stop` and `copy_response` are implemented in

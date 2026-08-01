@@ -136,17 +136,38 @@ The **zero value is not a usable App.** `app := web.App{}` gives you no default
 responses and no initialised storage; `web.app()` and `web.bare()` are the two
 constructors, and there are no others.
 
-## Exactly one server per process
+## More than one server in a process
 
-Running two servers in one process is **not supported**. One process, one
-`web.serve`.
+Supported since WP123 (ADR-018). Each `web.serve` runs its own App, and every
+server-wide question is asked OF an App:
 
-The reason is the public contract, not a cross-wire. `web.stats` and
-`web.refused_connections` take no server argument and so could not say which
-server they describe; those signatures are frozen. (The per-request
-configuration stopped living in a package global in WP43, so the older
-"they cross-wire dispatch" wording is out of date wherever you still find it.)
-ADR-018 is accepted and WP123 owns the fix.
+<!-- pseudocode: every server-wide accessor names the App whose server it describes -->
+```odin
+web.serve(&api, 8080)              // on one thread
+web.serve(&admin, 9090)            // on another
+
+web.stats(&api).responses_sent     // this listener's traffic
+web.stats(&admin).responses_sent   // that listener's, separately
+web.stop(&admin)                   // drains the admin listener; the API keeps serving
+```
+
+**One process still runs at most sixteen concurrent servers**, which is a bound
+on a topology rather than on a workload: a seventeenth `serve` returns without
+binding. The ordinary case is two.
+
+**Prefer separate processes anyway when the servers are independent.** A shared
+process shares a fate — a faulting handler on either one aborts both, because
+Odin has no recoverable panic. Two listeners in one process is for the case where
+they are genuinely one service (an application port and its admin or metrics
+port), not for packing unrelated services together.
+
+*History, because the old wording is still quoted in places.* Two things once
+made this unsupported, and they were fixed one at a time. Per-request
+configuration stopped living in a package global in WP43, which ended the
+cross-wired dispatch. What remained until WP123 was a single process-wide slot
+holding "the" running server: `stop`, `stats`, `refused_connections` and every
+`stream_send` resolved through it, so the second server to start silently
+answered for the first.
 
 **There is a stop procedure**: `web.stop(&app)` begins a graceful drain, safe to
 call from a signal handler, and `web.is_draining(&app)` reports it for a

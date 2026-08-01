@@ -149,7 +149,7 @@ wp92_a_slow_consumer_does_not_stall_a_fast_one :: proc(t: ^testing.T) {
 	lab.thread = thread.create_and_start_with_poly_data(&lab, serve_thread)
 	testing.expect(t, sync.sema_wait_with_timeout(&lab.ready, 5 * time.Second), "transport must start")
 	defer {
-		transport.request_stop()
+		transport.request_stop(transport.server_current())
 		_ = sync.sema_wait_with_timeout(&lab.serve_done, 10 * time.Second)
 		thread.join(lab.thread)
 		thread.destroy(lab.thread)

@@ -58,7 +58,7 @@ Give every event an id if you want this to work.
 ## What it costs
 
 Each open stream holds a connection and a lane for as long as it lives. They
-are bounded, and refusals are counted in `web.stats()` —
+are bounded, and refusals are counted in `web.stats(&app)` —
 `stream_refused_full`, `stream_refused_budget`, `stream_aborted_slow`.
 
 Watch those counters. Long-lived connections are how a server runs out of

@@ -995,39 +995,71 @@ fi
 echo "public API contract: all $DRUSE_APP_INTERNAL_LITERALS App constructors initialise Limits to DEFAULT_LIMITS"
 
 # ---------------------------------------------------------------------------
-# 8d. WP43 — THE ADAPTER'S PER-REQUEST STATE IS NOT A PACKAGE GLOBAL.
+# 8d. WP43/WP123 — THE TRANSPORT'S PROCESS-WIDE STATE, BY NAME AND BY FILE.
 #
-# `web.serve` used to write its `Config` into a package variable that the
-# backend handler read on every request. With one server per process that is
-# fine; with two it is a SILENT CROSS-WIRE — the second `serve` overwrites the
-# first's dispatch pointer and requests to one application run the other's.
-# Nothing diagnoses it, because from each server's own point of view nothing is
-# wrong. That is the worst shape a defect can have.
+# `web.serve` once wrote its `Config` into a package variable that the backend
+# handler read on every request. With one server per process that is fine; with
+# two it is a SILENT CROSS-WIRE — the second `serve` overwrites the first's
+# dispatch pointer and requests to one application run the other's. Nothing
+# diagnoses it, because from each server's own point of view nothing is wrong.
+# That is the worst shape a defect can have.
 #
 # WP43 moved the config into per-server state reached through the backend
-# handler's own `user_data`. This check keeps it there: any package-level
-# variable in the adapter that is written per REQUEST rather than per SERVER
-# fails here.
+# handler's own `user_data`, and carved out ONE exception by name: `g_server`,
+# a single slot holding the running server. WP123 removed that slot — the
+# process-wide record is now a table of live servers keyed by a stale-safe
+# handle — so the exception is gone and the shape of this check changes with it.
 #
-# `g_server` is deliberately still permitted and is the ONE exception, named
-# rather than pattern-matched: `request_stop` asks a process-wide question
-# ("stop the running server") that only WP44's public surface can answer
-# properly. Naming it means a SECOND such global cannot arrive quietly.
+# TWO FILES, TWO DIFFERENT RULES, and the split is the point:
+#
+#   * the ADAPTER may declare NO package variable that is per-request state.
+#     The two it does declare are `STREAM_CRLF` and `STREAM_TERMINATOR`, byte
+#     literals Odin cannot express as `::` constants — they are written once at
+#     init and never again, and they are named here rather than pattern-matched
+#     so a third cannot arrive quietly beside them.
+#
+#   * the REGISTRY file may declare exactly `g_servers`, and that file exists so
+#     the process-wide record lives somewhere whose whole subject is being
+#     process-wide, instead of hiding among per-request machinery.
+#
+# THE PATTERN NOW MATCHES CAPITALS. It used to anchor on `^[a-z_]`, so
+# `STREAM_CRLF` and `STREAM_TERMINATOR` were invisible to it: the check reported
+# "no package-level variables" about a file with two, and the message promised
+# more than the check delivered. Screaming case is the convention for a constant,
+# not a guarantee of one — a mutable global spelled in capitals would have walked
+# straight through.
 # ---------------------------------------------------------------------------
 DRUSE_ADAPTER="$DRUSE_WEB/internal/transport/odin_http_adapter.odin"
+DRUSE_REGISTRY="$DRUSE_WEB/internal/transport/server_registry.odin"
 test -f "$DRUSE_ADAPTER" || fail "the transport adapter is missing"
-DRUSE_ADAPTER_CODE="$(sed -E 's://.*$::' "$DRUSE_ADAPTER")"
+test -f "$DRUSE_REGISTRY" || fail "the transport server registry is missing; WP123 put the one process-wide record in its own file, and this check depends on that separation"
 
 # Package-level variable declarations: `name: Type` at column 0, no `::`.
-DRUSE_ADAPTER_GLOBALS="$(grep -nE '^[a-z_][A-Za-z0-9_]*:[[:space:]]*[^:=]' <<<"$DRUSE_ADAPTER_CODE" |
-  sed -E 's/^[0-9]+:([a-z_][A-Za-z0-9_]*):.*/\1/' | LC_ALL=C sort -u || true)"
-DRUSE_ADAPTER_UNEXPECTED="$(grep -vxF 'g_server' <<<"$DRUSE_ADAPTER_GLOBALS" | grep -c . || true)"
+druse_package_globals() { # file
+  sed -E 's://.*$::' "$1" |
+    grep -nE '^[A-Za-z_][A-Za-z0-9_]*:[[:space:]]*[^:=]' |
+    sed -E 's/^[0-9]+:([A-Za-z_][A-Za-z0-9_]*):.*/\1/' | LC_ALL=C sort -u || true
+}
+
+DRUSE_ADAPTER_GLOBALS="$(druse_package_globals "$DRUSE_ADAPTER")"
+DRUSE_ADAPTER_UNEXPECTED="$(grep -vxE 'STREAM_CRLF|STREAM_TERMINATOR' <<<"$DRUSE_ADAPTER_GLOBALS" | grep -c . || true)"
 if test "$DRUSE_ADAPTER_UNEXPECTED" -ne 0; then
-  echo "--- package-level variables in the adapter ---" >&2
-  grep -vxF 'g_server' <<<"$DRUSE_ADAPTER_GLOBALS" >&2
-  fail "the transport adapter declares a package-level variable other than the one ratified exception 'g_server'. Per-request state in a package global cross-wires two servers silently (WP43): the second serve overwrites the first's dispatch pointer, and nothing diagnoses it."
+  echo "--- unexpected package-level variables in the adapter ---" >&2
+  grep -vxE 'STREAM_CRLF|STREAM_TERMINATOR' <<<"$DRUSE_ADAPTER_GLOBALS" >&2
+  fail "the transport adapter declares a package-level variable other than the two ratified byte literals (STREAM_CRLF, STREAM_TERMINATOR). Per-server state in a package global cross-wires two servers silently (WP43/WP123): the second serve overwrites the first's, and nothing diagnoses it. The process-wide server table belongs in server_registry.odin."
 fi
-echo "public API contract: the transport adapter holds per-server state, not per-request globals (g_server is the one named exception)"
+
+DRUSE_REGISTRY_GLOBALS="$(druse_package_globals "$DRUSE_REGISTRY")"
+DRUSE_REGISTRY_UNEXPECTED="$(grep -vxF 'g_servers' <<<"$DRUSE_REGISTRY_GLOBALS" | grep -c . || true)"
+if test "$DRUSE_REGISTRY_UNEXPECTED" -ne 0; then
+  echo "--- unexpected package-level variables in the server registry ---" >&2
+  grep -vxF 'g_servers' <<<"$DRUSE_REGISTRY_GLOBALS" >&2
+  fail "the transport server registry declares a package-level variable other than the one ratified exception 'g_servers'. One process-wide record is the whole budget: naming it means a SECOND cannot arrive quietly."
+fi
+grep -qF 'g_servers' <<<"$DRUSE_REGISTRY_GLOBALS" ||
+  fail "server_registry.odin no longer declares 'g_servers'. If the server table moved, this check is now guarding an empty file while the real global sits somewhere unexamined."
+
+echo "public API contract: the adapter holds no package global but its two byte literals; the one process-wide record is g_servers, in the registry file"
 
 # ---------------------------------------------------------------------------
 # 9. WP4 route registration and dispatch (planning/phase-1-plan.md §WP4 D1-D5)

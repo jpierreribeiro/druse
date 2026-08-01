@@ -331,9 +331,9 @@ c05_combined_saturation_degrades_recovers_and_stops :: proc(t: ^testing.T) {
 		len(hold_threads),
 	)
 
-	saturation_before := web.stats().saturation_refusals
+	saturation_before := web.stats(&server.app).saturation_refusals
 	controlled := run_level(server.port, 8)
-	saturation_after := web.stats().saturation_refusals
+	saturation_after := web.stats(&server.app).saturation_refusals
 	controlled_http :=
 		controlled[.Lane_Refused] + controlled[.Lane_Refused_No_Retry]
 	testing.expectf(
@@ -468,7 +468,7 @@ c05_combined_saturation_degrades_recovers_and_stops :: proc(t: ^testing.T) {
 	// Campaign C plus PATCH 42: handler dwell measures dispatched work, while
 	// saturation_refusals names accepted sockets closed before HTTP dispatch.
 	// The two counters deliberately describe different resources.
-	stats := web.stats()
+	stats := web.stats(&server.app)
 	fmt.printf(
 		"[c05] handler_dwell_ns=%d saturation_refusals=%d pre_request_503=%d handler dwell=%v\n",
 		stats.handler_dwell_ns,
@@ -580,7 +580,7 @@ c05_combined_saturation_degrades_recovers_and_stops :: proc(t: ^testing.T) {
 	testing.expectf(
 		t,
 		stats.handler_dwell_ns >= i64(total_served) * min_dwell_ns,
-		"web.stats().handler_dwell_ns=%d is far below the %d SERVED dispatches at %v dwell each; the dwell accumulator is not wired to the dispatch bracket",
+		"web.stats(&server.app).handler_dwell_ns=%d is far below the %d SERVED dispatches at %v dwell each; the dwell accumulator is not wired to the dispatch bracket",
 		stats.handler_dwell_ns,
 		total_served,
 		WORK_DWELL,

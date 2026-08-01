@@ -270,7 +270,7 @@ wp21_a_faulting_handler_answers_the_standard_500_over_a_real_socket :: proc(t: ^
 			delete(probe)
 		}
 
-		transport.request_stop()
+		transport.request_stop(transport.server_current())
 		thread.join(fixture.thread)
 		thread.destroy(fixture.thread)
 		fixture.thread = nil

@@ -105,13 +105,18 @@ get_ok :: proc(port: int) -> bool {
 
 @(test)
 h3_stats_count_real_responses_and_are_zero_without_a_server :: proc(t: ^testing.T) {
-	// Before any server: the accessor must be safe and return zero.
-	pre := web.stats()
+	server: Server
+
+	// Before this App runs a server: the accessor must be safe and return zero.
+	// WP123 made that claim stronger rather than weaker — it used to mean "no
+	// server exists in this process", which a sibling suite could falsify by
+	// starting one; it now means "THIS App is not running one", which nothing
+	// outside this test can change.
+	pre := web.stats(&server.app)
 	testing.expect_value(t, pre.responses_sent, 0)
 	testing.expect_value(t, pre.response_bytes, i64(0))
 	testing.expect_value(t, pre.saturation_refusals, 0)
 
-	server: Server
 	if !start_server(&server) {
 		testing.expect(t, false, "no candidate port produced a working server")
 		return
@@ -127,7 +132,7 @@ h3_stats_count_real_responses_and_are_zero_without_a_server :: proc(t: ^testing.
 	// Let the send completions land before reading the counters.
 	time.sleep(100 * time.Millisecond)
 
-	s := web.stats()
+	s := web.stats(&server.app)
 	fmt.printf(
 		"[h3] after %d requests: responses_sent=%d response_bytes=%d send_errors=%d write_aborts=%d\n",
 		served,

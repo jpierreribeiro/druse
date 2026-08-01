@@ -101,7 +101,7 @@ start_lab :: proc(lab: ^Lab, port: int, mode: string) -> bool {
 
 @(private)
 stop_lab :: proc(lab: ^Lab) {
-	transport.request_stop()
+	transport.request_stop(transport.server_current())
 	_ = sync.sema_wait_with_timeout(&lab.serve_done, 10 * time.Second)
 	if lab.thread != nil {
 		thread.join(lab.thread)
