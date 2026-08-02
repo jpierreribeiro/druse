@@ -1243,6 +1243,13 @@ echo "--- C-06 reverse-proxy contract: buffering off, and the trusted-hop client
 timeout 180 env DRUSE_COMPILER="$DRUSE_COMPILER" \
   bash "$DRUSE_ROOT/build/check_c06_controls.sh"
 
+# R1-WP03 keeps C-06 as the fast behavioral fixture and adds the reviewed real
+# proxy topology: pinned Caddy image, static invariants, mutation controls and
+# native config validation when the immutable image is already available.
+echo "--- R1-WP03 pinned Caddy topology: policy, negative controls and config validation ---"
+timeout 180 env DRUSE_COMPILER="$DRUSE_COMPILER" \
+  bash "$DRUSE_ROOT/build/check_proxy_config.sh"
+
 # C-07 (Closure) — the record and the verdict. It runs LAST of the Closure gates
 # and it checks the verdict's own evidence: every artifact it cites still exists
 # and is still wired into this gate, the exit condition is quoted verbatim rather

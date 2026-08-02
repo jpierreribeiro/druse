@@ -170,6 +170,13 @@ Deferred work here means *a specification handed forward*, not an open question.
 | The **3,000 real-socket** SSE round (Phase 7) | same | the same quiet machine — run once, together |
 | `radix_compact` (C-08) | optimisation with no readiness consequence | only on material gain, and it must pass the backtracking test unchanged |
 
+**Follow-forward status (R1, 2026-08-01):** the two C-06 deferrals above are
+closed for the pinned Caddy topology by R1-WP03
+(`ops/proxy/caddy/`, `ops/verification/run-real-proxy-contract.sh` and
+`evidence/2026-08-02-r1-real-proxy/`). They remain historical rows because
+this table records what the Closure freeze handed forward. The result does not
+transfer to nginx, HAProxy or a different CDN/trust chain.
+
 ---
 
 ## 4. The verdict

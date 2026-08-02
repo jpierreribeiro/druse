@@ -14,8 +14,7 @@
 #   3. THE UNTRUSTED ARM SURVIVES. It is the security half of the client-address
 #      clause: an untrusted peer's X-Forwarded-For must be ignored, or any client
 #      can name its own address in an audit log;
-#   4. what is OWED is still recorded — a fixture proves the contract is
-#      satisfiable, not that nginx satisfies it.
+#   4. the real-product distinction remains explicit and points to R1-WP03.
 set -euo pipefail
 
 DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -78,10 +77,14 @@ grep -q 'c06_a_buffering_proxy_withholds_a_stream_and_an_unbuffered_one_does_not
 grep -q 'c06_the_forwarded_client_address_is_believed_only_from_a_trusted_hop ::' "$DRUSE_SUITE" ||
   fail "the client-address clause test is gone"
 
-# --- 4. The owed work is still named -----------------------------------------
+# --- 4. The real-product evidence remains linked -----------------------------
 DRUSE_FLAT="$(tr '\n' ' ' <"$DRUSE_DOC" | tr -s ' ')"
 grep -qi 'real-proxy round' <<<"$DRUSE_FLAT" ||
-  fail "the owed real-proxy round is no longer recorded. The fixture proves the contract is SATISFIABLE, not that nginx satisfies it, and the difference must stay written down."
+  fail "the real-proxy round is no longer recorded; the fixture/product distinction must remain explicit"
+grep -q 'ops/proxy/caddy/Caddyfile' "$DRUSE_DOC" ||
+  fail "the C-06 record no longer links the reviewed real Caddy topology"
+grep -q 'run-real-proxy-contract.sh' "$DRUSE_DOC" ||
+  fail "the C-06 record no longer links the repeatable real-proxy campaign"
 grep -qi 'mandatory, documented' <<<"$DRUSE_FLAT" ||
   fail "the record lost the classification rule it rests on — a delegation is acceptable only if the topology is mandatory, documented AND tested"
 
@@ -93,5 +96,5 @@ env ODIN_ROOT="$DRUSE_ODIN_ROOT" "$DRUSE_ODIN" test \
 
 echo "c06: the stream (${DRUSE_STREAM_MS} ms) outlasts the observation window (${DRUSE_PATIENCE_MS} ms)"
 echo "c06: direct, unbuffered and buffered arms all present; the untrusted-hop arm survives"
-echo "c06: the owed real-proxy round is on record"
+echo "c06: the completed real-proxy round and reviewed Caddy topology are linked"
 echo "PASS: C-06 reverse-proxy contract controls"

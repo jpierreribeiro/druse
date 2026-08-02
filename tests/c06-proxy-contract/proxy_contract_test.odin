@@ -19,11 +19,12 @@
 //   - NOT evidence about nginx. It proves Druse behaves correctly under the
 //     contract; it cannot prove that any particular proxy implements it.
 //
-// So a real-proxy interop round remains OWED, and is recorded as such in
-// `planning/closure-proxy-contract.md` beside the two other named obligations
-// (the hours-long soak and the 3,000 real-socket SSE round). Recording it is the
-// point: this phase exists because an obligation nobody wrote down stopped being
-// trackable.
+// This fixture still cannot make a product claim. R1-WP03 has now executed the
+// separate pinned Caddy round recorded in
+// `planning/closure-proxy-contract.md` and
+// `evidence/2026-08-02-r1-real-proxy/`. Keeping both instruments is the
+// point: the fast fixture guards Druse behavior on every gate; the Docker
+// campaign proves one reviewed real topology.
 //
 // THE TWO CONTRACT CLAUSES THIS SUITE PROVES, each with a control arm:
 //
@@ -41,15 +42,11 @@
 //      is not. The negative arm is the security half: an untrusted peer that
 //      sends the header must not be believed.
 //
-// NOT PROVEN HERE, and named rather than implied: upstream keep-alive (two
-// client requests over ONE upstream connection, in order, with no bleed) and
-// duplicated timeout limits (the proxy's deadline shorter than the server's).
-// Both need a proxy fixture that pools upstream connections, which is a second
-// fixture rather than a switch on this one; both are recorded as owed in
-// `planning/closure-proxy-contract.md` alongside the real-proxy round. The
-// keep-alive property itself is already proven at the wire level by
-// `wp41-fault` `phase_keep_alive_serves_two_requests_on_one_connection` — what
-// is unproven is that a POOLING PROXY sees the same thing.
+// NOT PROVEN HERE, and therefore never inferred from this fixture: product
+// pooling, duplicated limit precedence, TLS/H2 and readiness-aware shutdown.
+// The R1-WP03 real Caddy campaign owns those claims. The keep-alive property
+// itself remains independently proven at the wire level by `wp41-fault`
+// `phase_keep_alive_serves_two_requests_on_one_connection`.
 package test_c06_proxy_contract
 
 import "core:fmt"
