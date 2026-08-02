@@ -1,0 +1,182 @@
+toolchain version: /opt/odin/odin version dev-2026-07-nightly:819fdc7
+toolchain commit: 819fdc7
+odin version: odin version dev-2026-07-nightly:819fdc7
+--- api-shape (run) ---
+caller app addr = 0x7FFD812C5190 ; app.self_addr(recorded in app()) = 7ffd812c50b0
+[serve] port=8080 routes=2 app_addr=0x7FFD812C5190
+[serve] port=8081 routes=1 app_addr=0x7FFD812C5130
+PASS: api-shape
+--- generic-json-response (run) ---
+ok/User      -> status=OK commit=1 body={"id":1,"name":"Jean"}
+[json] marshal error: Unsupported_Type
+created/^User -> status=Bad_Request commit=1 body={"id":1,"name":"Jean"}
+json/Big     -> status=OK commit=1 body={"tags":["a","b","c"],"scores":[10,20,30,40],"nested":[{"id":3,"name":"x"},{"id":4,"name":"y"}]}
+PASS: generic-json-response
+--- body-binding (run) ---
+valid+nested       ok=true err=None responded=false name="Jean" tags=["a", "b"]
+empty-body         ok=false err=Invalid_Json responded=true name="" tags=[]
+invalid-json       ok=false err=Invalid_Json responded=true name="" tags=[]
+over-limit         ok=false err=Body_Too_Large responded=true name="" tags=[]
+arena used bytes: 68
+PASS: body-binding
+--- optional-ok (run) ---
+checked   -> id=42 ok=true
+discarded -> just_id=42 (ok discarded; allowed but discouraged)
+missing   -> v=0 ok=false responded=true
+PASS: optional-ok
+--- typed-state (run) ---
+[A] correct -> db="primary" hits=1 (lifetime: shared &st)
+[A] st.hits after handler = 1 (mutation visible => same object)
+[B] correct -> db="primary" (wrong type is a COMPILE error, not runtime)
+PASS: typed-state
+--- request-views (run) ---
+views    -> method="GET" path="/users" query="page=2" body="body-bytes-here\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+after reuse -> req.path (view, now GARBAGE)="######" ; saved (copied)="/users"
+PASS: request-views
+--- middleware-chain (run) ---
+onion order   : ["global:before", "group:before", "route:auth", "handler:commit", "route:after", "group:after", "global:after"]
+onion commit  : true  (commit happens at handler; middleware 'after' runs post-commit)
+preorder order: ["preorder:run", "preorder:run", "handler:commit"]
+per-request chain state = slice + index + aborted + committed (no per-hop alloc)
+PASS: middleware-chain
+--- transport-boundary (run) ---
+resp[0] status=200 commit=1 body=pong
+resp[1] status=404 commit=1 body={"error":{"code":"not_found"}}
+PASS: transport-boundary
+--- test-transport (test) ---
+[INFO ] --- [2026-08-02 07:50:13] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 07:50:13] The random seed sent to every test is: 7044913071278. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 07:50:13] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 07:50:13] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 6 tests in 6.452089ms. All tests were successful.
+
+PASS: test-transport
+--- handler-errors (test) ---
+[INFO ] --- [2026-08-02 07:50:15] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 07:50:15] The random seed sent to every test is: 7048238242026. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 07:50:15] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 07:50:15] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 4 tests in 1.641215ms. All tests were successful.
+
+PASS: handler-errors
+--- marshal-parity (run) ---
+ENC2 — whole-document parity against core:encoding/json
+
+scalars
+  ok    int                          42
+  ok    negative int                 -7
+  ok    f64 1.5                      1.5000000000000000
+  ok    string                       "hello"
+  ok    bool                         true
+
+structs
+  ok    small struct                 {"id":42,"name":"ada"}
+  ok    json tags and skip           {"identifier":7,"plain":"kept"}
+  ok    omitempty, all empty         {"always":1,"keep":5}
+  ok    omitempty, populated         {"always":1,"s":"x","sl":[1,2],"m":{"present":1},"keep":5}
+  ok    using _ flattening           {"a":3,"b":"flat","c":true}
+  ok    nested struct + slice        {"head":{"id":42,"name":"ada"},"items":[{"id":1,"name":"one"},{"id":2,"name":"
+  ok    empty slice                  {"head":{"id":42,"name":"ada"},"items":[]}
+
+numeric widths
+  ok    every integer width          {"i8v":-128,"u8v":255,"i16v":-32768,"u16v":65535,"i32v":-2147483648,"u32v":429
+  ok    f32 and f64                  {"f32v":1.50000000,"f64v":1.5000000000000000}
+  ok    f16, complex, i128/u128, cstring {"half":1.5000,"c64":[1.5000000000000000, -2.5000000000000000],"big_i":-170141
+  ok    bool, b8, b64                {"plain":true,"eight":true,"wide":false}
+
+collections
+  ok    fixed array                  [1,2,3]
+  ok    dynamic array                [10,20,30]
+  ok    map[string]int, one key      {"only":1}
+  ok    map[string]int, four keys    {"beta":2,"alpha":1,"gamma":3,"delta":4}
+  ok    map[int]string, one key      {"7":"seven"}
+  ok    empty map                    {}
+  ok    every empty container        {"s":"","sl":[],"dyn":[],"m":{},"st":{}}
+
+exotic but reachable
+  ok    enum, bit_set, rune          {"colour":1,"flags":5,"r":"x"}
+  ok    union, nil and held          {"empty":null,"held":5}
+  ok    json.Null                    null
+
+strings
+  ok    every escaping shape         {"plain":"plain ascii","quoted":"a \"quote\" and a \\ backslash","newline":"li
+  ok    control byte in a key        {"k\ax":"v\u0007y"}
+
+the rejection set (both must refuse)
+  ok    pointer payload              both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+  ok    procedure payload            both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+  ok    any inside a struct          both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+  ok    typeid payload               both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+  ok    typeid inside a struct       both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+  ok    quaternion payload           both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+  ok    matrix payload               both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+  ok    multi-pointer payload        both refuse (core=Unsupported_Type, druse=Unsupported_Type)
+
+36 cases, 0 disagreements
+ENC2: byte-for-byte equivalent over the corpus.
+PASS: marshal-parity
+--- optional-ok plain-result discard probe (expected compile failure) ---
+PASS: plain extractor forces capture of ok
+--- handler-errors ignored-result probe (expected compile success) ---
+PASS: returned handler errors can be ignored (risk confirmed)
+--- handler-errors bare-return probe (expected compile failure) ---
+PASS: bare return rejected with expected diagnostic
+--- stream topology candidate B (lane-polled producer) (test) ---
+[INFO ] --- [2026-08-02 07:50:17] Starting test runner with 2 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 07:50:17] The random seed sent to every test is: 7053277719994. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 07:50:17] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 07:50:17] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 2 tests in 13.539674ms. All tests were successful.
+
+PASS: stream topology candidate B (lane-polled producer)
+--- stream topology candidate C (detached token stream) (test) ---
+[INFO ] --- [2026-08-02 07:50:19] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 07:50:19] The random seed sent to every test is: 7055881362410. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 07:50:19] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 07:50:19] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 5 tests in 7.804795ms. All tests were successful.
+
+PASS: stream topology candidate C (detached token stream)
+--- stream topology candidate D (SSE-specific API) (test) ---
+[INFO ] --- [2026-08-02 07:50:20] Starting test runner with 3 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 07:50:20] The random seed sent to every test is: 7058248274600. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 07:50:20] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 07:50:20] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 3 tests in 2.767234ms. All tests were successful.
+
+PASS: stream topology candidate D (SSE-specific API)
+--- large-body ingest arms E/F/G/H (test) ---
+[INFO ] --- [2026-08-02 07:50:21] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 07:50:21] The random seed sent to every test is: 7060575149482. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 07:50:21] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 07:50:21] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 6 tests in 52.607081ms. All tests were successful.
+
+PASS: large-body ingest arms E/F/G/H
+--- ADR-020 leak shape (builds; run it via its own run.sh) (check) ---
+PASS: ADR-020 leak shape (builds; run it via its own run.sh)
+--- accept-stall harness (builds) (check) ---
+PASS: accept-stall harness (builds)
+--- shutdown-race harness (builds) (check) ---
+PASS: shutdown-race harness (builds)
+--- usage lab A, unguarded CRUD (builds) (check) ---
+PASS: usage lab A, unguarded CRUD (builds)
+--- usage lab B, guarded CRUD (builds) (check) ---
+PASS: usage lab B, guarded CRUD (builds)
+--- concurrency arms consumer (builds) (check) ---
+PASS: concurrency arms consumer (builds)
+--- JSON failure anatomy (builds) (check) ---
+PASS: JSON failure anatomy (builds)
+--- blocking boundary (builds) (check) ---
+PASS: blocking boundary (builds)
+FAIL: these experiment packages are in the tree but nothing checks them: 27-observability-arms
+      Add a 'check' line above, or add it to DRUSE_EXP_EXEMPT with the reason.
+      An unchecked experiment is code that stops compiling and nobody finds out.
+============================================
+PASS=23 FAIL=1 SKIP=0

@@ -113,6 +113,10 @@ check 11-usage-lab/b-crud-guarded    check "usage lab B, guarded CRUD (builds)"
 check 12-concurrency-arms/consumer   check "concurrency arms consumer (builds)"
 check 14-json-failure-anatomy        check "JSON failure anatomy (builds)"
 check 15-blocking-boundary           check "blocking boundary (builds)"
+# R2-WP03. `check`, not `run`: running it holds two ports and occupies every
+# Handler lane for the length of a sampling window, which is fine on purpose in
+# a campaign and hostile inside a gate that other suites share a machine with.
+check 27-observability-arms          check "observability arms (builds)"
 
 # ---------------------------------------------------------------------------
 # THE SET IS CLOSED, and it was not until 2026-07-31.
