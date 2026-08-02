@@ -15,6 +15,7 @@ ROLLBACK="$ROOT/docs/runbooks/rollback.md"
 CHECKLIST="$ROOT/ops/verification/pilot-checklist.md"
 
 fail() { echo "PILOT-RUNBOOK-FAIL: $*" >&2; exit 1; }
+command -v rg >/dev/null 2>&1 || fail "rg is required for placeholder detection"
 for file in "$POLICY" "$DEPLOY" "$INCIDENT" "$ROLLBACK" "$CHECKLIST"; do
   test -s "$file" || fail "missing required artifact: ${file#$ROOT/}"
 done
