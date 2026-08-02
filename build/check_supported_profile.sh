@@ -15,6 +15,7 @@ fail() {
   echo "SUPPORTED-PROFILE-FAIL: $*" >&2
   exit 1
 }
+command -v rg >/dev/null 2>&1 || fail "rg is required for stale-claim detection"
 
 need() {
   local text=$1 reason=$2

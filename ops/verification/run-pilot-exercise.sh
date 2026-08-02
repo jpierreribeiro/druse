@@ -26,7 +26,7 @@ test "$ALLOW_DIRTY" -eq 1 || test -z "$(git -C "$ROOT" status --porcelain)" ||
   fail "candidate working tree is dirty; commit before generating evidence"
 test ! -e "$OUTPUT" || fail "output already exists: $OUTPUT"
 
-for cmd in odin git docker openssl curl python3 systemctl systemd-run coredumpctl sha256sum; do
+for cmd in odin git docker openssl curl python3 rg systemctl systemd-run coredumpctl sha256sum; do
   command -v "$cmd" >/dev/null || fail "required command missing: $cmd"
 done
 systemctl --user is-system-running >/dev/null 2>&1 || fail "user systemd is unavailable"

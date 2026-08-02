@@ -44,7 +44,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      # R1 evidence gates validate that measured candidate commits are real
+      # ancestors and that rollback targets are their actual parents. A shallow
+      # checkout cannot answer either question.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # The toolchain is PINNED and the pin carries its own checksum, so this
       # step verifies rather than trusts. odin-version.txt is the single source:
@@ -74,8 +79,13 @@ jobs:
       - name: Tools the gate requires
         run: |
           set -euo pipefail
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ripgrep
+          fi
           clang --version | head -1
           python3 --version
+          rg --version | head -1
 
       - name: build/check.sh
         env:

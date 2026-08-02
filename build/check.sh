@@ -42,6 +42,8 @@ test -d "$DRUSE_COMPILER_DIR/core/encoding/json" ||
   fail "pinned core:encoding/json package missing"
 command -v clang >/dev/null 2>&1 ||
   fail "clang not found; Odin needs it to link runnable checks"
+command -v rg >/dev/null 2>&1 ||
+  fail "rg not found; documentation and evidence controls require ripgrep"
 
 bash -n "$DRUSE_ROOT/build/check.sh"
 bash -n "$DRUSE_ROOT/build/check_test.sh"
