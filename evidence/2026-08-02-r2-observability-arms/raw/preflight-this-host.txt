@@ -1,0 +1,10 @@
+ops/soak/preflight.sh: line 227: /dev/stdout: Permission denied
+PREFLIGHT FAILED — this host cannot run the campaign as planned:
+  - the campaign pins CPU 7 and this host has 4 online: run-soak.sh would fail inside taskset and report it as a product failure
+  - taskset -c 4-7 is rejected by this host
+  - nstat is not installed: kernel drop counters would record as zero, which is indistinguishable from no drops
+  - hard nofile limit is 4096 and the run raises it to 8192
+  - 29 GiB free at /home/user/druse; a 12h run is estimated to need 100 GiB of raw CSV
+
+Change the plan and commit it, or use a host that satisfies it.
+Do not adapt the affinity silently during a campaign (R2-WP02).

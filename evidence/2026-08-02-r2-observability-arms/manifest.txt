@@ -1,0 +1,62 @@
+# R2-WP03 — campaign manifest (G1, G6)
+#
+# Campaign: observability arms — closing AUD-P2-009.
+# Date: 2026-08-02 (UTC).
+# Verdict: R2-WP03 CLOSED, arm B. The gate stays at R1. No soak was run.
+
+## Identity
+
+repo                 jpierreribeiro/druse
+branch               claude/r2-restricted-production-skzmmx
+pre-registration     0f84275  (planning/readiness/R2-WP03-preregistration.md)
+arm measurement      27fd085  tree 641570c71e7c9c5152a64318f0bc30334dbfefcc
+implementation       01c114e
+working tree         clean at each of the above
+
+## Toolchain
+
+odin                 dev-2026-07-nightly:819fdc7 (pinned in odin-version.txt)
+odin bundle sha256   32a7678abc66f1af7353abb5b0b5da47d94b7e663f6d250df29bc9117e864c10
+                     verified against the pin BEFORE first use, not after
+clang                18.1.3
+go                   1.24.7 (openload only)
+python3              3.11.15
+
+## Binaries
+
+arms                 abceba71ae63f929c02a99805cb7813d92d268ed37843433d17f49fd75cb417b
+soak-server          ac6c940d8a503106ed2c8562b8501a726c5393bd2b5e1bdd6bb6ec57f5a60cbe
+                     (the overhead run's build; see analysis/overhead/binaries.txt)
+openload             see analysis/overhead-throughput/binaries.txt
+
+## Host
+
+4 shared CPUs, 15.7 GiB, kernel 6.18.5, no nstat, hard nofile 4096.
+DISQUALIFIED for any soak — see raw/preflight-this-host.txt, five reasons.
+See environment.txt for the full record.
+
+## Contents
+
+commands.txt                             every command, in order
+environment.txt                          identity, toolchain, host, clock
+config/preregistration.md                the frozen criteria, as committed
+config/arms.txt                          the arm program's configuration
+config/overhead.txt                      the overhead run's configuration
+raw/arm-baseline.txt                     120 samples, negative control  (0/120)
+raw/arm-arm-a.txt                        120 samples, in-process admin  (120/120)
+raw/arm-arm-b.txt                        120 samples, out-of-band file  (120/120)
+raw/arms-binary-sha256.txt               the measured binary's identity
+raw/suite.txt                            tests/r2-observability-saturation
+raw/controls.txt                         build/check_r2_observability_controls.sh
+raw/gate.txt                             build/check.sh (local; see next file)
+raw/gate-wp72-environment.txt            why the local gate stops, proven vs main
+raw/preflight-this-host.txt              this host refusing the soak campaign
+analysis/arms.md                         the arm comparison, derived from raw/
+analysis/overhead/                       B5, B6 — five paired idle reps
+analysis/overhead-throughput/            the throughput diagnostic (INCONCLUSIVE)
+verdict.md                               the decision and what it does NOT establish
+
+## Reading order
+
+verdict.md, then analysis/arms.md, then raw/. The verdict CITES raw/ and
+analysis/; it does not replace them.

@@ -1,0 +1,192 @@
+# Reference alerting rules for a Druse deployment inside the supported profile.
+#
+# Prometheus-shaped because that is the most widely readable notation, NOT
+# because Druse has chosen Prometheus. The framework exports integers; this file
+# shows what an operator does with them. Translate freely.
+#
+# The metric names below are what a small exporter would publish from
+# `ops/monitoring/sample-metrics.sh`; the mapping is one line per snapshot key.
+#
+# TWO RULES ARE LOAD-BEARING AND THE REST IS ORDINARY:
+#
+#   * `DruseMetricsAbsent` — a missing sample is an ALERT. Never `absent()`
+#     wrapped in an `or vector(0)`, never a recording rule that fills a gap.
+#     An interpolated point is a claim the process made about itself while it
+#     was silent, and AUD-P2-009 is the finding that says so.
+#   * `DruseLanesSaturated` — alert on the LEVEL, never on a flat counter. Every
+#     cumulative counter freezes at full occupancy (finding OBS-001), so a flat
+#     `handler_dwell_ns` means either "idle" or "completely saturated" and
+#     nothing distinguishes them except `handlers_active`.
+
+groups:
+  - name: druse-availability
+    rules:
+      # The sampler runs outside the process and emits a line every tick,
+      # including ticks that read nothing. So an absent SERIES means the sampler
+      # itself is gone — a different and more serious fault than a sample whose
+      # cause is recorded.
+      - alert: DruseSamplerAbsent
+        expr: absent(druse_sample_cause_total)
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "The out-of-band metric sampler has stopped emitting"
+          description: >-
+            No sample line at all, which is not the same as a sample that failed.
+            A failed sample carries a cause; this carries nothing. Check the
+            sampler unit before concluding anything about the server.
+
+      # A sample the sampler took and could not fill. `cause` says which.
+      - alert: DruseMetricsAbsent
+        expr: |
+          sum by (cause) (rate(druse_sample_cause_total{cause!="ok"}[5m])) > 0
+        for: 3m
+        labels: {severity: page}
+        annotations:
+          summary: "Metric snapshots absent: {{ $labels.cause }}"
+          description: >-
+            missing = wrong path or the process never started; unreadable =
+            permissions or filesystem; malformed = a writer from another build,
+            or a partial write; stale = the process is alive and not exporting
+            (wedged, or the exporter thread died); no_process = the pid in the
+            last record is gone.
+            Do NOT interpolate across this gap. The gap is the signal.
+
+      - alert: DruseProcessGone
+        expr: sum(rate(druse_sample_cause_total{cause="no_process"}[2m])) > 0
+        labels: {severity: page}
+        annotations:
+          summary: "The process named in the last snapshot no longer exists"
+          description: >-
+            This is a fault, not a scrape failure, and the distinction is only
+            available because the sampler runs outside the process. Correlate
+            with druse_restarts_total before treating it as an outage.
+
+  - name: druse-saturation
+    rules:
+      # THE saturation signal. A LEVEL against a resolved ceiling — the ceiling
+      # has to come from the process because `max_handlers = 0` resolves to the
+      # host core count and is unknowable from outside.
+      - alert: DruseLanesSaturated
+        expr: druse_handlers_active / druse_handler_capacity >= 1
+        for: 1m
+        labels: {severity: page}
+        annotations:
+          summary: "Every Handler lane is inside a handler"
+          description: >-
+            Requests arriving now queue silently on a busy lane's socket: no
+            503, no counter, only latency. Every cumulative counter is frozen
+            for the duration, so a flat throughput graph here means saturated,
+            not quiet. Raise max_handlers, shorten the handler, or move blocking
+            work off the lane.
+
+      - alert: DruseLanesHot
+        expr: druse_handlers_active / druse_handler_capacity >= 0.8
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Handler lanes sustained above 80% occupancy"
+
+      - alert: DruseAdmissionRefusing
+        expr: rate(druse_refused_connections_total[5m]) > 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "The admission budget is refusing connections"
+          description: >-
+            active_connections reached max_connections - reserved_conns. The
+            reserve exists so a drain still has room; refusing is the designed
+            behaviour, and sustained refusal is a capacity decision.
+
+      - alert: DruseAcceptorRefusingForSaturation
+        expr: rate(druse_saturation_refusals_total[5m]) > 0
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "The acceptor is refusing sockets because every lane is busy"
+          description: >-
+            A TRANSPORT refusal before any HTTP request was parsed — never
+            describe it as a 503. This is the counter that moves while all the
+            others are frozen, and it is what a saturated /stats scrape looks
+            like from the server's side.
+
+      - alert: DruseConnectionsNearCeiling
+        expr: |
+          druse_connection_capacity > 0
+          and druse_active_connections / druse_connection_capacity >= 0.9
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Connection occupancy above 90% of the enforced admission ceiling"
+
+  - name: druse-host-and-proxy
+    rules:
+      # The kernel's side of the same story: connections the server never got to
+      # refuse. -1 means the counter was unavailable on this host, which is a
+      # different fact from zero and must not alert as if it were healthy.
+      - alert: DruseListenQueueDropping
+        expr: |
+          rate(druse_listen_drops_total[5m]) > 0
+          or rate(druse_listen_overflows_total[5m]) > 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "The kernel is dropping or overflowing the listen queue"
+
+      - alert: DruseHostCountersUnavailable
+        expr: druse_listen_drops_total == -1
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Host TCP counters are unreadable; saturation attribution is degraded"
+          description: >-
+            Reported as -1 rather than 0 on purpose. A missing counter and a
+            counter reading zero are different facts, and printing 0 for both is
+            how a host without them starts looking healthy.
+
+      - alert: DruseFdsClimbing
+        expr: druse_process_fds > 0.8 * druse_process_fd_limit
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Open file descriptors above 80% of LimitNOFILE"
+
+      - alert: DruseRssApproachingCgroup
+        expr: druse_process_rss_bytes > 0.85 * druse_memory_max_bytes
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "RSS approaching MemoryMax; the next step is an OOM kill"
+
+      - alert: DruseRestarted
+        expr: increase(druse_restarts_total[10m]) > 0
+        labels: {severity: page}
+        annotations:
+          summary: "The unit restarted"
+          description: >-
+            Every cumulative counter reset to zero with it. Without this series a
+            restart is indistinguishable from a quiet period, because both look
+            like counters that stopped rising.
+
+      - alert: DruseDraining
+        expr: druse_draining == 1
+        for: 2m
+        labels: {severity: ticket}
+        annotations:
+          summary: "The server has been draining for more than two minutes"
+          description: >-
+            Readiness should already have flipped. A drain longer than
+            max_drain_time means a handler is not returning; the supervisor's
+            TimeoutStopSec is the backstop.
+
+      - alert: DruseProxyUpstreamErrors
+        expr: rate(druse_proxy_upstream_connect_errors_total[5m]) > 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "The proxy cannot connect upstream to Druse"
+          description: >-
+            Correlate with druse_saturation_refusals_total. Upstream connect
+            errors WITH acceptor refusals is application saturation; upstream
+            connect errors WITHOUT them is the path between proxy and server.
+            That correlation is the whole point of sampling both on one tick.

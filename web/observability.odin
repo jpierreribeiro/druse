@@ -75,15 +75,19 @@ refused_connections :: proc(a: ^App) -> int {
 //
 // WHY A STRUCT OF INTEGERS AND NOT A METRICS API. The same reason as
 // `refused_connections`: a framework that exports a metrics abstraction has
-// chosen a vendor for its users. Ten running totals an application reads and
+// chosen a vendor for its users. A struct of integers an application reads and
 // hands to whatever it already runs is the smallest thing that discharges the
 // obligation. **Redaction holds by construction**: every field is an integer,
 // so no request-derived byte can reach an observer through it — the gate pins
 // that no field is a string.
 //
-// Each field is a running total for the life of the server (a scraper
-// differences it), and all are zero when no server is running — the same rule
-// as `refused_connections`, and for the same reason (WP44: no readable state).
+// TWO KINDS OF FIELD, and the difference is load-bearing. The first ten are
+// RUNNING TOTALS for the life of the server, which a scraper differences. The
+// last four (R2-WP03) are two LEVELS and the two CEILINGS they are measured
+// against, which a scraper reads as they are. All are zero when no server is
+// running —
+// the same rule as `refused_connections`, and for the same reason (WP44: no
+// readable state).
 Server_Stats :: struct {
 	// Admission — identical to `refused_connections()`, included so one read
 	// answers the whole write-and-refuse picture.
@@ -112,6 +116,37 @@ Server_Stats :: struct {
 	stream_refused_full:   int, // a per-stream event/byte cap refused a send
 	stream_refused_budget: int, // the process-wide byte budget refused a send
 	stream_aborted_slow:   int, // an owner tore a stream down on write error/deadline
+	// R2-WP03 / ADR-050 (AUD-P2-009) — OCCUPANCY AND RESOLVED CAPACITY.
+	//
+	// THESE FOUR ARE NOT RUNNING TOTALS, and mixing them up is the reason this
+	// paragraph is longer than they are. Every field above is cumulative and a
+	// scraper DIFFERENCES it; these four are two levels and the two ceilings
+	// they are measured against, and a scraper must take them AS THEY ARE.
+	// Differencing `active_connections` yields the net change in occupancy,
+	// which is a number that looks like a rate and is not one.
+	//
+	// WHY THEY EXIST, AND IT IS SHARPER THAN "GAUGES ARE NICE". Every counter
+	// above is written when work COMPLETES: `responses_sent` on send completion,
+	// `handler_dwell_ns` after the dispatch returns. **At full lane occupancy
+	// nothing completes, so all of them freeze**, and the utilization formula
+	// this file documents — `Δdwell / (lanes × Δwall)` — reads ZERO at the exact
+	// moment utilization is one. A fully saturated server and an idle server
+	// produce the same flat lines. That was measured, not reasoned about:
+	// `evidence/2026-08-02-r2-observability-arms/`, finding OBS-001, where four
+	// of four lanes were provably inside handlers, 120 of 120 scrapes were
+	// refused for saturation, and `handler_dwell_ns` was 0.
+	//
+	// `handlers_active` against `handler_capacity` is what tells the two apart,
+	// and `handler_capacity` has to be reported because it is UNKNOWABLE from
+	// outside: `max_handlers = 0` is the documented default and resolves to the
+	// host's core count clamped to [4, 32]. An operator with the numerator and
+	// no denominator has a ratio they cannot compute.
+	//
+	// All four already existed inside the process. Nothing could read them.
+	active_connections:    int, // connections admitted and not yet closed (a LEVEL)
+	handlers_active:       int, // lanes currently inside a handler (a LEVEL)
+	handler_capacity:      int, // lanes actually running, after `max_handlers = 0` resolves
+	connection_capacity:   int, // the admission ceiling actually enforced; 0 = unbounded
 }
 
 // stats returns THIS APPLICATION's server's write-side counters, or the zero
@@ -123,8 +158,17 @@ Server_Stats :: struct {
 // server's send counters under both servers' labels, and the numbers were
 // individually plausible the whole time.
 //
-// It allocates nothing, takes no lock, and reads ten integers inside one
+// It allocates nothing, takes no lock, and reads every field inside one
 // registry acquisition, so the snapshot is coherent.
+//
+// R2-WP03 — IT IS SAFE FROM ANY THREAD, and that property is what closes
+// AUD-P2-009 rather than any field added to the struct. A metric that leaves
+// the process through a route competes with the traffic it describes; this
+// procedure can be called from a thread that owns no lane and answers no
+// request, so an application can export its own numbers without spending any of
+// the resource under measurement. `docs/reference/observability.md` and
+// `docs/operations.md` §6 carry the shape; `examples/10-config-and-health` and
+// `ops/soak/soak-server` carry a working exporter.
 stats :: proc(a: ^App) -> Server_Stats {
 	s := transport.server_stats(sync.atomic_load(&a.private.server))
 	return Server_Stats {
@@ -138,5 +182,9 @@ stats :: proc(a: ^App) -> Server_Stats {
 		stream_refused_full   = s.stream_refused_full,
 		stream_refused_budget = s.stream_refused_budget,
 		stream_aborted_slow   = s.stream_aborted_slow,
+		active_connections    = s.active_connections,
+		handlers_active       = s.handlers_active,
+		handler_capacity      = s.handler_capacity,
+		connection_capacity   = s.connection_capacity,
 	}
 }

@@ -48,6 +48,7 @@ demanda. Registrar a escolha em ADR com:
 | R3-WP07 | druse-crystals/ecossistema | integração opcional verificada |
 | R3-WP08 | feedback, incidentes e upgrade | battle-hardening documentado |
 | R3-WP09 | freeze de maturidade | decisão sobre 1.0/nível suportado |
+| R3-WP10 | contenção de falha de handler | manter N=1, ou processos worker |
 
 ## 3. Etapa A — aprender com R2
 
@@ -231,6 +232,70 @@ O último braço é presumido recusado até evidência extraordinária.
 
 Qualquer API pública passa pelos guardrails e por estudo de uso. Não expor
 futures/tasks apenas porque o backend interno mudou.
+
+### R3-WP10 — contenção do fault de handler
+
+**Entrada:** ADR-049 (PROPOSED) e R2-WP03 concluído. **Não começar antes do
+WP03**, pelo motivo registrado no ADR: N processos tornam `web.stats()` uma
+resposta por processo, e um `/stats` que parece global sem ser é pior que
+nenhum.
+
+> **R2-WP03 fechou em 2026-08-02, e este bloqueio caiu — só ele.** ADR-050
+> escolheu um canal fora do caminho de request, e sob esse canal a agregação
+> entre processos é possível: cada worker escreve seu próprio snapshot, o
+> sidecar soma e publica `workers_seen` contra `workers_expected`. ADR-049 **não**
+> foi fechado como recusado, porque a condição que o recusaria não se verificou.
+>
+> **O custo virou requisito de entrada deste WP:** o supervisor precisa publicar
+> `workers_expected`, e ele não pode vir de contar arquivos. Um agregado é tão
+> honesto quanto esse número, e um `workers_expected` errado reproduz exatamente
+> o defeito — um número que parece global e não é — um nível acima.
+>
+> As outras dependências continuam abertas e nenhuma foi tocada por WP03:
+> orçamento de memlock/RSS/FDs refeito para N > 1
+> (`evidence/2026-08-01-r1-resource-budget/` foi produzida para N=1), semântica
+> de drain por worker, rollback para N=1 sem rebuild, e a campanha de fault cujo
+> **controle negativo em N=1 tem de ficar vermelho** ou ela não mediu contenção.
+
+Hoje um fault de handler custa **100% da capacidade e toda conexão em voo**.
+ADR-020 fecha a recuperação em definitivo e ADR-047 já decidiu o diagnóstico;
+esta trilha trata apenas do **raio**, que nenhum dos dois tocou.
+
+#### Braços
+
+Os três de ADR-049, com a viabilidade já medida na árvore:
+
+| Braço | Perda ao morrer um worker | Custo |
+|---|---|---|
+| A — `SO_REUSEPORT` | a accept queue daquele worker | 1 linha vendorizada (patch 44) |
+| B — listener herdado | nenhuma | ponto de entrada novo no nbio |
+| C — pre-fork | nenhuma | fork + threads + io_uring, sem precedente |
+
+#### O que precisa ser medido antes de escolher
+
+O orçamento de recursos do R1 foi derivado para **N=1** e não transfere:
+memlock (um ring io_uring por lane, agora × N), `MemoryMax`, `LimitNOFILE`.
+`evidence/2026-08-01-r1-resource-budget/` teria de ser refeita para N>1 antes
+de qualquer unit template ir para `ops/deploy/`.
+
+#### Provas mínimas
+
+- **Controle positivo:** matar um worker sob carga; as requisições nos demais
+  workers não falham.
+- **Controle negativo:** a mesma campanha com N=1 tem de ficar **vermelha**.
+  Sem isso a campanha não mediu contenção — mediu que o serviço estava de pé.
+- drain por worker não fecha admissão dos outros (o modo de falha que
+  `tests/wp123-two-servers` já cobre dentro de um processo);
+- `stats` agregado ou explicitamente por processo, decidido no WP03;
+- orçamento de recursos refeito para N>1;
+- rollback para N=1 sem rebuild;
+- `docs/supported-profile.md` emendado no mesmo commit do comportamento.
+
+#### Resultado permitido
+
+- **manter N=1:** o custo de recursos ou de observabilidade não se paga;
+- **adotar processos worker:** com braço nomeado, evidência de contenção e
+  perfil emendado.
 
 ## 7. Etapa E — protocolos
 

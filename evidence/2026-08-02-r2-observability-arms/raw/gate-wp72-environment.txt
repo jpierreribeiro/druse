@@ -1,0 +1,24 @@
+# Why the LOCAL gate run in raw/gate.txt stops at WP72
+
+It is the container, not the change, and this file is the proof rather than
+the claim.
+
+build/check_wp72_controls.sh:32 raises the soft RLIMIT_NOFILE to 8192 for its
+3,000-connection laboratory and fails closed when it cannot. This container's
+HARD limit is 4096, so no user in it can satisfy that precondition:
+
+  ulimit -Sn = 1024
+  ulimit -Hn = 4096
+
+Run against a pristine worktree of origin/main (f560f8b), same container,
+same user, no changes from this work package present:
+
+  WP72-CONTROL-FAIL: the 3,000-connection laboratory requires a soft RLIMIT_NOFILE of 8192
+
+Identical failure, identical line. The gate reached and PASSED the R2-WP03
+controls before this point — see raw/gate.txt lines 1513-1527, seven mutants
+red for their own reasons.
+
+CI IS THE AUTHORITY (.github/workflows/gate.yml). This local run is a
+diagnostic, and G4 says so: a gate run on a shared container answers
+deterministic-correctness questions and not capacity ones.

@@ -1,0 +1,16 @@
+# throughput diagnostic — 7 paired reps, 15s each, rate=2000 conns=64
+# NOT an acceptance criterion. G4: a local gate does not answer capacity.
+rep=1 arm=no-export goodput_per_second=1999.884758907304 transport_errors=0
+rep=1 arm=with-export goodput_per_second=1999.9028552521136 transport_errors=0
+rep=2 arm=no-export goodput_per_second=1999.985966765133 transport_errors=0
+rep=2 arm=with-export goodput_per_second=2000.0205083436274 transport_errors=0
+rep=3 arm=no-export goodput_per_second=1999.9865434238736 transport_errors=0
+rep=3 arm=with-export goodput_per_second=1999.9409210785443 transport_errors=0
+rep=4 arm=no-export goodput_per_second=1999.9112194078384 transport_errors=0
+rep=4 arm=with-export goodput_per_second=1999.9746661875718 transport_errors=0
+rep=5 arm=no-export goodput_per_second=1999.9187950305907 transport_errors=0
+rep=5 arm=with-export goodput_per_second=1999.9464772990448 transport_errors=0
+rep=6 arm=no-export goodput_per_second=1999.932830922585 transport_errors=0
+rep=6 arm=with-export goodput_per_second=2000.0386748811923 transport_errors=0
+rep=7 arm=no-export goodput_per_second=1999.9750836437495 transport_errors=0
+rep=7 arm=with-export goodput_per_second=1999.8966042789473 transport_errors=0

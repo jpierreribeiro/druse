@@ -1,6 +1,7 @@
 # R2 — plano para produção restrita
 
-**Status:** EM EXECUÇÃO. R2-WP01 fechado em 2026-08-02; WP02–WP08 abertos.
+**Status:** EM EXECUÇÃO. R2-WP01 e R2-WP03 fechados em 2026-08-02; WP02 e
+WP04–WP08 abertos.
 **Objetivo:** autorizar workloads de produção dentro de um envelope explícito,
 com SLO, observabilidade, capacidade, segurança e rollback provados.
 **Entrada:** R1 promovido e um candidato de release imutável.
@@ -21,7 +22,7 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 |---|---|---|---|
 | R2-WP01 | auditoria e correção do instrumento | soak capaz de explicar toda falha | **fechado** 2026-08-02 |
 | R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — falta host dedicado |
-| R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | aberto |
+| R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | **fechado** 2026-08-02 |
 | R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — bloqueado por WP02 |
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
 | R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto |
@@ -177,9 +178,52 @@ Não copiar números de microbenchmark como SLO.
 
 ## 4. Etapa C — observabilidade que sobreviva à pressão
 
-### R2-WP03 — fechar AUD-P2-009
+### R2-WP03 — fechado
 
-#### Análise de arquitetura
+**Braço B**, decidido em ADR-050 a partir da medição em
+`evidence/2026-08-02-r2-observability-arms/`, com os critérios congelados antes
+do run em [`R2-WP03-preregistration.md`](R2-WP03-preregistration.md) (G3).
+
+Sob ocupação total e determinística das lanes, 120 amostras agendadas por braço:
+o `baseline` (`/stats` como rota) respondeu **0 de 120** — o controle negativo
+ficou vermelho, que era a condição para o run valer — e os braços A e B
+responderam **120 de 120**. A e B **empataram** em disponibilidade e latência; a
+decisão foi por **B4**, ambiguidade estrutural: toda ausência de A é um erro
+HTTP, e cada um dos quatro erros HTTP é produzível tanto por uma aplicação que
+parou quanto por uma rede que perdeu a troca. A torna o caso indistinguível mais
+raro; ele não o remove. B não tem rede entre a métrica e o leitor, então as
+causas que restam — `missing`, `unreadable`, `malformed`, `stale`, `no_process`
+— nomeiam todas a aplicação.
+
+**OBS-001, encontrado ao medir e não ao ler.** Todo contador de `Server_Stats` é
+escrito quando o trabalho **termina**. Sob ocupação total nada termina, então
+todos congelam, e a fórmula de utilização que a documentação ensina lê **zero**
+quando a utilização é **um**. Um servidor saturado e um ocioso desenham as
+mesmas linhas planas. Medido: 4 de 4 lanes dentro de handlers, 120 de 120
+scrapes recusados por saturação, `handler_dwell_ns` = 0.
+
+Entregue: quatro campos em `web.Server_Stats` (`active_connections`,
+`handlers_active`, `handler_capacity`, `connection_capacity` — nenhum símbolo
+novo, nenhum patch de vendor), exportador de referência em
+`examples/10-config-and-health` e `ops/soak/soak-server`, `ops/monitoring/`
+(formato, amostrador, regras de alerta, dashboard, medição de overhead),
+`tests/r2-observability-saturation/`, `build/check_r2_observability_controls.sh`
+com seis mutantes, e ADR-050 — que também responde a pergunta de agregação de
+ADR-049 e **não** o fecha como recusado.
+
+**Este WP não promove nada. O gate continua em R1.**
+
+#### Residual declarado
+
+**Conexões ativas × idle não foi separado.** `active_connections` é
+"admitidas e ainda não fechadas". O backend mantém um `Connection_State` com
+`.Idle`, mas o atribui por um ponto de estrangulamento **e** por três escritas
+diretas (`.New`, `.Closing`, `.Closed`), então um contador no ponto de
+estrangulamento subcontaria conexões que fecham direto a partir de `.Idle`.
+Fazer certo é mudança de vendor nos quatro sítios, e ela não foi feita aqui.
+Registrado como residual, não como concluído.
+
+#### Análise de arquitetura (histórico, como o WP foi especificado)
 
 Comparar, com dois braços:
 

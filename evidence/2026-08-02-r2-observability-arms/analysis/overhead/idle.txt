@@ -1,0 +1,12 @@
+# B5/B6 — idle process, 60s, export at 1 Hz, 5 paired reps
+# clk_tck=100 (CPU accounting resolution: 10 ms)
+rep=1 arm=no-export cpu_ticks=6 vmhwm_kb=4564 export_ticks=0
+rep=1 arm=with-export cpu_ticks=7 vmhwm_kb=4600 export_ticks=60
+rep=2 arm=no-export cpu_ticks=6 vmhwm_kb=4560 export_ticks=0
+rep=2 arm=with-export cpu_ticks=8 vmhwm_kb=4584 export_ticks=60
+rep=3 arm=no-export cpu_ticks=5 vmhwm_kb=4492 export_ticks=0
+rep=3 arm=with-export cpu_ticks=7 vmhwm_kb=4560 export_ticks=60
+rep=4 arm=no-export cpu_ticks=6 vmhwm_kb=4512 export_ticks=0
+rep=4 arm=with-export cpu_ticks=8 vmhwm_kb=4544 export_ticks=60
+rep=5 arm=no-export cpu_ticks=6 vmhwm_kb=4472 export_ticks=0
+rep=5 arm=with-export cpu_ticks=8 vmhwm_kb=4520 export_ticks=60

@@ -1,0 +1,144 @@
+arm arm-a
+lanes 4
+occupied true entered=4
+sample 0 ok 355137 false
+sample 1 ok 487946 false
+sample 2 ok 415603 false
+sample 3 ok 396253 false
+sample 4 ok 330980 false
+sample 5 ok 378986 false
+sample 6 ok 400500 false
+sample 7 ok 473985 false
+sample 8 ok 382289 false
+sample 9 ok 360290 false
+sample 10 ok 346546 false
+sample 11 ok 389431 false
+sample 12 ok 374099 false
+sample 13 ok 417219 false
+sample 14 ok 514835 false
+sample 15 ok 504863 false
+sample 16 ok 347403 false
+sample 17 ok 377779 false
+sample 18 ok 427010 false
+sample 19 ok 407032 false
+sample 20 ok 346185 false
+sample 21 ok 363636 false
+sample 22 ok 377600 false
+sample 23 ok 357528 false
+sample 24 ok 429641 false
+sample 25 ok 404380 false
+sample 26 ok 467289 false
+sample 27 ok 379205 false
+sample 28 ok 420595 false
+sample 29 ok 335387 false
+sample 30 ok 362144 false
+sample 31 ok 402285 false
+sample 32 ok 359648 false
+sample 33 ok 408684 false
+sample 34 ok 372506 false
+sample 35 ok 353243 false
+sample 36 ok 436590 false
+sample 37 ok 478897 false
+sample 38 ok 540312 false
+sample 39 ok 351343 false
+sample 40 ok 419178 false
+sample 41 ok 387014 false
+sample 42 ok 343792 false
+sample 43 ok 394902 false
+sample 44 ok 461188 false
+sample 45 ok 459389 false
+sample 46 ok 3286110 false
+sample 47 ok 378559 false
+sample 48 ok 374008 false
+sample 49 ok 447754 false
+sample 50 ok 405482 false
+sample 51 ok 480878 false
+sample 52 ok 367393 false
+sample 53 ok 337146 false
+sample 54 ok 361439 false
+sample 55 ok 404535 false
+sample 56 ok 351281 false
+sample 57 ok 474344 false
+sample 58 ok 390047 false
+sample 59 ok 341538 false
+sample 60 ok 347146 false
+sample 61 ok 303679 false
+sample 62 ok 313253 false
+sample 63 ok 323560 false
+sample 64 ok 361806 false
+sample 65 ok 308736 false
+sample 66 ok 394609 false
+sample 67 ok 429165 false
+sample 68 ok 366549 false
+sample 69 ok 447465 false
+sample 70 ok 411532 false
+sample 71 ok 385126 false
+sample 72 ok 324805 false
+sample 73 ok 396701 false
+sample 74 ok 358954 false
+sample 75 ok 366060 false
+sample 76 ok 323197 false
+sample 77 ok 343856 false
+sample 78 ok 400485 false
+sample 79 ok 382678 false
+sample 80 ok 354682 false
+sample 81 ok 354302 false
+sample 82 ok 483037 false
+sample 83 ok 421591 false
+sample 84 ok 359372 false
+sample 85 ok 334289 false
+sample 86 ok 360978 false
+sample 87 ok 290984 false
+sample 88 ok 320339 false
+sample 89 ok 308664 false
+sample 90 ok 369128 false
+sample 91 ok 369493 false
+sample 92 ok 387975 false
+sample 93 ok 345757 false
+sample 94 ok 363667 false
+sample 95 ok 341409 false
+sample 96 ok 391374 false
+sample 97 ok 373688 false
+sample 98 ok 369873 false
+sample 99 ok 402145 false
+sample 100 ok 419059 false
+sample 101 ok 340330 false
+sample 102 ok 459869 false
+sample 103 ok 395339 false
+sample 104 ok 393140 false
+sample 105 ok 429952 false
+sample 106 ok 423294 false
+sample 107 ok 354357 false
+sample 108 ok 394096 false
+sample 109 ok 354327 false
+sample 110 ok 389001 false
+sample 111 ok 393233 false
+sample 112 ok 359044 false
+sample 113 ok 350162 false
+sample 114 ok 374777 false
+sample 115 ok 362498 false
+sample 116 ok 368813 false
+sample 117 ok 389464 false
+sample 118 ok 505814 false
+sample 119 ok 395589 false
+samples 120
+ok 120
+cause ok 120
+cause http_refused 0
+cause http_timeout 0
+cause http_empty 0
+cause http_recv_error 0
+cause missing 0
+cause unreadable 0
+cause malformed 0
+cause stale 0
+unclassified 0
+network_ambiguous_absences 0
+availability_ppm 1000000
+latency_p50_ns 378986
+latency_p99_ns 540312
+latency_max_ns 3286110
+target_handler_dwell_ns 0
+target_responses_sent 0
+target_saturation_refusals 0
+verdict COMPLETE

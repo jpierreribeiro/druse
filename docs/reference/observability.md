@@ -60,7 +60,7 @@ Taught in [`05-recipes/observe-the-framework.md`](../guide/05-recipes/observe-th
 ## `Server_Stats`
 
 ```odin
-Server_Stats :: struct {refused_connections: int, saturation_refusals: int, responses_sent: int, response_bytes: i64, send_errors: int, write_deadline_aborts: int, handler_dwell_ns: i64, stream_refused_full: int, stream_refused_budget: int, stream_aborted_slow: int}
+Server_Stats :: struct {refused_connections: int, saturation_refusals: int, responses_sent: int, response_bytes: i64, send_errors: int, write_deadline_aborts: int, handler_dwell_ns: i64, stream_refused_full: int, stream_refused_budget: int, stream_aborted_slow: int, active_connections: int, handlers_active: int, handler_capacity: int, connection_capacity: int}
 ```
 
 Server_Stats is the write-side accounting `web.stats` returns (Closure H-3).

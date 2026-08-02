@@ -1,0 +1,6 @@
+precondition export_ticks_with_export_min=60 export_ticks_no_export_max=0
+B5 raw no_export_median_ticks=6 with_export_median_ticks=8 delta_ms=20 control_arm_spread_ms=10 accounting_resolution_ms=10 budget_ms=60
+B5 PASS exporter_cpu_delta_ms=20 budget=60
+B6 raw delta_kb=48 control_arm_spread_kb=92 budget_kb=2048
+B6 PASS vmhwm_delta_kb=48 budget=2048
+throughput INCONCLUSIVE: not enough valid reps

@@ -1705,6 +1705,16 @@ done
 echo "--- soak instrument: a failure it observes is a failure it can name ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_soak_controls.sh"
 
+# R2-WP03 — observability that does not compete with the load it describes.
+# The soak instrument above can now name a failure it observes; this one proves
+# the server can still be observed while it is failing. AUD-P2-009: `/stats` is
+# an ordinary route on the Handler lanes, so under saturation it stops
+# answering — and an absent scrape is indistinguishable from a lost packet.
+# Seven mutants, because a control that only knows how to say "failed" is
+# indistinguishable from a control that is broken.
+echo "--- R2-WP03 observability: saturation is visible, and absence has a cause ---"
+env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_r2_observability_controls.sh"
+
 # The benchmark summary must notice when two servers did not do the same work.
 # It did not, once, and a comparison of four servers went out in which one
 # answered with 21.6% more bytes than the others.

@@ -1,0 +1,17 @@
+# The overhead measurement's configuration.
+# ops/monitoring/measure-export-overhead.sh, defaults as run.
+
+idle_seconds     = 60
+idle_reps        = 5     # paired and alternating
+export_period    = 1s    # ops/soak/soak-server EXPORT_PERIOD
+load_seconds     = 15
+reps             = 7
+rate             = 2000
+connections      = 64
+
+# Budgets, copied from the pre-registration so the two can be diffed
+# rather than trusted to agree.
+B5_budget        = 60 ms CPU per 60 s idle at 1 Hz
+B6_budget        = 2048 KiB VmHWM delta
+throughput_budget= 1.0 %  (DIAGNOSTIC, not a criterion)
+noise_abort      = 1.0 %  (control-arm spread above this -> INCONCLUSIVE)

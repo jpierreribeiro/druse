@@ -1,0 +1,43 @@
+# R2-WP03 — the exact commands, in order.
+#
+# The toolchain is NOT on PATH in this environment. It is fetched from the
+# release named in odin-version.txt and its sha256 is VERIFIED against the pin
+# before it is used for anything — the gate refuses a mismatched compiler, but
+# an unverified download would already have run by then.
+
+release="$(sed -n 's/^release=//p' odin-version.txt)"
+asset="$(sed -n 's/^linux_amd64_asset=//p' odin-version.txt)"
+want="$(sed -n 's/^linux_amd64_sha256=//p' odin-version.txt)"
+curl -fsSL -o "/tmp/$asset" \
+  "https://github.com/odin-lang/Odin/releases/download/$release/$asset"
+test "$want" = "$(sha256sum "/tmp/$asset" | cut -d' ' -f1)"   # verified, not trusted
+mkdir -p /opt/odin && tar -xzf "/tmp/$asset" -C /opt/odin --strip-components=1
+export DRUSE_ODIN_BIN=/opt/odin/odin
+export ODIN_ROOT=/opt/odin
+
+# build/check.sh is not green as root: check_r1_resource_controls.sh chmods a
+# spool to 0500 and requires the preflight to call it non-writable, and root
+# ignores DAC. Everything below runs as an unprivileged user.
+useradd -m druse && chown -R druse:druse .
+
+# --- the arm comparison, at commit 27fd085, clean tree ----------------------
+odin build experiments/27-observability-arms -collection:druse=. -out:/tmp/arms
+sha256sum /tmp/arms                              # -> raw/arms-binary-sha256.txt
+/tmp/arms baseline                               # -> raw/arm-baseline.txt
+/tmp/arms arm-a                                  # -> raw/arm-arm-a.txt
+/tmp/arms arm-b                                  # -> raw/arm-arm-b.txt
+
+# --- the behavioural suite and its six mutants ------------------------------
+odin test tests/r2-observability-saturation -collection:druse=. \
+  -define:ODIN_TEST_THREADS=1 -out:/tmp/r2obs   # -> raw/suite.txt
+bash build/check_r2_observability_controls.sh    # -> raw/controls.txt
+
+# --- overhead against the budget frozen before the run ----------------------
+bash ops/monitoring/measure-export-overhead.sh \
+  evidence/2026-08-02-r2-observability-arms/analysis/overhead
+
+# --- the full gate ----------------------------------------------------------
+bash build/check.sh                              # -> raw/gate.txt
+
+# --- the host is disqualified for a soak, and it says so itself -------------
+bash ops/soak/preflight.sh                       # -> raw/preflight-this-host.txt

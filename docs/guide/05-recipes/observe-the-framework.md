@@ -57,16 +57,21 @@ refused_connections :: proc(a: ^App) -> int
 
 Both name the App whose server they describe, so a process running two listeners
 reports on each separately rather than on whichever started last.
+`Server_Stats` carries ten **running totals** you difference (`refused_connections`,
+`saturation_refusals`, `responses_sent`, `response_bytes`, `send_errors`,
+`write_deadline_aborts`, `handler_dwell_ns`, three `stream_*`) and four **levels and
+ceilings** you read as-is (`active_connections`, `handlers_active`,
+`handler_capacity`, `connection_capacity`). Rising `write_deadline_aborts` means
+slow clients hitting `Limits.max_write_time`; `refused_connections`, that you are
+at `max_connections`; `saturation_refusals`, that every lane was active and the
+acceptor closed sockets before parsing HTTP.
 
-`Server_Stats` carries `refused_connections`, `saturation_refusals`, `responses_sent`,
-`response_bytes`, `send_errors`, `write_deadline_aborts`, `handler_dwell_ns`,
-`stream_refused_full`, `stream_refused_budget` and `stream_aborted_slow`.
-
-Rising `write_deadline_aborts` means slow clients hitting `Limits.max_write_time`;
-rising `refused_connections` means you are at `max_connections`. Divide the
-interval's `Δhandler_dwell_ns` by `(max_handlers × wall time)` for utilization.
-Rising `saturation_refusals` means every Handler lane was active and the
-dedicated acceptor closed newly accepted sockets before parsing HTTP.
+**Alert on `handlers_active / handler_capacity`, never on a flat counter**: every
+total above is written on *completion*, so at full occupancy they freeze and
+utilization from `handler_dwell_ns` reads zero while it is one. **And do not scrape
+this over a route** — it shares the lanes with your traffic, and an HTTP scrape
+failure is also what a lost packet looks like; export from a lane-less thread
+instead. See `docs/operations.md` §6.0 and `ops/monitoring/`.
 
 ## Draining
 
