@@ -112,7 +112,8 @@ Stated plainly, because a framework that hides its edges wastes your time:
 limits, multi-server ceiling and R1 deployment recommendation live in
 [`docs/supported-profile.md`](docs/supported-profile.md). CI also verifies the
 negative portability claim: the current transport must fail on macOS and
-Windows for the recorded Linux-only symbols, not for an unrelated build error.
+Windows for the recorded Linux-only symbols `sched_yield` and
+`setsockopt_base`, not for an unrelated build error.
 
 ## Performance
 

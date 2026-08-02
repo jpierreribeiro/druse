@@ -65,7 +65,9 @@ work :: proc(ctx: ^web.Context) {
 }
 
 crash :: proc(_: ^web.Context) {
-	assert(false, "R1-WP06 deliberate Handler fault")
+	// A production-mode drill cannot depend on assertions: -o:speed may remove
+	// them. SIGABRT exercises the same supervisor/core path deterministically.
+	_ = posix.raise(.SIGABRT)
 }
 
 upload :: proc(ctx: ^web.Context) {
