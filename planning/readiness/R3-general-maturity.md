@@ -48,7 +48,7 @@ demanda. Registrar a escolha em ADR com:
 | R3-WP07 | druse-crystals/ecossistema | integração opcional verificada |
 | R3-WP08 | feedback, incidentes e upgrade | battle-hardening documentado |
 | R3-WP09 | freeze de maturidade | decisão sobre 1.0/nível suportado |
-| R3-WP10 | contenção de falha de handler | manter N=1, ou processos worker |
+| R3-WP10 | contenção de falha de handler | manter N=1, ou processos worker — **Etapa 1 fechada** 2026-08-02 (ADR-051); Etapa 3 bloqueada por um ponto de entrada em `nbio` |
 
 ## 3. Etapa A — aprender com R2
 
@@ -270,6 +270,36 @@ Os três de ADR-049, com a viabilidade já medida na árvore:
 | A — `SO_REUSEPORT` | a accept queue daquele worker | 1 linha vendorizada (patch 44) |
 | B — listener herdado | nenhuma | ponto de entrada novo no nbio |
 | C — pre-fork | nenhuma | fork + threads + io_uring, sem precedente |
+
+#### Etapa 1 fechada em 2026-08-02 — medida, e o resultado mudou o plano
+
+`evidence/2026-08-02-r3-worker-budget/`, decisão em **ADR-051**.
+
+**O orçamento de recursos NÃO é o obstáculo.** Por worker, com 4 lanes: 14 FDs,
+5 threads, 5 rings io_uring, ~1020 KiB de bytes de ring, `VmLck` 0, ~4,5 MiB de
+RSS — e **tudo constante em N** (W1 passou). `LimitMEMLOCK` é um RLIMIT, por
+processo, com ~64× de folga; ele só apertaria por volta de 320 lanes num único
+processo contra um máximo de 32. O que muda de significado é **`MemoryMax`**, que
+é do cgroup e passa a ser dividido por N sem que nada no unit diga isso.
+
+**A viabilidade registrada em ADR-049 estava errada em dois pontos**, ambos
+verificados: `net.Socket_Option.Reuse_Port` vale **`-1`** em Linux (só FreeBSD o
+implementa), e o caminho de bind do produto é **`core:nbio`**, não `vendor/nbio`
+— que é importado por dois benches e por mais nada. A "uma linha" seria um no-op
+num arquivo que o servidor não usa.
+
+**Consequência: A e B convergem no mesmo requisito ausente** — `nbio` não sabe
+adotar um socket que não criou — e a vantagem de custo de A desaparece.
+**Nenhum braço foi adotado**, e isso **não** é "manter N=1": o custo de recursos
+se paga; falta um ponto de entrada em `nbio`, que é trabalho nomeável.
+
+**Bloqueio da Etapa 3.** A campanha de fault (F1 e o controle negativo F1n em
+N=1) **não rodou e não podia rodar** — ela exige um braço implementado. Nenhuma
+contenção foi demonstrada.
+
+**Próximo:** um ponto de entrada em `nbio` que adote um socket existente. Como
+`core:nbio` é do toolchain fixado e não vendorizado, isso é upstream ou uma
+decisão de vendorizar o pacote — decisão de política, não detalhe.
 
 #### O que precisa ser medido antes de escolher
 

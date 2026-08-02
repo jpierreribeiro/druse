@@ -1,0 +1,66 @@
+55fdf77c2000-55fdf77ee000 r--p 00000000 fe:00 1884346                    /tmp/druse-worker-budget-YF9mID4Z/soak-server
+55fdf77ee000-55fdf7898000 r-xp 0002c000 fe:00 1884346                    /tmp/druse-worker-budget-YF9mID4Z/soak-server
+55fdf7898000-55fdf78b3000 r--p 000d6000 fe:00 1884346                    /tmp/druse-worker-budget-YF9mID4Z/soak-server
+55fdf78b3000-55fdf78be000 r--p 000f1000 fe:00 1884346                    /tmp/druse-worker-budget-YF9mID4Z/soak-server
+55fdf78be000-55fdf78e6000 rw-p 000fc000 fe:00 1884346                    /tmp/druse-worker-budget-YF9mID4Z/soak-server
+55fdf78e6000-55fdf78e9000 rw-p 00000000 00:00 0 
+55fe1c5f1000-55fe1c633000 rw-p 00000000 00:00 0                          [heap]
+7f692bffc000-7f692bffd000 rw-p 00000000 00:00 0 
+7f692bffd000-7f696bffd000 ---p 00000000 00:00 0 
+7f696bffd000-7f696bffe000 rw-p 00000000 00:00 0 
+7f696bffe000-7f69abffe000 ---p 00000000 00:00 0 
+7f69abffe000-7f69abfff000 rw-p 00000000 00:00 0 
+7f69abfff000-7f69ebfff000 ---p 00000000 00:00 0 
+7f69ebfff000-7f69ec000000 rw-p 00000000 00:00 0 
+7f69ec000000-7f6a2c000000 ---p 00000000 00:00 0 
+7f6a2c000000-7f6a2c021000 rw-p 00000000 00:00 0 
+7f6a2c021000-7f6a30000000 ---p 00000000 00:00 0 
+7f6a30000000-7f6a30021000 rw-p 00000000 00:00 0 
+7f6a30021000-7f6a34000000 ---p 00000000 00:00 0 
+7f6a34000000-7f6a34021000 rw-p 00000000 00:00 0 
+7f6a34021000-7f6a38000000 ---p 00000000 00:00 0 
+7f6a38000000-7f6a38021000 rw-p 00000000 00:00 0 
+7f6a38021000-7f6a3c000000 ---p 00000000 00:00 0 
+7f6a3db2f000-7f6a3db4f000 rw-s 10000000 00:0f 5820                       anon_inode:[io_uring]
+7f6a3db4f000-7f6a3db62000 rw-s 00000000 00:0f 5820                       anon_inode:[io_uring]
+7f6a3db62000-7f6a3db82000 rw-s 10000000 00:0f 8512                       anon_inode:[io_uring]
+7f6a3db82000-7f6a3db95000 rw-s 00000000 00:0f 8512                       anon_inode:[io_uring]
+7f6a3db95000-7f6a3dbb5000 rw-s 10000000 00:0f 6705                       anon_inode:[io_uring]
+7f6a3dbb5000-7f6a3dbc8000 rw-s 00000000 00:0f 6705                       anon_inode:[io_uring]
+7f6a3dbc8000-7f6a3dbe8000 rw-s 10000000 00:0f 8511                       anon_inode:[io_uring]
+7f6a3dbe8000-7f6a3dbfb000 rw-s 00000000 00:0f 8511                       anon_inode:[io_uring]
+7f6a3dbfb000-7f6a3dbfc000 ---p 00000000 00:00 0 
+7f6a3dbfc000-7f6a3e3fc000 rw-p 00000000 00:00 0 
+7f6a3e3fc000-7f6a3e3fd000 ---p 00000000 00:00 0 
+7f6a3e3fd000-7f6a3ebfd000 rw-p 00000000 00:00 0 
+7f6a3ebfd000-7f6a3ebfe000 ---p 00000000 00:00 0 
+7f6a3ebfe000-7f6a3f3fe000 rw-p 00000000 00:00 0 
+7f6a3f3fe000-7f6a3f3ff000 ---p 00000000 00:00 0 
+7f6a3f3ff000-7f6a3fbff000 rw-p 00000000 00:00 0 
+7f6a3fbff000-7f6a3fc00000 rw-p 00000000 00:00 0 
+7f6a3fc00000-7f6a7fc00000 ---p 00000000 00:00 0 
+7f6a7fc00000-7f6a7fc28000 r--p 00000000 fe:00 152035                     /usr/lib/x86_64-linux-gnu/libc.so.6
+7f6a7fc28000-7f6a7fdb0000 r-xp 00028000 fe:00 152035                     /usr/lib/x86_64-linux-gnu/libc.so.6
+7f6a7fdb0000-7f6a7fdff000 r--p 001b0000 fe:00 152035                     /usr/lib/x86_64-linux-gnu/libc.so.6
+7f6a7fdff000-7f6a7fe03000 r--p 001fe000 fe:00 152035                     /usr/lib/x86_64-linux-gnu/libc.so.6
+7f6a7fe03000-7f6a7fe05000 rw-p 00202000 fe:00 152035                     /usr/lib/x86_64-linux-gnu/libc.so.6
+7f6a7fe05000-7f6a7fe12000 rw-p 00000000 00:00 0 
+7f6a7fe1d000-7f6a7fe3d000 rw-s 10000000 00:0f 5818                       anon_inode:[io_uring]
+7f6a7fe3d000-7f6a7fe50000 rw-s 00000000 00:0f 5818                       anon_inode:[io_uring]
+7f6a7fe50000-7f6a7fe53000 rw-p 00000000 00:00 0 
+7f6a7fe53000-7f6a7fe63000 r--p 00000000 fe:00 152077                     /usr/lib/x86_64-linux-gnu/libm.so.6
+7f6a7fe63000-7f6a7fee2000 r-xp 00010000 fe:00 152077                     /usr/lib/x86_64-linux-gnu/libm.so.6
+7f6a7fee2000-7f6a7ff3a000 r--p 0008f000 fe:00 152077                     /usr/lib/x86_64-linux-gnu/libm.so.6
+7f6a7ff3a000-7f6a7ff3b000 r--p 000e7000 fe:00 152077                     /usr/lib/x86_64-linux-gnu/libm.so.6
+7f6a7ff3b000-7f6a7ff3c000 rw-p 000e8000 fe:00 152077                     /usr/lib/x86_64-linux-gnu/libm.so.6
+7f6a7ff45000-7f6a7ff47000 rw-p 00000000 00:00 0 
+7f6a7ff47000-7f6a7ff4b000 r--p 00000000 00:00 0                          [vvar]
+7f6a7ff4b000-7f6a7ff4d000 r--p 00000000 00:00 0                          [vvar_vclock]
+7f6a7ff4d000-7f6a7ff4f000 r-xp 00000000 00:00 0                          [vdso]
+7f6a7ff4f000-7f6a7ff50000 r--p 00000000 fe:00 152017                     /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+7f6a7ff50000-7f6a7ff7b000 r-xp 00001000 fe:00 152017                     /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+7f6a7ff7b000-7f6a7ff85000 r--p 0002c000 fe:00 152017                     /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+7f6a7ff85000-7f6a7ff87000 r--p 00036000 fe:00 152017                     /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+7f6a7ff87000-7f6a7ff89000 rw-p 00038000 fe:00 152017                     /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+7fffe4094000-7fffe40b6000 rw-p 00000000 00:00 0                          [stack]
+ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]

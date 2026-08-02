@@ -1,0 +1,18 @@
+# R3-WP10 Stage 1 — campaign environment (G1)
+
+repo: jpierreribeiro/druse
+branch: claude/r2-restricted-production-skzmmx
+base: 87723fc (main, after R2-WP03 merged)
+pre-registration commit: dccadb7
+
+odin: /opt/odin/odin version dev-2026-07-nightly:819fdc7
+odin bundle sha256 (verified before use): 32a7678abc66f1af7353abb5b0b5da47d94b7e663f6d250df29bc9117e864c10
+kernel: Linux 6.18.5 x86_64 GNU/Linux
+cpus: 4
+memory total: 15.7 GiB
+nofile soft/hard: 1024/4096
+memlock (ulimit -l, KiB): 8192
+
+This is a shared CI container. It answers resource ACCOUNTING, which is
+deterministic. It does not answer capacity or tail latency (G4).
+generated_utc: 2026-08-02T14:43:37Z

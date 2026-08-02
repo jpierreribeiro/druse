@@ -2610,6 +2610,24 @@ none; the requirement it keeps is the one nobody disputes.
   memlock/RSS/FDs refeito para N > 1, semântica de drain por worker, rollback
   para N=1 sem rebuild, e a campanha de fault com controle negativo em N=1.
 
+- **Correção de R3-WP10 (2026-08-02) — a tabela de viabilidade acima está
+  ERRADA em dois pontos, e ADR-051 a substitui.** Ambos foram verificados na
+  árvore:
+
+  1. `net.Socket_Option.Reuse_Port` existe como **símbolo** e vale **`-1`** em
+     Linux (`core/net/socket_linux.odin:40`). Só FreeBSD o mapeia para uma
+     constante real. A "uma linha" seria um `setsockopt` com optname −1.
+  2. O caminho de bind **do produto** é `core:nbio`, não `vendor/nbio`.
+     `druse:vendor/nbio` é importado por dois programas de bench e por mais
+     nada, então a linha estaria num arquivo que o servidor não usa.
+
+  Consequência: A e B convergem no mesmo requisito ausente — `nbio` não tem como
+  adotar um socket que não criou — e a vantagem de custo de A sobre B
+  desaparece. O orçamento de recursos de N>1 foi medido e **não** é o obstáculo:
+  `LimitMEMLOCK` tem ~64× de folga por worker; o que muda de significado é
+  `MemoryMax`, que é do cgroup e passa a ser dividido por N. Ver ADR-051 e
+  `evidence/2026-08-02-r3-worker-budget/`.
+
 ## ADR-050 — como uma métrica sai de um processo saturado, e se ela pode ser agregada entre processos
 
 - **Status.** **ACCEPTED — braço B (canal fora do caminho de request), 2026-08-02.**
@@ -2759,3 +2777,137 @@ none; the requirement it keeps is the one nobody disputes.
 - **O que este ADR não estabelece.** Que N > 1 processos funcionam. Nada aqui
   foi medido com mais de um processo; a resposta de agregação é sobre o que o
   mecanismo **admite**, e prová-la é R3-WP10.
+
+## ADR-051 — o braço de contenção de falha, com o custo medido e a viabilidade corrigida
+
+- **Status.** **ACCEPTED — nenhum braço é adotado agora; a trilha continua, com o
+  custo real escrito. 2026-08-02.** Substitui a tabela de viabilidade de ADR-049,
+  que estava errada em dois pontos verificáveis. Critérios congelados antes da
+  medição em `planning/readiness/R3-WP10-preregistration.md`; medição em
+  `evidence/2026-08-02-r3-worker-budget/`.
+
+- **Contexto.** ADR-049 registrou a pergunta — qual mecanismo de compartilhamento
+  de listener — e deliberadamente não a respondeu, para que ninguém adicionasse
+  `SO_REUSEPORT` numa tarde por ser uma linha. `R3-general-maturity.md` §6 exige
+  medir o orçamento de recursos de N>1 **antes** de escolher. Foi o que se fez, e
+  a medição encontrou duas coisas: uma sobre recursos, e uma sobre viabilidade
+  que inverte a tabela de custos de ADR-049.
+
+### Achado 1 — o custo de recursos não é o obstáculo, e o obstáculo não é o que ADR-049 supôs
+
+Medido em `analysis/budget.md`, N ∈ {1, 2, 4}, 4 lanes por worker:
+
+| | por worker | constante em N? |
+|---|---|---|
+| FDs | 14 | sim |
+| threads | 5 | sim |
+| rings io_uring | **5** (4 lanes + 1 acceptor) | sim |
+| bytes de ring | **1.044.480** (~1020 KiB) | sim |
+| `VmLck` | **0** | sim |
+| `VmRSS` | ~4,5 MiB | sim |
+
+**W1 passou:** nada varia com N. Não há acoplamento entre processos.
+
+**`LimitMEMLOCK` não é a restrição que aperta, e ADR-049 supôs que fosse.** Ele é
+um RLIMIT — **por processo** — então cada worker recebe os seus 64 MiB. Contra
+~1 MiB de rings por worker, isso é ~64× de folga. Extrapolando para o perfil R1
+(8 lanes → 9 rings): ~1,8 MiB por worker, ainda ~35× abaixo. O limite só
+apertaria por volta de **320 lanes num único processo**, e
+`AUTO_HANDLER_CONCURRENCY_MAX` é 32.
+
+**O que muda de significado é `MemoryMax`**, e ele muda em silêncio: é do cgroup,
+portanto **agregado**. O mesmo 1 GiB passa a ser dividido por N — 256 MiB por
+worker em N=4 — e nada no unit diz "dividido por N". Somar os dois tipos de
+limite, ou tratar `LimitMEMLOCK` como agregado, produz um unit que parece correto
+e mata workers sob carga.
+
+**`VmLck` é 0 em todo worker, e isso é a armadilha e não um erro.** O kernel cobra
+a memória dos rings contra `RLIMIT_MEMLOCK` **sem** reportá-la em `VmLck`. Um
+operador que observa `VmLck` para prever exaustão de memlock vê um zero plano até
+a alocação que falha — e esse modo já foi reproduzido aqui (F-C03-2, patch 30). O
+número a observar é a soma dos mapeamentos, e nenhum arquivo de `/proc` o entrega
+pronto.
+
+### Achado 2 — a viabilidade de ADR-049 estava errada, e o erro colapsa a tabela de custos
+
+ADR-049 afirmou duas coisas verificáveis. Ambas foram verificadas, e ambas caem.
+
+1. **"`net.Socket_Option.Reuse_Port` existe no Odin fixado (`core/net/socket.odin:36`)."**
+   O **símbolo** existe. Em Linux ele vale **`-1`**:
+   `core/net/socket_linux.odin:40` — `_SOCKET_OPTION_REUSE_PORT :: -1`. Só FreeBSD
+   o mapeia para uma constante real. `net.set_option(sock, .Reuse_Port, true)` em
+   Linux é um `setsockopt` com optname −1. O símbolo é um espaço reservado, não
+   uma capacidade, e a plataforma-alvo é exatamente a que não o tem.
+
+2. **"O caminho de bind é `vendor/nbio/impl.odin:_listen_tcp` ... inserir
+   `Reuse_Port` é uma linha, num arquivo vendorizado: patch 44."**
+   O caminho de bind **do produto** é `core:nbio`, não `vendor/nbio`.
+   `web/internal/transport/odin_http_adapter.odin:19` e os quatro arquivos de
+   `vendor/odin-http` importam `core:nbio`. `druse:vendor/nbio` é importado por
+   **dois programas de bench** e por mais nada. Patchear `vendor/nbio/impl.odin`
+   mudaria os benches e não mudaria o servidor.
+
+   Somando com o item 1: a "uma linha" seria um no-op num arquivo que o produto
+   não usa.
+
+**A árvore já continha a receita correta, e ela diz isto por escrito.**
+`bench/echo_reuseport/main.odin` (protótipo WP119) abre seu listener com
+`linux.setsockopt(fd, SOL_SOCKET, .REUSEPORT, &one)` cru, e o comentário dá o
+motivo: *"core:net on Linux does not expose REUSEPORT"*. Está lá desde WP119.
+
+### O que isso faz com os braços
+
+`_listen_tcp` faz criar-socket → `Reuse_Address` → `bind` → `listen` numa
+sequência sem costura, e `SO_REUSEPORT` tem de ser setado **antes do bind**. Não
+há ponto de inserção de fora.
+
+Portanto **A e B convergem no mesmo requisito ausente**: `nbio` não tem como
+receber um socket que não criou. `create_tcp_socket` passa por `create_socket`,
+que associa o socket ao event loop; não existe `adopt`. ADR-049 atribuiu esse
+custo apenas ao braço B. Ele é de A também.
+
+| Braço | Custo em ADR-049 | Custo medido |
+|---|---|---|
+| A — `SO_REUSEPORT` | 1 linha vendorizada | **ponto de entrada novo no nbio** + socket cru por `core:sys/linux` + a lane de accept dedicada repensada |
+| B — listener herdado | ponto de entrada novo no nbio | **o mesmo ponto de entrada**, mais o contrato de socket activation |
+| C — pre-fork | fork + threads + io_uring | inalterado, e continua sem precedente |
+
+A vantagem de custo de A sobre B **desaparece**. O que os separava era uma linha
+contra um ponto de entrada; medido, os dois pagam o ponto de entrada, e então B
+— que perde **zero** conexões quando um worker morre, porque a fila de accept
+pertence a quem não morreu — passa a ser o candidato melhor pelo mesmo preço.
+
+- **Decisão. NENHUM BRAÇO É ADOTADO NESTE ADR, e a razão mudou.** ADR-049 não
+  escolheu para que a escolha fosse feita com o custo visível. O custo agora está
+  visível, e ele diz que a escolha barata não existe. Adotar A hoje seria pagar o
+  preço de B por um mecanismo que perde a accept queue do worker morto.
+
+  **Isto não é "manter N=1".** O resultado permitido "manter N=1" de
+  `R3-general-maturity.md` §6 é para quando o custo de recursos não se paga, e a
+  medição diz o contrário: o custo de recursos é modesto, linear e sem
+  acoplamento. O que falta é **um ponto de entrada em `nbio`**, e essa é uma peça
+  de trabalho nomeável, não um impedimento.
+
+- **O que a próxima etapa exige, agora que é possível escrevê-lo.**
+
+  1. `nbio` ganha uma forma de adotar um socket já criado e ligado ao loop — a
+     peça que A, B e a socket activation compartilham. Como `core:nbio` é do
+     toolchain fixado e não vendorizado, isso é **upstream, ou vendorização do
+     pacote**, e a política de vendor vem *encolhendo* o delta (patch 42 foi uma
+     deleção de 1.295 linhas). É uma decisão de política, não um detalhe.
+  2. Só então o braço, com a campanha de fault de F1/F1n.
+  3. `MemoryMax` passa a ser contabilidade **por slice**, não por unidade, e o
+     unit template diz isso explicitamente em vez de deixar o operador descobrir
+     a divisão por N.
+
+- **Ledger.** **Sem crescimento.** Nenhum código, nenhum símbolo público, nenhum
+  patch de vendor, nenhum default. `ops/verification/measure-worker-budget.sh` é
+  harness, não produto.
+
+- **Reversibilidade. N/A.** Nada foi adicionado para reverter.
+
+- **O que este ADR não estabelece.** Que N workers funcionam: nada foi executado
+  com um listener compartilhado, porque nenhum existe. A campanha de fault
+  (F1 e o controle negativo F1n em N=1) **não rodou** e não podia rodar — ela
+  exige um braço implementado. Os números de recursos são de um container de
+  4 CPUs, e são contabilidade determinística, não capacidade (G4).

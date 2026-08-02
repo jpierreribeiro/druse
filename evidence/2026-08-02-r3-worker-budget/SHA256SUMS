@@ -1,0 +1,15 @@
+097b2c0d20a487e128e4a855baabf51c7e9a92ec88fcfc9099a4caadc64fe4d7  ./analysis/budget.md
+37c9549ea9c9920d9c78d4d4f569defc42a66fe84497bcd511720faa52daec67  ./commands.txt
+d950f65f08c27efc1772a94ee4565f05cf871dcdcd4fccb0caf6f9b21d4df514  ./config/budget.txt
+bdd6fc84bc237498efd12fb02f2e527eb394c32722c2a46ca545d76a8f8bf5e9  ./config/preregistration.md
+ae614a65188c561f19f3d4c7778d12a80793eb00c469f3d9edf8025c959d1b49  ./environment.txt
+8ace554f329b5d8c2ac88bf9dbfe49dec5571ae8d5b04fb1f9e7cff1828ee928  ./manifest.txt
+0fc13558999a579f9de44e6522ec8b31d16607d3abb59aed5902aad87c7ed50c  ./raw/adr049-feasibility-recheck.txt
+41cf1d8e2681ac7de8e45315ddf4f795eed7b8e39ae654b27e2daa2e786d9772  ./raw/maps-n1-worker0.txt
+012c43a558659bad6f0d4e2348a9f89a7d0d51db893148ac8951e62eb7a9ea1a  ./raw/maps-n2-worker0.txt
+171bc3961eb895b2a9d3455af9c94ac46fed5a2d3bb6ec5136c452f43d9ebb9d  ./raw/maps-n4-worker0.txt
+c1668e4d0842af5e4a7fa01d4f2f21100366cf6181b8f5d032e4c005951e970f  ./raw/per-worker.txt
+5e87dad49b0e2611ac2f427000535053b61678c9222b322b4e9750934852fd61  ./raw/status-n1-worker0.txt
+7f3f29fbb14a750d3e14bd1d77c1c6d0605daf6ef6b070b3081e1e6d836d9afc  ./raw/status-n2-worker0.txt
+5e87dad49b0e2611ac2f427000535053b61678c9222b322b4e9750934852fd61  ./raw/status-n4-worker0.txt
+6f55c3a0718a26a09e932f7f768df9696b31c5fd3da738b6532aab1933ef7f86  ./verdict.md

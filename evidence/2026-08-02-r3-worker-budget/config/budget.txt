@@ -1,0 +1,11 @@
+lanes_per_worker=4
+worker_counts=1 2 4
+base_port=57811
+server_sha256=19c0cc3d4662308c7190e3606453b74ee1f7f8cfe95c291b09ea446045c3aad9
+r1_limit_nofile=2048
+r1_limit_memlock_mb=64
+r1_memory_max_mb=1024
+ulimit_soft_nofile=1024
+ulimit_hard_nofile=4096
+ulimit_memlock_kb=8192
+nproc=4
