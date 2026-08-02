@@ -1,0 +1,60 @@
+# Druse R1 controlled-pilot runtime profile.
+#
+# Install as /etc/druse/runtime-limits (root-owned, mode 0644).  The systemd
+# unit loads this file with EnvironmentFile=, the application reads the DRUSE_*
+# values it owns, and check-runtime-limits.sh validates the same resolved
+# integers before ExecStart.  Keep this file in simple KEY=value form: it is
+# valid both as a systemd EnvironmentFile and as a shell file for local checks.
+
+DRUSE_PROFILE=controlled-pilot
+DRUSE_LIMITS_SOURCE=systemd
+
+# One listener per process is the supported R1 topology.  Put health/readiness
+# on this listener behind the reference proxy; a second listener requires a new
+# aggregate FD/memory measurement.
+DRUSE_SERVER_COUNT=1
+DRUSE_MAX_CONNECTIONS=1024
+DRUSE_RESERVED_CONNECTIONS=16
+DRUSE_MAX_HANDLERS=8
+DRUSE_MAX_RESPONSE_BYTES=8388608
+DRUSE_MAX_DRAIN_TIME_SEC=10
+DRUSE_MAX_WRITE_TIME_SEC=5
+
+# Upload spool budget.  StateDirectory=druse creates /var/lib/druse with the
+# service user as owner before ExecStartPre runs.
+DRUSE_SPOOL_DIR=/tmp/druse-r1-pilot-aRcKVI9i/state
+DRUSE_MAX_CONCURRENT_SPOOLS=7
+DRUSE_UPLOAD_QUOTA_BYTES=8388608
+DRUSE_UPLOAD_PROCESS_QUOTA_BYTES=33554432
+DRUSE_READ_WRITE_PATHS=/tmp/druse-r1-pilot-aRcKVI9i/state
+
+# FD accounting, measured on Linux 6.8 / Odin 819fdc7:
+#   stdio 3 + per server [listener 1 + 2 FDs * (handlers + acceptor 1)]
+#   + max connections + live spool files + app/log/telemetry + margin
+# = 3 + 1*(1 + 2*(8+1)) + 1*1024 + 1*7 + 32 + 128 = 1213.
+DRUSE_AUXILIARY_FDS=32
+DRUSE_FD_MARGIN=128
+DRUSE_EXPECTED_NOFILE=2048
+
+# Each io_uring loop mapped 208896 bytes in the recorded run; Linux 6.8 did
+# not charge those maps to VmLck/RLIMIT_MEMLOCK, while the recorded kernel 7.0
+# VPS did.  The supported floor therefore remains the conservative 64 MiB that
+# covers kernel/accounting variance and the earlier ASan failure mode.
+DRUSE_IO_URING_MAPPED_BYTES_PER_LOOP=208896
+DRUSE_MEMLOCK_FLOOR_BYTES=67108864
+
+# Three runs with eight concurrent 8 MiB responses held by slow readers peaked
+# at 308320, 324804 and 325264 KiB.  The maximum is frozen below; MemoryMax must
+# be at least that peak plus 200% headroom and must equal the effective cgroup
+# limit.  max_response_bytes does NOT prevent allocations made while building
+# the response and is not an OOM guarantee.
+DRUSE_MEASURED_PEAK_SERVER_COUNT=1
+DRUSE_MEASURED_PEAK_HANDLERS=8
+DRUSE_MEASURED_PEAK_RESPONSE_BYTES=8388608
+DRUSE_MEASURED_PEAK_RSS_BYTES=333070336
+DRUSE_MEMORY_HEADROOM_PERCENT=200
+DRUSE_MEMORY_MAX_BYTES=1073741824
+
+# Supervisor outer bound.  It must remain strictly greater than the framework
+# drain deadline.  The static contract checker also compares it with the unit.
+DRUSE_TIMEOUT_STOP_SEC=30

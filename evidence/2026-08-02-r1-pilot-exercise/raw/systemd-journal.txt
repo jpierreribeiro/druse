@@ -1,0 +1,24 @@
+2026-08-02T03:08:40.467726+00:00 jp-Latitude-5400 systemd[1401]: Started druse-r1-pilot-3358300.service - /bin/bash -c "set -a; . \"\$1/runtime-limits\"; set +a; \"\$1/check-runtime-limits.sh\"; exec \"\$1/app\"" _ /tmp/druse-r1-pilot-aRcKVI9i/releases/current.
+2026-08-02T03:08:40.492970+00:00 jp-Latitude-5400 bash[3426372]: PASS: druse runtime preflight profile=controlled-pilot servers=1 handlers=8 nofile=2048/1213 memlock=67108864/67108864 memory.max=1073741824/999211008 spool=/tmp/druse-r1-pilot-aRcKVI9i/state
+2026-08-02T03:08:40.494939+00:00 jp-Latitude-5400 bash[3426370]: event=serve-start release=candidate port=22141
+2026-08-02T03:08:50.244971+00:00 jp-Latitude-5400 systemd[1401]: druse-r1-pilot-3358300.service: Sent signal SIGTERM to main process 3426370 (app) on client request.
+2026-08-02T03:08:50.745892+00:00 jp-Latitude-5400 bash[3426370]: event=serve-return release=candidate
+2026-08-02T03:08:50.837861+00:00 jp-Latitude-5400 systemd[1401]: Started druse-r1-pilot-3358300.service - /bin/bash -c "set -a; . \"\$1/runtime-limits\"; set +a; \"\$1/check-runtime-limits.sh\"; exec \"\$1/app\"" _ /tmp/druse-r1-pilot-aRcKVI9i/releases/current.
+2026-08-02T03:08:50.870230+00:00 jp-Latitude-5400 bash[3426585]: PASS: druse runtime preflight profile=controlled-pilot servers=1 handlers=8 nofile=2048/1213 memlock=67108864/67108864 memory.max=1073741824/999211008 spool=/tmp/druse-r1-pilot-aRcKVI9i/state
+2026-08-02T03:08:50.872684+00:00 jp-Latitude-5400 bash[3426582]: event=serve-start release=candidate port=22141
+2026-08-02T03:08:51.376554+00:00 jp-Latitude-5400 systemd[1401]: druse-r1-pilot-3358300.service: Main process exited, code=dumped, status=6/ABRT
+2026-08-02T03:08:51.376800+00:00 jp-Latitude-5400 systemd[1401]: druse-r1-pilot-3358300.service: Failed with result 'core-dump'.
+2026-08-02T03:08:51.424421+00:00 jp-Latitude-5400 systemd-coredump[3426627]: Process 3426582 (app) of user 1000 dumped core.
+                                                                             
+                                                                             Stack trace of thread 3426595:
+                                                                             #0  0x00007d4d2749eb2c n/a (n/a + 0x0)
+                                                                             ELF object binary architecture: AMD x86-64
+2026-08-02T03:08:51.602696+00:00 jp-Latitude-5400 systemd[1401]: druse-r1-pilot-3358300.service: Scheduled restart job, restart counter is at 1.
+2026-08-02T03:08:51.617076+00:00 jp-Latitude-5400 systemd[1401]: Started druse-r1-pilot-3358300.service - /bin/bash -c "set -a; . \"\$1/runtime-limits\"; set +a; \"\$1/check-runtime-limits.sh\"; exec \"\$1/app\"" _ /tmp/druse-r1-pilot-aRcKVI9i/releases/current.
+2026-08-02T03:08:51.652035+00:00 jp-Latitude-5400 bash[3426675]: PASS: druse runtime preflight profile=controlled-pilot servers=1 handlers=8 nofile=2048/1213 memlock=67108864/67108864 memory.max=1073741824/999211008 spool=/tmp/druse-r1-pilot-aRcKVI9i/state
+2026-08-02T03:08:51.654981+00:00 jp-Latitude-5400 bash[3426674]: event=serve-start release=candidate port=22141
+2026-08-02T03:08:52.633693+00:00 jp-Latitude-5400 systemd[1401]: druse-r1-pilot-3358300.service: Sent signal SIGTERM to main process 3426674 (app) on client request.
+2026-08-02T03:08:53.134668+00:00 jp-Latitude-5400 bash[3426674]: event=serve-return release=candidate
+2026-08-02T03:08:54.166960+00:00 jp-Latitude-5400 systemd[1401]: Started druse-r1-pilot-3358300.service - /bin/bash -c "set -a; . \"\$1/runtime-limits\"; set +a; \"\$1/check-runtime-limits.sh\"; exec \"\$1/app\"" _ /tmp/druse-r1-pilot-aRcKVI9i/releases/current.
+2026-08-02T03:08:54.197877+00:00 jp-Latitude-5400 bash[3426920]: PASS: druse runtime preflight profile=controlled-pilot servers=1 handlers=8 nofile=2048/1213 memlock=67108864/67108864 memory.max=1073741824/999211008 spool=/tmp/druse-r1-pilot-aRcKVI9i/state
+2026-08-02T03:08:54.200186+00:00 jp-Latitude-5400 bash[3426918]: event=serve-start release=previous port=22141

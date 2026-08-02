@@ -1,0 +1,4 @@
+pid=3426918
+exe=/tmp/druse-r1-pilot-aRcKVI9i/releases/previous/app
+bundle=previous
+rollback_seconds=3

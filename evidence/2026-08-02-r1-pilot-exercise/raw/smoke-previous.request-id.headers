@@ -1,0 +1,12 @@
+HTTP/2 200 
+content-type: text/plain; charset=utf-8
+date: Sun, 02 Aug 2026 03:08:54 GMT
+referrer-policy: no-referrer
+strict-transport-security: max-age=31536000; includeSubDomains
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-r1-bundle: previous
+x-request-id: r1-wp06
+content-length: 9
+

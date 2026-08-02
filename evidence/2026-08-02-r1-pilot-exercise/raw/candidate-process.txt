@@ -1,0 +1,7 @@
+pid=3426370
+exe=/tmp/druse-r1-pilot-aRcKVI9i/releases/candidate/app
+VmLck:	       0 kB
+VmHWM:	    4736 kB
+VmRSS:	    4736 kB
+Threads:	9
+fds=24
