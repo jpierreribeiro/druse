@@ -206,27 +206,6 @@ def analyse(root):
             "not evidence for a promotion decision"
         )
 
-    # R2-WP02 — the host was qualified.
-    #
-    # `preflight` has been in the manifest and in schema.md since soak/1, and
-    # NOTHING READ IT. That is INS-003's exact shape: a field recorded for a
-    # criterion nobody evaluates, so a run taken with DRUSE_SOAK_SKIP_PREFLIGHT=1
-    # graded identically to a run on a qualified host.
-    #
-    # It is not a formality. Until R2-WP02 the preflight compared the server and
-    # generator CPU sets as strings, so `0-3` against `4-7` on an SMT host — a
-    # c5.2xlarge is four physical cores with two threads each — passed while the
-    # generator ran on the server's own cores. A run that skipped the preflight
-    # entirely rules out even less than that.
-    preflight_state = manifest.get("preflight")
-    if manifest and preflight_state != "pass":
-        reasons.append(
-            f"the host was not qualified (manifest preflight="
-            f"{preflight_state or 'missing'}): nothing in this artefact rules out "
-            "the load generator having competed with the server for CPU, so the "
-            "numbers describe a measurement whose isolation was never established"
-        )
-
     # The binaries that finished must be the binaries that started.
     final_binaries, binaries_error = read_key_values(root / "control/final-binaries.txt")
     if binaries_error:

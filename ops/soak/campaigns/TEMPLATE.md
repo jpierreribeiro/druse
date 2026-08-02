@@ -101,7 +101,7 @@ reach twelve hours.
 
 ## 6. Criteria and SLO
 
-The seventeen criteria in `ops/soak/CRITERIA.md` apply as written and are
+The eighteen criteria in `ops/soak/CRITERIA.md` apply as written and are
 pinned by hash. Anything **additional** for this campaign goes here, with a
 number, before the run.
 

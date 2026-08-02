@@ -688,6 +688,34 @@ require "$TMP/n11" "negative 11 (kernel counters never collected)" FAIL \
 echo "PASS (soak negative 11): a host that could not collect kernel counters is refused, not read as a clean kernel"
 
 # ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 12 — the host was never qualified (R2-WP02, criterion 18).
+#
+# `preflight` has been in the manifest and in schema.md since soak/1 and was
+# read by nothing at all, so a run taken with DRUSE_SOAK_SKIP_PREFLIGHT=1 graded
+# exactly like a run on a qualified host. Criterion 11's finding, one level up:
+# the field was written for a rule that never ran.
+#
+# Both of the states that are not `pass` are exercised, because they arrive by
+# different routes — `skipped` is a deliberate override at the prompt, `absent`
+# is a host where the preflight script was not there to run.
+# ---------------------------------------------------------------------------
+base "$TMP/n12"
+sed -i 's/^preflight=.*/preflight=skipped/' "$TMP/n12/manifest.txt"
+require "$TMP/n12" "negative 12 (preflight skipped)" FAIL \
+  "the host was not qualified"
+
+base "$TMP/n12b"
+sed -i 's/^preflight=.*/preflight=absent/' "$TMP/n12b/manifest.txt"
+require "$TMP/n12b" "negative 12b (no preflight at all)" FAIL \
+  "the host was not qualified"
+
+base "$TMP/n12c"
+sed -i '/^preflight=/d' "$TMP/n12c/manifest.txt"
+require "$TMP/n12c" "negative 12c (manifest carries no preflight state)" FAIL \
+  "the host was not qualified"
+echo "PASS (soak negative 12): a run whose host was never qualified is refused, instead of grading like one that was"
+
+# ---------------------------------------------------------------------------
 # The preflight refuses a host it cannot qualify, and says which CPU.
 # ---------------------------------------------------------------------------
 test -f "$SOAK/preflight.sh" || fail "ops/soak/preflight.sh is missing"

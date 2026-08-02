@@ -18,7 +18,7 @@ start. That is a blocker recorded, not a criterion relaxed.
 
 **H1:** the candidate identified in §2, on the host described in §3, sustains
 the six workloads of §4 for twelve continuous hours without violating any of the
-seventeen criteria in `ops/soak/CRITERIA.md` or the service SLO in §6.
+eighteen criteria in `ops/soak/CRITERIA.md` or the service SLO in §6.
 
 One claim, and it is falsifiable by a single red criterion.
 
@@ -35,9 +35,10 @@ One claim, and it is falsifiable by a single red criterion.
 - **Not a comparison with any other framework, build or campaign.** See §8; the
   permitted list is empty on purpose.
 - **Not a security result.** R2-WP06 is untouched.
-- **Not a statement that the SLO in §6 is achievable.** Five of its six latency
-  rows are `open` (§6.2). This campaign is where the first honest inputs to them
-  come from, which is not the same as passing them.
+- **Not a statement that the SLO in §6 is achievable.** Fifteen of its eighteen
+  latency cells are `open` (§6.2) — five workloads with no percentile at all, and
+  `/health` with only its inherited p99. This campaign is where the first honest
+  inputs to them come from, which is not the same as passing them.
 
 ## 2. Candidate identity
 
@@ -72,10 +73,10 @@ instrument change cannot silently keep an old pre-registration:
 
 | File | sha256 |
 |---|---|
-| `ops/soak/CRITERIA.md` | `51fc9527b2b3e582695faf8716a9d9415afb0f2d99ba690b7fed2de508e17220` |
+| `ops/soak/CRITERIA.md` | `456abe821d51511040e418adb0b3847c57f087c942ccbb1940460a7c820275ae` |
 | `ops/soak/schema.md` | `e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640` |
 | `ops/soak/run-soak.sh` | `5844528c0f7215429cc9f42b2df41d835f1f0e62e70983dfb2cb1623f8be710e` |
-| `ops/soak/analyze-soak.py` | `ff25766041819d56af0dc1511e7b7f056f752f8820062f6fdc68961675515730` |
+| `ops/soak/analyze-soak.py` | `b46aafa75f605672309dc3221e7a20b100cc37adf5e6713d852087aa2921a008` |
 | `ops/soak/soak-server/main.odin` | `59e22b0b7cd017acb7658023950e3ac35bceb4dfb3e25b21e6d9c717e2823b54` |
 | `ops/soak/openload/main.go` | `3382a965e18bb1e714fe36cb6b4ec2ff71b27dfa3818e260c970980d132c48dd` |
 
@@ -197,7 +198,7 @@ not. Both directions are enforced by the analyser.
 | json decode | `/json/medium/decode` | 4,000/s | 256 | 204 | yes |
 | 64 KiB | `/bytes/64k` | 150/s | 64 | 200 | yes |
 | blocking | `/wait/40ms` | 15/s | 32 | 200 | yes |
-| 1 MiB | `/bytes/1m` | — | — | — | **no** — the route exists in the soak server and no rate was ever set for it; adding one now would be a new profile with no history, decided during a stability campaign. Recorded in `control/short.txt` at run time. |
+| 1 MiB | `/bytes/1m` | — | — | — | **not as a rated profile.** The route is exercised — it is the target of the slow-reader injection below, 24 sockets abandoned mid-response (`run-soak.sh`) — but it carries no rate, no connection count and no expected status, so it has no SLO row in §6.2. Giving it one now would be a new profile with no history, decided during a stability campaign. Recorded in `control/short.txt` at run time. |
 
 **These rates are offered load, not promises.** They come from
 `ops/soak/CRITERIA.md` §"The criteria have a history", where they were halved
@@ -235,7 +236,7 @@ are corrected: the 100 GiB disk figure in `preflight.sh` and the 2%
 
 ## 6. Criteria and SLO
 
-The seventeen criteria in `ops/soak/CRITERIA.md` apply as written and are pinned
+The eighteen criteria in `ops/soak/CRITERIA.md` apply as written and are pinned
 by hash (§2.1). Anything **additional** for this campaign is numbered here,
 before the run.
 

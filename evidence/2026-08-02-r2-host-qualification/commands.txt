@@ -51,6 +51,8 @@ bash build/check_soak_controls.sh; git checkout ops/soak/preflight.sh
 #    the table the pre-registration pinned.
 printf '\n# drift\n' >> ops/soak/analyze-soak.py                  # M3
 bash build/check_soak_controls.sh; git checkout ops/soak/analyze-soak.py
+# M4 disables the criterion-18 check in the analyser (`if False:`) and requires
+#    negative control 12 to go red.
 
 # 9. The full gate. NOT as root: build/check_r1_resource_controls.sh chmods a
 #    spool to 0500 and requires the preflight to see it non-writable, and root

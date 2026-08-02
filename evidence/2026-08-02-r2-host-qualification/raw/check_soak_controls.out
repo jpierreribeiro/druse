@@ -23,6 +23,7 @@ PASS (soak negative 8): a binary that changed during the run, or was never re-ha
 PASS (soak negative 9): a run that never reached its end is not graded as one that did
 PASS (soak negative 10): injected faults are counted apart from spontaneous ones, and neither is netted off the other
 PASS (soak negative 11): a host that could not collect kernel counters is refused, not read as a clean kernel
+PASS (soak negative 12): a run whose host was never qualified is refused, instead of grading like one that was
 PASS (soak preflight): an unqualified host is refused before the campaign, with the reason recorded
 PASS (soak preflight, R2-WP02 positive): CPU sets on four distinct physical cores are qualified, and the mapping is recorded
 PASS (soak preflight, R2-WP02 mutant): CPU sets that are disjoint by number and SMT siblings by topology are refused, by that reason

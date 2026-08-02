@@ -11,10 +11,12 @@ raw/preflight-topology-unreadable.txt       an unreadable topology: refused, not
 raw/host-topology.txt                       lscpu -e and every thread_siblings_list on this host
 raw/smoke-this-host.txt                     upload, stream and proxy, green, on an UNQUALIFIED host
 raw/smoke-stderr.txt                        the smoke's console output
-raw/check_soak_controls.out                 the full control suite, 37 assertions
-raw/mutations.txt                           three mutations, each red, each for its own reason
+raw/check_soak_controls.out                 the full control suite, 38 assertions
+raw/mutations.txt                           four mutations, each red, each for its own reason
 config/pre-registration.md                  the campaign pre-registration as committed
 config/preflight.sh.before                  the preflight as shipped on main
 config/preflight.sh.after                   the preflight after R2-WP02
+config/analyze-soak.py.before               the analyser as shipped on main
+config/analyze-soak.py.after                the analyser after R2-WP02 (criterion 18)
 commands.txt                                how to reproduce all of it
 environment.txt                             the host, its topology, and why it is not the campaign host

@@ -17,3 +17,8 @@ SOAK-CONTROL-FAIL: the instrument moved and the pre-registration did not:
     on disk: cfd4d6df0ebe328c6d4e01080a3a2b9f8106d13db4d0f92fbfd0803d1b74bb80
 Readiness rule G1: a change to the instrument creates a NEW CANDIDATE, and
 exit=1
+
+=== M4: the manifest says the preflight was skipped (criterion 18) ===
+negative 12 (preflight skipped): expected FAIL, got PASS
+SOAK-CONTROL-FAIL: control failed: negative 12 (preflight skipped)
+exit=1

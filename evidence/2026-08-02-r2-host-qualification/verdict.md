@@ -22,9 +22,10 @@ Against the acceptance list in `planning/readiness/R2-restricted-production.md`
 | `preflight.sh` runs on the host and qualifies it | **NOT met** | no dedicated host exists; see below |
 | upload/stream/proxy smoke green on the host | **partially met** | green on an unqualified workstation, stamped as such: `raw/smoke-this-host.txt` |
 
-`build/check_soak_controls.sh` is at 37 assertions, up from 26. The ten new ones
-are six for the topology check, three for the smoke's ordering and its override,
-and one that recomputes the instrument hashes the pre-registration pins.
+`build/check_soak_controls.sh` is at 38 assertions, up from 26. The twelve new
+ones are six for the topology check, three for the smoke's ordering and its
+override, one for the new criterion 18, one that compiles the smoke server, and
+one that recomputes the instrument hashes the pre-registration pins.
 
 ## The finding
 
@@ -47,6 +48,24 @@ It did refuse this host, for a busy port and 40 GiB of free disk. Both are
 fixable in an afternoon, after which the host would have qualified for a
 twelve-hour campaign with the generator on the server's cores, and the artefact
 would have recorded a properly isolated run.
+
+## The second finding, which the first one exposed
+
+Once the preflight could refuse a host by topology, the obvious next question was
+what happens to a run that never asked it. The answer: nothing.
+
+`manifest.txt` has recorded `preflight=pass|skipped|absent` since `soak/1`, and
+`schema.md` documents the field. **`analyze-soak.py` never read it.** A run taken
+with `DRUSE_SOAK_SKIP_PREFLIGHT=1` graded exactly like a run on a qualified host.
+
+That is criterion 11's finding one level up — a field written for a rule that
+never ran — and it is now `CRITERIA.md` criterion 18, enforced by the analyser
+and controlled three ways (`skipped`, `absent`, and the key missing entirely).
+All eight committed fixtures already carried `preflight=pass`, so the criterion
+cost the reference artefacts nothing; it had simply never been asked of them.
+
+`raw/mutations.txt` M4 records the analyser with the new check disabled: negative
+control 12 goes red immediately.
 
 ## The decision the finding forces
 

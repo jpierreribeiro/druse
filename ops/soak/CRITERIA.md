@@ -95,6 +95,17 @@ describes an artefact that used to grade PASS:
     artefact a bad night produces, so the run with the most to say produced no
     grade at all.
 
+## What R2-WP02 added
+
+18. **The host was qualified.** `manifest.txt` records `preflight=pass`. The
+    field has existed since `soak/1` and was read by NOTHING, so a run taken
+    with `DRUSE_SOAK_SKIP_PREFLIGHT=1` graded exactly like a run on a qualified
+    host — the same shape as criterion 11's finding, one level up. It matters
+    more since R2-WP02, because the preflight is now also what refuses a host
+    whose server and generator CPU sets are SMT siblings of the same physical
+    cores; a run that skipped it establishes neither that the host could run the
+    campaign nor that the generator stayed off the server's cores.
+
 ## Accounting, not tolerance
 
 Criterion 3 is the one this instrument exists for.
