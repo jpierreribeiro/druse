@@ -1,7 +1,7 @@
 # R1 — plano para piloto controlado
 
-**Status:** EM EXECUÇÃO — R1-WP01, R1-WP02 e R1-WP03 implementados; promoção
-continua bloqueada pelos R1-WP04–R1-WP07.
+**Status:** PROMOTED TO R1 em 2026-08-02 — piloto interno não crítico somente;
+produção crítica, produção geral e R2 continuam bloqueados.
 **Objetivo:** permitir tráfego interno e não crítico, com perda tolerável,
 rollback imediato e domínio de falha conhecido.
 **Não autoriza:** produção crítica, exposição direta sem proxy, SLO externo ou
@@ -33,17 +33,17 @@ e voltar a R0; não executar uma campanha “informativa” e depois promovê-la
 | R1-WP06 | exercício de implantação, crash e rollback | campanha |
 | R1-WP07 | freeze e decisão de promoção | freeze |
 
-### Estado de execução em 2026-08-01
+### Estado de execução em 2026-08-02
 
 | ID | Estado | Evidência |
 |---|---|---|
 | R1-WP01 | implementado; gate dedicado verde | `evidence/2026-08-01-r1-shutdown/` |
 | R1-WP02 | implementado; gate e drill systemd verdes | `evidence/2026-08-01-r1-resource-budget/` |
 | R1-WP03 | implementado; Caddy real e controles verdes | `evidence/2026-08-02-r1-real-proxy/` |
-| R1-WP04 | pendente | perfil normativo ainda não consolidado |
-| R1-WP05 | pendente | runbooks do piloto ainda não criados |
-| R1-WP06 | pendente | deploy/crash/rollback ainda não exercitados |
-| R1-WP07 | bloqueado pelos anteriores | nenhuma promoção autorizada |
+| R1-WP04 | implementado; perfil e nove mutantes verdes | `docs/supported-profile.md` |
+| R1-WP05 | implementado; policy, runbooks e controles verdes | `docs/runbooks/` e `ops/verification/pilot-checklist.md` |
+| R1-WP06 | implementado; campanha oficial e hashes verdes | `evidence/2026-08-02-r1-pilot-exercise/` |
+| R1-WP07 | implementado; freeze e decisão verdes | `planning/readiness/R1-freeze.md` e `evidence/2026-08-02-r1-freeze/` |
 
 ## 3. Etapa A — contrato de shutdown
 
@@ -333,6 +333,13 @@ negativos mínimos:
 
 Cada mutante precisa falhar na afirmação correspondente, não em link quebrado.
 
+#### Resultado executado em 2026-08-02
+
+`docs/supported-profile.md` passou a ser a fonte normativa. O checker deriva o
+teto de 16 servidores e as 43 disposições do vendor e recusou nove afirmações
+semanticamente falsas, incluindo TLS/HTTP/2 nativos, plataforma não Linux,
+preempção de Handler e garantia de OOM pelo limite de resposta.
+
 ### R1-WP05 — perfil e runbook do piloto
 
 Criar:
@@ -345,6 +352,13 @@ Criar:
 O perfil do piloto deve fixar carga máxima inicial, rotas permitidas, dados não
 críticos, janela, owner de plantão, dashboards, alertas, rollback e critérios de
 abort. Não usar o piloto como soak disfarçado.
+
+#### Resultado executado em 2026-08-02
+
+O perfil fixa owner, janela de 60 minutos, máximo de 10 rps/20 concorrentes,
+rotas `/pilot/`, dados reconstruíveis, alertas, abort e rollback em cinco
+minutos. Três runbooks e o checklist versionado passaram controles que tentam
+remover owner/abort ou permitir carga, migração e rollback inseguros.
 
 ## 7. Etapa E — exercício do piloto
 
@@ -372,6 +386,15 @@ Preservar:
 - exit status/signal e `systemctl show`;
 - resultados de health/readiness;
 - decisão final e qualquer intervenção manual.
+
+### Resultado executado em 2026-08-02
+
+O candidato `350eefb` passou o gate integral e a campanha com Caddy e systemd
+reais: 50/50 respostas a 10 rps, zero erros, p99 de 65,43 ms, drain com zero
+restarts, fault SIGABRT com um restart e rollback atômico do binário e da
+configuração para o pai real `489421d` em três segundos. A campanha terminou
+sem listener, processo candidato ou spool órfão. O pacote completo e seus
+hashes estão em `evidence/2026-08-02-r1-pilot-exercise/`.
 
 ## 8. R1-WP07 — freeze
 
@@ -405,3 +428,11 @@ citam o mesmo commit/binário do gate local.
 - **HOLD:** evidência incompleta ou risco sem aceite;
 - **ROLL BACK TO R0:** regressão funcional, gate vermelho ou identidade do
   candidato quebrada.
+
+### Resultado executado em 2026-08-02
+
+**PROMOTE TO R1 — internal, non-critical controlled pilot only.** O ledger de
+riscos, as limitações que continuam bloqueando R2, o índice de evidências e o
+comando repetível estão congelados em `planning/readiness/R1-freeze.md`. O
+checker `build/check_r1_freeze.sh` impede que a decisão seja alargada, que um
+P0/P1 desapareça ou que evidência/hashes deixem de verificar.

@@ -95,6 +95,10 @@ motivo correto, além do controle positivo final.
 
 ## Gate R1 — piloto controlado
 
+**Status em 2026-08-02:** R1.1–R1.5 concluídos e promovidos exclusivamente para
+piloto interno não crítico. Evidência e riscos aceitos estão em
+[`readiness/R1-freeze.md`](readiness/R1-freeze.md); R2 continua bloqueado.
+
 Plano executável detalhado: [`readiness/R1-controlled-pilot.md`](readiness/R1-controlled-pilot.md).
 
 ### R1.1 — reconciliar shutdown real
