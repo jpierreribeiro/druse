@@ -1,0 +1,5 @@
+valid_chain=accepted
+wrong_ca=refused
+wrong_host=refused
+client_http_version=2
+upstream_version=1.1

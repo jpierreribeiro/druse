@@ -1,0 +1,5 @@
+caddy_peer=172.17.0.3
+previous_hop=172.17.0.1
+edge_spoof_result=172.17.0.1
+direct_spoof_result=127.0.0.1
+multi_hop_result=203.0.113.44

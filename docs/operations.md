@@ -442,6 +442,37 @@ can send one — and a rate limit, audit log or allow-list built on a forged val
 is an authorization bypass. If you configure nothing, you get the peer, which
 behind a proxy is the proxy: correct, if not what you wanted, and safe.
 
+The controlled-pilot reference topology is versioned in
+`ops/proxy/caddy/Caddyfile`; its immutable image identity is in
+`ops/proxy/caddy/image.env`. It terminates TLS/HTTP/2, forwards HTTP/1.1 to
+Druse, bounds its pool, deletes header maps from access logs and trusts no real
+ingress network by default. Replace the TEST-NET trusted-ingress value only
+with the exact CDN/load-balancer networks in front of Caddy. Separately,
+`web.trust_proxies` must name only Caddy's address/network as seen by Druse.
+
+The retry contract has two layers:
+
+- Caddy load-balancer retries are disabled on every route
+  (`lb_retries 0`, `lb_try_duration 0s`), so a new refused connection produces
+  one bounded proxy failure rather than a retry storm.
+- Caddy's Go HTTP transport may transparently replace a stale *previously used*
+  pooled connection only for a replay-safe request: `GET`, `HEAD`, `OPTIONS`,
+  `TRACE`, or a request carrying an idempotency key, and only when it has no
+  body or a replayable body. The reference pool has at most four idle
+  connections; therefore at most four stale pooled attempts plus one fresh
+  attempt can occur. Do not use an idempotency key on non-idempotent work.
+
+Run the real interop campaign after changing the proxy, its image or any limit:
+
+```sh
+bash ops/verification/run-real-proxy-contract.sh
+```
+
+The campaign requires Docker and the pinned image already present. It generates
+ephemeral private keys, preserves only public certificates/fingerprints, and
+exercises TLS identity, HTTP/2→HTTP/1.1, pooling, buffering, layer precedence,
+forwarded chains, saturation, shutdown and log redaction.
+
 ---
 
 ## 8. Security posture
@@ -450,9 +481,10 @@ behind a proxy is the proxy: correct, if not what you wanted, and safe.
 web.use(&app, web.secure_headers)   // nosniff, DENY, no-referrer
 ```
 
-**There is no CSP and no HSTS**, deliberately. A CSP not written for your
-application breaks it; HSTS belongs to whatever terminates TLS. Set both **at
-your proxy**, where they can be written against your actual deployment.
+**There is no automatic CSP and no HSTS**, deliberately. HSTS belongs to the
+proxy that terminates TLS. CSP belongs to the application (or an application-
+specific proxy route), because only that layer knows which sources the page
+needs; the reference fixture sets its CSP in the handler and Caddy sets HSTS.
 
 **There is no cookie API**, so there is nothing to secure with `SameSite` — if
 you set cookies, you set the headers, and you own their attributes.
@@ -492,10 +524,11 @@ close immediately without losing it.
 
 **Behind a proxy.** The framework produces chunked output a non-buffering proxy
 forwards frame by frame. A BUFFERING proxy is the failure mode to configure
-away, not a framework behaviour: on nginx set `proxy_buffering off;` (or send
-`X-Accel-Buffering: no`) for the SSE location, disable response buffering, and
-raise `proxy_read_timeout` past your heartbeat interval. `Last-Event-ID` crosses
-an ordinary proxy unchanged. Send a heartbeat comment (`: ping`) periodically so
+away, not a framework behaviour. The reference Caddy route fixes
+`flush_interval -1`; on nginx set `proxy_buffering off;` (or send
+`X-Accel-Buffering: no`) for the SSE location. Keep the proxy stream/read
+timeout beyond your heartbeat interval. `Last-Event-ID` crosses an ordinary
+proxy unchanged. Send a heartbeat comment (`: ping`) periodically so
 idle-timeout proxies keep the connection open.
 
 **SSE and reconnection.** SSE is a Crystal (`crystals:web/sse`) over this
@@ -518,13 +551,15 @@ hook in the vendored backend is a numbered `BRIDGE` patch, deletable when
 
 ## 9. A deployment checklist
 
-1. Reverse proxy in front, terminating TLS, with its own timeouts and body caps.
+1. Install the pinned Caddy reference configuration, or prove your real proxy
+   with the same campaign; terminate TLS and own public timeouts/body caps there.
 2. Supervisor with `Restart=on-failure` and a `TimeoutStopSec` you chose.
 3. Install the canonical runtime profile/preflight; set `web.limits` from the
    same environment and keep its derived `LimitNOFILE`/`LimitMEMLOCK` green.
 4. `web.trust_proxies` naming your proxy's network — or nothing at all, never a
    guess.
-5. `web.secure_headers` on, CSP and HSTS at the proxy.
+5. `web.secure_headers` on; HSTS at the TLS proxy; CSP and cookie attributes
+   owned by the application policy.
 6. `web.logger` and `web.request_id` on; `web.observe` exporting to wherever you
    alert from.
 7. A cgroup memory limit, because the framework does not bound your handlers.
@@ -557,7 +592,9 @@ the topology those limitations make mandatory:
 
 * **Run behind a reverse proxy.** TLS is delegated to it by decision, and the
   proxy's own timeouts are a second, independent bound on a slow client. §7 and
-  the C-06 contract.
+  the C-06 contract. R1's reference is the pinned Caddy configuration under
+  `ops/proxy/caddy/`; another proxy is not covered until it passes the same
+  campaign.
 * **Run under a supervisor with `Restart=on-failure` and a kill timeout.** A
   faulting handler aborts the process by construction — Odin has no recoverable
   panic (ADR-020) — and a handler blocked in foreign code cannot be preempted,

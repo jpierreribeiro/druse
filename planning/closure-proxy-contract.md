@@ -1,7 +1,7 @@
 # C-06 — The reverse-proxy contract, as a tested topology
 
-**Status: TWO CLAUSES PROVEN, TWO OWED (Closure, WP C-06).** Answers perimeter 8
-of `planning/production-readiness-closure.md` §4.
+**Status: FAST FIXTURE RETAINED; REAL CADDY ROUND COMPLETE (C-06 + R1-WP03).**
+Answers perimeter 8 of `planning/production-readiness-closure.md` §4.
 
 ---
 
@@ -34,11 +34,12 @@ therefore carries a ~150-line relay of its own:
 - **−** it is **not evidence about nginx.** It proves Druse behaves correctly
   *under the contract*; it cannot prove any particular proxy implements it.
 
-**A real-proxy interop round is therefore OWED**, and is recorded here beside the
-phase's two other named obligations: the hours-long soak (C-04) and the 3,000
-real-socket SSE round (Phase 7). All three want the same thing — a quiet machine
-and a little setup — and naming them is the point, because this phase exists
-because an obligation nobody wrote down stopped being trackable.
+The fast fixture is still not evidence about a product proxy. R1-WP03 closes
+that distinction with Caddy 2.11.4, pinned by tag, immutable image digest and
+`linux/amd64` platform in `ops/proxy/caddy/image.env`. The reviewed
+topology is `ops/proxy/caddy/Caddyfile`, the repeatable campaign is
+`ops/verification/run-real-proxy-contract.sh`, and the preserved
+real-proxy round is `evidence/2026-08-02-r1-real-proxy/`.
 
 ---
 
@@ -89,21 +90,29 @@ end-to-end behaviour across a real hop, with the trust decision switched.
 
 ---
 
-## 4. What is owed, named rather than implied
+## 4. The real-proxy round
 
-1. **A real-proxy round** (nginx or caddy, `proxy_buffering off`, an SSE
-   endpoint, an `X-Forwarded-For` assertion). The fixture proves the contract is
-   satisfiable; only a real proxy proves a real proxy satisfies it.
-2. **Upstream keep-alive through a POOLING proxy** — two client requests over
-   one upstream connection, in order, with no bleed. The property itself is
-   already proven at the wire level by `wp41-fault`
-   `phase_keep_alive_serves_two_requests_on_one_connection`; what is unproven is
-   that a pooling proxy sees the same thing. It needs a fixture that pools, which
-   is a second fixture rather than a switch on this one.
-3. **Duplicated limits** — the proxy's timeout shorter than the server's, so the
-   client sees the proxy's error while the server's connection is retired
-   cleanly. Same fixture as (2).
+The R1 campaign adds the properties the fixture could not claim:
 
-None of the three blocks the verdict: clause 1 is the one that silently breaks a
-shipped feature, and it is proven. The rest are refinements of a topology now
-demonstrated to work.
+| Area | Executed contract |
+|---|---|
+| TLS/protocol | valid CA/host accepted; wrong CA/host refused; HTTP/2 client→Caddy; HTTP/1.1 Caddy→Druse |
+| pool | 20 client requests with retained upstream sockets measured; four-connection maximum |
+| stream | `flush_interval -1` delivers incrementally; a `response_buffers` control delivers no event inside its window |
+| limits | proxy and Druse each win body/header/time arms when configured stricter; outcomes are 413/431/504 rather than ambiguous close |
+| identity | edge and direct spoof fail closed; a declared multi-hop chain is walked from the right |
+| degradation | admission refusal becomes one bounded 502/503 and recovers to 200 |
+| shutdown | active `/ready` health plus Druse admission stop yields zero handler entries after drain is observable |
+| ownership/logs | HSTS at Caddy; CSP/cookies at the app; request ID retained while header maps and secrets are deleted |
+
+Every `reverse_proxy` block has `lb_retries 0` and
+`lb_try_duration 0s`. The Go transport's narrower transparent stale-
+connection behavior remains: only replay-safe requests on previously successful
+pooled connections qualify. With at most four idle upstream connections, its
+derived ceiling is four stale attempts plus one fresh attempt. A new TCP
+refusal, which the saturation arm exercises, has one attempt.
+
+This closes the real-proxy round for **this Caddy topology only**. Nginx,
+HAProxy, a CDN in front, or materially different limits/trust networks require
+their own campaign arm. The hours-long soak remains an R2 obligation, not a
+proxy-contract deferral.

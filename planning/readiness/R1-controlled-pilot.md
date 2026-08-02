@@ -1,7 +1,7 @@
 # R1 — plano para piloto controlado
 
-**Status:** EM EXECUÇÃO — R1-WP01 e R1-WP02 implementados; promoção continua
-bloqueada pelos R1-WP03–R1-WP07.
+**Status:** EM EXECUÇÃO — R1-WP01, R1-WP02 e R1-WP03 implementados; promoção
+continua bloqueada pelos R1-WP04–R1-WP07.
 **Objetivo:** permitir tráfego interno e não crítico, com perda tolerável,
 rollback imediato e domínio de falha conhecido.
 **Não autoriza:** produção crítica, exposição direta sem proxy, SLO externo ou
@@ -39,7 +39,7 @@ e voltar a R0; não executar uma campanha “informativa” e depois promovê-la
 |---|---|---|
 | R1-WP01 | implementado; gate dedicado verde | `evidence/2026-08-01-r1-shutdown/` |
 | R1-WP02 | implementado; gate e drill systemd verdes | `evidence/2026-08-01-r1-resource-budget/` |
-| R1-WP03 | pendente | proxy real ainda não escolhido/provado |
+| R1-WP03 | implementado; Caddy real e controles verdes | `evidence/2026-08-02-r1-real-proxy/` |
 | R1-WP04 | pendente | perfil normativo ainda não consolidado |
 | R1-WP05 | pendente | runbooks do piloto ainda não criados |
 | R1-WP06 | pendente | deploy/crash/rollback ainda não exercitados |
@@ -258,6 +258,25 @@ apenas certificados públicos, fingerprints e comandos.
 - nenhuma retry storm; número máximo de tentativas e métodos retryable fixados;
 - proxy e Druse têm logs correlacionáveis sem vazar dados sensíveis;
 - campanha repetível a partir do repositório.
+
+#### Resultado executado em 2026-08-01
+
+Caddy 2.11.4 foi fixado por tag, digest e plataforma em
+`ops/proxy/caddy/image.env`; a configuração completa está no `Caddyfile` ao
+lado. O fixture C-06 continua como gate rápido, enquanto
+`ops/verification/run-real-proxy-contract.sh` executa a imagem real.
+
+A campanha provou cadeia/hostname TLS e HTTP/2 até Caddy, HTTP/1.1 e pool
+limitado até Druse, stream incremental contra um braço deliberadamente
+bufferizado, precedência de body/header/timeout nas duas camadas, XFF direto,
+spoofado e multi-hop, saturação/recovery e shutdown após readiness negativa.
+HSTS ficou no terminador TLS; CSP/cookie attributes no aplicativo. Os logs
+preservaram somente o request ID validado e descartaram mapas de headers.
+
+Retries do balanceador são zero. O transporte Go ainda pode substituir conexão
+pooled stale para métodos/requisições replay-safe; com o pool de quatro, o teto
+derivado é quatro tentativas stale mais uma fresh. Essa exceção está no contrato
+operacional e não autoriza retry de trabalho não idempotente.
 
 ## 6. Etapa D — documentação normativa
 
