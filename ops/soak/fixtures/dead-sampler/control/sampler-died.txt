@@ -1,0 +1,1 @@
+the telemetry sampler was not running when the load stopped

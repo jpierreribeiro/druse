@@ -1,0 +1,218 @@
+{
+  "complete_marker": true,
+  "cycles": 1,
+  "expected_samples": 15,
+  "failure_classes": {},
+  "failure_examples": {},
+  "failures_classified": 0,
+  "failures_counted": 0,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 14,
+    "last": 14,
+    "max": 25
+  },
+  "final_state": {
+    "forced_kill": "0",
+    "sampler_exit": "143",
+    "server_exit": "0"
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 11279,
+    "median_p99_us": 11279,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 5256
+  },
+  "injected_faults": {
+    "attempted": 0,
+    "by_phase": {},
+    "campaigns": 0,
+    "declared": {},
+    "errors": 0,
+    "unreadable": []
+  },
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 0,
+    "tcp_retrans": 0
+  },
+  "manifest": {
+    "allow_dirty": "0",
+    "analyzer_sha256": "4eb7f265758b3d870df2746ea19289ca5459f3baf1195aa033ac11fa2bedbc1d",
+    "bytes_64k_rate": "20",
+    "compiler": "/tmp/druse-toolchain/odin version dev-2026-07-nightly:819fdc7",
+    "completed_utc": "2026-08-02T05:44:30Z",
+    "criteria_sha256": "b57a6baaf532b34d3636e6e3af1c96ee7d4bbd3168761ab0360108def2112f06",
+    "cycles": "1",
+    "expected_samples": "15",
+    "final_settle_seconds": "3",
+    "generator_cpus": "2-3",
+    "git_dirty": "0",
+    "git_head": "e32930d8bc66cd4f334d1e04f22d63f17184dddb",
+    "git_tree": "697c9bab0222f9e195233650f935b4eb8c9d4db1",
+    "harness_head": "e32930d8bc66cd4f334d1e04f22d63f17184dddb",
+    "health_rate": "20",
+    "hours": "1",
+    "json_decode_rate": "100",
+    "json_encode_rate": "100",
+    "kernel": "Linux 6.18.5 x86_64 GNU/Linux",
+    "lanes": "4",
+    "launch_stagger_seconds": "1",
+    "max_cycles": "1",
+    "max_rss_kib": "4194304",
+    "nofile": "4096",
+    "nstat": "absent",
+    "openload_sha256": "7a38257e1b770816031a66417d87100430d11637cf2657d9b576067ec3cd5dfc",
+    "phase_seconds": "6",
+    "preflight": "skipped",
+    "runner_sha256": "5844528c0f7215429cc9f42b2df41d835f1f0e62e70983dfb2cb1623f8be710e",
+    "sample_seconds": "1",
+    "schema_sha256": "505170bd31be3d2b64cd61bab3dde76b69d6dedb44644845e7b5edc36ad27b14",
+    "schema_version": "soak/1",
+    "server_cpus": "0-1",
+    "server_sha256": "d42d61aa5c8422ad89f32c88addddd867bc8a9d0418edbb85ba7c070058048d3",
+    "started_utc": "2026-08-02T05:44:15Z",
+    "tiny_rate": "200",
+    "wait_40ms_rate": "5"
+  },
+  "nstat": "absent",
+  "pins": {
+    "criteria": {
+      "run": "b57a6baaf532b34d3636e6e3af1c96ee7d4bbd3168761ab0360108def2112f06",
+      "tree": "b57a6baaf532b34d3636e6e3af1c96ee7d4bbd3168761ab0360108def2112f06"
+    },
+    "schema": {
+      "run": "505170bd31be3d2b64cd61bab3dde76b69d6dedb44644845e7b5edc36ad27b14",
+      "tree": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640"
+    }
+  },
+  "reasons": [
+    "schema.md changed after the run: manifest pinned 505170bd31be, the tree holds e611a96f1360. The criteria a run is graded by cannot be edited between the run and the grade",
+    "nstat was not installed on the host, so the kernel drop counters were never collected: the zeros in those columns are absence of measurement, not absence of drops"
+  ],
+  "result": "FAIL",
+  "rss_kib": {
+    "first": 4220,
+    "last": 4872,
+    "max": 5256,
+    "min": 4220,
+    "tail_slope_kib_per_hour": -281314.2857142857
+  },
+  "run_directory": "/tmp/claude-0/-home-user-druse/1d80288d-5dc9-5c1b-aa1c-a9cfcc6a19da/scratchpad/smoke2/soak",
+  "sample_shortfall": 1,
+  "schema_version": "soak/1",
+  "schema_version_expected": "soak/1",
+  "short_workloads": {},
+  "skipped_workloads": {},
+  "stats_empty_bodies": 0,
+  "stats_failure_causes": {},
+  "stats_failures_uncaptured": 0,
+  "stats_missing_samples": 0,
+  "telemetry_samples": 14,
+  "threads": {
+    "max": 5,
+    "min": 5
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 120,
+      "failures": [],
+      "max_p99_us": 1670,
+      "median_p99_us": 1670,
+      "planned": 120,
+      "runs": 1,
+      "status": {
+        "200": 120
+      },
+      "status_total": 120,
+      "succeeded": 120,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 120,
+      "failures": [],
+      "max_p99_us": 11279,
+      "median_p99_us": 11279,
+      "planned": 120,
+      "runs": 1,
+      "status": {
+        "200": 120
+      },
+      "status_total": 120,
+      "succeeded": 120,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 600,
+      "failures": [],
+      "max_p99_us": 37226,
+      "median_p99_us": 37226,
+      "planned": 600,
+      "runs": 1,
+      "status": {
+        "204": 600
+      },
+      "status_total": 600,
+      "succeeded": 600,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 600,
+      "failures": [],
+      "max_p99_us": 2224,
+      "median_p99_us": 2224,
+      "planned": 600,
+      "runs": 1,
+      "status": {
+        "200": 600
+      },
+      "status_total": 600,
+      "succeeded": 600,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 1200,
+      "failures": [],
+      "max_p99_us": 5738,
+      "median_p99_us": 5738,
+      "planned": 1200,
+      "runs": 1,
+      "status": {
+        "200": 1200
+      },
+      "status_total": 1200,
+      "succeeded": 1200,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 30,
+      "failures": [],
+      "max_p99_us": 41695,
+      "median_p99_us": 41695,
+      "planned": 30,
+      "runs": 1,
+      "status": {
+        "200": 30
+      },
+      "status_total": 30,
+      "succeeded": 30,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}

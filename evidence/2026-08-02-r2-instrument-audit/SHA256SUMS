@@ -1,0 +1,17 @@
+a7e74a0f6adf56bff7df579aac4ca1d9bd9f036b56d63b91b37e0f4df072ca09  evidence/2026-08-02-r2-instrument-audit/analysis/e2e-verdict.json
+ff90f1576b848c5ed79a25b9519e0b2d17014cc0763754474a91b12f71a0140d  evidence/2026-08-02-r2-instrument-audit/analysis/findings.md
+911bce5763df4f72579bdc628b4cc12fb9d034a73c9cb4317a8c59a4cf5d69c5  evidence/2026-08-02-r2-instrument-audit/commands.txt
+5844528c0f7215429cc9f42b2df41d835f1f0e62e70983dfb2cb1623f8be710e  evidence/2026-08-02-r2-instrument-audit/config/run-soak.sh.after
+3d57ff97ddab51f0e59adc9eabd6c68b4335b6172a6fd58da5e3574ad980ccaa  evidence/2026-08-02-r2-instrument-audit/config/run-soak.sh.before
+ab4d7c5eb1455a8f7faf06decfe97446b5c632f6f7e31dcecaf5f9497ccc576c  evidence/2026-08-02-r2-instrument-audit/environment.txt
+bccabd9c8d9124ab4d4b834f9634b19fdb5bf1bd744309a50099d8828834f3f4  evidence/2026-08-02-r2-instrument-audit/manifest.txt
+cedfef69141d3a06385a8e1aea435788a4ddf90dabe1e3261b1b01f004331ea7  evidence/2026-08-02-r2-instrument-audit/raw/check_soak_controls.out
+21d06affb2dcdc62e559beee424719c57145022608c6bb80d6bab838609e0fa3  evidence/2026-08-02-r2-instrument-audit/raw/e2e-cycles.csv
+c4f9b99dda135bbcd79932392bee51b4a5902cf79965cb11b81b633d0e981c71  evidence/2026-08-02-r2-instrument-audit/raw/e2e-final-state.txt
+2a9d304378a33c7df72472ccc997727ed7b7178a15c2b98304380a66147759d4  evidence/2026-08-02-r2-instrument-audit/raw/e2e-manifest.txt
+ff4bcad9bc218c8100875415ce8a80ff5267c0679211f0b31893e0deb6dc158f  evidence/2026-08-02-r2-instrument-audit/raw/e2e-process.csv
+c04cb1a355a18221184da4179f759ea30d8f44d2fb87ad7a64e81698b1a5472f  evidence/2026-08-02-r2-instrument-audit/raw/fixture-verdicts.txt
+7aceae8c82ccefe2241422c60c2196179765dd224432bad5c3fa93e2ed1d30b5  evidence/2026-08-02-r2-instrument-audit/raw/preflight-this-host.stderr
+f400f146e1533c9d1110d851051410c6d6beac214d7479d16aa22c5625963419  evidence/2026-08-02-r2-instrument-audit/raw/preflight-this-host.txt
+757ed6280f6433831bff15c45360040dcd53cf92afa3a97b0b3d6851bb022a32  evidence/2026-08-02-r2-instrument-audit/raw/shipped-analyser-on-the-same-artefacts.txt
+58f683ef78f1d662320dbc252fae339e415dc7b792d3444f83b6f91bf0e5f433  evidence/2026-08-02-r2-instrument-audit/verdict.md

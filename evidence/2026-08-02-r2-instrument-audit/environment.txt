@@ -1,0 +1,42 @@
+campaign=2026-08-02-r2-instrument-audit
+work_package=R2-WP01
+utc=2026-08-02T05:48:31Z
+git_head=e32930d8bc66cd4f334d1e04f22d63f17184dddb
+branch=claude/r2-restricted-production-skzmmx
+kernel=Linux 6.18.5 x86_64 GNU/Linux
+cpus_online=4
+cpu_model=Intel(R) Xeon(R) Processor @ 2.10GHz
+mem_total_kib=16461176
+nofile_hard=4096
+odin=/tmp/druse-toolchain/odin version dev-2026-07-nightly:819fdc7
+odin_pin_release=dev-2026-07a
+odin_pin_sha256_verified=yes
+go=go version go1.24.7 linux/amd64
+python=Python 3.11.15
+nstat=absent
+host_qualified_for_campaign=no
+host_qualification_report=raw/preflight-this-host.txt
+
+# GATE VERIFICATION IN THIS CONTAINER.
+#
+# build/check.sh cannot be taken to green here, and neither blocker is this
+# change. Both were reproduced on unmodified HEAD (e32930d) in the same
+# container, with byte-identical output.
+#
+#  1. check_r1_resource_controls.sh, as root. It chmods a spool directory to
+#     0500 and requires the R1 preflight to call it unwritable; root bypasses
+#     DAC permission checks, so the mutation cannot be detected and the control
+#     reports itself stale. PASSES as an unprivileged user.
+#
+#  2. tests/wp123-two-servers, as any user. "server A answered 507 after server
+#     B was stopped". Identical on e32930d and on this branch; the suite is
+#     deliberately parallel and this is a 4-CPU sandbox. CI is the authority
+#     for it (run 30732945327 was green on the same commit).
+#
+# Everything the change actually touches is green here: check_soak_controls.sh
+# (26 controls), check_gate_inventory.sh, check_docs.sh, check_readiness_matrix.sh,
+# check_supported_profile.sh, check_r1_freeze.sh.
+gate_run_as=both root and an unprivileged user
+gate_green_here=no
+gate_blockers_reproduced_on_clean_head=yes
+gate_blockers=check_r1_resource_controls.sh (root only); tests/wp123-two-servers (pre-existing here)

@@ -38,6 +38,28 @@ permite recomputar cada número publicado.
 | Marshal próprio | `docs/reports/2026-07-30-own-marshal.md` | `2026-07-30-own-marshal/` |
 | Limpeza do host | — | `2026-07-30-host-cleanup/` |
 
+### Campanhas dos gates de prontidão (R0/R1/R2)
+
+Ficam inteiras no git: são pequenas e cada uma sustenta uma decisão de promoção.
+O plano correspondente está em `planning/readiness/`.
+
+| Gate | Campanha | Diretório |
+|---|---|---|
+| R0 | fechamento de ciclo de vida | `2026-08-01-r0-lifecycle-closure/` |
+| R1 | auditoria de prontidão | `2026-08-01-production-readiness-audit/` |
+| R1 | entrada | `2026-08-01-r1-entry/` |
+| R1 | shutdown cooperativo | `2026-08-01-r1-shutdown/` |
+| R1 | orçamento de recursos | `2026-08-01-r1-resource-budget/` |
+| R1 | proxy real | `2026-08-02-r1-real-proxy/` |
+| R1 | exercício do piloto | `2026-08-02-r1-pilot-exercise/` |
+| R1 | freeze e veredito | `2026-08-02-r1-freeze/` |
+| R2 | auditoria do instrumento (WP01) | `2026-08-02-r2-instrument-audit/` |
+
+`2026-08-02-r2-instrument-audit/` é sobre o **instrumento**, não sobre o
+produto: nenhum soak foi executado, e o próprio `verdict.md` lista o que não
+estabelece. Um diretório de evidência datado dentro do R2 será lido depois como
+se falasse do produto, e por isso a distinção está escrita nele.
+
 **Duas campanhas de A/B estão preservadas e são inutilizáveis como medida de
 teto**, de propósito: `2026-07-30-own-marshal/ab-30k-censored/` e
 `ab-45k-censored/`. Nas duas o braço `ownmarshal` serviu 100% da taxa oferecida,

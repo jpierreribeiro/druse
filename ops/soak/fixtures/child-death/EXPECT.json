@@ -1,0 +1,13 @@
+{
+  "note": "A twelve-hour run that died at cycle 417. Every one of these reasons is separately load-bearing; the telemetry shortfall is the one that used to be invisible.",
+  "reasons_must_include": [
+    "server died",
+    "load generator process failed",
+    "server required SIGKILL",
+    "server exit was 137",
+    "COMPLETE is absent",
+    "telemetry stopped early",
+    "the run aborted"
+  ],
+  "result": "FAIL"
+}

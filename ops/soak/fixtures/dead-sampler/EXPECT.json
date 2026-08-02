@@ -1,0 +1,8 @@
+{
+  "note": "A clean twelve-hour run whose sampler died after two seconds. soak/0 graded this PASS: the RSS-slope rule only applies at 720 samples, so a two-row artefact disabled it silently.",
+  "reasons_must_include": [
+    "telemetry stopped early",
+    "the telemetry sampler stopped before the run ended"
+  ],
+  "result": "FAIL"
+}

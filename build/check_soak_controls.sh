@@ -193,139 +193,501 @@ if counted == classified:
 PY
 echo "PASS (soak mutation 2): counted-but-unexplained failures are detectable, which the old artefact never was"
 
-# ---------------------------------------------------------------------------
-# The analyser refuses an artefact it cannot explain. Proved against the shape
-# the old harness actually produced, not against a hypothetical one.
-# ---------------------------------------------------------------------------
-mkdir -p "$TMP/run/cycles" "$TMP/run/telemetry" "$TMP/run/control"
-cat >"$TMP/run/cycles.csv" <<'CSV'
-cycle,started_utc,ended_utc,health_status,health_transport_errors,health_p99_us,stats_http
-1,2026-07-30T00:00:00Z,2026-07-30T00:02:00Z,2400,0,1500,200
-CSV
-cat >"$TMP/run/telemetry/process.csv" <<'CSV'
-sample,utc,unix_nanos,elapsed_s,rss_kib,hwm_kib,threads,fds,proc_ticks,host_ticks,stats_http
-0,2026-07-30T00:00:00Z,1785000000000000000,0,4096,4096,5,14,0,0,200
-1,2026-07-30T00:00:01Z,1785000001000000000,1,4096,4096,5,14,1,1,200
-CSV
-printf 'forced_kill=0\nserver_exit=0\n' >"$TMP/run/control/final-state.txt"
-for workload in health tiny json-encode json-decode bytes-64k wait-40ms; do
-  status='"200": 10'
-  [ "$workload" = json-decode ] && status='"204": 10'
-  cat >"$TMP/run/cycles/c0001-$workload.json" <<JSON
-{"planned": 10, "completed": 10, "transport_errors": 0, "status": {$status},
- "latency_p99_us": 1000, "failures": []}
-JSON
-done
-# One workload counts a failure and explains nothing — the 674-error shape.
-cat >"$TMP/run/cycles/c0001-tiny.json" <<'JSON'
-{"planned": 10, "completed": 10, "transport_errors": 1, "status": {"200": 9, "0": 1},
- "latency_p99_us": 1000}
-JSON
+# ===========================================================================
+# R2-WP01. Everything below grades the ANALYSER and the ORCHESTRATOR against
+# ops/soak/fixtures/, and then mutates each mechanism the audit found missing.
+#
+# The audit that opened R2 asked ten questions of this instrument. Seven of the
+# answers were "no", and each one had the same shape: the runner recorded
+# something the analyser never read, or the analyser assumed a file the runner
+# did not always write. None of it was visible, because the only thing anybody
+# looked at was the word PASS.
+#
+# So each control below states the artefact it mutates, the reason the analyser
+# must give, and — for the four that used to pass — what the shipped instrument
+# said about that same artefact before soak/1.
+# ===========================================================================
 
-if python3 "$SOAK/analyze-soak.py" "$TMP/run" >"$TMP/verdict.json" 2>"$TMP/verdict.err"; then
-  python3 - "$TMP/verdict.json" <<'PY' || fail "the analyser accepted an artefact that counts a failure it cannot explain"
+FIXTURES="$SOAK/fixtures"
+ANALYSE="$SOAK/analyze-soak.py"
+
+test -d "$FIXTURES" || fail "ops/soak/fixtures/ is missing; the analyser has no reference artefact"
+
+# grade DIR -> verdict JSON at $TMP/verdict.json, and NEVER a traceback.
+#
+# The analyser's contract is that it always prints a verdict and always exits 0.
+# That contract is itself a control: soak/0 raised FileNotFoundError on the
+# single most likely artefact of a bad night, and a crash is not a grade.
+grade() { # run-directory label
+  local dir="$1" label="$2"
+  if ! python3 "$ANALYSE" "$dir" >"$TMP/verdict.json" 2>"$TMP/verdict.err"; then
+    fail "the analyser exited non-zero on $label: $(cat "$TMP/verdict.err")"
+  fi
+  if [ -s "$TMP/verdict.err" ]; then
+    fail "the analyser wrote to stderr on $label (a traceback is not a verdict): $(cat "$TMP/verdict.err")"
+  fi
+  python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$TMP/verdict.json" ||
+    fail "the analyser did not print valid JSON for $label"
+}
+
+# require DIR label VERDICT [reason-substring...]
+require() {
+  local dir="$1" label="$2" want="$3"
+  shift 3
+  grade "$dir" "$label"
+  python3 - "$TMP/verdict.json" "$label" "$want" "$@" <<'PY' || fail "control failed: $label"
 import json, sys
+
 verdict = json.load(open(sys.argv[1]))
-if verdict["result"] != "FAIL":
-    print(f"analyser said {verdict['result']} for an unexplained failure", file=sys.stderr)
+label, want, needles = sys.argv[2], sys.argv[3], sys.argv[4:]
+reasons = verdict.get("reasons", [])
+
+if verdict.get("result") != want:
+    print(f"{label}: expected {want}, got {verdict.get('result')}", file=sys.stderr)
+    for reason in reasons:
+        print(f"    reason: {reason}", file=sys.stderr)
     raise SystemExit(1)
-if not any("not classified" in reason for reason in verdict["reasons"]):
-    print(f"analyser failed for the wrong reason: {verdict['reasons']}", file=sys.stderr)
+
+for needle in needles:
+    if not any(needle in reason for reason in reasons):
+        print(f"{label}: no reason mentions {needle!r}", file=sys.stderr)
+        for reason in reasons:
+            print(f"    reason: {reason}", file=sys.stderr)
+        raise SystemExit(1)
+PY
+}
+
+# ---------------------------------------------------------------------------
+# The committed fixtures, each against the verdict and the REASONS its
+# EXPECT.json names.
+#
+# Asserting the reason and not only the verdict is the whole point. A suite that
+# only required FAIL would be satisfied by an analyser that failed everything —
+# and this repository has already paid for that once: a run went red for the
+# wrong reason and the control could not tell the difference.
+# ---------------------------------------------------------------------------
+for fixture_dir in "$FIXTURES"/*/; do
+  fixture="$(basename "$fixture_dir")"
+  [ -f "$fixture_dir/EXPECT.json" ] || continue
+  bash "$FIXTURES/materialise.sh" "$fixture" "$TMP/fx-$fixture" ||
+    fail "fixture $fixture could not be materialised"
+  grade "$TMP/fx-$fixture" "fixture $fixture"
+  python3 - "$fixture_dir/EXPECT.json" "$TMP/verdict.json" "$fixture" <<'PY' ||
+import json, sys
+
+expect = json.load(open(sys.argv[1]))
+verdict = json.load(open(sys.argv[2]))
+fixture = sys.argv[3]
+reasons = verdict.get("reasons", [])
+
+if verdict.get("result") != expect["result"]:
+    print(f"{fixture}: expected {expect['result']}, got {verdict.get('result')}", file=sys.stderr)
+    for reason in reasons:
+        print(f"    reason: {reason}", file=sys.stderr)
+    raise SystemExit(1)
+
+for needle in expect.get("reasons_must_include", []):
+    if not any(needle in reason for reason in reasons):
+        print(f"{fixture}: no reason mentions {needle!r}", file=sys.stderr)
+        for reason in reasons:
+            print(f"    reason: {reason}", file=sys.stderr)
+        raise SystemExit(1)
+
+for needle in expect.get("reasons_must_not_include", []):
+    if any(needle in reason for reason in reasons):
+        print(f"{fixture}: a reason mentions {needle!r} and must not", file=sys.stderr)
+        for reason in reasons:
+            print(f"    reason: {reason}", file=sys.stderr)
+        raise SystemExit(1)
+
+# A PASS fixture with any reason at all is a contradiction the JSON would hide.
+if expect["result"] == "PASS" and reasons:
+    print(f"{fixture}: PASS with reasons attached: {reasons}", file=sys.stderr)
     raise SystemExit(1)
 PY
-else
-  fail "the analyser could not read a well-formed run directory: $(cat "$TMP/verdict.err")"
+    fail "fixture $fixture did not produce its expected verdict and reasons"
+  echo "PASS (soak fixture): $fixture -> $(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["result"])' "$TMP/verdict.json")"
+done
+
+# PASS is materialised once more as the base for the mutations below. Each
+# mutation starts from a run the analyser has just certified clean, so a red
+# result can only come from the mutation.
+base() { # destination
+  bash "$FIXTURES/materialise.sh" pass "$1" || fail "could not materialise the pass fixture"
+}
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 1 — the /stats curl exit is zeroed.
+#
+# THE DEFECT THIS WORK PACKAGE IS NAMED FOR. The sampler read
+#
+#     stats_http="$(curl ...)" || true
+#     stats_curl_exit=$?
+#
+# and `$?` there is the exit status of `true`. Every failed scrape in the
+# history of this harness recorded 0, so the taxonomy promised in the comment
+# above it — 7 refused, 28 timeout, 52 empty reply, 56 receive failure — was
+# unreachable for the whole life of the field.
+#
+# This control is behavioural and it runs the REAL BLOCK from run-soak.sh,
+# extracted from the shipped file rather than retyped here. A copy of the idiom
+# would prove only that the copy works.
+# ---------------------------------------------------------------------------
+RUNNER="$SOAK/run-soak.sh"
+# The sampler's block specifically — run-soak.sh captures /stats twice, once per
+# telemetry sample and once per cycle, and a range pattern would splice the two
+# together. Stop at the first `fi`.
+awk '/^ *if stats_http="\$\(curl/ {found=1} found {print} found && /^ *fi$/ {exit}' \
+  "$RUNNER" >"$TMP/capture.sh"
+test -s "$TMP/capture.sh" ||
+  fail "could not find the /stats capture block in run-soak.sh; this control cannot test what it claims"
+grep -q 'stats_curl_exit=\$?' "$TMP/capture.sh" ||
+  fail "the extracted block does not capture a curl exit status at all; this control cannot test what it claims"
+
+cat >"$TMP/capture-live.sh" <<EOF
+set -euo pipefail
+PORT=$CLOSED_PORT
+stats_file="$TMP/stats-live.json"
+$(cat "$TMP/capture.sh")
+echo "\$stats_curl_exit"
+EOF
+live_exit="$(bash "$TMP/capture-live.sh")"
+if [ "$live_exit" = "0" ]; then
+  fail "the shipped /stats capture recorded curl exit 0 for a refused connection: the cause of every failed scrape is still being discarded"
 fi
-echo "PASS (soak): the analyser refuses a run whose failures carry no cause"
+if [ "$live_exit" != "7" ]; then
+  fail "a refused /stats scrape recorded curl exit $live_exit; 7 (connection refused) is what makes the failure nameable"
+fi
 
-# ---------------------------------------------------------------------------
-# The analyser CARRIES a cause it was given. This is the positive half of the
-# check above, and it is here because its absence let a real defect through:
-# the analyser aggregated each workload into a dict with no `failures` key, so
-# the accounting rule read an empty list and reported every failure as
-# unexplained. The run above still went red — for the wrong reason — and the
-# control could not tell the difference. A rule that only ever says "no cause"
-# is indistinguishable from a broken one.
-# ---------------------------------------------------------------------------
-cat >"$TMP/run/cycles/c0001-tiny.json" <<'JSON'
-{"planned": 10, "completed": 10, "transport_errors": 2, "status": {"200": 8, "0": 2},
- "latency_p99_us": 1000,
- "failures": [{"class": "peer_reset", "count": 2,
-               "example_error": "read tcp 127.0.0.1:1->127.0.0.1:2: connection reset by peer"}]}
-JSON
+# The mutant: the old idiom, restored. It must go blind.
+cat >"$TMP/capture-mutant.sh" <<EOF
+set -uo pipefail
+PORT=$CLOSED_PORT
+stats_file="$TMP/stats-mutant.json"
+stats_http="\$(curl -sS --max-time 1 -o "\$stats_file" -w '%{http_code}' \\
+  "http://127.0.0.1:\$PORT/stats" 2>/dev/null)" || true
+stats_curl_exit=\$?
+echo "\$stats_curl_exit"
+EOF
+mutant_exit="$(bash "$TMP/capture-mutant.sh")"
+if [ "$mutant_exit" != "0" ]; then
+  fail "the mutant did not reproduce the original defect (recorded $mutant_exit, expected 0); this control is not testing what it claims"
+fi
+echo "PASS (soak negative 1): a refused /stats scrape records curl exit 7, and the old '|| true' idiom is proved to record 0"
 
-python3 "$SOAK/analyze-soak.py" "$TMP/run" >"$TMP/verdict2.json" 2>"$TMP/verdict2.err" ||
-  fail "the analyser could not read a run whose failures are classified: $(cat "$TMP/verdict2.err")"
-
-python3 - "$TMP/verdict2.json" <<'PY' || fail "the analyser dropped a cause the artefact carried"
+# And the analyser must act on it: a cause captured is a NAMED cause, a cause
+# discarded is a red run that says so.
+base "$TMP/n1a"
+python3 - "$TMP/n1a/telemetry/process.csv" 000 7 <<'PY'
+import sys
+path, http, exit_code = sys.argv[1], sys.argv[2], sys.argv[3]
+lines = open(path).read().splitlines()
+fields = lines[3].split(",")
+fields[10], fields[11], fields[12] = http, exit_code, "0"
+lines[3] = ",".join(fields)
+open(path, "w").write("\n".join(lines) + "\n")
+PY
+require "$TMP/n1a" "negative 1a (scrape failed, cause captured)" FAIL \
+  "/stats did not answer 200" "7 (connection refused)"
+grade "$TMP/n1a" "negative 1a"
+python3 - "$TMP/verdict.json" <<'PY' || fail "a captured curl exit was still reported as uncaptured"
 import json, sys
 verdict = json.load(open(sys.argv[1]))
-if verdict["failures_counted"] != 2:
-    print(f"expected 2 counted, got {verdict['failures_counted']}", file=sys.stderr)
+if verdict["stats_failures_uncaptured"] != 0:
+    print(f"cause was captured, analyser called it uncaptured: {verdict['reasons']}", file=sys.stderr)
     raise SystemExit(1)
-if verdict["failures_classified"] != 2:
+PY
+
+base "$TMP/n1b"
+python3 - "$TMP/n1b/telemetry/process.csv" 000 0 <<'PY'
+import sys
+path, http, exit_code = sys.argv[1], sys.argv[2], sys.argv[3]
+lines = open(path).read().splitlines()
+fields = lines[3].split(",")
+fields[10], fields[11], fields[12] = http, exit_code, "0"
+lines[3] = ",".join(fields)
+open(path, "w").write("\n".join(lines) + "\n")
+PY
+require "$TMP/n1b" "negative 1b (scrape failed, cause zeroed)" FAIL \
+  "captured no cause"
+echo "PASS (soak negative 1): the analyser separates a scrape failure with a cause from one whose cause was zeroed"
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 2 — failure_examples are discarded.
+#
+# A class name with no example text is a bucket, not an explanation. The
+# generator mutation is the honest form of this control: it removes the example
+# at the source, exactly as the pre-diagnosability generator did.
+# ---------------------------------------------------------------------------
+mkdir -p "$TMP/mut3"
+sed 's|^\t\t\tExample: exampleOf\[class\],|\t\t\tExample: "",|' \
+  "$SOAK/openload/main.go" >"$TMP/mut3/main.go"
+cmp -s "$SOAK/openload/main.go" "$TMP/mut3/main.go" &&
+  fail "mutation 3 changed nothing; the control is not testing what it claims"
+build_generator "$TMP/mut3" "$TMP/openload-mut3"
+run_generator "$TMP/openload-mut3" "$TMP/raw-mut3.csv" >"$TMP/summary-mut3.json"
+
+base "$TMP/n2"
+python3 - "$TMP/summary-mut3.json" "$TMP/n2/cycles/c0001-tiny.json" <<'PY'
+import json, sys
+generated = json.load(open(sys.argv[1]))
+target = json.load(open(sys.argv[2]))
+errors = generated["transport_errors"]
+if errors == 0:
+    print("mutation 3 produced no failure, so nothing is proved", file=sys.stderr)
+    raise SystemExit(1)
+target["transport_errors"] = errors
+target["succeeded"] = target["completed"] - errors
+target["status"] = {"200": target["completed"] - errors, "0": errors}
+target["failures"] = generated["failures"]
+json.dump(target, open(sys.argv[2], "w"), indent=2, sort_keys=True)
+PY
+require "$TMP/n2" "negative 2 (examples discarded at the source)" FAIL \
+  "no example text"
+echo "PASS (soak negative 2): a generator that keeps class names and drops the error text is caught"
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 3 — `completed` is inflated with no class and no status.
+#
+# BEFORE soak/1 THIS PASSED. The analyser summed `planned` and `completed` and
+# compared neither against the other nor against the status map, so a generator
+# whose workers hung — or one that simply overstated its work — produced a clean
+# run with requests that left no record of any kind.
+# ---------------------------------------------------------------------------
+base "$TMP/n3"
+python3 - "$TMP/n3/cycles/c0001-tiny.json" <<'PY'
+import json, sys
+report = json.load(open(sys.argv[1]))
+report["completed"] += 250          # 250 requests with no status and no class
+json.dump(report, open(sys.argv[1], "w"), indent=2, sort_keys=True)
+PY
+require "$TMP/n3" "negative 3 (completed inflated)" FAIL \
+  "more requests finished than were scheduled" "status map accounts for"
+echo "PASS (soak negative 3): requests counted with no status and no class are caught"
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 4 — a workload is removed with nothing recorded.
+#
+# The opposite mistake is also live and also tested: a workload deliberately
+# excluded, WITH a reason in control/skipped.txt, must not fail the run. An
+# instrument that cannot tell a configured absence from an unexplained one is
+# useless in both directions.
+# ---------------------------------------------------------------------------
+base "$TMP/n4"
+rm -f "$TMP/n4/cycles/c0001-wait-40ms.json"
+require "$TMP/n4" "negative 4 (workload vanished)" FAIL \
+  "no runs and control/skipped.txt gives no reason"
+
+echo "skipped=wait-40ms reason=rate_zero" >"$TMP/n4/control/skipped.txt"
+grade "$TMP/n4" "negative 4 positive half"
+python3 - "$TMP/verdict.json" <<'PY' || fail "a deliberately excluded workload was reported as a failure"
+import json, sys
+verdict = json.load(open(sys.argv[1]))
+if any("wait-40ms" in reason for reason in verdict["reasons"]):
+    print(f"the skipped profile still failed the run: {verdict['reasons']}", file=sys.stderr)
+    raise SystemExit(1)
+if verdict["skipped_workloads"].get("wait-40ms") != "rate_zero":
+    print(f"the reason was not carried: {verdict['skipped_workloads']}", file=sys.stderr)
+    raise SystemExit(1)
+if verdict["result"] != "PASS":
+    print(f"an explained absence failed the run: {verdict['reasons']}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+echo "PASS (soak negative 4): an absent workload is red unless the run recorded why"
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 5 — telemetry samples are removed.
+#
+# BEFORE soak/1 THIS PASSED, and it is the subtlest of the eight. A short
+# telemetry file does not merely lose data: the RSS-slope criterion only applies
+# at 720 samples or more, so a sampler that died in minute three of a twelve-hour
+# run DISABLED that criterion silently and the run went green with the rule
+# never evaluated. Nothing in the artefact said so.
+# ---------------------------------------------------------------------------
+base "$TMP/n5"
+python3 - "$TMP/n5/telemetry/process.csv" <<'PY'
+import sys
+lines = open(sys.argv[1]).read().splitlines()
+open(sys.argv[1], "w").write("\n".join(lines[:3]) + "\n")   # header + 2 samples
+PY
+require "$TMP/n5" "negative 5 (samples removed)" FAIL "telemetry stopped early"
+echo "PASS (soak negative 5): a sampler that stopped early is red, not a criterion that quietly did not apply"
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 6 — the run dies before it can clean up.
+#
+# Behavioural, against the real orchestrator. run-soak.sh is driven into two
+# abort paths and each must leave control/final-state.txt carrying an
+# abort_reason. soak/0 wrote that file only on the happy path, so the artefact a
+# bad night actually produces made the analyser raise FileNotFoundError instead
+# of returning a verdict — the run with the most to say produced no grade.
+# ---------------------------------------------------------------------------
+abort_run() { # label extra-env... -- expects run-soak.sh to fail
+  local label="$1"
+  shift
+  local base_dir="$TMP/abort-$label"
+  rm -rf "$base_dir"
+  mkdir -p "$base_dir/repo"
+  # A minimal clean repo, so the dirty-tree refusal is a decision of the control
+  # rather than an accident of the developer's working tree.
+  git -C "$base_dir/repo" init -q 2>/dev/null
+  git -C "$base_dir/repo" config user.email control@example.invalid
+  git -C "$base_dir/repo" config user.name control
+  echo "placeholder" >"$base_dir/repo/README"
+  git -C "$base_dir/repo" add README
+  git -C "$base_dir/repo" commit -qm "control fixture"
+  "$@" DRUSE_SOAK_SKIP_PREFLIGHT=1 DRUSE_SOAK_HARNESS="$SOAK" \
+    bash "$RUNNER" "$base_dir" 1 >"$base_dir/run.log" 2>&1 &&
+    fail "control 6/$label: run-soak.sh was expected to abort and did not"
+  test -f "$base_dir/soak/control/final-state.txt" ||
+    fail "control 6/$label: the run aborted and recorded no final state; the analyser would have nothing to grade"
+  grep -q '^abort_reason=' "$base_dir/soak/control/final-state.txt" ||
+    fail "control 6/$label: final-state.txt records no abort_reason: $(cat "$base_dir/soak/control/final-state.txt")"
+  # And the analyser must GRADE that artefact rather than crash on it.
+  require "$base_dir/soak" "control 6/$label artefact" FAIL "the run aborted"
+}
+
+# 6a: no compiler. The build fails before anything is launched.
+abort_run no-compiler env DRUSE_ODIN_BIN="$TMP/there-is-no-compiler-here"
+
+# 6b: a dirty working tree. Identity, not machinery: the artefact would be
+# attributable to no commit (readiness rule G1).
+abort_dirty() {
+  local base_dir="$TMP/abort-dirty"
+  rm -rf "$base_dir"
+  mkdir -p "$base_dir/repo"
+  git -C "$base_dir/repo" init -q 2>/dev/null
+  git -C "$base_dir/repo" config user.email control@example.invalid
+  git -C "$base_dir/repo" config user.name control
+  echo "placeholder" >"$base_dir/repo/README"
+  git -C "$base_dir/repo" add README
+  git -C "$base_dir/repo" commit -qm "control fixture"
+  echo "uncommitted" >>"$base_dir/repo/README"
+  env DRUSE_SOAK_SKIP_PREFLIGHT=1 DRUSE_SOAK_HARNESS="$SOAK" \
+    DRUSE_ODIN_BIN="$DRUSE_SOAK_ODIN" \
+    bash "$RUNNER" "$base_dir" 1 >"$base_dir/run.log" 2>&1 &&
+    fail "control 6/dirty: run-soak.sh measured a dirty tree without being told to"
+  grep -q 'is dirty' "$base_dir/soak/control/final-state.txt" ||
+    fail "control 6/dirty: the refusal was not recorded as the abort reason: $(cat "$base_dir/soak/control/final-state.txt" 2>/dev/null)"
+}
+abort_dirty
+echo "PASS (soak negative 6): a run that dies before cleanup records how it died, and the analyser grades that artefact"
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 7 — a criterion is changed after the manifest.
+#
+# A criteria file edited between a run and its grade cannot be detected by
+# reading either one. The run pins the hash; the analyser recomputes it. This
+# control materialises the fixture with a pin that does not match the tree,
+# which is what a post-hoc edit looks like from the analyser's side.
+# ---------------------------------------------------------------------------
+bash "$FIXTURES/materialise.sh" pass "$TMP/n7" \
+  "0000000000000000000000000000000000000000000000000000000000000000" ||
+  fail "could not materialise the pass fixture with a stale criteria pin"
+require "$TMP/n7" "negative 7 (criteria changed after the run)" FAIL \
+  "CRITERIA.md changed after the run"
+
+base "$TMP/n7b"
+sed -i '/^criteria_sha256=/d' "$TMP/n7b/manifest.txt"
+require "$TMP/n7b" "negative 7b (no criteria pin at all)" FAIL \
+  "pinned no criteria_sha256"
+echo "PASS (soak negative 7): a criterion edited after the run, or never pinned, is caught"
+
+# ---------------------------------------------------------------------------
+# NEGATIVE CONTROL 8 — the binary changes after its hash is taken.
+#
+# The manifest hashes what was launched; the run re-hashes what finished. A
+# candidate swapped in between is a different candidate, and readiness rule G1
+# is that evidence is not transferred by similarity.
+# ---------------------------------------------------------------------------
+base "$TMP/n8"
+sed -i 's/^server_sha256=.*/server_sha256=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff/' \
+  "$TMP/n8/control/final-binaries.txt"
+require "$TMP/n8" "negative 8 (binary swapped mid-run)" FAIL \
+  "server_sha256 changed during the run"
+
+base "$TMP/n8b"
+rm -f "$TMP/n8b/control/final-binaries.txt"
+require "$TMP/n8b" "negative 8b (no post-run hash)" FAIL \
+  "control/final-binaries.txt is missing"
+echo "PASS (soak negative 8): a binary that changed during the run, or was never re-hashed, is caught"
+
+# ---------------------------------------------------------------------------
+# Two more the audit turned up, kept because each was a silent PASS.
+# ---------------------------------------------------------------------------
+
+# The run never finished, and soak/0 graded it exactly like one that did.
+base "$TMP/n9"
+rm -f "$TMP/n9/COMPLETE"
+require "$TMP/n9" "negative 9 (no COMPLETE marker)" FAIL "COMPLETE is absent"
+echo "PASS (soak negative 9): a run that never reached its end is not graded as one that did"
+
+# An injected fault report with no declaration, and a declaration with no
+# report. Deliberate faults are only separable from spontaneous ones while both
+# records agree — and the analyser never read either before soak/1.
+base "$TMP/n10"
+cat >"$TMP/n10/cycles/c0005-rst.json" <<'JSON'
+{"mode": "rst-after-write", "deliberate": true, "attempted": 128, "errors": 128,
+ "errors_by_phase": {"close": 128}, "started_unix_nanos": 1785000000000000000,
+ "ended_unix_nanos": 1785000003000000000}
+JSON
+require "$TMP/n10" "negative 10 (undeclared injection)" FAIL \
+  "0 RST injection(s) declared"
+
+echo "cycle=5 kind=rst attempted=128 utc=2026-08-02T00:00:05Z" >"$TMP/n10/control/injected.txt"
+grade "$TMP/n10" "negative 10 positive half"
+python3 - "$TMP/verdict.json" <<'PY' || fail "a declared injection was not accounted separately"
+import json, sys
+verdict = json.load(open(sys.argv[1]))
+injected = verdict["injected_faults"]
+if injected["campaigns"] != 1 or injected["errors"] != 128:
+    print(f"the injection was not counted: {injected}", file=sys.stderr)
+    raise SystemExit(1)
+if verdict["failures_counted"] != 0:
     print(
-        f"the artefact classified 2 failures and the analyser reported "
-        f"{verdict['failures_classified']}: the aggregation discarded them",
+        "an injected fault was folded into the spontaneous failure count: "
+        f"{verdict['failures_counted']}",
         file=sys.stderr,
     )
     raise SystemExit(1)
-if verdict["failures_unclassified"] != 0:
-    print(f"classified failures reported as unclassified", file=sys.stderr)
-    raise SystemExit(1)
-if verdict["failure_classes"].get("peer_reset") != 2:
-    print(f"class lost in aggregation: {verdict['failure_classes']}", file=sys.stderr)
-    raise SystemExit(1)
-if "connection reset by peer" not in verdict["failure_examples"].get("peer_reset", ""):
-    print("the example error text was dropped", file=sys.stderr)
-    raise SystemExit(1)
-if any("not classified" in reason for reason in verdict["reasons"]):
-    print(f"analyser called an explained failure unexplained: {verdict['reasons']}", file=sys.stderr)
+if verdict["result"] != "PASS":
+    print(f"a declared injection failed the run: {verdict['reasons']}", file=sys.stderr)
     raise SystemExit(1)
 PY
-echo "PASS (soak): the analyser carries a cause the artefact gave it, class and text intact"
+echo "PASS (soak negative 10): injected faults are counted apart from spontaneous ones, and neither is netted off the other"
 
 # ---------------------------------------------------------------------------
-# A profile absent WITH a recorded reason is fine; absent WITHOUT one is red.
+# NEGATIVE CONTROL 11 — the host could not collect kernel counters.
 #
-# The saturation experiment removes the blocking handler by setting its rate to
-# zero, and the orchestrator records that in control/skipped.txt. Before this
-# distinction existed, a profile with no runs divided by a planned count of zero,
-# was charged a transport error ratio of 1.0, and failed the run for never having
-# happened — an arm deliberately configured would have been read as an arm that
-# broke. The opposite mistake is worse: a profile that silently vanishes and
-# nobody notices.
+# Found by RUNNING the repaired instrument rather than by reading it. The
+# kernel-counter line is a pipeline, run-soak.sh runs under `set -o pipefail`,
+# and on a host with no `nstat` that pipeline returned 127 and took the whole
+# sampler subshell with it on iteration one — leaving telemetry/process.csv
+# holding a header and nothing else. Under the old analyser that graded PASS.
+#
+# The counters are still written as zeros when nstat is absent, and a zero in
+# those columns reads as "no drops": the single thing they exist to
+# distinguish. So absence of the tool is recorded and refused, rather than
+# rendered as a clean result.
 # ---------------------------------------------------------------------------
-rm -f "$TMP/run/cycles/c0001-wait-40ms.json"
+base "$TMP/n11"
+sed -i 's/^nstat=.*/nstat=absent/' "$TMP/n11/manifest.txt"
+require "$TMP/n11" "negative 11 (kernel counters never collected)" FAIL \
+  "absence of measurement, not absence of drops"
+echo "PASS (soak negative 11): a host that could not collect kernel counters is refused, not read as a clean kernel"
 
-# 1. absent and unexplained -> red, naming the disappearance
-python3 "$SOAK/analyze-soak.py" "$TMP/run" >"$TMP/verdict3.json" 2>&1 || true
-python3 - "$TMP/verdict3.json" <<'PY' || fail "a profile vanished from the run and the analyser did not say so"
-import json, sys
-verdict = json.load(open(sys.argv[1]))
-if verdict["result"] != "FAIL":
-    print("a profile disappeared and the run passed", file=sys.stderr)
-    raise SystemExit(1)
-if not any("no runs and control/skipped.txt gives no reason" in r for r in verdict["reasons"]):
-    print(f"failed for the wrong reason: {verdict['reasons']}", file=sys.stderr)
-    raise SystemExit(1)
-PY
+# ---------------------------------------------------------------------------
+# The preflight refuses a host it cannot qualify, and says which CPU.
+# ---------------------------------------------------------------------------
+test -f "$SOAK/preflight.sh" || fail "ops/soak/preflight.sh is missing"
+if env DRUSE_SOAK_SERVER_CPUS="0-3" DRUSE_SOAK_GENERATOR_CPUS="9000-9003" \
+   bash "$SOAK/preflight.sh" "$TMP/preflight-bad.txt" >/dev/null 2>&1; then
+  fail "preflight qualified a host for CPUs 9000-9003"
+fi
+grep -q '^preflight=fail' "$TMP/preflight-bad.txt" ||
+  fail "preflight refused a host and did not record the refusal in its report"
+grep -q '^problem=' "$TMP/preflight-bad.txt" ||
+  fail "preflight refused a host and recorded no reason"
+echo "PASS (soak preflight): an unqualified host is refused before the campaign, with the reason recorded"
 
-# 2. absent WITH a reason -> accepted, and the reason is carried through
-mkdir -p "$TMP/run/control"
-echo "skipped=wait-40ms reason=rate_zero" >"$TMP/run/control/skipped.txt"
-python3 "$SOAK/analyze-soak.py" "$TMP/run" >"$TMP/verdict4.json" 2>&1 || true
-python3 - "$TMP/verdict4.json" <<'PY' || fail "a deliberately excluded profile was reported as a failure"
-import json, sys
-verdict = json.load(open(sys.argv[1]))
-if any("wait-40ms" in r for r in verdict["reasons"]):
-    print(f"the skipped profile still failed the run: {verdict['reasons']}", file=sys.stderr)
-    raise SystemExit(1)
-if verdict.get("skipped_workloads", {}).get("wait-40ms") != "rate_zero":
-    print(f"the reason was not carried: {verdict.get('skipped_workloads')}", file=sys.stderr)
-    raise SystemExit(1)
-if verdict["workloads"]["wait-40ms"].get("skipped_reason") != "rate_zero":
-    print("the workload row does not say why it is empty", file=sys.stderr)
-    raise SystemExit(1)
-PY
-echo "PASS (soak): an absent profile is red unless the run recorded why it is absent"
+echo "PASS (soak): the R2-WP01 instrument controls are green"

@@ -1,0 +1,7 @@
+{
+  "note": "The kernel discarded connections before the server saw them. These counters were recorded from 2026-07-30 and read by nothing until soak/1.",
+  "reasons_must_include": [
+    "listen_drops rose by 9000"
+  ],
+  "result": "FAIL"
+}

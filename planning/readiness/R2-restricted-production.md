@@ -1,9 +1,15 @@
 # R2 — plano para produção restrita
 
-**Status:** PLANO.
+**Status:** EM EXECUÇÃO. R2-WP01 fechado em 2026-08-02; WP02–WP08 abertos.
 **Objetivo:** autorizar workloads de produção dentro de um envelope explícito,
 com SLO, observabilidade, capacidade, segurança e rollback provados.
 **Entrada:** R1 promovido e um candidato de release imutável.
+
+> **O gate continua em R1.** Fechar o WP01 significa que o instrumento passou a
+> ser capaz de explicar uma falha — não que exista qualquer evidência sobre o
+> produto. Nenhum soak foi executado. Ver
+> `evidence/2026-08-02-r2-instrument-audit/verdict.md`, seção "What this does
+> NOT establish".
 
 “Produção restrita” significa que plataforma, protocolo, topologia, tipos de
 handler e carga ficam dentro de `docs/supported-profile.md`. Não significa
@@ -11,16 +17,35 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 
 ## 1. Entregáveis
 
-| ID | Entregável | Saída principal |
-|---|---|---|
-| R2-WP01 | auditoria e correção do instrumento | soak capaz de explicar toda falha |
-| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados |
-| R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis |
-| R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato |
-| R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional |
-| R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy |
-| R2-WP07 | canário e rollback produtivo | composição real validada |
-| R2-WP08 | freeze/aceite de risco | decisão Tier 2 |
+| ID | Entregável | Saída principal | Estado |
+|---|---|---|---|
+| R2-WP01 | auditoria e correção do instrumento | soak capaz de explicar toda falha | **fechado** 2026-08-02 |
+| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — falta host dedicado |
+| R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | aberto |
+| R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — bloqueado por WP02 |
+| R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
+| R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto |
+| R2-WP07 | canário e rollback produtivo | composição real validada | aberto — bloqueado por WP04/06 |
+| R2-WP08 | freeze/aceite de risco | decisão Tier 2 | aberto |
+
+### R2-WP01 — fechado
+
+Doze achados por leitura (`INS-001` a `INS-012`) e um décimo terceiro
+encontrado ao **executar** o instrumento reparado (`INS-013`): num host sem
+`nstat`, `pipefail` matava o sampler na primeira iteração e o artefato de doze
+horas resultante — sem telemetria alguma — era classificado como PASS.
+
+Dos oito artefatos de referência hoje commitados em `ops/soak/fixtures/`, o
+instrumento anterior aprovava três que deveriam ser vermelhos e travava em dois
+sem produzir veredito nenhum.
+
+Entregue: `ops/soak/schema.md` (`soak/1`), `ops/soak/preflight.sh`,
+`ops/soak/fixtures/`, `ops/soak/campaigns/TEMPLATE.md`, correções em
+`run-soak.sh` e `analyze-soak.py`, sete critérios novos em `CRITERIA.md`, e
+`build/check_soak_controls.sh` expandido para 26 asserções — oito controles
+negativos obrigatórios mais três dos achados da auditoria.
+
+Evidência: `evidence/2026-08-02-r2-instrument-audit/`.
 
 ## 2. Etapa A — instrumento antes do produto
 

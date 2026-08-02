@@ -1,0 +1,5 @@
+{
+  "note": "A clean run. The positive control: without it, an analyser that returned FAIL unconditionally would satisfy every other fixture.",
+  "reasons_must_include": [],
+  "result": "PASS"
+}

@@ -1,0 +1,37 @@
+# The shipped (soak/0) analyser, run against the soak/1 fixtures
+
+Reproduced with: git show HEAD:ops/soak/analyze-soak.py
+Each block is what the instrument said BEFORE R2-WP01 about the same artefact.
+
+=== pass ===
+verdict: PASS
+
+=== fail-classified ===
+verdict: FAIL
+  reason: tiny transport error ratio exceeded 0.01%
+
+=== fail-unclassified ===
+verdict: FAIL
+  reason: 1 failure(s) of an unrecognised class — the run is red because the cause is unknown, not because the rate is high
+
+=== child-death ===
+verdict: NO VERDICT — the analyser crashed
+      final_state[key] = int(value)
+                         ^^^^^^^^^^
+  ValueError: invalid literal for int() with base 10: 'orchestrator failed at run-soak.sh:301 with exit 137'
+
+=== missing-final-state ===
+verdict: NO VERDICT — the analyser crashed
+      return io.open(self, mode, buffering, encoding, errors, newline)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  FileNotFoundError: [Errno 2] No such file or directory: '/tmp/claude-0/-home-user-druse/1d80288d-5dc9-5c1b-aa1c-a9cfcc6a19da/scratchpad/ev-missing-final-state/control/final-state.txt'
+
+=== dead-sampler ===
+verdict: PASS
+
+=== kernel-drops ===
+verdict: PASS
+
+=== broken-accounting ===
+verdict: PASS
+
