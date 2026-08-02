@@ -1,0 +1,19 @@
+# R3-WP10 Stage 1 — the exact commands, in order.
+
+release="$(sed -n 's/^release=//p' odin-version.txt)"
+asset="$(sed -n 's/^linux_amd64_asset=//p' odin-version.txt)"
+want="$(sed -n 's/^linux_amd64_sha256=//p' odin-version.txt)"
+curl -fsSL -o "/tmp/$asset" \
+  "https://github.com/odin-lang/Odin/releases/download/$release/$asset"
+test "$want" = "$(sha256sum "/tmp/$asset" | cut -d' ' -f1)"   # verified, not trusted
+mkdir -p /opt/odin && tar -xzf "/tmp/$asset" -C /opt/odin --strip-components=1
+export DRUSE_ODIN_BIN=/opt/odin/odin
+
+# The resource budget for N>1, which R3-general-maturity.md §6 makes a
+# PRECONDITION of choosing an arm rather than a follow-up to it.
+bash ops/verification/measure-worker-budget.sh \
+  evidence/2026-08-02-r3-worker-budget          # -> raw/, analysis/budget.md
+
+# The two feasibility claims of ADR-049, checked rather than repeated.
+grep -n '_SOCKET_OPTION_REUSE_PORT' /opt/odin/core/net/socket_linux.odin
+grep -rn 'import.*nbio' --include=*.odin web/ vendor/ bench/

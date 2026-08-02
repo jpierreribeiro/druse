@@ -1,0 +1,75 @@
+# ADR-049's two feasibility claims, checked in the tree
+
+## Claim 1: "net.Socket_Option.Reuse_Port EXISTS in the pinned Odin"
+
+The SYMBOL exists. On Linux it is a placeholder:
+
+  core/net/socket_linux.odin:40:_SOCKET_OPTION_REUSE_PORT                :: -1
+  core/net/socket_linux.odin:42:_SOCKET_OPTION_REUSE_PORT_LOAD_BALANCING :: -1
+
+Only FreeBSD maps it to a real constant:
+
+  core/net/socket_freebsd.odin:41:_SOCKET_OPTION_REUSE_PORT                :: freebsd.Socket_Option.REUSEPORT
+
+  net.set_option(sock, .Reuse_Port, true) on Linux is setsockopt(fd, SOL_SOCKET, -1, ...).
+  The target platform is exactly the one without it.
+
+## Claim 2: "the bind path is vendor/nbio/impl.odin:_listen_tcp"
+
+The PRODUCT's bind path is core:nbio. Every importer:
+
+  web/internal/transport/odin_http_adapter.odin:19:import "core:nbio"
+  vendor/odin-http/response.odin:7:import "core:nbio"
+  vendor/odin-http/server.odin:12:import "core:nbio"
+  vendor/odin-http/scanner.odin:8:import "core:nbio"
+  vendor/odin-http/responses.odin:7:import "core:nbio"
+  bench/echo_oneshot/main.odin:9:import nbio "druse:vendor/nbio"
+  bench/echo_reuseport/main.odin:16:import nbio "druse:vendor/nbio"
+
+  druse:vendor/nbio is imported by two BENCH programs and nothing else.
+  Patching vendor/nbio/impl.odin would change the benches, not the server.
+
+## The tree already held the working recipe, and says why
+
+  // (via raw setsockopt — core:net on Linux does not expose REUSEPORT), binds
+  // 0.0.0.0:PORT and listens. Returns the socket as an nbio TCP_Socket, or 0 on error.
+  open_reuseport_listener :: proc() -> net.TCP_Socket {
+  	fd, serr := linux.socket(.INET, .STREAM, {.NONBLOCK}, .TCP)
+  	if serr != nil { return 0 }
+  
+  	one: i32 = 1
+  	// SOL_SOCKET = 1; SO_REUSEADDR = 2; SO_REUSEPORT = 15 (linux bits).
+  	linux.setsockopt(fd, linux.SOL_SOCKET, linux.Socket_Option.REUSEADDR, &one)
+  	linux.setsockopt(fd, linux.SOL_SOCKET, linux.Socket_Option.REUSEPORT, &one)
+  
+  	addr := linux.Sock_Addr_In{sin_family = .INET, sin_port = u16be(PORT), sin_addr = {0, 0, 0, 0}}
+  	if berr := linux.bind(fd, &addr); berr != nil { linux.close(fd); return 0 }
+  	if lerr := linux.listen(fd, 1024); lerr != nil { linux.close(fd); return 0 }
+  
+  	return net.TCP_Socket(fd)
+
+## No adopt entry point
+
+  _listen_tcp does create-socket -> Reuse_Address -> bind -> listen with no seam,
+  and SO_REUSEPORT must be set BEFORE bind:
+
+  _listen_tcp :: proc(
+  	l: ^Event_Loop,
+  	endpoint: Endpoint,
+  	backlog := 1000,
+  	loc := #caller_location,
+  ) -> (
+  	socket: TCP_Socket,
+  	err: Network_Error,
+  ) {
+  	family := family_from_endpoint(endpoint)
+  	socket = create_tcp_socket(family, l, loc) or_return
+  	defer if err != nil { close(socket, l=l) }
+  
+  	net.set_option(socket, .Reuse_Address, true)
+  
+  	bind(socket, endpoint) or_return
+  
+  	_listen(socket, backlog) or_return
+  	return
+  }

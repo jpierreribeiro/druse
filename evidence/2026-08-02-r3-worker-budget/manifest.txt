@@ -1,0 +1,50 @@
+# R3-WP10 Stage 1 — campaign manifest (G1, G6)
+#
+# Campaign: what N worker processes cost, and what an arm costs.
+# Date: 2026-08-02 (UTC).
+# Verdict: no arm adopted; Stage 3 blocked on an nbio entry point. Gate stays R1.
+
+## Identity
+
+repo                 jpierreribeiro/druse
+branch               claude/r2-restricted-production-skzmmx
+base                 87723fc (main, after R2-WP03)
+pre-registration     dccadb7 (planning/readiness/R3-WP10-preregistration.md)
+decision             ADR-051 (planning/adrs.md)
+
+## Toolchain
+
+odin                 dev-2026-07-nightly:819fdc7 (pinned)
+odin bundle sha256   32a7678abc66f1af7353abb5b0b5da47d94b7e663f6d250df29bc9117e864c10
+                     verified against the pin BEFORE first use
+soak-server sha256   19c0cc3d4662308c7190e3606453b74ee1f7f8cfe95c291b09ea446045c3aad9
+
+## Host
+
+4 shared CPUs, 15.7 GiB, kernel 6.18.5, nofile 1024/4096, memlock 8192 KiB.
+Answers resource ACCOUNTING, which is deterministic. Does NOT answer capacity
+or tail latency (G4). See environment.txt.
+
+## Contents
+
+commands.txt                        every command, in order
+environment.txt                     identity, toolchain, host, clock
+config/preregistration.md           the frozen criteria, as committed
+config/budget.txt                   the measurement's own configuration
+raw/per-worker.txt                  per-process samples at N = 1, 2, 4
+raw/maps-n{1,2,4}-worker0.txt       the io_uring mappings the ring bytes come from
+raw/status-n{1,2,4}-worker0.txt     VmPeak/VmSize/VmRSS/VmHWM/VmLck/Threads
+raw/adr049-feasibility-recheck.txt  ADR-049's two claims, checked in the tree
+analysis/budget.md                  the budget, derived from raw/
+verdict.md                          the decision and what it does NOT establish
+
+## Reading order
+
+verdict.md, then analysis/budget.md, then raw/. The verdict CITES raw/ and
+analysis/; it does not replace them.
+
+## The one thing to find later
+
+The fault campaign DID NOT RUN. F1 and its negative control F1n both need an
+implemented arm, and there is none. No containment has been demonstrated. A
+handler fault still costs 100% of capacity and every connection in flight.
