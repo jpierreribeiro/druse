@@ -14,9 +14,10 @@ and WP46 is the first work package held to them.
 
 `vendor/odin-http/` is a snapshot of the root server package of
 `laytan/odin-http` at commit `112c49b` (2026-04-11), vendored 2026-07-19, MIT.
-Twenty-three local patches, all security-, lifecycle- or ownership-motivated, all
-marked `DRUSE PATCH` at their site and all covered by an executable case that
-failed before the patch.
+The table below is the canonical live ledger and currently contains **43
+dispositions**. It includes patches, later bridge work and one recorded
+deletion, so “disposition” is the exact term. Every retained divergence is
+marked `DRUSE PATCH` at its site and covered by executable evidence.
 
 **The standing risk is stated by the dependency itself.** Its README:
 
@@ -42,7 +43,7 @@ forever is a fork with extra steps.
 queue is not a schedule, and re-vendoring across an API its author says moves is
 work regardless of who wrote the fix.
 
-### 2.1 The twenty-three patches, each with its upstream disposition
+### 2.1 Canonical divergence ledger, each with its upstream disposition
 
 | # | Patch | Is it upstream's bug? | Disposition |
 |---|---|---|---|

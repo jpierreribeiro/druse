@@ -1,10 +1,13 @@
 # Platform contract
 
-**Status: PROPOSED, 2026-07-23.** The platform Druse actually targets, stated
+**Status: ADOPTED for R1.** The platform Druse actually targets, stated
 as a **selected profile** — not a claim of full POSIX (IEEE 1003.1-2024)
 conformance. Druse uses a small, named subset of operating-system services; this
 document is that subset and the guarantees that depend on it. It lives at the
 adapter/operations boundary, not in the public API.
+
+`docs/supported-profile.md` is authoritative for which platform is supported;
+this document records the OS-service assumptions inside that selection.
 
 ## Supported profile
 

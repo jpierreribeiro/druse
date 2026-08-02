@@ -1,28 +1,24 @@
 # Canonical API Patterns
 
-This document is **normative**. For every common task there is exactly one
+This document is **normative for API call forms**. For every common task there is exactly one
 recommended form. Documentation, examples, tests, and generated code use only
 these forms. If a pattern here conflicts with any other document except
 `knowledge-base/01-architecture-spec.md`, this document wins.
 
-> Status: Phase-1 canonical forms, ratified and implemented.
+The operational support boundary is separately normative in
+`docs/supported-profile.md`; an API example here cannot widen it.
+
+> Status: live canonical forms, ratified and implemented.
 >
 > Every Phase-1 form below works today against the real `web` package on the
 > pinned toolchain: routing, extractors, JSON bodies, responses, the error
 > envelopes, in-memory testing, and a real HTTP server.
 >
-> Sections marked **Phase 2**, **Phase 3** or **Phase 4** are design targets.
-> They are NOT available today and their code blocks are marked accordingly —
-> do not copy them.
->
-> Still ahead: graceful shutdown with a deadline (Phase 4). Typed application
-> state (WP37) and configurable limits (WP36) shipped in Phase 3; **read and
-> write timeouts did not**, because the vendored server then had no deadline to
-> configure — the read deadline arrived in Phase 4 (`max_request_time`, WP46)
-> and the write/idle deadlines in Phase 7 (`max_write_time`/`max_idle_time`,
-> WP90). Request-scoped state is not ahead either and never will be, because
-> ADR-028 decided against it, and panic recovery never will be: Odin has no recoverable
-> panic, a faulting handler aborts the process, and ADR-020 records why.
+> Historical phase labels explain when a form arrived; they do not mean the
+> implemented form is unavailable. Graceful transport drain, application state,
+> configurable limits and read/write/idle deadlines all ship. Odin has no
+> recoverable panic: a faulting Handler aborts the process, and ADR-020 records
+> why.
 
 ## The one rule
 

@@ -13,7 +13,8 @@ when needed, data-oriented underneath.
 [![Odin](https://img.shields.io/badge/Odin-dev--2026--07a-orange)](odin-version.txt)
 
 More about the API is in the [documentation](docs/), and the fastest way in is
-the [quick start](docs/quick-start.md).
+the [quick start](docs/quick-start.md). The normative deployment and support
+boundary is the [supported profile](docs/supported-profile.md).
 
 ## High level features
 
@@ -107,33 +108,11 @@ Stated plainly, because a framework that hides its edges wastes your time:
 
 ## Platform
 
-**Linux x86-64 only, and by construction rather than by omission.** The vendored
-bootstrap transport imports `core:sys/linux` and stands up an `io_uring` event
-loop per Handler lane, so the library is not portable in its current form.
-
-**Verified on both non-Linux targets**, macOS and Windows. CI builds an example
-there and the compile stops at `sched_yield` and `setsockopt_base`, which
-`core:sys/linux` declares and no other target does:
-
-```
-vendor/odin-http/server.odin(774:4)  Error: 'sched_yield' is not declared by 'linux'
-vendor/odin-http/server.odin(1079:6) Error: 'setsockopt_base' is not declared by 'linux'
-```
-
-CI asserts that failure **and its cause**, and the assertion blocks — so a build
-that succeeded, or one that failed for some other reason, turns the workflow red
-and sends someone back to this paragraph. The only tolerated step is installing
-the unpinned nightly toolchain; if that breaks, the assertion is skipped and
-says so rather than passing silently.
-
-Windows was the one that took a second try. Its first CI runs died on a bug in
-the workflow — an output path missing an extension — before reaching a single
-line of Druse, and the job counted that as portability confirmed. It was green
-for the wrong reason. Once the assertion had to match the cause, the run above
-is what came back: the same two symbols, on Windows, for the documented reason.
-
-This is not a gap waiting on testing. It lifts when the bootstrap transport is
-replaced by the official Odin HTTP package, not before.
+**Linux x86-64 only.** The exact platform, toolchain, HTTP boundary, lifecycle,
+limits, multi-server ceiling and R1 deployment recommendation live in
+[`docs/supported-profile.md`](docs/supported-profile.md). CI also verifies the
+negative portability claim: the current transport must fail on macOS and
+Windows for the recorded Linux-only symbols, not for an unrelated build error.
 
 ## Performance
 

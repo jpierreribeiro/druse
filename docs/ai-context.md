@@ -1,11 +1,13 @@
 # Druse API Reference for Coding Agents
 
-Paste this file into your agent's context (Cursor rules, CLAUDE.md, etc.).
+Paste this file into your agent's context (Cursor rules, CLAUDE.md, etc.). The
+operational support boundary is `docs/supported-profile.md`; this reference
+describes APIs and cannot widen that profile.
 
-**Use only the APIs documented in the Phase-1 sections below. Do not invent
+**Use only the APIs documented in the live sections below. Do not invent
 procedures, aliases, or alternative forms. If something is not listed here, it
-does not exist.** Anything under *Appendix — future phases* is NOT available and
-must never be emitted.
+does not exist.** Anything explicitly marked historical or future is NOT
+available and must never be emitted.
 
 ## What works today
 

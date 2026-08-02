@@ -104,6 +104,8 @@ bash -n "$DRUSE_ROOT/build/check_wp70_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_wp71_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_wp72_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_r1_shutdown_controls.sh"
+bash -n "$DRUSE_ROOT/build/check_supported_profile.sh"
+bash -n "$DRUSE_ROOT/build/check_pilot_runbooks.sh"
 bash -n "$DRUSE_ROOT/build/check_vendor_policy.sh"
 bash -n "$DRUSE_ROOT/build/check_wp38_controls.sh"
 bash -n "$DRUSE_ROOT/build/install-hooks.sh"
@@ -1249,6 +1251,15 @@ timeout 180 env DRUSE_COMPILER="$DRUSE_COMPILER" \
 echo "--- R1-WP03 pinned Caddy topology: policy, negative controls and config validation ---"
 timeout 180 env DRUSE_COMPILER="$DRUSE_COMPILER" \
   bash "$DRUSE_ROOT/build/check_proxy_config.sh"
+
+# R1-WP04 — one source of truth for the supported deployment profile. The
+# checker derives the multi-server ceiling and vendor disposition count, then
+# proves nine stale/false variants are rejected for their semantic reason.
+echo "--- R1-WP04 normative supported profile and semantic controls ---"
+bash "$DRUSE_ROOT/build/check_supported_profile.sh"
+
+echo "--- R1-WP05 controlled-pilot policy and runbook controls ---"
+bash "$DRUSE_ROOT/build/check_pilot_runbooks.sh"
 
 # C-07 (Closure) — the record and the verdict. It runs LAST of the Closure gates
 # and it checks the verdict's own evidence: every artifact it cites still exists
