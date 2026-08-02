@@ -2,9 +2,9 @@ toolchain version: /opt/odin/odin version dev-2026-07-nightly:819fdc7
 toolchain commit: 819fdc7
 odin version: odin version dev-2026-07-nightly:819fdc7
 --- api-shape (run) ---
-caller app addr = 0x7FFD812C5190 ; app.self_addr(recorded in app()) = 7ffd812c50b0
-[serve] port=8080 routes=2 app_addr=0x7FFD812C5190
-[serve] port=8081 routes=1 app_addr=0x7FFD812C5130
+caller app addr = 0x7FFE7FF3D6E0 ; app.self_addr(recorded in app()) = 7ffe7ff3d600
+[serve] port=8080 routes=2 app_addr=0x7FFE7FF3D6E0
+[serve] port=8081 routes=1 app_addr=0x7FFE7FF3D680
 PASS: api-shape
 --- generic-json-response (run) ---
 ok/User      -> status=OK commit=1 body={"id":1,"name":"Jean"}
@@ -44,21 +44,21 @@ resp[0] status=200 commit=1 body=pong
 resp[1] status=404 commit=1 body={"error":{"code":"not_found"}}
 PASS: transport-boundary
 --- test-transport (test) ---
-[INFO ] --- [2026-08-02 07:50:13] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
-[INFO ] --- [2026-08-02 07:50:13] The random seed sent to every test is: 7044913071278. Set with -define:ODIN_TEST_RANDOM_SEED=n.
-[INFO ] --- [2026-08-02 07:50:13] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
-[INFO ] --- [2026-08-02 07:50:13] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:01:35] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:35] The random seed sent to every test is: 8475232049020. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:35] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:35] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
 
-Finished 6 tests in 6.452089ms. All tests were successful.
+Finished 6 tests in 5.883816ms. All tests were successful.
 
 PASS: test-transport
 --- handler-errors (test) ---
-[INFO ] --- [2026-08-02 07:50:15] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
-[INFO ] --- [2026-08-02 07:50:15] The random seed sent to every test is: 7048238242026. Set with -define:ODIN_TEST_RANDOM_SEED=n.
-[INFO ] --- [2026-08-02 07:50:15] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
-[INFO ] --- [2026-08-02 07:50:15] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:01:36] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:36] The random seed sent to every test is: 8477717777336. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:36] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:36] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
 
-Finished 4 tests in 1.641215ms. All tests were successful.
+Finished 4 tests in 1.63615ms. All tests were successful.
 
 PASS: handler-errors
 --- marshal-parity (run) ---
@@ -90,7 +90,7 @@ collections
   ok    fixed array                  [1,2,3]
   ok    dynamic array                [10,20,30]
   ok    map[string]int, one key      {"only":1}
-  ok    map[string]int, four keys    {"beta":2,"alpha":1,"gamma":3,"delta":4}
+  ok    map[string]int, four keys    {"alpha":1,"gamma":3,"beta":2,"delta":4}
   ok    map[int]string, one key      {"7":"seven"}
   ok    empty map                    {}
   ok    every empty container        {"s":"","sl":[],"dyn":[],"m":{},"st":{}}
@@ -124,39 +124,39 @@ PASS: returned handler errors can be ignored (risk confirmed)
 --- handler-errors bare-return probe (expected compile failure) ---
 PASS: bare return rejected with expected diagnostic
 --- stream topology candidate B (lane-polled producer) (test) ---
-[INFO ] --- [2026-08-02 07:50:17] Starting test runner with 2 threads. Set with -define:ODIN_TEST_THREADS=n.
-[INFO ] --- [2026-08-02 07:50:17] The random seed sent to every test is: 7053277719994. Set with -define:ODIN_TEST_RANDOM_SEED=n.
-[INFO ] --- [2026-08-02 07:50:17] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
-[INFO ] --- [2026-08-02 07:50:17] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:01:38] Starting test runner with 2 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:38] The random seed sent to every test is: 8483225833146. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:38] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:38] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
 
-Finished 2 tests in 13.539674ms. All tests were successful.
+Finished 2 tests in 13.759026ms. All tests were successful.
 
 PASS: stream topology candidate B (lane-polled producer)
 --- stream topology candidate C (detached token stream) (test) ---
-[INFO ] --- [2026-08-02 07:50:19] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
-[INFO ] --- [2026-08-02 07:50:19] The random seed sent to every test is: 7055881362410. Set with -define:ODIN_TEST_RANDOM_SEED=n.
-[INFO ] --- [2026-08-02 07:50:19] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
-[INFO ] --- [2026-08-02 07:50:19] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:01:40] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:40] The random seed sent to every test is: 8485706396424. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:40] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:40] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
 
-Finished 5 tests in 7.804795ms. All tests were successful.
+Finished 5 tests in 4.328774ms. All tests were successful.
 
 PASS: stream topology candidate C (detached token stream)
 --- stream topology candidate D (SSE-specific API) (test) ---
-[INFO ] --- [2026-08-02 07:50:20] Starting test runner with 3 threads. Set with -define:ODIN_TEST_THREADS=n.
-[INFO ] --- [2026-08-02 07:50:20] The random seed sent to every test is: 7058248274600. Set with -define:ODIN_TEST_RANDOM_SEED=n.
-[INFO ] --- [2026-08-02 07:50:20] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
-[INFO ] --- [2026-08-02 07:50:20] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:01:41] Starting test runner with 3 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:41] The random seed sent to every test is: 8488119018474. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:41] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:41] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
 
-Finished 3 tests in 2.767234ms. All tests were successful.
+Finished 3 tests in 2.71414ms. All tests were successful.
 
 PASS: stream topology candidate D (SSE-specific API)
 --- large-body ingest arms E/F/G/H (test) ---
-[INFO ] --- [2026-08-02 07:50:21] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
-[INFO ] --- [2026-08-02 07:50:21] The random seed sent to every test is: 7060575149482. Set with -define:ODIN_TEST_RANDOM_SEED=n.
-[INFO ] --- [2026-08-02 07:50:21] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
-[INFO ] --- [2026-08-02 07:50:21] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:01:42] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:42] The random seed sent to every test is: 8490507806818. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:42] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:42] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
 
-Finished 6 tests in 52.607081ms. All tests were successful.
+Finished 6 tests in 71.795424ms. All tests were successful.
 
 PASS: large-body ingest arms E/F/G/H
 --- ADR-020 leak shape (builds; run it via its own run.sh) (check) ---
@@ -175,8 +175,583 @@ PASS: concurrency arms consumer (builds)
 PASS: JSON failure anatomy (builds)
 --- blocking boundary (builds) (check) ---
 PASS: blocking boundary (builds)
-FAIL: these experiment packages are in the tree but nothing checks them: 27-observability-arms
-      Add a 'check' line above, or add it to DRUSE_EXP_EXEMPT with the reason.
-      An unchecked experiment is code that stops compiling and nobody finds out.
+--- observability arms (builds) (check) ---
+PASS: observability arms (builds)
+PASS: every experiment package is checked or exempt on the record
 ============================================
-PASS=23 FAIL=1 SKIP=0
+PASS=24 FAIL=0 SKIP=0
+--- WP1 public API package (odin check) ---
+--- WP1 public API compile contract (odin test) ---
+[INFO ] --- [2026-08-02 08:01:47] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:47] The random seed sent to every test is: 8501201330586. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:47] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:47] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 1 test in 7.475138ms. The test was successful.
+
+--- WP2 request/response model, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:01:48] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:48] The random seed sent to every test is: 8503696480658. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:48] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:48] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 13 tests in 4.979701ms. All tests were successful.
+
+PASS: internal tests ran against the real sources; throwaway package removed
+--- WP2 public surface contract (odin test) ---
+[INFO ] --- [2026-08-02 08:01:49] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:49] The random seed sent to every test is: 8506109985426. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:49] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:49] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 5 tests in 4.782998ms. All tests were successful.
+
+--- WP2 probe: Header_Pair is not nameable from outside the package (expected compile failure) ---
+PASS: Header_Pair is not nameable from outside the package
+--- WP2 probe: Header_View_Internal is not nameable from outside the package (expected compile failure) ---
+PASS: Header_View_Internal is not nameable from outside the package
+--- WP2 probe: Context exposes no public response field (expected compile failure) ---
+PASS: Context exposes no public response field
+--- WP2 probe: internal slot stays reachable (expected compile success) ---
+PASS: encapsulation is by contract, not a barrier (ADR-008 scope confirmed)
+--- WP3 probe C1: web/testing machinery compiles alone (neutral, core-only) ---
+PASS: web/testing compiles as standalone machinery (C1)
+--- WP3 probe C2: web facade compiles importing web/testing ---
+PASS: web imports web/testing one-way (C2)
+--- WP3 machinery internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:01:52] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:52] The random seed sent to every test is: 8512034878056. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:52] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:52] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 7 tests in 2.016973ms. All tests were successful.
+
+PASS: machinery internal tests ran against the real sources; throwaway package removed
+--- WP3 public surface contract, incl. C4 in-memory round trip (odin test) ---
+[INFO ] --- [2026-08-02 08:01:53] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:53] The random seed sent to every test is: 8514712279458. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:53] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:53] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 4 tests in 1.507989ms. All tests were successful.
+
+--- WP3 probe: Recorded_Response.headers carries strings, not pairs (expected compile failure) ---
+PASS: Recorded_Response.headers carries strings, not pairs
+--- WP3 probe C5: web/testing -> web back-edge is a compile cycle (expected failure) ---
+PASS: the one-way dependency is enforced by the compiler (C5)
+--- WP4 route registration and dispatch, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:01:55] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:55] The random seed sent to every test is: 8519008029270. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:55] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:55] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 40 tests in 2.53588ms. All tests were successful.
+
+PASS: WP4 internal tests ran against the real sources; throwaway package removed
+--- WP4 public surface contract: routing, 404, 405, bare (odin test) ---
+[INFO ] --- [2026-08-02 08:01:57] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:57] The random seed sent to every test is: 8521818411324. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:57] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:57] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 13 tests in 1.913089ms. All tests were successful.
+
+--- WP5 canonical extractors, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:01:58] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:01:58] The random seed sent to every test is: 8525140350410. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:01:58] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:01:58] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 41 tests in 4.604083ms. All tests were successful.
+
+PASS: WP5 internal tests ran against the real sources; throwaway package removed
+--- WP5 public surface contract: path/query extraction and the 400 envelope ---
+[INFO ] --- [2026-08-02 08:02:00] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:00] The random seed sent to every test is: 8528445859618. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:00] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:00] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 12 tests in 1.797352ms. All tests were successful.
+
+--- WP5 probe: dropping the ok of path_int is rejected (expected compile failure) ---
+PASS: dropping the ok of path_int is rejected
+--- WP5 probe: dropping the ok of query_int is rejected (expected compile failure) ---
+PASS: dropping the ok of query_int is rejected
+--- WP5 probe: dropping the ok of query_int_or is rejected (expected compile failure) ---
+PASS: dropping the ok of query_int_or is rejected
+--- WP6 response rendering and ownership, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:02] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:02] The random seed sent to every test is: 8533224204220. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:02] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:02] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 36 tests in 1.957143ms. All tests were successful.
+
+PASS: WP6 internal tests ran against the real sources; throwaway package removed
+--- WP6 public surface contract: responders, envelopes, automatic 404/405 ---
+[INFO ] --- [2026-08-02 08:02:04] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:04] The random seed sent to every test is: 8536304063236. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:04] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:04] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 15 tests in 1.85115ms. All tests were successful.
+
+--- WP7 body binding and the request arena, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:05] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:05] The random seed sent to every test is: 8539318434026. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:05] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:05] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 20 tests in 93.736552ms. All tests were successful.
+
+PASS: WP7 internal tests ran against the real sources; throwaway package removed
+--- WP7 public surface contract: body binding, single-consumer, envelopes ---
+[INFO ] --- [2026-08-02 08:02:07] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:07] The random seed sent to every test is: 8543901053458. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:07] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:07] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 4 tests in 3.557168ms. All tests were successful.
+
+--- WP8 driver finalization and boundary, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:09] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:09] The random seed sent to every test is: 8547042713708. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:09] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:09] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 5 tests in 1.593963ms. All tests were successful.
+
+PASS: WP8 internal tests ran against the real sources; throwaway package removed
+--- WP8 probe: web/internal/transport compiles standalone ---
+PASS: the transport adapter compiles as standalone neutral code
+--- WP8 real-socket contract: GET /ping, POST JSON, 413, clean stop (odin test) ---
+[INFO ] --- [2026-08-02 08:02:11] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:11] The random seed sent to every test is: 8551687322896. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:11] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:11] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 1 test in 1.002473794s. The test was successful.
+
+--- WP9 semantic conformance: in-memory factory (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:14] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:14] The random seed sent to every test is: 8557385690236. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:14] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:14] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 1 test in 1.743737ms. The test was successful.
+
+PASS: the semantic matrix passes on the in-memory transport
+--- WP9 semantic conformance: real HTTP factory (odin test) ---
+[INFO ] --- [2026-08-02 08:02:15] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:15] The random seed sent to every test is: 8561137598542. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:15] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:15] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 1 test in 1.002233893s. The test was successful.
+
+--- WP9 raw-wire conformance: framing corpus against the real adapter ---
+[INFO ] --- [2026-08-02 08:02:18] Starting test runner with 2 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:18] The random seed sent to every test is: 8567251722028. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:18] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:18] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: valid GET
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: keep-alive serves two PIPELINED requests
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: 204 carries no body and no Content-Length
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: Connection: close closes after the response
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: valid Content-Length body
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: CL+TE is rejected (smuggling vector)
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: duplicate identical Content-Length is rejected
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: duplicate differing Content-Length is rejected
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: comma-list Content-Length is rejected
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: negative Content-Length is rejected
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: signed and overflowing Content-Length is rejected
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: valid chunked body
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: non-hex chunk size is rejected
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: negative chunk size is rejected
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: chunked body with a trailer field is accepted
+[INFO ] --- [2026-08-02 08:02:18] [wire_test.odin:176:run_wire_case()] wire case: truncated chunk is rejected
+[INFO ] --- [2026-08-02 08:02:22] [wire_test.odin:176:run_wire_case()] wire case: chunk without CRLF is rejected
+[INFO ] --- [2026-08-02 08:02:22] [wire_test.odin:176:run_wire_case()] wire case: missing zero terminator is rejected
+[INFO ] --- [2026-08-02 08:02:25] [wire_test.odin:176:run_wire_case()] wire case: unsupported Transfer-Encoding is rejected
+[INFO ] --- [2026-08-02 08:02:25] [wire_test.odin:176:run_wire_case()] wire case: chunked that is not the final coding is rejected
+[INFO ] --- [2026-08-02 08:02:25] [wire_test.odin:176:run_wire_case()] wire case: an unregistered coding ending in 'chunked' is rejected
+[INFO ] --- [2026-08-02 08:02:25] [wire_test.odin:176:run_wire_case()] wire case: chunked applied twice is rejected
+[INFO ] --- [2026-08-02 08:02:25] [wire_test.odin:176:run_wire_case()] wire case: the chunked coding is matched case-insensitively
+[INFO ] --- [2026-08-02 08:02:25] [wire_test.odin:176:run_wire_case()] wire case: truncated fixed body is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: whitespace before the header colon is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: obs-fold header continuation is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: tab obs-fold header continuation is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: overflowing Content-Length is rejected, its bytes never a second request
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: invalid request line is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: unread body does not desynchronize a following request
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: over-limit body is 413 and its bytes are never a second request
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: Expect: 100-continue is honored — body read, handler runs (C6)
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: an unknown Expect is still refused with 417
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: valid unknown method reaches the core, not a backend 501
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: bare LF line termination is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: a lone CR inside a header value is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: chunk size with a leading plus is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: chunk size with a digit separator is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: a NUL inside a header value is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: a C0 control inside a header value is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: a control byte inside a header NAME is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: absolute-form whose authority AGREES with Host is served
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: absolute-form whose authority DISAGREES with Host is rejected
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: OPTIONS * is still answered, not read as an authority
+[INFO ] --- [2026-08-02 08:02:28] [wire_test.odin:176:run_wire_case()] wire case: a horizontal tab inside a header value is still accepted
+
+Finished 2 tests in 10.003572484s. All tests were successful.
+
+--- WP9 public surface: the conformance harness adds no public symbol ---
+[INFO ] --- [2026-08-02 08:02:30] Starting test runner with 2 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:30] The random seed sent to every test is: 8591656686966. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:30] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:30] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 2 tests in 1.753441ms. All tests were successful.
+
+--- WP14 request bodies through the memory transport (odin test) ---
+[INFO ] --- [2026-08-02 08:02:32] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:32] The random seed sent to every test is: 8595004475056. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:32] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:32] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 4 tests in 11.92388ms. All tests were successful.
+
+--- WP14 query strings through the memory transport (odin test) ---
+[INFO ] --- [2026-08-02 08:02:33] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:33] The random seed sent to every test is: 8598184396666. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:33] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:33] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 8 tests in 2.159758ms. All tests were successful.
+
+--- WP17 middleware chains, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:34] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:34] The random seed sent to every test is: 8601020599588. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:34] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:34] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 21 tests in 2.202629ms. All tests were successful.
+
+PASS: WP17 internal tests ran against the real sources; throwaway package removed
+--- WP17 public surface contract: use, next, ordering, fail-closed (odin test) ---
+[INFO ] --- [2026-08-02 08:02:36] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:36] The random seed sent to every test is: 8603973761536. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:36] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:36] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 8 tests in 1.703644ms. All tests were successful.
+
+--- WP17 socket contract: serve refuses a poisoned app (odin test) ---
+[INFO ] --- [2026-08-02 08:02:37] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:37] The random seed sent to every test is: 8607395508446. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:37] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:37] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 1 test in 5.576003ms. The test was successful.
+
+--- WP18 Router and mount, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:39] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:39] The random seed sent to every test is: 8610458193892. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:39] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:39] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 23 tests in 2.483201ms. All tests were successful.
+
+PASS: WP18 internal tests ran against the real sources; throwaway package removed
+--- WP18 public surface contract: Router, router, mount (odin test) ---
+[INFO ] --- [2026-08-02 08:02:40] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:40] The random seed sent to every test is: 8613266845730. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:40] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:40] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 8 tests in 1.947608ms. All tests were successful.
+
+--- WP19 header lookup, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:42] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:42] The random seed sent to every test is: 8616052877332. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:42] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:42] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 17 tests in 1.834743ms. All tests were successful.
+
+PASS: WP19 internal tests ran against the real sources; throwaway package removed
+--- WP19 public surface contract: header, bearer_token, headers param (odin test) ---
+[INFO ] --- [2026-08-02 08:02:43] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:43] The random seed sent to every test is: 8618854405654. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:43] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:43] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 7 tests in 2.002109ms. All tests were successful.
+
+--- WP20 framework-error observer, internal behavior (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:45] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:45] The random seed sent to every test is: 8622759887128. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:45] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:45] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 14 tests in 4.033172ms. All tests were successful.
+
+PASS: WP20 internal tests ran against the real sources; throwaway package removed
+--- WP20 public surface contract: observe, Framework_Event (odin test) ---
+[INFO ] --- [2026-08-02 08:02:46] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:46] The random seed sent to every test is: 8625781815844. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:46] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:46] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 6 tests in 3.685103ms. All tests were successful.
+
+--- WP20 socket contract: listen failure is observed (odin test) ---
+[INFO ] --- [2026-08-02 08:02:48] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:48] The random seed sent to every test is: 8629203689992. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:48] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:48] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 1 test in 1.314386ms. The test was successful.
+
+--- WP21 fault behaviour, internal (throwaway package) ---
+[INFO ] --- [2026-08-02 08:02:49] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:49] The random seed sent to every test is: 8631987663896. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:49] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:49] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 5 tests in 1.669777ms. All tests were successful.
+
+PASS: WP21 internal tests ran against the real sources; throwaway package removed
+--- WP21 fault-behaviour contract, default build (odin test) ---
+[INFO ] --- [2026-08-02 08:02:50] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:50] The random seed sent to every test is: 8634757142518. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:50] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:50] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 8 tests in 1.501822ms. All tests were successful.
+
+--- WP21 fault-behaviour contract, -o:speed build (odin test) ---
+[INFO ] --- [2026-08-02 08:02:58] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:58] The random seed sent to every test is: 8649803205332. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:58] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:58] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 8 tests in 3.707849ms. All tests were successful.
+
+--- WP21 fault behaviour over a real socket (odin test) ---
+[INFO ] --- [2026-08-02 08:02:59] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:02:59] The random seed sent to every test is: 8653182616402. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:02:59] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:02:59] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:03:00] [server.odin:811:_server_thread_shutdown()] shutdown: done
+[INFO ] --- [2026-08-02 08:03:00] [server.odin:811:_server_thread_shutdown()] shutdown: done
+[INFO ] --- [2026-08-02 08:03:00] [server.odin:811:_server_thread_shutdown()] shutdown: done
+[INFO ] --- [2026-08-02 08:03:00] [server.odin:811:_server_thread_shutdown()] shutdown: done
+
+Finished 1 test in 1.004142121s. The test was successful.
+
+--- item 5b dual-stack bind + IPv4-mapped peer unmapping over a real socket (odin test) ---
+[INFO ] --- [2026-08-02 08:03:02] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:02] The random seed sent to every test is: 8658782063544. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:02] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:02] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:03:03] [server.odin:811:_server_thread_shutdown()] shutdown: done
+[INFO ] --- [2026-08-02 08:03:03] [server.odin:811:_server_thread_shutdown()] shutdown: done
+[INFO ] --- [2026-08-02 08:03:03] [server.odin:811:_server_thread_shutdown()] shutdown: done
+[INFO ] --- [2026-08-02 08:03:03] [server.odin:811:_server_thread_shutdown()] shutdown: done
+
+Finished 1 test in 1.007163029s. The test was successful.
+
+--- WP22 logger, internal behavior: the fixed buffer and its truncation contract (throwaway package) ---
+[INFO ] --- [2026-08-02 08:03:04] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:04] The random seed sent to every test is: 8663639900612. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:04] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:04] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 7 tests in 1.586597ms. All tests were successful.
+
+PASS: WP22 internal tests ran against the real sources; throwaway package removed
+--- WP22 public surface contract: web.logger and the bytes it writes (odin test) ---
+[INFO ] --- [2026-08-02 08:03:06] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:06] The random seed sent to every test is: 8666520275602. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:06] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:06] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 12 tests in 1.997226ms. All tests were successful.
+
+--- WP23 request_id, internal behavior: response header, overlay, validator (throwaway package) ---
+[INFO ] --- [2026-08-02 08:03:07] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:07] The random seed sent to every test is: 8669367319162. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:07] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:07] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 12 tests in 2.08904ms. All tests were successful.
+
+PASS: WP23 internal tests ran against the real sources; throwaway package removed
+--- WP23 public surface contract: request_id trust policy (odin test) ---
+[INFO ] --- [2026-08-02 08:03:08] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:08] The random seed sent to every test is: 8672135133876. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:08] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:08] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 10 tests in 1.953883ms. All tests were successful.
+
+--- WP27 allocation audit: A-8, A-12, A-13, measured (throwaway package) ---
+[INFO ] --- [2026-08-02 08:03:09] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:09] The random seed sent to every test is: 8674681809804. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:09] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:09] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 7 tests in 1.634796ms. All tests were successful.
+
+PASS: WP27 allocation audit ran against the real sources; throwaway package removed
+--- WP35 arena and oversize policy: R-16 measured (odin test) ---
+[INFO ] --- [2026-08-02 08:03:11] Starting test runner with 3 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:11] The random seed sent to every test is: 8677856814432. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:11] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:11] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 3 tests in 161.921605ms. All tests were successful.
+
+--- WP33 multi-parameter routes without a map (odin test) ---
+[INFO ] --- [2026-08-02 08:03:12] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:12] The random seed sent to every test is: 8680922708582. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:12] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:12] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 6 tests in 1.65429ms. All tests were successful.
+
+--- WP36 configurable limits: Limits, DEFAULT_LIMITS, limits (odin test) ---
+[INFO ] --- [2026-08-02 08:03:14] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:14] The random seed sent to every test is: 8684144948426. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:14] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:14] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 12 tests in 1.968259ms. All tests were successful.
+
+--- WP37 typed application state: app_with_state and state (odin test) ---
+[INFO ] --- [2026-08-02 08:03:15] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:15] The random seed sent to every test is: 8687052695794. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:15] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:15] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 11 tests in 1.749273ms. All tests were successful.
+
+--- WP34 route identity: the pattern, never the path (odin test) ---
+[INFO ] --- [2026-08-02 08:03:17] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:17] The random seed sent to every test is: 8689866463906. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:17] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:17] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 9 tests in 1.569272ms. All tests were successful.
+
+--- WP30 registration conflicts: the public half (odin test) ---
+[INFO ] --- [2026-08-02 08:03:18] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:18] The random seed sent to every test is: 8692662637780. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:18] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:18] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 9 tests in 1.852021ms. All tests were successful.
+
+--- WP30 registration conflicts: diagnose and poison (throwaway package) ---
+[INFO ] --- [2026-08-02 08:03:20] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:20] The random seed sent to every test is: 8696138662450. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:20] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:20] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 13 tests in 1.866508ms. All tests were successful.
+
+PASS: WP30 conflict diagnostics ran against the real sources; throwaway package removed
+--- WP32b automatic HEAD and OPTIONS (throwaway package) ---
+[INFO ] --- [2026-08-02 08:03:21] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:21] The random seed sent to every test is: 8698902232392. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:21] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:21] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 7 tests in 4.001628ms. All tests were successful.
+
+PASS: WP32b HEAD/OPTIONS ran against the real sources; throwaway package removed
+--- WP31b path policy: reject, do not transform (odin test) ---
+[INFO ] --- [2026-08-02 08:03:22] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:22] The random seed sent to every test is: 8701532925950. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:22] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:22] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 6 tests in 2.156508ms. All tests were successful.
+
+--- WP28 route shootout: seven representations must agree (odin test) ---
+[INFO ] --- [2026-08-02 08:03:23] Starting test runner with 3 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:23] The random seed sent to every test is: 8704005506006. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:23] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:23] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 3 tests in 18.795088ms. All tests were successful.
+
+PASS: the WP28 shootout runner still builds
+--- WP26 benchmark harness: the instrument, not the numbers (odin test) ---
+[INFO ] --- [2026-08-02 08:03:26] Starting test runner with 4 threads. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:26] The random seed sent to every test is: 8708959307918. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:26] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:26] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+
+Finished 7 tests in 2.296926ms. All tests were successful.
+
+PASS: the WP26 baseline runner still builds
+--- G-11 test-support teardown cost (nm) ---
+G-11: application that never tests  -> 0 web/testing symbols, 1064440 bytes
+G-11: application that does test    -> 13 web/testing symbols, 592184 bytes
+G-11: static-edge mutation          -> 4 web/testing symbols (correctly rejected)
+PASS: the test-support teardown is eliminated from applications that never test (G-11)
+--- WP10 documentation fragments (odin test) ---
+[INFO ] --- [2026-08-02 08:03:33] Starting test runner with 1 thread. Set with -define:ODIN_TEST_THREADS=n.
+[INFO ] --- [2026-08-02 08:03:33] The random seed sent to every test is: 8723217522688. Set with -define:ODIN_TEST_RANDOM_SEED=n.
+[INFO ] --- [2026-08-02 08:03:33] Memory tracking is enabled. Tests will log their memory usage if there's an issue.
+[INFO ] --- [2026-08-02 08:03:33] < Final Mem/ Total Mem> <  Peak Mem> (#Free/Alloc) :: [package.test_name]
+[INFO ] --- [2026-08-02 08:03:33] [logger.odin:82:()] druse: GET /orders/:id 200
+[INFO ] --- [2026-08-02 08:03:33] [logger.odin:82:()] druse: GET /orders/:id 200
+
+Finished 1 test in 5.290831ms. The test was successful.
+
+--- WP10 example programs (odin build) ---
+--- example: 01-hello-world (odin build) ---
+--- example: 02-json-api (odin build) ---
+--- example: 03-route-params (odin build) ---
+--- example: 04-middleware (odin build) ---
+--- example: 05-route-groups (odin build) ---
+--- example: 06-authentication (odin build) ---
+--- example: 07-app-state (odin build) ---
+--- example: 08-table-stakes (odin build) ---
+--- example: 09-graceful-shutdown (odin build) ---
+--- example: 10-config-and-health (odin build) ---
+--- example: 11-clean-layers (odin build) ---
+example 01-hello-world -> 1074928 bytes
+example 02-json-api -> 1274184 bytes
+example 03-route-params -> 1135024 bytes
+example 04-middleware -> 1129152 bytes
+example 05-route-groups -> 1152384 bytes
+example 06-authentication -> 1143176 bytes
+example 07-app-state -> 1129504 bytes
+example 08-table-stakes -> 1088064 bytes
+example 09-graceful-shutdown -> 1075488 bytes
+example 10-config-and-health -> 1139192 bytes
+example 11-clean-layers -> 1301800 bytes
+examples total: 12642896 bytes (built in /tmp/druse-examples-wiXaHH3f, removed on exit)
+PASS: the examples compile and use only the public surface
+--- WP10 documentation parity ---
+docs: every Odin block in an active document is classified
+docs: every compile/fragment marker resolves to a real file or fixture
+docs: all 80 application symbols appear in the active reference
+docs: Method and Status members match the package
+docs: no future-phase API appears in an active section
+docs: canonical call-site rules hold in every active document
+docs: no stale pre-WP10 status claim remains
+docs: the ownership table is present with all four questions; R-3, R-4 and the R-10 multi-server bound are stated
+docs: the Quick Start is real and teaches no internals
+docs: the fault-behaviour statement is present and no document promises recovery (ADR-020)
+docs: discarded speculative product remains absent
+package-aware symbol check
+  UNCHECKED: 28 of 29 packages are not on disk under /home/user/druse-crystals
+  UNCHECKED: 264 symbol reference(s) in the guide were NOT verified: api_key.*, authorization.*, config.*, cookie.*, csrf.*, csrf_http.*, form.*, health.*, html.*, idem.*, idempotency.*, jobs.*, mail.*, mail_http.*, memory.*, notes.*, password.*, pg.*, rate_limit.*, redirect.*, rl.*, session.*, session_http.*, sse.*, storage.*, tpl.*, validate.*, vh.*
+  UNCHECKED: check out druse-crystals beside this repository, or set $DRUSE_CRYSTALS, to verify them
+  every alias.symbol resolves in its own package (1 package(s) checked)
+arity check against build/phase1-public-signatures.txt
+  every web.* call matches its ledger signature
+ledger coverage: 82 / 82 symbols taught on a guide page
+cookbook drift check: docs/guide/06-cookbook/config-and-health.md DIFFER
