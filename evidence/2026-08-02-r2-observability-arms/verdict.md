@@ -161,6 +161,26 @@ m1 is the one worth naming. A gauge stuck at zero is what the first version of
 every metric looks like, and at full occupancy every counter around it is frozen
 — so nothing else in the snapshot would contradict it.
 
+## The gate
+
+`build/check_r2_observability_controls.sh` runs inside `build/check.sh` and
+passed there: `raw/gate.txt` lines 1513–1527, seven mutants red for their own
+reasons.
+
+**The local gate run does not complete, and the reason is the container.**
+`build/check_wp72_controls.sh` raises the soft `RLIMIT_NOFILE` to 8192 for its
+3,000-connection laboratory and fails closed when it cannot; this container's
+hard limit is 4096, so no user in it can satisfy that. Proven rather than
+asserted: a pristine worktree of `origin/main` at `f560f8b`, in the same
+container as the same user, fails at the identical line
+(`raw/gate-wp72-environment.txt`).
+
+**CI is the authority.** Two earlier gate stops in this campaign were real and
+were fixed rather than explained away: an experiment package nothing checked
+(`experiments/run_checks.sh`), and a generated cookbook page left stale by the
+change to `examples/10-config-and-health` plus a recipe page 21 lines over its
+budget.
+
 ## Answering ADR-049
 
 **Yes, metrics can be aggregated across processes, and ADR-049 is NOT closed as
