@@ -1,0 +1,95 @@
+{
+	admin off
+	auto_https off
+	servers {
+		protocols h1 h2
+		max_header_size 16KB
+		timeouts {
+			read_body 6s
+			read_header 2s
+			write 10s
+			idle 30s
+		}
+	}
+}
+
+https://proxy.test:{$DRUSE_PROXY_PORT:22453} {
+	tls /certs/server.pem /certs/server-key.pem
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	# The campaign replaces only this DEFAULT while building an immutable
+	# release bundle. It proves proxy configuration rolls back with the binary.
+	header X-R1-Bundle "{$DRUSE_BUNDLE_ID:unconfigured}"
+
+	@valid_request_id header_regexp X-Request-Id ^[A-Za-z0-9._-]{1,64}$
+	log_append @valid_request_id request_id {http.request.header.X-Request-Id}
+	log {
+		output file /logs/access.json
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				resp_headers delete
+			}
+		}
+	}
+
+	handle /pilot/stream {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			flush_interval -1
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+
+	# Health and readiness remain visible even when active health has removed the
+	# application routes. Operators must be able to distinguish down from drain.
+	handle /health {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+			}
+		}
+	}
+	handle /ready {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+			}
+		}
+	}
+
+	handle /pilot/* {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			health_uri /ready
+			health_interval 200ms
+			health_timeout 100ms
+			health_status 200
+			health_fails 1
+			health_passes 1
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+
+	# R1 is an allowlist, not a general deployment. No route falls through to
+	# Druse outside health/readiness and /pilot/*.
+	handle {
+		respond "outside R1 pilot allowlist" 404
+	}
+}

@@ -1,0 +1,6 @@
+Linux jp-Latitude-5400 6.8.0-86-generic #87-Ubuntu SMP PREEMPT_DYNAMIC Mon Sep 22 18:03:36 UTC 2025 x86_64 x86_64 x86_64 GNU/Linux
+/home/jp/.local/bin/odin version dev-2026-07-nightly:819fdc7
+systemd 255 (255.4-1ubuntu8.11)
+docker=28.2.2
+v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=
+OpenSSL 3.0.13 30 Jan 2024 (Library: OpenSSL 3.0.13 30 Jan 2024)

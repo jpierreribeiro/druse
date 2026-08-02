@@ -1,6 +1,6 @@
 # Standards registry
 
-**Status: PROPOSED, 2026-07-23.** The external standards Druse adopts, the
+**Status: ADOPTED for R1.** The external standards Druse adopts, the
 scope of each adoption, and where the evidence lives. The honest framing:
 
 > Druse defines selected contracts informed by IEEE, ISO/IEC/IEEE, IETF and W3C
@@ -10,6 +10,9 @@ Druse does **not** claim "IEEE compliant" or "POSIX compliant." It adopts the
 *contracts* it can verify, names the *deviations* it takes, and points every
 adoption at *executable evidence*. A conformance seal without evidence would be
 the exact ceremony this project refuses.
+
+`docs/supported-profile.md` remains authoritative for platform and deployment
+support; this registry only states the standards scope inside it.
 
 ## Registry
 

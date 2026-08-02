@@ -104,6 +104,10 @@ bash -n "$DRUSE_ROOT/build/check_wp70_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_wp71_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_wp72_controls.sh"
 bash -n "$DRUSE_ROOT/build/check_r1_shutdown_controls.sh"
+bash -n "$DRUSE_ROOT/build/check_supported_profile.sh"
+bash -n "$DRUSE_ROOT/build/check_pilot_runbooks.sh"
+bash -n "$DRUSE_ROOT/build/check_pilot_exercise.sh"
+bash -n "$DRUSE_ROOT/build/check_r1_freeze.sh"
 bash -n "$DRUSE_ROOT/build/check_vendor_policy.sh"
 bash -n "$DRUSE_ROOT/build/check_wp38_controls.sh"
 bash -n "$DRUSE_ROOT/build/install-hooks.sh"
@@ -112,6 +116,7 @@ bash -n "$DRUSE_ROOT/.githooks/pre-push"
 bash -n "$DRUSE_ROOT/ops/ci/run.sh"
 bash -n "$DRUSE_ROOT/ops/ci/status.sh"
 bash -n "$DRUSE_ROOT/ops/ci/install-odin.sh"
+bash -n "$DRUSE_ROOT/ops/verification/run-r1-freeze.sh"
 
 # `odin test` writes its runner executable into the CURRENT WORKING DIRECTORY.
 # It removes it again on success — but NOT when the test run fails, which drops
@@ -1249,6 +1254,22 @@ timeout 180 env DRUSE_COMPILER="$DRUSE_COMPILER" \
 echo "--- R1-WP03 pinned Caddy topology: policy, negative controls and config validation ---"
 timeout 180 env DRUSE_COMPILER="$DRUSE_COMPILER" \
   bash "$DRUSE_ROOT/build/check_proxy_config.sh"
+
+# R1-WP04 — one source of truth for the supported deployment profile. The
+# checker derives the multi-server ceiling and vendor disposition count, then
+# proves nine stale/false variants are rejected for their semantic reason.
+echo "--- R1-WP04 normative supported profile and semantic controls ---"
+bash "$DRUSE_ROOT/build/check_supported_profile.sh"
+
+echo "--- R1-WP05 controlled-pilot policy and runbook controls ---"
+bash "$DRUSE_ROOT/build/check_pilot_runbooks.sh"
+
+echo "--- R1-WP06 deploy, crash/restart, drain and rollback controls ---"
+timeout 180 env DRUSE_COMPILER="$DRUSE_COMPILER" \
+  bash "$DRUSE_ROOT/build/check_pilot_exercise.sh"
+
+echo "--- R1-WP07 evidence-backed controlled-pilot freeze ---"
+bash "$DRUSE_ROOT/build/check_r1_freeze.sh"
 
 # C-07 (Closure) — the record and the verdict. It runs LAST of the Closure gates
 # and it checks the verdict's own evidence: every artifact it cites still exists

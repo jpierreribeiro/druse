@@ -22,10 +22,9 @@ framework's, and are removed from this assessment.)
   suspension, p99 24× better, wp71/c05 + 150 gates green) and Phase 9 (io_uring infra
   + the measured perf investigation: Druse competes with fasthttp on throughput,
   wins on latency).
-- **`v0.10.0` — RELEASING (2026-07-30), the first not marked a pilot.** The six
-  gates stay green and every step is done except one: the tag is cut when the
-  12-hour soak closes green. What this release added, and the one place its
-  evidence stops, are recorded below under *Release record*.
+- **`v0.10.0` — RELEASED (2026-07-30), the first not marked a pilot.** What this
+  release added, and the one place its evidence stops, are recorded below under
+  *Release record*.
 
 ---
 
@@ -163,6 +162,5 @@ oversight.
 14 security findings pinned, measured performance that competes with fasthttp on
 throughput and wins on latency, and — new here — a soak-verified 12-hour
 steady state. Maturity beyond this is a question of accrued real-world use, not
-of another gate. The operational contract has not changed and is not negotiable
-by a release note: **Linux x86-64, one server per process, TLS terminated at the
-proxy, and a supervisor** (`docs/operations.md`).
+of another gate. A release record cannot redefine the operational contract;
+the current normative boundary is `docs/supported-profile.md`.

@@ -1,6 +1,7 @@
 # Programa de prontidão para produção — R1, R2 e R3
 
-**Status:** PLANO, 2026-08-01.
+**Status:** R1 PROMOTED em 2026-08-02 para piloto interno não crítico; R2/R3
+continuam como planos bloqueados por seus próprios gates.
 **Origem:** `docs/reports/2026-08-01-production-readiness-audit.md`.
 **Pré-condição absoluta:** R0 concluído, commit limpo e `build/check.sh`
 integralmente verde.
@@ -20,6 +21,10 @@ deles autoriza adicionar features sem relação com a evidência que o gate pede
 O backlog resumido continua em
 [`../2026-08-01-production-readiness-remediation.md`](../2026-08-01-production-readiness-remediation.md).
 Os planos deste diretório são a decomposição executável daquele backlog.
+
+O veredito e o ledger de risco do nível atual estão congelados em
+[`R1-freeze.md`](R1-freeze.md). “R1 promoted” não significa produção geral:
+significa somente o perfil limitado descrito naquele documento.
 
 ## Progressão
 

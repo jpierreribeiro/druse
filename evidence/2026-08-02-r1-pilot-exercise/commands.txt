@@ -1,0 +1,6 @@
+full_gate=bash build/check.sh
+candidate_build=odin build tests/r1-pilot-deployment/server -collection:druse=. -o:speed -define:R1_PILOT_RELEASE=candidate
+previous_build=git worktree add --detach previous-source 489421d71bdd33f458165b3a7127b33bbc689269; odin build tests/r1-pilot-deployment/server -o:speed -define:R1_PILOT_RELEASE=previous
+supervisor=systemd-run --user with Restart=on-failure TimeoutStopSec=30s MemoryMax=1G LimitNOFILE=2048 LimitMEMLOCK=64M
+proxy=docker run --network host --platform linux/amd64 docker.io/library/caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+private_keys=ephemeral; never copied into evidence

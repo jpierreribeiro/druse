@@ -1,0 +1,2 @@
+PASS: unit/profile agree on Restart=on-failure, LimitMEMLOCK=64M, LimitNOFILE=2048, MemoryMax=1G, TimeoutStopSec=30, spool=/var/lib/druse, and every document agrees
+PASS: ops/ci ships a parseable verifier, building from a clean copy, driven by a timer rather than a restart

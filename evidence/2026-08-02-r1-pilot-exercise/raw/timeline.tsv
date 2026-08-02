@@ -1,0 +1,28 @@
+2026-08-02T02:45:29.588Z	campaign-start candidate=350eefbacac5f9d32b889207754a22a9a03b24f5 previous=489421d71bdd33f458165b3a7127b33bbc689269
+2026-08-02T02:45:29.591Z	full-gate-start
+2026-08-02T03:07:48.541Z	full-gate-pass
+2026-08-02T03:08:37.881Z	bundle-switch target=previous
+2026-08-02T03:08:37.884Z	previous-bundle-baseline-verified
+2026-08-02T03:08:37.907Z	bundle-switch target=candidate
+2026-08-02T03:08:40.544Z	service-ready bundle=candidate pid=3426370
+2026-08-02T03:08:40.938Z	proxy-ready bundle=candidate
+2026-08-02T03:08:41.789Z	smoke-pass bundle=candidate
+2026-08-02T03:08:50.231Z	normal-drain-sigterm
+2026-08-02T03:08:50.767Z	normal-drain-inactive
+2026-08-02T03:08:50.919Z	service-ready bundle=candidate pid=3426582
+2026-08-02T03:08:51.078Z	proxy-application-ready-after-drain
+2026-08-02T03:08:51.100Z	handler-fault-request pid=3426582
+2026-08-02T03:08:51.667Z	handler-fault-recovered old_pid=3426582 new_pid=3426674 restarts=1
+2026-08-02T03:08:52.605Z	smoke-pass bundle=candidate
+2026-08-02T03:08:52.618Z	rollback-stop-sigterm
+2026-08-02T03:08:53.164Z	rollback-stop-inactive
+2026-08-02T03:08:53.402Z	proxy-stopped bundle=candidate
+2026-08-02T03:08:53.499Z	bundle-switch target=previous
+2026-08-02T03:08:54.261Z	service-ready bundle=previous pid=3426918
+2026-08-02T03:08:54.696Z	proxy-ready bundle=previous
+2026-08-02T03:08:55.538Z	smoke-pass bundle=previous
+2026-08-02T03:08:55.595Z	rollback-smoke-pass seconds=3
+2026-08-02T03:08:55.648Z	final-stop-sigterm
+2026-08-02T03:08:56.239Z	final-stop-inactive
+2026-08-02T03:08:56.429Z	proxy-stopped bundle=previous
+2026-08-02T03:08:56.478Z	campaign-complete decision=PROMOTE_TO_R1

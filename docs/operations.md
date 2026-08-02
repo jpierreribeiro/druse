@@ -2,6 +2,10 @@
 
 **Who this is for:** whoever has to deploy this and be woken up by it.
 
+The normative support boundary is `docs/supported-profile.md`. This manual
+explains how to operate that profile; it cannot widen its platform, topology or
+production claim.
+
 It says what is bounded, what is not, what to monitor, and — the section most
 documents leave out — **what this framework does not protect you from.** A
 deployment guide that only lists features is a guide that gets someone paged.
@@ -537,12 +541,11 @@ surface, not a core concept. A reconnecting client replays its cursor in
 carries the header, it does not replay events.
 
 **Large uploads.** The buffered path (`web.body`, `form_file`, up to
-`max_body`) is unchanged and canonical. A bounded spool substrate for bodies
-larger than memory exists internally (fragmentation-correct multipart, generated
-`druse-spool-` files at `0600`, per-upload/process quotas, exactly-once
-cleanup) but has **no public upload API yet** — see §10. When it ships, temp
-files are deleted on every non-persisted path; the operator's only concern is
-crash remnants, which carry the `druse-spool-` prefix.
+`max_body`) remains canonical for ordinary bodies. The opt-in public large-body
+path is `web.enable_upload` plus `web.upload`/`web.upload_persist`; it spools
+bounded windows into `0600` `druse-spool-` files with per-upload, concurrency
+and process quotas. Non-persisted paths clean up exactly once; the operator must
+still sweep crash remnants carrying that prefix at boot.
 
 **After first-byte commit**, framework 4xx/5xx responders cannot append a second
 envelope, and the adapter that carries this must be replaceable: every streaming
@@ -564,7 +567,8 @@ hook in the vendored backend is a numbered `BRIDGE` patch, deletable when
    alert from.
 7. A cgroup memory limit, because the framework does not bound your handlers.
 8. Metrics keyed on `web.route`, never on the path.
-9. One process per server; scale by adding processes.
+9. For R1, keep the measured one-App/one-listener process profile; the core's
+   16-server ceiling is capability, not permission to extrapolate its budget.
 10. Load-test **your** handlers. This framework's dispatch is flat from 5 routes
     to 5,000; your database is not.
 
@@ -646,8 +650,10 @@ the topology those limitations make mandatory:
   an operational invariant. Matrix row 4.
 * **Tune the accept backlog** (`somaxconn`) — it is the kernel's, and the only
   place a connection can queue. Matrix row 11.
-* **One server per process**, and install your own `SIGTERM`/`SIGINT` handler
-  that calls `web.stop` — the core installs none. §2 and §9.
+* **For R1 use one App/listener per process**, and install your own
+  `SIGTERM`/`SIGINT` handler that calls `web.stop` — the core installs none.
+  Core supports up to 16 concurrent servers, but a multi-server deployment
+  needs new aggregate FD, memory, memlock and rollback evidence. §2 and §9.
 
 The vendored HTTP backend remains a snapshot of `laytan/odin-http` with local
 patches (`planning/vendor-policy.md`), several fixing upstream defects. This is

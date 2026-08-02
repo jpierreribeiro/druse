@@ -1,0 +1,6 @@
+pilot config control: buffering rejected for the expected reason
+pilot config control: fallback rejected for the expected reason
+pilot config control: retry rejected for the expected reason
+pilot config control: logs rejected for the expected reason
+pilot exercise implementation: fixture builds, Caddy allowlist, real systemd/core and atomic rollback are wired
+PASS: R1-WP06 deploy, crash/restart, drain and rollback evidence verifies

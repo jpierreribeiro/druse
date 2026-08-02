@@ -62,11 +62,11 @@ opposite:
 
 Out of scope, because they are documented limitations rather than defects:
 
-- **only one server per process is supported.** `web.stats` and
-  `web.refused_connections` take no server argument, so a second concurrent
-  server would make them ambiguous; those signatures are frozen. ADR-018 is
-  accepted and WP123 owns the fix. Background: `planning/history/post-phase1-audit.md`
-  finding A-4;
+- **deployment outside the supported profile.** Core lifecycle state supports
+  up to 16 concurrent servers, but the measured R1 profile deliberately uses
+  one App/listener per process. More than 16, or an unmeasured multi-server
+  resource profile, is unsupported. Cross-wired routing, stats or shutdown
+  between two supported servers remains a vulnerability;
 - **no TLS, and there will not be.** Run Druse behind a reverse proxy that
   terminates TLS. In-process TLS would import an enormous attack surface into a
   framework whose value is a small, frozen, gate-enforced one, and the proxy
@@ -88,10 +88,9 @@ supported topology is a reverse proxy under a supervisor.
 
 ## Supported versions
 
-Releases exist — the latest is `v0.10.0`, pre-1.0 — but **only the latest tag
-and the current `main` are supported.** No backports exist, nothing is
-designated long-term, and a fix lands on `main` rather than being carried to an
-older tag.
+The version and platform support policy is normative in
+`docs/supported-profile.md`: only the latest tag and current `main`, no
+backports or LTS branches.
 
 Druse is built against a single pinned Odin toolchain, recorded in
 `odin-version.txt`. A report against a different toolchain is welcome but may be
@@ -102,8 +101,8 @@ version does not have.
 
 Druse vendors the root server package of
 [`laytan/odin-http`](https://github.com/laytan/odin-http) under `vendor/`, at a
-pinned commit, with twenty-four local patches recorded in
-`vendor/odin-http/VENDOR.md` — ten of them security-motivated.
+pinned commit. `vendor/odin-http/VENDOR.md` records provenance and
+`planning/vendor-policy.md` is the canonical, gate-counted divergence ledger.
 
 If the problem is in that upstream package, please tell us as well as upstream —
 the vendored copy is patched independently and may need its own fix.

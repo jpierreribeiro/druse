@@ -59,9 +59,16 @@ docs/          — generated documentation
 README.md, odinfmt.json, .editorconfig, .gitignore — repo tooling
 ```
 
-## Local patches
+## Local divergence record
 
-**Twenty-four**, numbered 1..24 in the table below. Five added by WP9 (transport
+The **canonical live ledger** is `../../planning/vendor-policy.md`; its row
+count is derived by `build/check_vendor_policy.sh` and currently records 43
+dispositions. The table below preserves the first 24 historical patch groups
+because they explain the bootstrap server's original delta. It is a historical
+subset, not the current count; later bridge patches and deletions live only in
+the canonical ledger so two copied lists cannot drift again.
+
+The first twenty-four groups were numbered 1..24 below. Five added by WP9 (transport
 conformance), one each by WP45,
 WP46 (ADR-031) and WP47, three by WP59's drain repair, one by WP70's multi-lane
 lifecycle repair, one by WP71's Handler-capacity mapping, five security
@@ -78,7 +85,7 @@ an all-lanes-active refusal that closes the accepted socket without writing
 HTTP, because the acceptor has not parsed a request and its old raw 503 reached
 a Go `net/http` client as an unsolicited response.
 
-**Ten of the twenty-four are security-motivated**: WP9's five and the
+**Ten of those first twenty-four are security-motivated**: WP9's five and the
 Phase-6-freeze scan's five.
 All are minimal and fix a security issue, an upstream defect,
 a lifecycle defect or a capacity the server had no way to bound. Each is marked
@@ -123,9 +130,9 @@ that array under `#no_bounds_check`) stays in bounds.
 
 Every other line is byte-for-byte upstream.
 
-To update to a newer upstream commit, re-apply the twenty-four patches above (they are
-small and each is commented at its site) and re-run the WP9 raw-wire corpus,
-which is what proves they are still needed and still sufficient.
+To update to a newer upstream commit, follow every current disposition in
+`../../planning/vendor-policy.md`, not merely the historical subset above, and
+re-run the owning executable corpora.
 
 A note on cost, for the record: importing this package links its one `@(init)`
 procedure (`status.odin::status_strings_init`, which precomputes the HTTP
@@ -140,8 +147,6 @@ this cost is not.
 ## Updating
 
 To move to a different upstream commit: re-copy the root `.odin` files, the
-`LICENSE` and `mod.pkg` from a fresh checkout at the new commit, re-apply the
-twenty-four patches listed above, update the provenance table, and re-run the full
-gate — including the WP9 raw-wire corpus, which is what proves the patches are
-still necessary and still sufficient. Do not make unrelated edits to these
-files.
+`LICENSE` and `mod.pkg` from a fresh checkout at the new commit, apply the live
+canonical disposition ledger, update provenance, and re-run the full gate and
+each owning corpus. Do not make unrelated edits to these files.

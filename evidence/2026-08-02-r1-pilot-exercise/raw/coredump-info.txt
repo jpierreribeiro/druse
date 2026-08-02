@@ -1,0 +1,22 @@
+           PID: 3426582 (app)
+           UID: 1000 (jp)
+           GID: 1000 (jp)
+        Signal: 6 (ABRT)
+     Timestamp: Sun 2026-08-02 00:08:51 -03 (738ms ago)
+  Command Line: /tmp/druse-r1-pilot-aRcKVI9i/releases/current/app
+    Executable: /tmp/druse-r1-pilot-aRcKVI9i/releases/candidate/app
+ Control Group: /user.slice/user-1000.slice/user@1000.service/app.slice/druse-r1-pilot-3358300.service
+          Unit: user@1000.service
+     User Unit: druse-r1-pilot-3358300.service
+         Slice: user-1000.slice
+     Owner UID: 1000 (jp)
+       Boot ID: 7e47a8eab3f243dc9ddadf9127fffe97
+    Machine ID: 11c3003b0e56407ea0312d8e0a062589
+      Hostname: jp-Latitude-5400
+       Storage: /var/lib/systemd/coredump/core.app.1000.7e47a8eab3f243dc9ddadf9127fffe97.3426582.1785640131000000.zst (present)
+  Size on Disk: 43.6K
+       Message: Process 3426582 (app) of user 1000 dumped core.
+                
+                Stack trace of thread 3426595:
+                #0  0x00007d4d2749eb2c n/a (n/a + 0x0)
+                ELF object binary architecture: AMD x86-64

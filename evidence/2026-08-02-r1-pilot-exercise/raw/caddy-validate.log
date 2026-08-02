@@ -1,0 +1,9 @@
+{"level":"info","ts":1785640120.2364483,"msg":"using config from file","file":"/etc/caddy/Caddyfile"}
+{"level":"info","ts":1785640120.2402232,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"info","ts":1785640120.2415257,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x34aed6a5800"}
+{"level":"warn","ts":1785640120.2418902,"logger":"tls","msg":"unmanaged certificate expires within 1 day","not_after":1785726519,"sans":["proxy.test"]}
+{"level":"info","ts":1785640120.2423484,"logger":"http.auto_https","msg":"automatic HTTPS is completely disabled for server","server_name":"srv0"}
+{"level":"info","ts":1785640120.243752,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1785640120.2437608,"logger":"http.handlers.reverse_proxy.health_checker.active","msg":"HTTP request failed","host":"127.0.0.1:22141","error":"Get \"http://127.0.0.1:22141/ready\": validation complete"}
+{"level":"info","ts":1785640120.2438095,"logger":"tls.cache.maintenance","msg":"stopped background certificate maintenance","cache":"0x34aed6a5800"}
+Valid configuration

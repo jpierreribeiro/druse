@@ -1,8 +1,8 @@
 # WP123 — per-server state replaces `g_server`
 
-**Status: SPEC, 2026-07-31. Not started.** Authorised by ADR-018 (ACCEPTED,
-owner, 2026-07-31) and recorded in `decisoes-do-dono.md`. This document is the
-plan; no code has changed.
+**Status: IMPLEMENTED AND FROZEN.** Authorised by ADR-018 and completed by
+WP123. This document is retained as the design/negative-control record; current
+support policy lives in `docs/supported-profile.md`.
 
 **What it closes.** A Phase-4 exit criterion the roadmap still lists and Phase 4
 froze without meeting: *"per-server state replaces the transport globals (audit
@@ -150,15 +150,12 @@ returning a server, a "current server" convenience, or a second lifecycle
 concept. ADR-018 authorises removing a global and changing two arities. Anything
 else is a new decision.
 
-**Not scheduled into a phase.** Phase 9 (WP114–WP121, I/O architecture) is in
-flight and WP122 is reserved for the CPU-diagnosis lever. WP123 runs when the
-owner puts it in a phase.
+This sequencing record is historical; both halves have landed.
 
-## 7. Until it lands
+## 7. Closed state
 
-One server per process remains **true and documented as such**. The
-2026-07-31 correction changed the *reason* the documents give — from the removed
-`g_config` cross-wire to the frozen contract — not the limitation itself. Those
-documents (`README.md`, `SECURITY.md`, `docs/operations.md` §5,
-`docs/canonical-patterns.md`) each carry a pointer here, and each needs its
-paragraph rewritten when this WP closes.
+The process-global server slot is gone, `stats` and `refused_connections` take
+the App, and the two-server socket suite plus the collapsed-registry mutation
+prove independent routing, metrics and drain. The registry ceiling is 16. R1
+still deploys one App/listener per process because that is the measured failure
+domain, not because the core is limited to one.
