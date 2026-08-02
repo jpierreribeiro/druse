@@ -96,14 +96,21 @@ change** before running. Do not narrow the affinity at the prompt.
 
 ### 3.1 The requirement
 
+**Amended 2026-08-02, before any run.** The owner has designated the host: an
+existing `c5.2xlarge` at `44.200.160.96`. That is the fallback branch of §3.2,
+and this section is the committed form of it — the affinity, the lane count and
+the consequences, written down before `started_utc` rather than adapted at the
+prompt. §3.4 records what the amendment costs.
+
 | Field | Required value |
 |---|---|
-| hostname / provider | recorded by the run |
-| logical CPUs online | ≥ 8 |
-| **physical cores** | **≥ 8 — `preflight.sh` must report `physical_core_disjoint=yes`** |
-| server CPU set | `0-3` |
-| generator CPU set | `4-7` |
-| lanes (`DRUSE_SOAK_LANES`) | 4 |
+| hostname / provider | AWS `c5.2xlarge`, `ip-172-31-7-128`, Xeon Platinum 8124M @ 3.00 GHz |
+| logical CPUs online | ≥ 8 — **measured: 8** |
+| physical cores | 4 (2 threads each), siblings `(0,4) (1,5) (2,6) (3,7)` — **measured, not assumed** |
+| **isolation** | **`preflight.sh` must report `physical_core_disjoint=yes`** |
+| server CPU set | `0,1,4,5` — physical cores `{0,1}` |
+| generator CPU set | `2,3,6,7` — physical cores `{2,3}` |
+| lanes (`DRUSE_SOAK_LANES`) | **2** (was 4; see §3.4) |
 | governor / turbo | recorded, not constrained |
 | NUMA nodes | recorded; a multi-node host needs this file amended before running |
 | RAM | ≥ 8 GiB (the RSS safety stop is 4 GiB) |
@@ -163,6 +170,31 @@ to make the preflight pass is the thing `preflight.sh` refuses by name — *"Do
 not adapt the affinity silently during a campaign"* — and it produces a run
 whose manifest disagrees with its plan.
 
+### 3.4 What the amendment costs, stated before the run
+
+The host is kept and the affinity changes. §3.2 pre-approved this and named three
+consequences; all three are now in force, and one more was found on the host.
+
+1. **The server has two physical cores, not four.** `0,1,4,5` is cores `{0,1}`
+   and `2,3,6,7` is cores `{2,3}`. Half the machine each, and no thread shared.
+2. **`DRUSE_SOAK_LANES` is 2.** Two physical cores cannot host four Handler
+   lanes plus a load generator without reintroducing the competition this
+   amendment exists to remove. `planning/verification-campaign-plan.md` reaches
+   the same number from the other direction.
+3. **Every rate in §4 loses its inherited basis.** They were set on this machine
+   under `0-3`/`4-7` with four lanes — which §3.3 now confirms was SMT-shared —
+   and they are carried forward only as *starting* offered load. The burn-in and
+   the rehearsal decide whether they are sustainable at two lanes; if they are
+   not, the rates are amended here, in their own commit, before the final run.
+   A rate lowered after seeing a red final run would invalidate that run (G3).
+4. **No result from this campaign is comparable to a four-core run**, including
+   any future campaign on a `ThreadsPerCore=1` host. The core count is part of
+   the candidate's identity.
+
+The `ThreadsPerCore=1` option in §3.2 is not withdrawn. It remains the better
+host, and taking it later is a new candidate and a new pre-registration — not an
+edit to this one.
+
 ### 3.3 A limitation of everything measured before this campaign
 
 Every published performance report in `docs/reports/` from 2026-07 was measured
@@ -172,17 +204,42 @@ eight" flagged in advance that this was "almost certainly" sibling pinning and
 told the reader to confirm it with `lscpu -e` before anything else. **No
 confirmation was ever recorded.**
 
-So those numbers were taken with the load generator on the server's own cores,
-or they were not, and the artefacts do not say which. That is why §8 licenses no
-comparison with any of them. Resolving it costs one command on the instance that
-produced them:
+**Resolved on 2026-08-02, and the answer is the bad one.** The instance was
+still running, the command was run on it, and the output is committed in
+`evidence/2026-08-02-r2-host-qualification/raw/ec2-host-topology.txt`:
 
-```bash
-lscpu -e   # read the CORE column; siblings share a core id
+```text
+CPU NODE SOCKET CORE            thread_siblings_list
+  0    0      0    0            cpu0=0,4
+  1    0      0    1            cpu1=1,5
+  2    0      0    2            cpu2=2,6
+  3    0      0    3            cpu3=3,7
+  4    0      0    0
+  5    0      0    1
+  6    0      0    2
+  7    0      0    3
 ```
 
-Until that output exists next to those reports, this campaign treats them as
-describing an unknown topology.
+Four physical cores. CPUs `0-3` and `4-7` are the two thread halves of the same
+four cores, exactly as warned. It is the same machine — Xeon Platinum 8124M @
+3.00 GHz, kernel `6.17.0-1017-aws` — that `docs/reports/2026-07-25-json-
+application-performance.md` and the rest name as their host.
+
+**So every one of those campaigns ran with the load generator on the server's own
+physical cores.** Not "possibly": the topology is now measured and recorded. This
+does not make any of those numbers wrong in the sense of miscomputed — the
+measurement did what it said — but it means each of them describes a server
+sharing all four of its cores with the process generating its load, which is not
+the configuration any of them claims to be reporting.
+
+Two consequences, and neither is this work package's to resolve:
+
+- §8 licenses no comparison with any of them, and now for a measured reason
+  rather than an unknown one;
+- whether those reports need a correction notice is a decision for their owner.
+  It is recorded here and not acted on: amending published reports is outside
+  R2-WP02, and doing it quietly inside a host-qualification commit is exactly the
+  kind of edit this programme exists to prevent.
 
 ## 4. Workloads, rates and connections
 
