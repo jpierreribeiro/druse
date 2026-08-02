@@ -1,0 +1,19 @@
+{
+  "completed": 1000,
+  "failures": [
+    {
+      "class": "peer_reset",
+      "count": 40,
+      "example_error": "read tcp 127.0.0.1:44002->127.0.0.1:8080: connection reset by peer"
+    }
+  ],
+  "latency_p99_us": 1800,
+  "planned": 1000,
+  "status": {
+    "0": 40,
+    "200": 960
+  },
+  "succeeded": 960,
+  "transport_errors": 40,
+  "unclassified": 0
+}

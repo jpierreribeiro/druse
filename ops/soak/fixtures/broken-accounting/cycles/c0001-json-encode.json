@@ -1,0 +1,12 @@
+{
+  "completed": 640,
+  "failures": [],
+  "latency_p99_us": 1800,
+  "planned": 1000,
+  "status": {
+    "200": 600
+  },
+  "succeeded": 640,
+  "transport_errors": 0,
+  "unclassified": 0
+}

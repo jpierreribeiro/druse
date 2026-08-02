@@ -1,0 +1,19 @@
+{
+  "completed": 100000,
+  "failures": [
+    {
+      "class": "unclassified",
+      "count": 1,
+      "example_error": "Get \"http://127.0.0.1:8080/bytes/64k\": something new"
+    }
+  ],
+  "latency_p99_us": 1800,
+  "planned": 100000,
+  "status": {
+    "0": 1,
+    "200": 99999
+  },
+  "succeeded": 99999,
+  "transport_errors": 1,
+  "unclassified": 1
+}

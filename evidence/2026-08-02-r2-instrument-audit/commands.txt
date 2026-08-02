@@ -1,0 +1,46 @@
+# R2-WP01 — commands, in order.
+# Run from the repository root. DRUSE_ODIN_BIN points at the pinned toolchain
+# from odin-version.txt, verified against its recorded sha256 before use.
+
+# 1. Reproduce the defect the work package is named for.
+bash -c 'set -euo pipefail
+  stats_http="$(curl -sS --max-time 1 -o /dev/null -w "%{http_code}" \
+    "http://127.0.0.1:9/stats" 2>/dev/null)" || true
+  echo "as shipped: exit=$?"'
+
+# 2. Regenerate the fixtures.
+python3 ops/soak/fixtures/build.py
+
+# 3. Grade every fixture with the repaired analyser.
+for f in pass fail-classified fail-unclassified child-death \
+         missing-final-state dead-sampler kernel-drops broken-accounting; do
+  bash ops/soak/fixtures/materialise.sh "$f" /tmp/fx-$f
+  python3 ops/soak/analyze-soak.py /tmp/fx-$f
+done
+
+# 4. Grade the same fixtures with the SHIPPED analyser, for comparison.
+git show HEAD~1:ops/soak/analyze-soak.py >/tmp/analyze-soak-shipped.py
+python3 /tmp/analyze-soak-shipped.py /tmp/fx-dead-sampler
+
+# 5. The full control suite: 8 fixtures, 11 negative controls, 26 assertions.
+DRUSE_ODIN_BIN=/tmp/druse-toolchain/odin bash build/check_soak_controls.sh
+
+# 6. Host qualification (refuses this container, with reasons).
+bash ops/soak/preflight.sh
+
+# 7. End-to-end wiring check against a clean clone. Overrides the CPU topology
+#    because this host has four CPUs; it is a wiring check, NOT a campaign, and
+#    the analyser refuses the artefact it produces.
+git clone -q . /tmp/smoke/repo
+DRUSE_ODIN_BIN=/tmp/druse-toolchain/odin \
+DRUSE_SOAK_HARNESS="$PWD/ops/soak" DRUSE_SOAK_SKIP_PREFLIGHT=1 \
+DRUSE_SOAK_SERVER_CPUS=0-1 DRUSE_SOAK_GENERATOR_CPUS=2-3 \
+DRUSE_SOAK_PORT=18081 DRUSE_SOAK_PHASE_SECONDS=6 DRUSE_SOAK_MAX_CYCLES=1 \
+DRUSE_SOAK_TINY_RATE=200 DRUSE_SOAK_JSON_ENCODE_RATE=100 \
+DRUSE_SOAK_JSON_DECODE_RATE=100 DRUSE_SOAK_BYTES_64K_RATE=20 \
+DRUSE_SOAK_WAIT_40MS_RATE=5 DRUSE_SOAK_FINAL_SETTLE_SECONDS=3 \
+  bash ops/soak/run-soak.sh /tmp/smoke 1
+python3 ops/soak/analyze-soak.py /tmp/smoke/soak
+
+# 8. The gate still accounts for every control script.
+bash build/check_gate_inventory.sh

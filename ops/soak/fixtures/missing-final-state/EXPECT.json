@@ -1,0 +1,10 @@
+{
+  "must_not_traceback": true,
+  "note": "The exact artefact a killed orchestrator leaves. soak/0 raised FileNotFoundError from pathlib here, so the run with the most to say produced no verdict at all.",
+  "reasons_must_include": [
+    "control/final-state.txt is missing",
+    "control/final-binaries.txt is missing",
+    "COMPLETE is absent"
+  ],
+  "result": "FAIL"
+}

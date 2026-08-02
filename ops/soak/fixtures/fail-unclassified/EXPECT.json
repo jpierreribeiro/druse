@@ -1,0 +1,7 @@
+{
+  "note": "One failure in 100,000 \u2014 comfortably inside the 0.01% ceiling \u2014 and red anyway because its cause has no name. Accounting, not tolerance.",
+  "reasons_must_include": [
+    "unrecognised class"
+  ],
+  "result": "FAIL"
+}

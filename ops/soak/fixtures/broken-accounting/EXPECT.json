@@ -1,0 +1,8 @@
+{
+  "note": "360 requests left no record of any kind and 40 more finished with no outcome recorded. Both passed before soak/1.",
+  "reasons_must_include": [
+    "json-encode completed 640 of 1000 planned",
+    "its status map accounts for 600"
+  ],
+  "result": "FAIL"
+}

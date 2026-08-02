@@ -1,0 +1,17 @@
+# Files in this evidence package, with the role of each.
+
+verdict.md                                     the decision and what it does not cover
+analysis/findings.md                           thirteen findings, with severity
+analysis/e2e-verdict.json                      the analyser's grade of the end-to-end run
+raw/check_soak_controls.out                    the full control suite, 26 assertions
+raw/fixture-verdicts.txt                       every fixture graded by the repaired analyser
+raw/shipped-analyser-on-the-same-artefacts.txt the SAME artefacts under the shipped analyser
+raw/preflight-this-host.txt                    why this host cannot run the campaign
+raw/e2e-manifest.txt                           manifest of the end-to-end wiring check
+raw/e2e-process.csv                            its telemetry, 14 samples
+raw/e2e-cycles.csv                             its cycle row
+raw/e2e-final-state.txt                        how it ended
+config/run-soak.sh.before                      the orchestrator as shipped
+config/run-soak.sh.after                       the orchestrator after R2-WP01
+commands.txt                                   how to reproduce all of it
+environment.txt                                the host, and why it is disqualified

@@ -1,7 +1,12 @@
 # Programa de prontidão para produção — R1, R2 e R3
 
-**Status:** R1 PROMOTED em 2026-08-02 para piloto interno não crítico; R2/R3
-continuam como planos bloqueados por seus próprios gates.
+**Status:** R1 PROMOTED em 2026-08-02 para piloto interno não crítico. R2 em
+execução — R2-WP01 (instrumento) fechado em 2026-08-02, WP02–WP08 abertos. R3
+continua como plano bloqueado por seu próprio gate.
+
+O gate permanece em **R1**. R2-WP01 tornou o instrumento capaz de explicar uma
+falha; não produziu evidência alguma sobre o produto, e regra G2 é explícita:
+uma falha do instrumento reprova a campanha, não o produto.
 **Origem:** `docs/reports/2026-08-01-production-readiness-audit.md`.
 **Pré-condição absoluta:** R0 concluído, commit limpo e `build/check.sh`
 integralmente verde.
