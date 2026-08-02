@@ -1,0 +1,3 @@
+requests=20
+retained_upstream_connections=2
+configured_max_conns_per_host=4

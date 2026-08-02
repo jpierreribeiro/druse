@@ -1,0 +1,13 @@
+{"level":"info","ts":1785631031.531486,"msg":"maxprocs: Leaving GOMAXPROCS=8: CPU quota undefined"}
+{"level":"info","ts":1785631031.5315177,"msg":"GOMEMLIMIT is updated","GOMEMLIMIT":22503868416,"previous":9223372036854775807}
+{"level":"info","ts":1785631031.5315335,"msg":"using config from file","file":"/etc/caddy/Caddyfile"}
+{"level":"info","ts":1785631031.531539,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1785631031.5319335,"logger":"admin","msg":"admin endpoint disabled"}
+{"level":"info","ts":1785631031.5325515,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x35a3439e500"}
+{"level":"warn","ts":1785631031.533428,"logger":"tls","msg":"unmanaged certificate expires within 1 day","not_after":1785717415,"sans":["proxy.test"]}
+{"level":"info","ts":1785631031.5338447,"logger":"http.auto_https","msg":"automatic HTTPS is completely disabled for server","server_name":"srv0"}
+{"level":"info","ts":1785631031.5384138,"logger":"http.log","msg":"server running","name":"srv0","protocols":["h1","h2"]}
+{"level":"info","ts":1785631031.5411775,"msg":"autosaved config (load with --resume flag)","file":"/tmp/caddy-config/caddy/autosave.json"}
+{"level":"info","ts":1785631031.5412323,"msg":"serving initial configuration"}
+{"level":"info","ts":1785631031.5444436,"logger":"tls","msg":"cleaning storage unit","storage":"FileStorage:/tmp/caddy-data/caddy"}
+{"level":"info","ts":1785631031.5466952,"logger":"tls","msg":"finished cleaning storage units"}

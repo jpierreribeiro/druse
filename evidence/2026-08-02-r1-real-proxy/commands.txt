@@ -1,0 +1,4 @@
+build=/home/jp/.local/bin/odin build tests/r1-real-proxy/server -collection:druse=.
+proxy=docker run --platform linux/amd64 docker.io/library/caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+client=curl --http2 --cacert campaign-ca.pem --resolve proxy.test:22443:127.0.0.1
+private_keys=ephemeral; never copied into evidence

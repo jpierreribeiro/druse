@@ -1,0 +1,8 @@
+ca_sha256=47:2E:C6:6E:A6:3C:1F:C7:3A:6B:15:F0:69:46:5D:13:92:EC:11:19:19:5B:5A:C1:3A:B8:8C:66:2A:04:DE:39
+server_sha256=0D:3A:58:2E:F6:BF:6F:55:95:5A:05:F3:BE:E7:66:BC:A6:AC:0A:7A:9E:A9:BE:7A:F7:64:21:5B:12:71:5A:4C
+subject=CN = proxy.test
+issuer=CN = Druse R1 Test CA
+notBefore=Aug  2 00:36:55 2026 GMT
+notAfter=Aug  3 00:36:55 2026 GMT
+X509v3 Subject Alternative Name:
+    DNS:proxy.test

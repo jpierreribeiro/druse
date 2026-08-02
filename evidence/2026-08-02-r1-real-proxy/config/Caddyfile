@@ -1,0 +1,145 @@
+{
+	admin off
+	auto_https off
+
+	servers {
+		protocols h1 h2
+		max_header_size {$DRUSE_PROXY_MAX_HEADER_SIZE:16KB}
+		timeouts {
+			read_body 6s
+			read_header 2s
+			write 10s
+			idle 30s
+		}
+
+		# This is the previous hop in front of Caddy, not the Druse peer trust
+		# list. The documentation-only TEST-NET default trusts no real address.
+		# Deployments with a CDN/LB replace it with that hop's exact networks.
+		trusted_proxies static {$DRUSE_PROXY_TRUSTED_INGRESS:192.0.2.0/24}
+		trusted_proxies_strict
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+https://proxy.test:{$DRUSE_PROXY_PORT:22443} {
+	tls /certs/server.pem /certs/server-key.pem
+
+	# TLS ownership lives here. CSP and cookie policy stay in the application,
+	# which knows the page and session semantics.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Retain one syntactically validated correlation value, but no inbound/outbound header
+	# maps. This prevents Authorization, Cookie and application secrets from
+	# entering the reference access log.
+	@valid_request_id header_regexp X-Request-Id ^[A-Za-z0-9._-]{1,64}$
+	log_append @valid_request_id request_id {http.request.header.X-Request-Id}
+	log {
+		output file /logs/access.json
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				resp_headers delete
+			}
+		}
+	}
+
+	# Streams are a distinct route because low-latency mode is a contract, not
+	# a performance hint. The buffered route is retained only as a drill arm.
+	handle /stream {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			flush_interval -1
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+
+	handle /buffered-stream {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			response_buffers 1MiB
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+
+	# Proxy is the owner of this smaller public body cap. The fallback route
+	# intentionally permits more so the campaign can prove Druse's inner cap.
+	handle /proxy-limit {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+
+	# This route proves the proxy's response-header timeout is shorter than an
+	# application handler. A 504 is the proxy-owned, unambiguous outcome.
+	handle /proxy-timeout {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				response_header_timeout 300ms
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+
+	# The guarded route is the rollout/shutdown path. Caddy stops selecting the
+	# only upstream after one failed /ready check; Druse still refuses admission
+	# immediately, closing the sub-interval between signal and health detection.
+	handle_path /guarded/* {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			health_uri /ready
+			health_interval 200ms
+			health_timeout 100ms
+			health_status 200
+			health_fails 1
+			health_passes 1
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy {$DRUSE_UPSTREAM} {
+			lb_retries 0
+			lb_try_duration 0s
+			transport http {
+				versions 1.1
+				keepalive 20s
+				keepalive_idle_conns_per_host 4
+				max_conns_per_host 4
+			}
+		}
+	}
+}

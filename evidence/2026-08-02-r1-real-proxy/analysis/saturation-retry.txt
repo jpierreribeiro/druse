@@ -1,0 +1,5 @@
+held_connections=10
+proxy_status=502
+failure_ms=26
+recovery_status=200
+lb_retries=0

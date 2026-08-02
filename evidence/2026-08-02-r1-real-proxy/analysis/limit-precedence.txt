@@ -1,0 +1,5 @@
+allowed_body_data_bytes=524288
+proxy_body_status=413
+druse_body_status=413
+proxy_timeout_status=504
+proxy_timeout_ms=339
