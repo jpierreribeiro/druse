@@ -2591,3 +2591,171 @@ none; the requirement it keeps is the one nobody disputes.
   Se R2-WP03 concluir que `stats` não pode ser agregado a custo aceitável, este
   ADR deve ser fechado como recusado por esse motivo, e não ficar aberto
   indefinidamente.
+
+- **Resposta de R2-WP03 (2026-08-02) — este ADR NÃO é fechado como recusado.**
+  ADR-050 mediu os braços de observabilidade e escolheu um canal fora do caminho
+  de request. Sob esse canal a agregação entre processos é possível: cada worker
+  escreve seu próprio snapshot, o sidecar soma e publica `workers_seen` contra
+  um `workers_expected` **vindo do supervisor**, de modo que um worker morto
+  produz um agregado marcado como incompleto em vez de uma soma silenciosamente
+  menor. A condição de recusa — "stats não pode ser agregado a custo aceitável"
+  — não se verificou.
+
+  O custo aparece como **requisito novo e escrito** deste ADR: o supervisor
+  precisa publicar `workers_expected`. Um agregado é tão honesto quanto esse
+  número, e um `workers_expected` errado reproduz exatamente o defeito que este
+  ADR quer evitar.
+
+  As demais dependências continuam abertas e nenhuma foi tocada: orçamento de
+  memlock/RSS/FDs refeito para N > 1, semântica de drain por worker, rollback
+  para N=1 sem rebuild, e a campanha de fault com controle negativo em N=1.
+
+## ADR-050 — como uma métrica sai de um processo saturado, e se ela pode ser agregada entre processos
+
+- **Status.** **ACCEPTED — braço B (canal fora do caminho de request), 2026-08-02.**
+  Fecha AUD-P2-009 e responde a pergunta que ADR-049 deixou aberta.
+  Critérios congelados antes da medição em
+  `planning/readiness/R2-WP03-preregistration.md` (G3); medição em
+  `evidence/2026-08-02-r2-observability-arms/`.
+
+- **Contexto.** `/stats` é uma rota comum, nas mesmas lanes da carga. Num soak
+  de 12 h, 111 de 8.611 scrapes (1,3%) não responderam sob saturação, e — o
+  ponto que importa — um scrape ausente e um pacote perdido são idênticos no
+  amostrador. Saturação de aplicação e perda de rede ficam indistinguíveis
+  exatamente quando a distinção vale alguma coisa.
+
+- **Os braços, e o que a medição fez com eles.** Ocupação total e determinística
+  das quatro lanes, 120 amostras agendadas por braço:
+
+  | Braço | Disponibilidade | p50 | p99 | Ausências ambíguas com a rede |
+  |---|---|---|---|---|
+  | `baseline` — `/stats` como rota | **0/120** | — | — | **120** |
+  | A — `/stats` noutro `App`, lanes próprias | 120/120 | 0,38 ms | 0,54 ms | 0 |
+  | B — snapshot em arquivo, thread própria | 120/120 | 0,043 ms | 0,087 ms | 0 |
+
+  O controle negativo ficou vermelho, que era a condição para o run valer
+  (B1n): `target_saturation_refusals` = 120 diz o **mecanismo** — o acceptor
+  recusou cada scrape porque nenhuma lane estava livre.
+
+  **A e B empatam em B1 e B3.** A decisão não é de desempenho, e escrever isso é
+  metade do valor deste ADR: os 8× de latência a favor de B são reais e
+  irrelevantes na escala de um scrape.
+
+- **Decisão: B, por B4 — ambiguidade estrutural.** O critério que separa os
+  braços é qual **classe de ausência** cada um admite.
+
+  A é HTTP. Toda ausência dele é `http_refused`, `http_timeout`, `http_empty` ou
+  `http_recv_error`, e **cada uma dessas quatro é produzível tanto por uma
+  aplicação que parou de responder quanto por uma rede que perdeu a troca**. A
+  isola a lane; ele não remove a ambiguidade — apenas a torna mais rara. Um
+  achado sobre indistinguibilidade não se fecha reduzindo a frequência do caso
+  indistinguível.
+
+  B não tem rede entre a métrica e o amostrador. As causas que restam —
+  `missing`, `unreadable`, `malformed`, `stale` — **nomeiam todas a aplicação**.
+  É por isso que B fecha AUD-P2-009 e A não.
+
+  A permanece **suportado e documentado** como listener administrativo
+  (`docs/operations.md` §5). Ele não é um erro; ele não é a resposta a este
+  achado.
+
+- **O que B custa, dito antes de alguém descobrir.**
+
+  1. **Um caminho novo de ownership.** O arquivo tem dono, permissão, diretório
+     e ciclo de vida, e nenhum deles existia. `tmpfs` é a escolha de referência
+     porque uma métrica não deve gerar I/O de disco.
+  2. **Um período de export.** Amostra é do último tick, não do instante da
+     leitura. `stale` cobre isso; ele é um alerta, não uma interpolação.
+  3. **O framework não ganha um exportador.** Ganha os números que faltavam. O
+     exportador é código de aplicação, em `examples/10-config-and-health` e
+     `ops/soak/soak-server`, pela razão de sempre: um framework que exporta uma
+     abstração de métricas escolheu um fornecedor pelos seus usuários.
+
+- **Crescimento de API pública (G5): quatro campos, nenhum símbolo novo.**
+  `Server_Stats` ganha `active_connections`, `handlers_active`,
+  `handler_capacity` e `connection_capacity`. O ledger continua em 80 símbolos;
+  o ledger de vendor continua em 43 disposições — todos os quatro são **leituras
+  de estado que o backend já mantém**.
+
+  **OBS-001, e ele foi medido, não deduzido.** Todo contador de `Server_Stats`
+  é escrito quando o trabalho **termina**: `responses_sent` na conclusão do
+  envio, `handler_dwell_ns` depois que o dispatch retorna. Sob ocupação total
+  nada termina — então todos congelam, e a fórmula de utilização que a própria
+  documentação ensina, `Δdwell / (lanes × Δwall)`, lê **zero** no exato momento
+  em que a utilização é **um**. Um servidor saturado e um servidor ocioso
+  produzem as mesmas linhas planas. Na medição: 4 de 4 lanes comprovadamente
+  dentro de handlers, 120 de 120 scrapes recusados por saturação,
+  `handler_dwell_ns` = 0.
+
+  `handlers_active / handler_capacity` é o que distingue os dois casos.
+  `handler_capacity` precisa ser reportado porque é **inobservável de fora**:
+  `max_handlers = 0` é o default documentado e resolve para o número de cores do
+  host limitado a [4, 32]. Um operador com o numerador e sem o denominador tem
+  uma razão que não consegue calcular.
+
+- **A pergunta de ADR-049: as métricas podem ser agregadas entre processos, e a
+  que custo?**
+
+  **Sim, e é o braço B que torna isso possível — não é coincidência que seja o
+  mesmo braço.**
+
+  Com N workers, cada um escreve seu próprio snapshot num diretório comum. O
+  sidecar lê todos, soma os cumulativos, soma os níveis, e — a parte que decide
+  se o resultado é honesto — reporta `workers_seen` **contra** `workers_expected`,
+  onde `workers_expected` vem do supervisor e nunca de contar arquivos. Um worker
+  morto para de escrever, seu snapshot fica `stale`, e o agregado sai marcado
+  como incompleto em vez de silenciosamente somar menos.
+
+  **O custo, e ele é real:** o sidecar passa a ser dono da verdade sobre o
+  conjunto de workers. Um agregado é tão honesto quanto `workers_expected`, e um
+  `workers_expected` errado produz exatamente o defeito que R3-WP10 existe para
+  evitar — um número que parece global e não é. Isso é um requisito para o
+  R3-WP10, não uma consequência dele.
+
+  **Por que A não consegue.** N listeners administrativos em N portas. O worker
+  que morre leva o listener junto, então "worker morto" chega ao scraper como
+  falha de scrape — que, por B4, ele não distingue de perda de rede. A agregação
+  sob A exigiria que o scraper soubesse a diferença entre um worker morto e um
+  pacote perdido, que é o achado AUD-P2-009 reaparecendo um nível acima.
+
+  **Consequência para ADR-049: ele NÃO é fechado como recusado.** A condição que
+  o teria recusado — "stats não pode ser agregado a custo aceitável" — não se
+  verificou. ADR-049 continua **PROPOSED** e R3-WP10 fica desbloqueado *nesta*
+  dimensão, com a exigência nova e escrita de que o supervisor publique
+  `workers_expected`. As outras dependências de R3-WP10 (memlock, RSS e FDs
+  refeitos para N > 1, drain por worker, rollback para N=1) seguem abertas e
+  este ADR não toca em nenhuma.
+
+- **Overhead.** B5 (CPU do exportador ≤ 60 ms em 60 s a 1 Hz), B6 (`VmHWM`
+  ≤ 2048 KiB) e B7 (custo de lane exatamente zero) medidos em
+  `evidence/2026-08-02-r2-observability-arms/analysis/overhead/verdict.txt`:
+  **+20 ms** de CPU contra 60 ms, **+48 KiB** de `VmHWM` contra 2048 KiB, e custo
+  de lane **zero**. B7 é o critério que fecha o achado: o exportador roda numa
+  thread que não possui lane, e `web.stats` não aloca, não trava e só lê
+  atômicos, então o recurso sob medição não é gasto para medi-lo.
+
+  O diagnóstico de vazão saiu **INCONCLUSIVE**, e não pela razão prevista: o
+  gerador é de taxa fixa e os dois braços entregaram os 2000 rps oferecidos, de
+  modo que o servidor nunca foi o gargalo e a medição é o relógio do gerador. O
+  que o run sustenta é a afirmação mais fraca e assim rotulada: **nenhuma
+  regressão** — zero requisições perdidas e zero erros de transporte com o
+  exportador ativo.
+
+- **Alternativas rejeitadas.** Memória compartilhada anônima com um leitor
+  externo: mesmo domínio de falha do arquivo, mais superfície de plataforma e
+  nenhum ganho de atomicidade que `rename` já não dê. Socket unix administrativo:
+  volta a ser um servidor no mesmo processo, com fila e aceitação próprias — as
+  causas de A de novo, num transporte diferente.
+
+- **Ledger.** +4 campos em `Server_Stats`, 0 símbolos, 0 patches de vendor,
+  0 defaults alterados. Nenhuma aplicação existente muda de comportamento: quem
+  não lê os campos novos não vê diferença.
+
+- **Reversibilidade. MÉDIA.** Os quatro campos são API pública e removê-los
+  quebraria um scraper. O formato de snapshot **não** é API pública — ele é
+  versionado (`druse_snapshot 1`) e vive em `ops/monitoring/`, então um formato
+  novo é uma versão nova, não uma quebra.
+
+- **O que este ADR não estabelece.** Que N > 1 processos funcionam. Nada aqui
+  foi medido com mais de um processo; a resposta de agregação é sobre o que o
+  mecanismo **admite**, e prová-la é R3-WP10.

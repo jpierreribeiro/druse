@@ -201,6 +201,25 @@ Server_Stats :: struct {
 	stream_refused_full:   int,
 	stream_refused_budget: int,
 	stream_aborted_slow:   int,
+	// R2-WP03 (AUD-P2-009 / ADR-050) — OCCUPANCY AND RESOLVED CAPACITY. These
+	// four are NOT running totals; they are two current levels and the two
+	// ceilings those levels are measured against.
+	//
+	// Every one of them already existed inside the backend and was reachable
+	// from nothing. `active_connections` is the gauge the admission budget is
+	// enforced against. `handlers_active` is a COUNT of `lane.handler_active`,
+	// the per-lane atomic the acceptor already reads all-or-nothing in
+	// `accept_all_handlers_active`. `len(threads)` is the lane count after
+	// `max_handlers = 0` resolves to the core count. The admission ceiling is
+	// `max_connections - reserved_connections`, not `max_connections`.
+	//
+	// NO BACKEND FIELD IS ADDED AND NO VENDOR PATCH IS INVOLVED — every one of
+	// these is a read of state the backend already maintains for its own
+	// purposes. The vendor ledger stays at 43 dispositions.
+	active_connections:    int,
+	handlers_active:       int,
+	handler_capacity:      int,
+	connection_capacity:   int,
 }
 
 // server_stats reads the running server's write-side counters, or the zero

@@ -1,0 +1,5 @@
+B5 not measured in this run (IDLE_REPS=1); see analysis/overhead/ for B5/B6
+B6 not measured in this run (IDLE_REPS=1); see analysis/overhead/ for B5/B6
+throughput no_export_median=1999.9 with_export_median=1999.9 delta_pct=-0.00 host_spread_pct=0.01 offered_rate=2000
+throughput INCONCLUSIVE: both arms delivered the full offered rate (2000/s), so the server was never the bottleneck. A fixed-rate generator below capacity measures ITS OWN clock, not throughput. NOT a pass.
+no-regression (a different and weaker claim): at 2000/s offered, both arms delivered full goodput with 0 transport error(s). This says the exporter did not break the server at a rate it handles comfortably. It says nothing about capacity.

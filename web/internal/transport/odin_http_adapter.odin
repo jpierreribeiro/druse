@@ -379,9 +379,41 @@ _refused_connections :: proc(h: Server_Handle) -> int {
 	return sync.atomic_load(&server.refused_total)
 }
 
-// _server_stats reads every write-side counter inside one registry acquisition,
-// so the ten numbers are a coherent snapshot rather than ten independently-timed
-// reads. Zero for a stale or absent handle, like `_refused_connections`.
+// count_active_handlers counts the lanes currently INSIDE a handler.
+//
+// R2-WP03 (AUD-P2-009). This is the gauge the measurement in
+// `evidence/2026-08-02-r2-observability-arms/` made non-optional, and finding
+// OBS-001 is the reason: every cumulative counter in `Server_Stats` is written
+// when work COMPLETES — `responses_sent` on send completion, `handler_dwell_ns`
+// after the dispatch returns. At full lane occupancy nothing completes, so
+// every one of them FREEZES, and the documented utilization formula
+// `Δdwell / (lanes × Δwall)` reads ZERO at exactly the moment utilization is
+// one. A fully saturated server and an idle server produce the same flat lines.
+// This is the number that tells them apart.
+//
+// It reads the SAME per-lane atomic the acceptor already consults in
+// `accept_all_handlers_active` — no field is added to the backend. `.Acquire`
+// matches that reader; the lane publishes with `.Seq_Cst` on entry.
+//
+// It is a SAMPLE, not a transaction: lanes may enter and leave while the loop
+// runs, so the answer is a level observed over a short window rather than an
+// instant. That is what a gauge is, and `handler_capacity` bounds the loop at
+// 32 (`AUTO_HANDLER_CONCURRENCY_MAX`), so the read stays cheap enough for the
+// caller's promise that `stats` allocates nothing and takes no lock.
+@(private)
+count_active_handlers :: proc(server: ^http.Server) -> int {
+	active := 0
+	for &lane in server.threads {
+		if sync.atomic_load_explicit(&lane.handler_active, .Acquire) {
+			active += 1
+		}
+	}
+	return active
+}
+
+// _server_stats reads every counter, level and ceiling inside one registry
+// acquisition, so the snapshot is coherent rather than a set of independently-
+// timed reads. Zero for a stale or absent handle, like `_refused_connections`.
 @(private)
 _server_stats :: proc(h: Server_Handle) -> Server_Stats {
 	e, ok := server_acquire(h)
@@ -401,6 +433,23 @@ _server_stats :: proc(h: Server_Handle) -> Server_Stats {
 		send_errors           = sync.atomic_load(&server.send_errors),
 		write_deadline_aborts = sync.atomic_load(&server.write_deadline_aborts),
 		handler_dwell_ns      = sync.atomic_load(&server.handler_dwell_ns),
+		// R2-WP03 — the two levels and the two ceilings they mean nothing
+		// without. `active_connections` is read atomically because every lane
+		// writes it, and `handlers_active` reads a per-lane atomic; the two
+		// ceilings are written once before the lanes exist and never again, so a
+		// plain read is correct and an atomic one would be theatre.
+		//
+		// The admission ceiling is `max_connections - reserved_connections`,
+		// which is what the acceptor actually compares against — reporting
+		// `max_connections` would show headroom that admission will never hand
+		// out. Zero means unbounded, the same value the backend uses, so
+		// `active/capacity` is a ratio only when capacity is non-zero.
+		active_connections    = sync.atomic_load(&server.active_connections),
+		handler_capacity      = len(server.threads),
+		handlers_active       = count_active_handlers(server),
+		connection_capacity   = server.opts.max_connections > 0 \
+			? max(1, server.opts.max_connections - server.opts.reserved_connections) \
+			: 0,
 	}
 	if e.streams != nil {
 		c := stream.counters(e.streams)

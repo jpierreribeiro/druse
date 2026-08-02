@@ -240,6 +240,23 @@ WP03**, pelo motivo registrado no ADR: N processos tornam `web.stats()` uma
 resposta por processo, e um `/stats` que parece global sem ser é pior que
 nenhum.
 
+> **R2-WP03 fechou em 2026-08-02, e este bloqueio caiu — só ele.** ADR-050
+> escolheu um canal fora do caminho de request, e sob esse canal a agregação
+> entre processos é possível: cada worker escreve seu próprio snapshot, o
+> sidecar soma e publica `workers_seen` contra `workers_expected`. ADR-049 **não**
+> foi fechado como recusado, porque a condição que o recusaria não se verificou.
+>
+> **O custo virou requisito de entrada deste WP:** o supervisor precisa publicar
+> `workers_expected`, e ele não pode vir de contar arquivos. Um agregado é tão
+> honesto quanto esse número, e um `workers_expected` errado reproduz exatamente
+> o defeito — um número que parece global e não é — um nível acima.
+>
+> As outras dependências continuam abertas e nenhuma foi tocada por WP03:
+> orçamento de memlock/RSS/FDs refeito para N > 1
+> (`evidence/2026-08-01-r1-resource-budget/` foi produzida para N=1), semântica
+> de drain por worker, rollback para N=1 sem rebuild, e a campanha de fault cujo
+> **controle negativo em N=1 tem de ficar vermelho** ou ela não mediu contenção.
+
 Hoje um fault de handler custa **100% da capacidade e toda conexão em voo**.
 ADR-020 fecha a recuperação em definitivo e ADR-047 já decidiu o diagnóstico;
 esta trilha trata apenas do **raio**, que nenhum dos dois tocou.

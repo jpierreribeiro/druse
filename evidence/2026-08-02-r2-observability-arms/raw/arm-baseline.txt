@@ -1,0 +1,144 @@
+arm baseline
+lanes 4
+occupied true entered=4
+sample 0 http_recv_error 203437 true
+sample 1 http_recv_error 178754 true
+sample 2 http_recv_error 231510 true
+sample 3 http_recv_error 228091 true
+sample 4 http_recv_error 191206 true
+sample 5 http_recv_error 211370 true
+sample 6 http_recv_error 192944 true
+sample 7 http_recv_error 236693 true
+sample 8 http_recv_error 274905 true
+sample 9 http_recv_error 262538 true
+sample 10 http_recv_error 200680 true
+sample 11 http_recv_error 180934 true
+sample 12 http_recv_error 172888 true
+sample 13 http_recv_error 195195 true
+sample 14 http_recv_error 258077 true
+sample 15 http_recv_error 323070 true
+sample 16 http_recv_error 195000 true
+sample 17 http_recv_error 218988 true
+sample 18 http_recv_error 166378 true
+sample 19 http_recv_error 292248 true
+sample 20 http_recv_error 325171 true
+sample 21 http_recv_error 187250 true
+sample 22 http_recv_error 215407 true
+sample 23 http_recv_error 245182 true
+sample 24 http_recv_error 205201 true
+sample 25 http_recv_error 276374 true
+sample 26 http_recv_error 229910 true
+sample 27 http_recv_error 204225 true
+sample 28 http_recv_error 228649 true
+sample 29 http_recv_error 257148 true
+sample 30 http_recv_error 224787 true
+sample 31 http_recv_error 213441 true
+sample 32 http_recv_error 196419 true
+sample 33 http_recv_error 202074 true
+sample 34 http_recv_error 210883 true
+sample 35 http_recv_error 234170 true
+sample 36 http_recv_error 484157 true
+sample 37 http_recv_error 207680 true
+sample 38 http_recv_error 194148 true
+sample 39 http_recv_error 206294 true
+sample 40 http_recv_error 253496 true
+sample 41 http_recv_error 225621 true
+sample 42 http_recv_error 221342 true
+sample 43 http_recv_error 267202 true
+sample 44 http_recv_error 206195 true
+sample 45 http_recv_error 241095 true
+sample 46 http_recv_error 205606 true
+sample 47 http_recv_error 185697 true
+sample 48 http_recv_error 236754 true
+sample 49 http_recv_error 190400 true
+sample 50 http_recv_error 188015 true
+sample 51 http_recv_error 201481 true
+sample 52 http_recv_error 231733 true
+sample 53 http_recv_error 195006 true
+sample 54 http_recv_error 214485 true
+sample 55 http_recv_error 234489 true
+sample 56 http_recv_error 198077 true
+sample 57 http_recv_error 173883 true
+sample 58 http_recv_error 175589 true
+sample 59 http_recv_error 159025 true
+sample 60 http_recv_error 175316 true
+sample 61 http_recv_error 229413 true
+sample 62 http_recv_error 181521 true
+sample 63 http_recv_error 190777 true
+sample 64 http_recv_error 199148 true
+sample 65 http_recv_error 202453 true
+sample 66 http_recv_error 185284 true
+sample 67 http_recv_error 2453258 true
+sample 68 http_recv_error 204369 true
+sample 69 http_recv_error 192023 true
+sample 70 http_recv_error 647304 true
+sample 71 http_recv_error 216659 true
+sample 72 http_recv_error 181271 true
+sample 73 http_recv_error 173569 true
+sample 74 http_recv_error 178136 true
+sample 75 http_recv_error 183560 true
+sample 76 http_recv_error 185567 true
+sample 77 http_recv_error 182022 true
+sample 78 http_recv_error 207682 true
+sample 79 http_recv_error 184256 true
+sample 80 http_recv_error 383301 true
+sample 81 http_recv_error 227128 true
+sample 82 http_recv_error 213270 true
+sample 83 http_recv_error 280710 true
+sample 84 http_recv_error 217863 true
+sample 85 http_recv_error 217945 true
+sample 86 http_recv_error 262283 true
+sample 87 http_recv_error 233375 true
+sample 88 http_recv_error 248658 true
+sample 89 http_recv_error 202483 true
+sample 90 http_recv_error 191996 true
+sample 91 http_recv_error 230514 true
+sample 92 http_recv_error 224658 true
+sample 93 http_recv_error 254975 true
+sample 94 http_recv_error 289328 true
+sample 95 http_recv_error 258930 true
+sample 96 http_recv_error 209330 true
+sample 97 http_recv_error 204946 true
+sample 98 http_recv_error 193945 true
+sample 99 http_recv_error 234177 true
+sample 100 http_recv_error 238332 true
+sample 101 http_recv_error 215366 true
+sample 102 http_recv_error 713638 true
+sample 103 http_recv_error 269680 true
+sample 104 http_recv_error 291246 true
+sample 105 http_recv_error 325434 true
+sample 106 http_recv_error 234533 true
+sample 107 http_recv_error 269900 true
+sample 108 http_recv_error 321780 true
+sample 109 http_recv_error 229883 true
+sample 110 http_recv_error 1261691 true
+sample 111 http_recv_error 202309 true
+sample 112 http_recv_error 183155 true
+sample 113 http_recv_error 166657 true
+sample 114 http_recv_error 178838 true
+sample 115 http_recv_error 272440 true
+sample 116 http_recv_error 250432 true
+sample 117 http_recv_error 238590 true
+sample 118 http_recv_error 192632 true
+sample 119 http_recv_error 180506 true
+samples 120
+ok 0
+cause ok 0
+cause http_refused 0
+cause http_timeout 0
+cause http_empty 0
+cause http_recv_error 120
+cause missing 0
+cause unreadable 0
+cause malformed 0
+cause stale 0
+unclassified 0
+network_ambiguous_absences 120
+availability_ppm 0
+latency_p50_ns -1
+latency_p99_ns -1
+latency_max_ns -1
+target_handler_dwell_ns 0
+target_responses_sent 0
+target_saturation_refusals 120
+verdict COMPLETE

@@ -462,6 +462,16 @@ main :: proc() {
 		time.sleep(SAMPLE_INTERVAL)
 	}
 
+	// READ THE SERVER'S OWN COUNTERS BEFORE STOPPING IT. `web.stats` returns the
+	// zero value once the App is no longer running a server — a documented rule,
+	// and one that silently turns a post-teardown read into a page of confident
+	// zeroes. The first version of this program printed
+	// `target_saturation_refusals 0` for a run in which the acceptor refused
+	// every single scrape, which is precisely the class of defect R2-WP01 spent
+	// its whole budget removing: a number that is plausible, wrong, and says
+	// nothing about the reason it is wrong.
+	final := web.stats(&target)
+
 	// Release the lanes and shut everything down before printing the summary, so
 	// a hung teardown cannot be mistaken for a clean run.
 	sync.atomic_store(&g_release, 1)
@@ -521,10 +531,15 @@ main :: proc() {
 	if arm == "arm-b" {
 		fmt.printfln("export_ticks %d", sync.atomic_load(&g_export_ticks))
 	}
-	// B7: the lane cost of the export mechanism. Only `/hold` and the scrapes
-	// themselves ran handlers, so any dwell attributable to the exporter would
-	// have to appear here — and the exporter never touches a lane.
-	final := web.stats(&target)
+	// The target's own account of the window, read while it was still running.
+	// `target_saturation_refusals` is the one that identifies the MECHANISM
+	// behind the baseline's failures: an acceptor refusal is the server saying
+	// no, and it is a different story from a connection that broke on its own.
+	//
+	// This is NOT criterion B7. B7 asks whether the export mechanism costs lane
+	// time, and this window deliberately holds every lane busy, so it cannot
+	// answer that. B7 is measured on an idle server, in
+	// `tests/r2-observability-saturation`.
 	fmt.printfln("target_handler_dwell_ns %d", final.handler_dwell_ns)
 	fmt.printfln("target_responses_sent %d", final.responses_sent)
 	fmt.printfln("target_saturation_refusals %d", final.saturation_refusals)

@@ -14,7 +14,9 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:strconv"
+import "core:strings"
 import "core:sys/posix"
+import "core:thread"
 import "core:time"
 import web "druse:web"
 
@@ -100,8 +102,97 @@ wait_40ms :: proc(ctx: ^web.Context) {
 	web.text(ctx, .OK, "done")
 }
 
+// The route the soak sampler has always scraped, kept because R2-WP01's
+// classification of curl exit codes is built on it and because the 1.3% of
+// scrapes it loses under saturation is the FINDING — removing the route would
+// remove the evidence.
 stats :: proc(ctx: ^web.Context) {
 	web.ok(ctx, web.stats(&app))
+}
+
+// ---------------------------------------------------------------------------
+// R2-WP03 / ADR-050 — the out-of-band exporter.
+//
+// AUD-P2-009 in one sentence: `/stats` above is an ordinary route on the same
+// lanes as the load, so in the recorded twelve-hour run 111 of 8,611 scrapes
+// produced nothing under saturation — and an absent scrape is indistinguishable
+// from a lost packet at the sampler.
+//
+// This thread owns no lane. `web.stats` allocates nothing, takes no lock and
+// reads atomics, so it costs the measured resource nothing, and there is no
+// network between the file and its reader, so an absent snapshot can only mean
+// this process. Both paths are live during a soak ON PURPOSE: the HTTP scrape
+// keeps producing the finding, and the snapshot is what explains it.
+// ---------------------------------------------------------------------------
+
+exporter: ^thread.Thread
+snapshot_path: string
+
+EXPORT_PERIOD :: 1 * time.Second
+
+export_loop :: proc() {
+	for {
+		draining := web.is_draining(&app)
+		write_snapshot(draining)
+		if draining {
+			// One final record carrying `draining 1`, so a drain shorter than
+			// the export period still lands on the timeline. A deploy that
+			// leaves no trace is a deploy nobody can correlate against.
+			return
+		}
+		time.sleep(EXPORT_PERIOD)
+	}
+}
+
+write_snapshot :: proc(draining: bool) {
+	s := web.stats(&app)
+	// DO NOT OVERWRITE A REAL RECORD WITH ZEROES. `web.stats` returns the zero
+	// value once the App is no longer running a server, which is exactly the
+	// state the final drain write can land in: `serve` returns, the exporter
+	// wakes, and every counter reads 0. Writing that would publish a counter
+	// RESET — and a reset is what this system tells operators to read as a
+	// restart. `handler_capacity` is 0 only when no server is running (a running
+	// server always has at least one lane), so it is the cheap test for it.
+	//
+	// Leaving the previous record in place is the honest outcome: it ages past
+	// max_age, reads as `stale`, and then as `no_process` once the pid is gone.
+	// Every one of those says something true.
+	if s.handler_capacity == 0 {
+		return
+	}
+	b: strings.Builder
+	strings.builder_init(&b)
+	defer strings.builder_destroy(&b)
+	fmt.sbprintfln(&b, "druse_snapshot 1")
+	fmt.sbprintfln(&b, "pid %d", os.get_pid())
+	fmt.sbprintfln(&b, "unix_ns %d", time.now()._nsec)
+	fmt.sbprintfln(&b, "draining %d", 1 if draining else 0)
+	fmt.sbprintfln(&b, "refused_connections %d", s.refused_connections)
+	fmt.sbprintfln(&b, "saturation_refusals %d", s.saturation_refusals)
+	fmt.sbprintfln(&b, "responses_sent %d", s.responses_sent)
+	fmt.sbprintfln(&b, "response_bytes %d", s.response_bytes)
+	fmt.sbprintfln(&b, "send_errors %d", s.send_errors)
+	fmt.sbprintfln(&b, "write_deadline_aborts %d", s.write_deadline_aborts)
+	fmt.sbprintfln(&b, "handler_dwell_ns %d", s.handler_dwell_ns)
+	fmt.sbprintfln(&b, "stream_refused_full %d", s.stream_refused_full)
+	fmt.sbprintfln(&b, "stream_refused_budget %d", s.stream_refused_budget)
+	fmt.sbprintfln(&b, "stream_aborted_slow %d", s.stream_aborted_slow)
+	fmt.sbprintfln(&b, "active_connections %d", s.active_connections)
+	fmt.sbprintfln(&b, "handlers_active %d", s.handlers_active)
+	fmt.sbprintfln(&b, "handler_capacity %d", s.handler_capacity)
+	fmt.sbprintfln(&b, "connection_capacity %d", s.connection_capacity)
+	fmt.sbprintfln(&b, "end")
+
+	tmp := strings.concatenate({snapshot_path, ".tmp"}, context.temp_allocator)
+	if os.write_entire_file(tmp, transmute([]u8)strings.to_string(b)) != nil {
+		return
+	}
+	// A failed rename leaves the PREVIOUS record in place, which ages past
+	// max_age and reads as `stale`. It is never a fresh-looking record holding
+	// old numbers — which is the failure the whole temp-then-rename exists to
+	// make impossible.
+	_ = os.rename(tmp, snapshot_path)
+	free_all(context.temp_allocator)
 }
 
 // on_framework_event is the second half of the diagnostic path, and the half
@@ -182,6 +273,22 @@ main :: proc() {
 
 	posix.signal(.SIGTERM, on_signal)
 	posix.signal(.SIGINT, on_signal)
+
+	// argv[3], optional: where to write the out-of-band snapshot. Optional
+	// rather than mandatory because `run-soak.sh` fixtures and the eight
+	// committed reference artefacts predate it, and a soak-server that refuses
+	// to start without a new argument would invalidate every one of them.
+	if len(os.args) > 3 && len(os.args[3]) > 0 {
+		snapshot_path = os.args[3]
+		exporter = thread.create_and_start(export_loop)
+	}
 	web.serve(&app, port)
+	if exporter != nil {
+		// `serve` has returned, so the drain is over and `export_loop` has
+		// written its final record and returned. Join before exit so that record
+		// cannot lose a race with process teardown.
+		thread.join(exporter)
+		thread.destroy(exporter)
+	}
 }
 

@@ -1,0 +1,23 @@
+# The configuration the arm comparison ran with.
+# Read from experiments/27-observability-arms/main.odin at commit 27fd085.
+
+target.max_handlers        = 4
+target.max_connections     = 256
+target.reserved_conns      = 16
+target.max_write_time      = 5s
+target.port                = 57431
+
+admin.max_handlers         = 2      # arm-a only
+admin.max_connections      = 32
+admin.reserved_conns       = 4
+admin.port                 = 57432
+
+samples                    = 120
+sample_interval            = 25ms
+sample_timeout             = 250ms
+export_period              = 250ms  # arm-b only
+max_age                    = 1s     # four export periods
+snapshot_schema            = druse_snapshot 1
+
+# Saturation: 4 hold clients against 4 lanes, barrier-counted.
+# A run that cannot reach 4/4 prints 'verdict VOID' and exits 3.

@@ -387,12 +387,78 @@ plausible while it did.
 ```odin
 web.refused_connections(&app)   // running total of admission refusals
 web.stats(&app).saturation_refusals // acceptor refusals while every Handler lane is active
+web.stats(&app).handlers_active     // lanes inside a handler RIGHT NOW
+web.stats(&app).handler_capacity    // lanes actually running, after max_handlers = 0 resolves
 web.observe(&app, on_framework_error)
 web.use(&app, web.logger)
 web.use(&app, web.request_id)
 ```
 
-* **Lane utilization is your saturation signal — `web.stats(&app).handler_dwell_ns`.**
+### 6.0. Do not scrape this over a route (R2-WP03 / ADR-050)
+
+**A `/metrics` route runs on the same Handler lanes as your traffic, so it is
+the first thing to stop answering under the pressure you want to measure.** In
+the recorded twelve-hour soak, 111 of 8,611 scrapes (1.3%) produced nothing; in
+a deterministic full-occupancy window, **0 of 120**.
+
+That is not primarily an availability problem. Every failure an HTTP scrape can
+produce — refused, timeout, empty reply, receive error — is producible **both**
+by an application that stopped answering **and** by a network that dropped the
+exchange. So a failed scrape tells you nothing about which happened, exactly
+when it matters. An admin listener on a second port fixes the availability and
+**does not fix that**, because it is still HTTP.
+
+Export out of band instead. A thread that owns no Handler lane calls
+`web.stats(&app)` — which allocates nothing, takes no lock and reads atomics, so
+it is safe from any thread and costs no lane time — and writes a record to a
+file on `tmpfs`, temp-then-rename. A sampler outside the process reads it.
+
+- format and the reader's absence taxonomy: `ops/monitoring/snapshot-format.md`
+- a working sampler that joins it with `/proc` and the host TCP counters:
+  `ops/monitoring/sample-metrics.sh`
+- alert rules and a reference dashboard: `ops/monitoring/alerts.yml`,
+  `ops/monitoring/dashboard.md`
+- a working exporter: `examples/10-config-and-health`, `ops/soak/soak-server`
+
+**Never interpolate across an absent sample.** An interpolated point is a claim
+the process made about itself while it was silent. Alert on the gap; the causes
+(`missing`, `unreadable`, `malformed`, `stale`, `no_process`) all name the
+application, which is the point.
+
+The framework ships no exporter and no metrics abstraction, for the reason it
+never has: a framework that exports one has chosen a vendor for its users. It
+ships the numbers.
+
+### 6.1. The counters freeze exactly when you need them
+
+**Every cumulative field in `Server_Stats` is written when work COMPLETES** —
+`responses_sent` on send completion, `handler_dwell_ns` after the dispatch
+returns. At full lane occupancy nothing completes, so **all of them stop
+moving**, and the utilization formula below reads **zero** while utilization is
+**one**. A saturated server and an idle server draw the same flat lines.
+
+Measured, not reasoned about: four of four lanes provably inside handlers, 120
+of 120 scrapes refused for saturation, `handler_dwell_ns` = 0
+(`evidence/2026-08-02-r2-observability-arms/`, finding OBS-001).
+
+**So alert on the level, not on a flat counter:**
+
+```
+lane occupancy = handlers_active / handler_capacity
+```
+
+`handler_capacity` has to come from the process: `max_handlers = 0` is the
+default and resolves to the host's core count clamped to [4, 32], so it is
+unknowable from outside. `connection_capacity` is likewise the ceiling admission
+actually enforces — `max_connections - reserved_conns`, not `max_connections` —
+so `active_connections / connection_capacity` is a true occupancy ratio.
+
+`handlers_active`, `active_connections`, `handler_capacity` and
+`connection_capacity` are **levels and ceilings, not running totals**. Take them
+as they are; differencing a level yields a number that looks like a rate and is
+not one.
+
+* **Lane utilization over an interval — `web.stats(&app).handler_dwell_ns`.**
   A synchronous Handler holds its lane and cannot be preempted, and under
   dedicated accept a request arriving at a busy lane queues silently on that
   lane's socket — no 503, no counter, only latency. The old `lane_collisions`

@@ -1,0 +1,14 @@
+r2-obs: mutant 'm1-gauge-stuck-at-zero' is red for the expected reason
+r2-obs: mutant 'm2-capacity-ignores-reserve' is red for the expected reason
+r2-obs: mutant 'm3-reader-accepts-truncation' is red for the expected reason
+r2-obs: mutant 'm4-stale-reads-as-a-value' is red for the expected reason
+r2-obs: mutant 'm5-exporter-costs-lane-time' is red for the expected reason
+r2-obs: mutant 'm6-saturated-route-answers' is red for the expected reason
+r2-obs: mutant 'm7-zeroed-record-after-stop' is red for the expected reason
+r2-obs: the pre-registered criteria B1-B7 and the INCONCLUSIVE rule are intact
+r2-obs: the four occupancy/capacity fields are wired to real backend state, with no vendor patch
+r2-obs: both reference exporters stage through a temporary file and rename
+r2-obs: the alert rules and dashboard treat an absent sample as an alert, never as data
+r2-obs: the sampler stamps a cause on every tick and does not swallow an exit status
+r2-obs: the behavioural suite is green, and seven mutants are red for their own reasons
+PASS: R2-WP03 observability controls

@@ -1,0 +1,31 @@
+# R2-WP03 — campaign environment (G1)
+
+## Identity
+repo: jpierreribeiro/druse
+branch: claude/r2-restricted-production-skzmmx
+arm-measurement commit: 27fd085 (tree 641570c71e7c9c5152a64318f0bc30334dbfefcc)
+arm-measurement working tree: clean at that commit
+
+## Toolchain
+odin pin: release=dev-2026-07a commit=819fdc7 linux_amd64_asset=odin-linux-amd64-dev-2026-07a.tar.gz linux_amd64_sha256=32a7678abc66f1af7353abb5b0b5da47d94b7e663f6d250df29bc9117e864c10 
+odin version: /opt/odin/odin version dev-2026-07-nightly:819fdc7
+odin bundle sha256 (release asset, verified before use): 32a7678abc66f1af7353abb5b0b5da47d94b7e663f6d250df29bc9117e864c10
+clang: Ubuntu clang version 18.1.3 (1ubuntu1)
+go: go version go1.24.7 linux/amd64
+python3: Python 3.11.15
+
+## Host — and it is DISQUALIFIED for any soak (R2-WP02)
+kernel: Linux 6.18.5 x86_64 GNU/Linux
+cpus: 4 (4 online)
+cpu model: Intel(R) Xeon(R) Processor @ 2.10GHz
+memory total: 15.7 GiB
+memory available: 15.1 GiB
+governor: unavailable
+nofile soft/hard: 4096/4096
+memlock: 8192
+nstat: absent
+container: this is a shared CI container, not a dedicated host
+
+## Clock
+started_utc: 2026-08-02T07:12Z (arm runs)
+generated_utc: 2026-08-02T07:24:59Z
