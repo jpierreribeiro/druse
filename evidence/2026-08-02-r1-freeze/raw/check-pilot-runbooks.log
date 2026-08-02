@@ -1,0 +1,7 @@
+pilot runbooks: owner=jpierreribeiro window=60m load=10rps/20 clients routes=/pilot/* data=reconstructible rollback=5m
+pilot-runbook control: owner rejected for the expected reason
+pilot-runbook control: load rejected for the expected reason
+pilot-runbook control: abort rejected for the expected reason
+pilot-runbook control: migration rejected for the expected reason
+pilot-runbook control: split-rollback rejected for the expected reason
+PASS: R1-WP05 controlled-pilot policy, runbooks and mutation controls

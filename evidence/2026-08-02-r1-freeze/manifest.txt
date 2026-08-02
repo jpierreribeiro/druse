@@ -1,0 +1,9 @@
+campaign=R1-WP07-freeze
+start_utc=2026-08-02T03:15:01.327Z
+end_utc=2026-08-02T03:36:56.787Z
+candidate_commit=9478c89c9145782500a613fe7b196b48885cc72d
+candidate_tree=2a9040e678b090e5d652fe74dd895f2fc4652402
+pilot_candidate_commit=350eefbacac5f9d32b889207754a22a9a03b24f5
+owner=jpierreribeiro
+decision=PROMOTE_TO_R1
+production_authorized=false

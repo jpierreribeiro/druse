@@ -1,0 +1,12 @@
+64a849ad7e248792cbad60b33222e47d9a231b9246124de56ffe8663bcaebfca  ./commands.txt
+0ce2934c713e95c2d77d8cd4550509e901892bcca3c7a2a368d6674de915912d  ./environment.txt
+b7591fb7121c025a7ed5a8548494debb47403bb42caceb1352f24c4de5d54365  ./manifest.txt
+55e7d8eed4f17428ad93ad778502718098015c239ec84e7b4f3a08476c35c7eb  ./raw/check-pilot-exercise.log
+2f6edcd30468125e94b98ff656d9f37c09dc1e54a9df80bf30f7964bde6d204f  ./raw/check-pilot-runbooks.log
+db01ba38632f89ffacfda982637acf7d555ceb1f9ba006b5ee76e521500adea9  ./raw/check-proxy-config.log
+9f12dc9d3b04df903989e659278de2693c8e70b6a6725fc8643f7997c2ceae06  ./raw/check-r1-freeze.log
+9e2954df992d843cc4f0f1063c8a09a674f4f5e6076a15c3f6aa404cfa4f5e3f  ./raw/check-r1-shutdown-controls.log
+fa5916eb080a347df6fbcdcab3ca45f0138a7a396c1b4cf08f2ceb67c9e1dd56  ./raw/check-supervisor-contract.log
+9cf4ceff21510c1d53d550a7a17fe4afee9690bda59e38ec50db73aea2f7c6ab  ./raw/check-supported-profile.log
+54f0228e3a4c0ab75136a8451b42ca2aecc5ed7ac396e2f4b6173800c6c0b8c4  ./raw/full-gate.log
+490a2e848f4b34d7b8c9f163ab3b0a8fc2a37cc8d5582158a22ee52ded70fc0a  ./verdict.md

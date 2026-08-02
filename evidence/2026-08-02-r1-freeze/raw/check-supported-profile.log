@@ -1,0 +1,11 @@
+supported profile: Linux x86-64, HTTP/1.1 behind proxy, server ceiling 16, R1 server count 1, vendor dispositions 43
+supported-profile control: shutdown rejected for the expected reason
+supported-profile control: upload rejected for the expected reason
+supported-profile control: single-server rejected for the expected reason
+supported-profile control: missing-ceiling rejected for the expected reason
+supported-profile control: oom-guarantee rejected for the expected reason
+supported-profile control: vendor-count rejected for the expected reason
+supported-profile control: native-http2 rejected for the expected reason
+supported-profile control: native-tls rejected for the expected reason
+supported-profile control: non-linux rejected for the expected reason
+PASS: R1-WP04 normative supported profile and semantic mutation controls

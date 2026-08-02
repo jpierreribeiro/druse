@@ -1,0 +1,16 @@
+r1-shutdown: signal handler is structurally minimal
+r1-shutdown: draining publication precedes transport stop
+r1-shutdown: TimeoutStopSec=30s is greater than default max_drain_time=10s
+r1-shutdown: supervisor deadline control rejects a missing TimeoutStopSec
+R1 S0 PASS: draining became observable before serve returned
+R1 S1 PASS: idle keep-alive closed and process exited cleanly
+R1 S2 PASS: short in-flight handler completed during drain
+R1 S3 PASS: slow reader did not outlive write/drain bounds
+R1 S4 PASS: open stream drained and process exited
+R1 S5 PASS: in-progress spool was cancelled and cleaned
+R1 S6 PASS: blocked handler required explicit supervisor SIGKILL (137)
+R1 S7 PASS: repeated stop signal kept one clean shutdown
+R1 S8 PASS: SIGTERM stopped App A while App B remained healthy
+PASS: R1 real-process shutdown drill
+r1-shutdown: S0 goes red when draining publication is removed
+PASS: R1 shutdown controls

@@ -1,0 +1,5 @@
+r1 freeze control: widened-decision rejected for the expected reason
+r1 freeze control: missing-risk rejected for the expected reason
+r1 freeze control: hidden-memory rejected for the expected reason
+r1 freeze evidence: generation mode, pending full gate
+PASS: R1-WP07 freeze inputs and controls (evidence pending in runner)

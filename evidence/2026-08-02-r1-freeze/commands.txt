@@ -1,0 +1,8 @@
+bash build/check_supported_profile.sh
+bash build/check_supervisor_contract.sh
+bash build/check_r1_shutdown_controls.sh
+bash build/check_proxy_config.sh
+bash build/check_pilot_runbooks.sh
+bash build/check_pilot_exercise.sh
+bash build/check_r1_freeze.sh
+bash build/check.sh
