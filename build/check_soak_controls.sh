@@ -872,9 +872,11 @@ echo "PASS (soak preflight, R2-WP02): a topology that cannot be read is refused 
 # AND THE CONTROL ITSELF CAN GO RED. Every assertion above is about the
 # preflight; this one is about them. A copy of the preflight with the
 # physical-core refusal deleted must stop satisfying the mutant case — otherwise
-# the mutant case is passing for some reason other than the check it names, and
-# planning/diagnosability.md rule 4 is the standing finding that a positive case
-# alone proves nothing.
+# the mutant case is passing for some reason other than the check it names.
+# planning/diagnosability.md rule 4, "no unattributed pass": an assertion that an
+# outcome is expected must match the CAUSE of that outcome, not only its exit
+# status. That rule is usually read as being about the gate's assertions; it
+# applies to the assertions ABOUT the gate too.
 # ---------------------------------------------------------------------------
 sed '/share physical core(s)/d' "$SOAK/preflight.sh" >"$TMP/preflight-mutated.sh"
 cmp -s "$SOAK/preflight.sh" "$TMP/preflight-mutated.sh" &&
