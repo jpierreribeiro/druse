@@ -119,6 +119,8 @@ bash -n "$DRUSE_ROOT/ops/ci/run.sh"
 bash -n "$DRUSE_ROOT/ops/ci/status.sh"
 bash -n "$DRUSE_ROOT/ops/ci/install-odin.sh"
 bash -n "$DRUSE_ROOT/ops/verification/run-r1-freeze.sh"
+bash -n "$DRUSE_ROOT/ops/soak/preflight.sh"
+bash -n "$DRUSE_ROOT/ops/soak/smoke.sh"
 
 # `odin test` writes its runner executable into the CURRENT WORKING DIRECTORY.
 # It removes it again on success — but NOT when the test run fails, which drops

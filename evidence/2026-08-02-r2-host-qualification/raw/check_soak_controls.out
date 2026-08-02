@@ -1,0 +1,37 @@
+PASS (soak): the soak server compiles against the current public surface
+PASS (soak): the smoke server compiles against the current public surface
+PASS (soak): a caused failure is classified, kept its text, and is locatable in absolute time
+PASS (soak mutation 1): a generator that classifies nothing reports its failures as unclassified
+PASS (soak mutation 2): counted-but-unexplained failures are detectable, which the old artefact never was
+PASS (soak fixture): broken-accounting -> FAIL
+PASS (soak fixture): child-death -> FAIL
+PASS (soak fixture): dead-sampler -> FAIL
+PASS (soak fixture): fail-classified -> FAIL
+PASS (soak fixture): fail-unclassified -> FAIL
+PASS (soak fixture): kernel-drops -> FAIL
+PASS (soak fixture): missing-final-state -> FAIL
+PASS (soak fixture): pass -> PASS
+PASS (soak negative 1): a refused /stats scrape records curl exit 7, and the old '|| true' idiom is proved to record 0
+PASS (soak negative 1): the analyser separates a scrape failure with a cause from one whose cause was zeroed
+PASS (soak negative 2): a generator that keeps class names and drops the error text is caught
+PASS (soak negative 3): requests counted with no status and no class are caught
+PASS (soak negative 4): an absent workload is red unless the run recorded why
+PASS (soak negative 5): a sampler that stopped early is red, not a criterion that quietly did not apply
+PASS (soak negative 6): a run that dies before cleanup records how it died, and the analyser grades that artefact
+PASS (soak negative 7): a criterion edited after the run, or never pinned, is caught
+PASS (soak negative 8): a binary that changed during the run, or was never re-hashed, is caught
+PASS (soak negative 9): a run that never reached its end is not graded as one that did
+PASS (soak negative 10): injected faults are counted apart from spontaneous ones, and neither is netted off the other
+PASS (soak negative 11): a host that could not collect kernel counters is refused, not read as a clean kernel
+PASS (soak preflight): an unqualified host is refused before the campaign, with the reason recorded
+PASS (soak preflight, R2-WP02 positive): CPU sets on four distinct physical cores are qualified, and the mapping is recorded
+PASS (soak preflight, R2-WP02 mutant): CPU sets that are disjoint by number and SMT siblings by topology are refused, by that reason
+PASS (soak preflight, R2-WP02): on the same SMT host, the core-disjoint split 0,1,4,5 / 2,3,6,7 qualifies
+PASS (soak preflight, R2-WP02): overlapping CPU sets are refused however they are spelled
+PASS (soak preflight, R2-WP02): a topology that cannot be read is refused rather than assumed flat
+PASS (soak preflight, R2-WP02 control-of-the-control): removing the physical-core refusal makes the mutant case red
+PASS (soak smoke, R2-WP02): the smoke refuses to run on a host the preflight has not qualified
+PASS (soak smoke, R2-WP02): overriding the qualification stamps the artefact with the override and the reasons
+PASS (soak smoke, R2-WP02): a leg cannot be skipped — a missing dependency refuses the host
+PASS (soak pre-registration, R2-WP02): the campaign criteria are present, every SLO row has a declared origin, and the 6 pinned instrument files still hash to what was frozen
+PASS (soak): the R2-WP01 instrument controls are green

@@ -75,6 +75,17 @@ env ODIN_ROOT="$(cd "$(dirname "$DRUSE_SOAK_ODIN")" && pwd)" \
   fail "ops/soak/soak-server does not compile. It is the instrument that produces release evidence and it is in no other gate, so a break here is invisible until a campaign starts."
 echo "PASS (soak): the soak server compiles against the current public surface"
 
+# The smoke target, for exactly the same reason and it is the newer half of it:
+# `ops/soak/smoke-server` calls web.enable_upload, web.upload, web.stream,
+# web.stream_send and web.stream_close, and it is the only program in ops/ that
+# does. A signature change to any of the five would break the host
+# qualification silently, and the first person to notice would be somebody
+# starting a campaign on a host they cannot qualify.
+env ODIN_ROOT="$(cd "$(dirname "$DRUSE_SOAK_ODIN")" && pwd)" \
+  "$DRUSE_SOAK_ODIN" check "$SOAK/smoke-server" "-collection:druse=$DRUSE_ROOT" ||
+  fail "ops/soak/smoke-server does not compile. It is the upload/stream/proxy smoke R2-WP02 requires before any load, and nothing else in the tree exercises that trio from ops/."
+echo "PASS (soak): the smoke server compiles against the current public surface"
+
 # A port nothing listens on. The failure is caused, not waited for, so the
 # control is deterministic and takes under a second.
 CLOSED_PORT=9
@@ -689,5 +700,297 @@ grep -q '^preflight=fail' "$TMP/preflight-bad.txt" ||
 grep -q '^problem=' "$TMP/preflight-bad.txt" ||
   fail "preflight refused a host and recorded no reason"
 echo "PASS (soak preflight): an unqualified host is refused before the campaign, with the reason recorded"
+
+# ===========================================================================
+# R2-WP02. The preflight's CPU-isolation check, against physical cores.
+#
+# WHAT WAS WRONG. The check above proves the preflight can REFUSE. That is half
+# a control: an instrument that only ever says no is indistinguishable from one
+# that is broken, and this file already argues the same point about the analyser
+# ("an analyser that returned FAIL unconditionally would satisfy every negative
+# control in the file"). The preflight had no positive case at all.
+#
+# It also had the defect the positive case would have exposed. Isolation was
+# tested as `[[ "$SERVER_CPUS" == "$GENERATOR_CPUS" ]]` — a STRING comparison —
+# so two things passed that must not:
+#
+#   * `0-3` against `0,1,2,3`: the same four CPUs, spelled differently;
+#   * `0-3` against `4-7` on an SMT host: disjoint by number, and the two thread
+#     halves of ONE set of four physical cores. A c5.2xlarge is exactly this
+#     shape. The preflight's own header says the sets must be disjoint because
+#     "the load generator would compete with the process under measurement", and
+#     through SMT siblings it competes precisely so — on every core the server
+#     is pinned to.
+#
+# So the property under control is: SERVER AND GENERATOR DO NOT SHARE A PHYSICAL
+# CORE. Below it is exercised green, red, and red-for-the-right-reason, against
+# synthetic sibling maps rather than against whatever machine the gate happens to
+# run on — a control whose result depends on the CI runner's core count is not a
+# control. DRUSE_SOAK_TOPOLOGY_DIR exists for this and the preflight records in
+# its report when it is set, so a real campaign cannot use it unnoticed.
+# ===========================================================================
+
+# topology_fixture DIR SIBLINGS...  — one argument per physical core, each the
+# comma-separated sibling list of that core. `topology_fixture d 0,4 1,5` builds
+# a four-CPU host of two cores whose threads are (0,4) and (1,5).
+topology_fixture() {
+  local dir="$1"; shift
+  local core cpu
+  rm -rf "$dir"
+  for core in "$@"; do
+    for cpu in ${core//,/ }; do
+      mkdir -p "$dir/cpu$cpu/topology"
+      printf '%s\n' "$core" >"$dir/cpu$cpu/topology/thread_siblings_list"
+    done
+  done
+}
+
+# preflight_report TOPOLOGY SERVER GENERATOR OUT — run the preflight against a
+# fixture and keep its report. Its EXIT STATUS is deliberately ignored: the gate
+# runs on hosts with no free 100 GiB, a busy port 8080 and no dedicated CPUs, so
+# a whole-host PASS is not available here and asserting on one would make this
+# control a statement about the runner. The assertions below read the two lines
+# that belong to the topology check and nothing else.
+preflight_report() {
+  env DRUSE_SOAK_TOPOLOGY_DIR="$1" \
+      DRUSE_SOAK_SERVER_CPUS="$2" \
+      DRUSE_SOAK_GENERATOR_CPUS="$3" \
+      bash "$SOAK/preflight.sh" "$4" >/dev/null 2>&1 || true
+  test -s "$4" || fail "preflight produced no report for server=$2 generator=$3"
+}
+
+# ---------------------------------------------------------------------------
+# POSITIVE — cores really are disjoint, and the preflight SAYS SO.
+#
+# Siblings (0,1) (2,3) (4,5) (6,7): CPUs 0-3 are two whole cores and 4-7 are the
+# other two. This is the ThreadsPerCore=1-equivalent shape the campaign needs,
+# and the check must go green on it. Without this case every assertion below is
+# satisfied by a preflight that refuses everything.
+# ---------------------------------------------------------------------------
+topology_fixture "$TMP/topo-distinct" 0,1 2,3 4,5 6,7
+preflight_report "$TMP/topo-distinct" 0-3 4-7 "$TMP/pf-distinct.txt"
+grep -q '^physical_core_disjoint=yes$' "$TMP/pf-distinct.txt" ||
+  { cat "$TMP/pf-distinct.txt" >&2
+    fail "the preflight did not confirm physical-core disjointness on a host where the two CPU sets are four whole cores. A preflight that can only refuse cannot be told apart from a broken one."; }
+grep -q '^problem=.*physical core' "$TMP/pf-distinct.txt" &&
+  fail "the preflight refused genuinely disjoint physical cores"
+grep -q '^server_physical_cores=0 1;2 3$' "$TMP/pf-distinct.txt" ||
+  { cat "$TMP/pf-distinct.txt" >&2
+    fail "the preflight did not record which physical cores the server set resolves to. The mapping is the evidence that the check ran; its absence would leave 'disjoint' as an unsupported claim in the campaign record."; }
+echo "PASS (soak preflight, R2-WP02 positive): CPU sets on four distinct physical cores are qualified, and the mapping is recorded"
+
+# ---------------------------------------------------------------------------
+# THE MUTANT — disjoint by number, siblings by topology.
+#
+# Siblings (0,4) (1,5) (2,6) (3,7): the AWS Nitro layout for a c5.2xlarge, and
+# the shape this host qualification exists to catch. Server 0-3 and generator
+# 4-7 pass every numeric test and are the same four cores.
+#
+# The assertion is on the REASON, not only on the refusal. This file already
+# carries that rule for the analyser — "asserting the reason and not only the
+# verdict is the whole point" — and it applies here for the same cause: the
+# preflight refuses this fixture for a missing port and a small disk too, so a
+# bare `preflight=fail` would be satisfied without the topology check existing
+# at all.
+# ---------------------------------------------------------------------------
+topology_fixture "$TMP/topo-smt" 0,4 1,5 2,6 3,7
+preflight_report "$TMP/topo-smt" 0-3 4-7 "$TMP/pf-smt.txt"
+grep -q '^preflight=fail$' "$TMP/pf-smt.txt" ||
+  { cat "$TMP/pf-smt.txt" >&2
+    fail "the preflight qualified a host where the server set and the generator set are SMT siblings of the same four physical cores"; }
+grep -q '^physical_core_disjoint=no$' "$TMP/pf-smt.txt" ||
+  { cat "$TMP/pf-smt.txt" >&2
+    fail "the preflight did not record physical_core_disjoint=no for sibling-thread CPU sets"; }
+grep -q '^problem=.*disjoint by CPU NUMBER and share physical core' "$TMP/pf-smt.txt" ||
+  { cat "$TMP/pf-smt.txt" >&2
+    fail "the preflight refused the SMT host for some OTHER reason. A refusal for the wrong reason would let the same host through the moment its disk grew, and the campaign would run with the generator on the server's cores."; }
+echo "PASS (soak preflight, R2-WP02 mutant): CPU sets that are disjoint by number and SMT siblings by topology are refused, by that reason"
+
+# The same SMT host, split along cores instead of along thread numbers. This is
+# the affinity a campaign must pre-register and commit if it keeps such a host
+# (R2-WP02: "alterar o plano e commitá-lo antes do run"), and it proves the
+# refusal above is about the TOPOLOGY and not about that fixture.
+preflight_report "$TMP/topo-smt" 0,1,4,5 2,3,6,7 "$TMP/pf-smt-split.txt"
+grep -q '^physical_core_disjoint=yes$' "$TMP/pf-smt-split.txt" ||
+  { cat "$TMP/pf-smt-split.txt" >&2
+    fail "the preflight refused 0,1,4,5 / 2,3,6,7 on an SMT host, which IS the core-disjoint split of it. A check that cannot pass any affinity on a given host offers no way to fix the host."; }
+echo "PASS (soak preflight, R2-WP02): on the same SMT host, the core-disjoint split 0,1,4,5 / 2,3,6,7 qualifies"
+
+# ---------------------------------------------------------------------------
+# The set comparison is over MEMBERS. `0-3` and `0,1,2,3` differ as strings and
+# are one set; the shipped check compared strings and passed this.
+# ---------------------------------------------------------------------------
+preflight_report "$TMP/topo-distinct" 0-3 0,1,2,3 "$TMP/pf-same-set.txt"
+grep -q '^problem=.*share logical CPU(s) 0,1,2,3' "$TMP/pf-same-set.txt" ||
+  { cat "$TMP/pf-same-set.txt" >&2
+    fail "the preflight accepted '0-3' against '0,1,2,3' as distinct CPU sets. They are the same four CPUs written two ways, and a string comparison cannot see it."; }
+echo "PASS (soak preflight, R2-WP02): overlapping CPU sets are refused however they are spelled"
+
+# ---------------------------------------------------------------------------
+# A topology that cannot be READ is refused, not assumed flat. INS-013's rule:
+# an absent measurement must never be rendered as a clean result. A container
+# without sysfs would otherwise qualify every affinity it was given.
+# ---------------------------------------------------------------------------
+preflight_report "$TMP/topo-absent" 0-3 4-7 "$TMP/pf-absent.txt"
+grep -q '^physical_core_disjoint=unknown$' "$TMP/pf-absent.txt" ||
+  { cat "$TMP/pf-absent.txt" >&2
+    fail "an unreadable topology did not record physical_core_disjoint=unknown"; }
+grep -q '^problem=.*topology is unreadable' "$TMP/pf-absent.txt" ||
+  { cat "$TMP/pf-absent.txt" >&2
+    fail "the preflight qualified a host whose CPU topology it could not read. 'No siblings found' and 'no siblings file' are different facts and only one of them is an isolated host."; }
+echo "PASS (soak preflight, R2-WP02): a topology that cannot be read is refused rather than assumed flat"
+
+# ---------------------------------------------------------------------------
+# AND THE CONTROL ITSELF CAN GO RED. Every assertion above is about the
+# preflight; this one is about them. A copy of the preflight with the
+# physical-core refusal deleted must stop satisfying the mutant case — otherwise
+# the mutant case is passing for some reason other than the check it names, and
+# planning/diagnosability.md rule 4 is the standing finding that a positive case
+# alone proves nothing.
+# ---------------------------------------------------------------------------
+sed '/share physical core(s)/d' "$SOAK/preflight.sh" >"$TMP/preflight-mutated.sh"
+cmp -s "$SOAK/preflight.sh" "$TMP/preflight-mutated.sh" &&
+  fail "the physical-core refusal could not be located in preflight.sh to mutate it; this control has gone stale against the script it guards"
+env DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-smt" \
+    DRUSE_SOAK_SERVER_CPUS="0-3" DRUSE_SOAK_GENERATOR_CPUS="4-7" \
+    bash "$TMP/preflight-mutated.sh" "$TMP/pf-mutated.txt" >/dev/null 2>&1 || true
+if grep -q '^problem=.*disjoint by CPU NUMBER and share physical core' "$TMP/pf-mutated.txt"; then
+  fail "a preflight with the physical-core refusal removed still produced it. The mutant control above is not reading what it claims to read."
+fi
+echo "PASS (soak preflight, R2-WP02 control-of-the-control): removing the physical-core refusal makes the mutant case red"
+
+# ---------------------------------------------------------------------------
+# The SMOKE runs after qualification, and its escape hatch is loud.
+#
+# The smoke itself is not a gate — it builds a server, starts a container and
+# terminates TLS, and the campaign is not a gate (same rule as the soak server
+# above: this file compiles it and does not run it). What IS gated is the
+# ordering, because the ordering is the whole claim: a host that passes the
+# preflight and fails the smoke is not qualified, and a smoke that ran on a host
+# the preflight refused says nothing about the host at all.
+#
+# CPUs 9000-9003 make the preflight refuse on any machine, so both cases below
+# are deterministic wherever the gate runs.
+# ---------------------------------------------------------------------------
+test -x "$SOAK/smoke.sh" || fail "ops/soak/smoke.sh is missing or not executable"
+
+if env DRUSE_SOAK_GENERATOR_CPUS="9000-9003" \
+   bash "$SOAK/smoke.sh" "$TMP/smoke-refused.txt" >/dev/null 2>&1; then
+  fail "the smoke ran to completion on a host the preflight refuses. The smoke qualifies a host; it cannot substitute for the qualification."
+fi
+grep -q '^problem=the preflight refuses this host' "$TMP/smoke-refused.txt" ||
+  { cat "$TMP/smoke-refused.txt" >&2
+    fail "the smoke stopped on an unqualified host without recording that the preflight was the reason"; }
+echo "PASS (soak smoke, R2-WP02): the smoke refuses to run on a host the preflight has not qualified"
+
+# The escape hatch exists — the instrument has to be exercisable somewhere — and
+# the control is that using it MARKS THE ARTEFACT. A green smoke carrying this
+# line is a fact about the script; the same file without it would be read as a
+# qualified host. DRUSE_COMPILER is pointed at nothing so the run stops before
+# building anything, which keeps this control at about a second.
+env DRUSE_SOAK_GENERATOR_CPUS="9000-9003" \
+    DRUSE_SOAK_SMOKE_ALLOW_UNQUALIFIED=1 \
+    DRUSE_COMPILER=/nonexistent/odin \
+    bash "$SOAK/smoke.sh" "$TMP/smoke-allowed.txt" >/dev/null 2>&1 || true
+grep -q '^smoke_on_unqualified_host=yes' "$TMP/smoke-allowed.txt" ||
+  { cat "$TMP/smoke-allowed.txt" >&2
+    fail "the smoke accepted DRUSE_SOAK_SMOKE_ALLOW_UNQUALIFIED and did not stamp the report with it. An override that leaves no trace in the artefact is how an unqualified host becomes a qualified one in the record."; }
+grep -q '^preflight_problem=' "$TMP/smoke-allowed.txt" ||
+  { cat "$TMP/smoke-allowed.txt" >&2
+    fail "the smoke overrode the preflight and did not carry the preflight's reasons into its own report"; }
+echo "PASS (soak smoke, R2-WP02): overriding the qualification stamps the artefact with the override and the reasons"
+
+# A missing tool must be a REFUSAL, not a leg that quietly does not run. This is
+# INS-013 restated: one absent optional tool produced a clean twelve-hour
+# artefact with no telemetry in it, and it graded PASS. Asserted on the source
+# because the failure mode is a code shape — there is no `skip` verdict in this
+# script, and there must not be one.
+grep -q 'a missing tool is a refusal, not a skipped leg' "$SOAK/smoke.sh" ||
+  fail "smoke.sh lost the rule that a missing tool refuses rather than skips a leg"
+if grep -Eq '^[[:space:]]*(note "[a-z_]*_(upload|stream)=skip|continue[[:space:]]*#.*skip)' "$SOAK/smoke.sh"; then
+  fail "smoke.sh grew a path that records a leg as skipped. Three legs are required; two of three is a red smoke, not a partial one."
+fi
+echo "PASS (soak smoke, R2-WP02): a leg cannot be skipped — a missing dependency refuses the host"
+
+# ---------------------------------------------------------------------------
+# R2-WP02 — the pre-registration, and the identity it pins.
+#
+# G3 says criteria are frozen before the run. A gate cannot check WHEN a file was
+# committed, so it checks the two things that make the ordering meaningful
+# afterwards — the same approach check_r2_observability_controls.sh takes for
+# R2-WP03:
+#
+#   1. the numbered criteria are still there. Deleting one after a result is how
+#      a pre-registration becomes a description of what happened;
+#   2. the INSTRUMENT the pre-registration pins is still the instrument on disk.
+#      Under G1 a changed instrument is a changed candidate, and a
+#      pre-registration whose hashes have drifted is frozen against a program
+#      that no longer exists.
+#
+# (2) has a cost that is intended: a future WP that edits run-soak.sh or the
+# analyser must update this table in the same commit. That IS G1 — evidence is
+# not transferred by similarity — and the alternative is a table that was true
+# once.
+# ---------------------------------------------------------------------------
+PREREG="$SOAK/campaigns/2026-08-02-r2-soak-candidate-1.md"
+test -f "$PREREG" ||
+  fail "the R2-WP02 pre-registration is missing. No soak result is admissible for promotion without it committed ahead of the run's started_utc."
+
+for DRUSE_CRIT in C18 C19 C20; do
+  grep -q "| $DRUSE_CRIT |" "$PREREG" ||
+    fail "criterion $DRUSE_CRIT is gone from the R2-WP02 pre-registration. Criteria are frozen before the run (G3); removing one afterwards invalidates the run it was frozen for."
+done
+
+# The three origins, and the rule that produced them. A pre-registration whose
+# SLO table lost the distinction between a measured number, an inherited one and
+# an open one is a table of numbers with no provenance, which is the exact thing
+# R2-WP02 exists to prevent.
+grep -q 'A \*\*service SLO is a promise to the user of the service' "$PREREG" ||
+  fail "the pre-registration lost the statement separating an SLO from a microbenchmark. Without it the origin column is decoration."
+for DRUSE_ORIGIN in 'measured' 'inherited' 'open'; do
+  grep -q "\`$DRUSE_ORIGIN\` —" "$PREREG" ||
+    fail "the pre-registration no longer defines the '$DRUSE_ORIGIN' origin. Every SLO number needs one of the three, and a number with no origin is an invented number."
+done
+grep -q '\*\*An open row is a deliverable' "$PREREG" ||
+  fail "the pre-registration lost the rule that an open SLO row is a deliverable. Deleting it is how open rows quietly become invented numbers."
+
+# Every workload in §4 has a row in the SLO table of §6.2. A profile that is
+# offered load with no promise attached is a profile nobody decided about.
+for DRUSE_ROUTE in '/health' '/tiny' '/json/medium' '/json/medium/decode' '/bytes/64k' '/wait/40ms'; do
+  grep -q "^| \`$DRUSE_ROUTE\` |" "$PREREG" ||
+    fail "workload $DRUSE_ROUTE is driven by the campaign and has no row in the service SLO table"
+done
+
+# The pinned instrument still hashes to what the pre-registration says.
+DRUSE_HASH_DRIFT=""
+while IFS='|' read -r _ DRUSE_FILE DRUSE_WANT _; do
+  DRUSE_FILE="$(echo "$DRUSE_FILE" | tr -d ' `')"
+  DRUSE_WANT="$(echo "$DRUSE_WANT" | tr -d ' `')"
+  case "$DRUSE_FILE" in ops/soak/*) ;; *) continue ;; esac
+  test -f "$DRUSE_ROOT/$DRUSE_FILE" ||
+    fail "the pre-registration pins $DRUSE_FILE and it does not exist"
+  DRUSE_GOT="$(sha256sum "$DRUSE_ROOT/$DRUSE_FILE" | awk '{print $1}')"
+  test "$DRUSE_GOT" = "$DRUSE_WANT" ||
+    DRUSE_HASH_DRIFT="$DRUSE_HASH_DRIFT
+  $DRUSE_FILE
+    pinned:  $DRUSE_WANT
+    on disk: $DRUSE_GOT"
+done < <(sed -n '/<!-- r2-wp02-instrument-hashes -->/,/<!-- \/r2-wp02-instrument-hashes -->/p' "$PREREG" |
+         grep '^| `ops/soak/')
+
+test -z "$DRUSE_HASH_DRIFT" || fail "the instrument moved and the pre-registration did not:$DRUSE_HASH_DRIFT
+
+Readiness rule G1: a change to the instrument creates a NEW CANDIDATE, and
+evidence is not transferred by similarity. Update the table in
+ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md in this commit — and if a
+run has already been graded against the old hashes, that run belongs to the old
+candidate and does not carry over."
+
+# The table is not empty, or the loop above passes by finding nothing.
+DRUSE_PINNED="$(sed -n '/<!-- r2-wp02-instrument-hashes -->/,/<!-- \/r2-wp02-instrument-hashes -->/p' "$PREREG" |
+  grep -c '^| `ops/soak/')"
+test "$DRUSE_PINNED" -ge 6 ||
+  fail "the pre-registration pins only $DRUSE_PINNED instrument files; the runner, the analyser, the criteria, the schema, the soak server and the generator are all part of the candidate's identity"
+echo "PASS (soak pre-registration, R2-WP02): the campaign criteria are present, every SLO row has a declared origin, and the $DRUSE_PINNED pinned instrument files still hash to what was frozen"
 
 echo "PASS (soak): the R2-WP01 instrument controls are green"

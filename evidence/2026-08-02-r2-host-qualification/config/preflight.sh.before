@@ -14,30 +14,6 @@
 # So the topology is checked against the affinity the run will actually use,
 # by name, before anything is built.
 #
-# AND BY PHYSICAL CORE, NOT BY CPU NUMBER (R2-WP02). The first edition of this
-# script compared the two CPU sets as STRINGS and called them distinct when they
-# differed. Two defects lived in that one line.
-#
-#   1. `0-3` against `0,1,2,3` is the same set written twice, and it passed.
-#   2. On an SMT host, `0-3` against `4-7` is disjoint by NUMBER and identical by
-#      CORE. A c5.2xlarge is 4 physical cores x 2 hyperthreads and the Nitro
-#      layout pairs (0,4) (1,5) (2,6) (3,7) — so the campaign's server set and
-#      its generator set are the two sibling threads of the SAME four cores. The
-#      reason this script demands disjoint sets is written four lines below the
-#      check itself: "the load generator would compete with the process under
-#      measurement". Via SMT they compete exactly like that, and the check that
-#      exists to prevent it reported nothing.
-#
-# A check that stays green while the property it protects is false is a defect of
-# the INSTRUMENT, and this repository has already paid for that class twice
-# (INS-003, INS-013). So the sets are expanded to CPU numbers, each CPU is mapped
-# to its physical core through
-# /sys/devices/system/cpu/cpu*/topology/thread_siblings_list, and the comparison
-# is made between CORE sets.
-#
-# A host whose topology cannot be READ is refused rather than assumed flat. That
-# is INS-013's rule applied here: a missing measurement is not a clean result.
-#
 # This script REFUSES; it does not adapt. R2-WP02: "Se o host não satisfizer a
 # topologia, alterar o plano e commitá-lo antes do run; não adaptar affinity
 # silenciosamente durante a campanha." A preflight that quietly narrowed the CPU
@@ -60,12 +36,6 @@ SAMPLE_SECONDS="${DRUSE_SOAK_SAMPLE_SECONDS:-1}"
 # an estimate and it is recorded as one, but a host with 20 GiB free is not
 # going to survive the night and should learn that now rather than at hour nine.
 MIN_FREE_GIB="${DRUSE_SOAK_MIN_FREE_GIB:-100}"
-# Where the CPU topology is read from. Overridable for ONE reason: the physical
-# core check is itself a control, and a control that can only be exercised on the
-# machine it happens to run on cannot have a positive case. build/check_soak_
-# controls.sh points this at synthetic sysfs trees with known sibling maps. The
-# override is recorded in the report, so a real campaign cannot use it unnoticed.
-TOPOLOGY_DIR="${DRUSE_SOAK_TOPOLOGY_DIR:-/sys/devices/system/cpu}"
 
 problems=()
 notes=()
@@ -94,52 +64,6 @@ cpu_count_of() {
   echo "$total"
 }
 
-# expand_cpu_spec 0-3    -> "0 1 2 3"
-# expand_cpu_spec 0,2-3  -> "0 2 3"
-# The members, not the count. Disjointness is a question about members, and the
-# string comparison this replaces could not ask it: `0-3` and `0,1,2,3` differ as
-# strings and are the same four CPUs.
-expand_cpu_spec() {
-  local spec="$1" out="" part low high i
-  local IFS=,
-  for part in $spec; do
-    case "$part" in
-      *-*)
-        low="${part%%-*}"; high="${part##*-}"
-        if ! [[ "$low" =~ ^[0-9]+$ && "$high" =~ ^[0-9]+$ ]] || (( high < low )); then
-          echo "invalid"; return 1
-        fi
-        for (( i = low; i <= high; i++ )); do out="$out $i"; done ;;
-      *)
-        [[ "$part" =~ ^[0-9]+$ ]] || { echo "invalid"; return 1; }
-        out="$out $part" ;;
-    esac
-  done
-  echo "${out# }"
-}
-
-# physical_core_of 4 -> "0 4"   (on a host where cpu4's siblings are 0 and 4)
-#
-# The sorted sibling list IS the core's identity: two CPUs are on one physical
-# core exactly when they list each other. Nothing here needs a core NUMBER, and
-# deriving one from `core_id` would need `physical_package_id` too to stay
-# correct on a multi-socket host — the sibling list is already unique per core
-# and needs no second file to disambiguate.
-#
-# Prints nothing and returns 1 when the topology is unreadable. The caller must
-# treat that as a refusal, not as "no siblings".
-physical_core_of() {
-  local cpu="$1" file="$TOPOLOGY_DIR/cpu$1/topology/thread_siblings_list" raw expanded
-  [[ -r "$file" ]] || return 1
-  raw="$(<"$file")"
-  raw="${raw//[[:space:]]/}"
-  [[ -n "$raw" ]] || return 1
-  expanded="$(expand_cpu_spec "$raw")" || return 1
-  [[ "$expanded" == invalid ]] && return 1
-  # Sorted, so the same core reached from either sibling yields one key.
-  tr ' ' '\n' <<<"$expanded" | sort -n | tr '\n' ' ' | sed 's/ $//'
-}
-
 # highest_cpu_of 4-7 -> 7
 highest_cpu_of() {
   local spec="$1" highest=-1 part value
@@ -153,15 +77,7 @@ highest_cpu_of() {
 }
 
 # --- 1. topology vs the affinity this campaign will use ----------------------
-if [[ "$TOPOLOGY_DIR" == "/sys/devices/system/cpu" ]]; then
-  online_cpus="$(nproc --all 2>/dev/null || echo 0)"
-  note "topology_source=$TOPOLOGY_DIR"
-else
-  # Fixture mode. `nproc` would describe the machine running the control rather
-  # than the machine the fixture describes, and the two disagree by design.
-  online_cpus="$(find "$TOPOLOGY_DIR" -maxdepth 1 -name 'cpu[0-9]*' -type d 2>/dev/null | wc -l)"
-  note "topology_source=$TOPOLOGY_DIR (OVERRIDE — not a real host; DRUSE_SOAK_TOPOLOGY_DIR is set)"
-fi
+online_cpus="$(nproc --all 2>/dev/null || echo 0)"
 server_n="$(cpu_count_of "$SERVER_CPUS")"
 generator_n="$(cpu_count_of "$GENERATOR_CPUS")"
 highest_server="$(highest_cpu_of "$SERVER_CPUS")"
@@ -180,73 +96,8 @@ fi
 
 # Distinct sets, or the generator competes with the server for the thing being
 # measured. This is a criterion of the campaign, not a preference.
-#
-# Two levels, and the second is the one that was missing. Disjoint LOGICAL CPUs
-# is necessary and not sufficient: on an SMT host two disjoint CPU sets can be
-# the two thread halves of one set of physical cores, and then the competition
-# this check exists to prevent is happening on every core the server runs on.
-server_cpu_list="$(expand_cpu_spec "$SERVER_CPUS")"
-generator_cpu_list="$(expand_cpu_spec "$GENERATOR_CPUS")"
-
-if [[ "$server_cpu_list" == invalid || "$generator_cpu_list" == invalid ]]; then
-  : # already reported by the parse check above
-else
-  shared_cpus="$(comm -12 \
-    <(tr ' ' '\n' <<<"$server_cpu_list" | sort -n -u) \
-    <(tr ' ' '\n' <<<"$generator_cpu_list" | sort -n -u) | tr '\n' ' ')"
-  shared_cpus="${shared_cpus% }"
-  if [[ -n "$shared_cpus" ]]; then
-    problem "server ($SERVER_CPUS) and generator ($GENERATOR_CPUS) share logical CPU(s) ${shared_cpus// /,}: the load generator would compete with the process under measurement"
-  fi
-
-  # --- physical cores ---------------------------------------------------------
-  server_cores=(); generator_cores=(); unreadable=()
-  for cpu in $server_cpu_list; do
-    if core="$(physical_core_of "$cpu")"; then
-      server_cores+=("$core")
-    else
-      unreadable+=("$cpu")
-    fi
-  done
-  for cpu in $generator_cpu_list; do
-    if core="$(physical_core_of "$cpu")"; then
-      generator_cores+=("$core")
-    else
-      unreadable+=("$cpu")
-    fi
-  done
-
-  if (( ${#unreadable[@]} > 0 )); then
-    # Not "assume no SMT". A topology that cannot be read is a property that
-    # cannot be verified, and INS-013 is the finding that says an absent
-    # measurement must never be rendered as a clean one.
-    note "physical_core_disjoint=unknown"
-    problem "the physical-core topology is unreadable for CPU(s) $(printf '%s,' "${unreadable[@]}" | sed 's/,$//') under $TOPOLOGY_DIR/cpuN/topology/thread_siblings_list: whether the server and generator sets share a core cannot be verified, and an unverified isolation claim is not an isolated host"
-  else
-    server_core_set="$(printf '%s\n' "${server_cores[@]}" | sort -u)"
-    generator_core_set="$(printf '%s\n' "${generator_cores[@]}" | sort -u)"
-    shared_cores="$(comm -12 \
-      <(printf '%s\n' "$server_core_set") \
-      <(printf '%s\n' "$generator_core_set"))"
-
-    note "server_physical_cores=$(tr '\n' ';' <<<"$server_core_set" | sed 's/;$//')"
-    note "generator_physical_cores=$(tr '\n' ';' <<<"$generator_core_set" | sed 's/;$//')"
-    note "server_physical_core_count=$(grep -c . <<<"$server_core_set")"
-    note "generator_physical_core_count=$(grep -c . <<<"$generator_core_set")"
-    threads_per_core="$(awk '{print NF}' <<<"$server_core_set" | sort -rn | head -n 1)"
-    note "threads_per_core_max=${threads_per_core:-unknown}"
-
-    if [[ -n "$shared_cores" ]]; then
-      note "physical_core_disjoint=no"
-      problem "server ($SERVER_CPUS) and generator ($GENERATOR_CPUS) are disjoint by CPU NUMBER and share physical core(s) [$(tr '\n' ';' <<<"$shared_cores" | sed 's/;$//')]: those CPUs are SMT sibling threads of one core, so the load generator would compete with the process under measurement on the very cores being measured — which is the condition the disjoint sets exist to rule out"
-    else
-      # The affirmative. A preflight that can only say "refused" is
-      # indistinguishable from a preflight that is broken, so the verified case
-      # is recorded as a fact in the report and not merely as the absence of a
-      # complaint (R2 rule G2).
-      note "physical_core_disjoint=yes"
-    fi
-  fi
+if [[ "$SERVER_CPUS" == "$GENERATOR_CPUS" ]]; then
+  problem "server and generator share the CPU set $SERVER_CPUS: the load generator would compete with the process under measurement"
 fi
 
 if command -v taskset >/dev/null 2>&1; then

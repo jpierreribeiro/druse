@@ -12,7 +12,16 @@ The artefact these criteria are read from is defined in
 ## The run
 
 One server process, pinned to CPUs 0-3, with the load generators on CPUs 4-7,
-driving six profiles at once for the configured number of hours:
+driving six profiles at once for the configured number of hours.
+
+**Those must be eight PHYSICAL cores, not eight logical CPUs.** On an SMT host
+`0-3` and `4-7` are routinely the two thread halves of the same four cores — an
+AWS c5.2xlarge pairs them `(0,4) (1,5) (2,6) (3,7)` — and then the generator
+runs on the server's own cores, which is the single condition the split exists to
+prevent. `ops/soak/preflight.sh` maps every CPU through
+`thread_siblings_list` and refuses the host when the two sets share a core; a run
+whose preflight report does not carry `physical_core_disjoint=yes` describes a
+server that was competing with its own load generator (R2-WP02).
 
 | Profile | Rate | Connections | Expected status |
 |---|---:|---:|---|

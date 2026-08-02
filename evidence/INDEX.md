@@ -54,11 +54,20 @@ O plano correspondente está em `planning/readiness/`.
 | R1 | exercício do piloto | `2026-08-02-r1-pilot-exercise/` |
 | R1 | freeze e veredito | `2026-08-02-r1-freeze/` |
 | R2 | auditoria do instrumento (WP01) | `2026-08-02-r2-instrument-audit/` |
+| R2 | braços de observabilidade (WP03) | `2026-08-02-r2-observability-arms/` |
+| R2 | qualificação de host e pré-registro (WP02) | `2026-08-02-r2-host-qualification/` |
 
 `2026-08-02-r2-instrument-audit/` é sobre o **instrumento**, não sobre o
 produto: nenhum soak foi executado, e o próprio `verdict.md` lista o que não
 estabelece. Um diretório de evidência datado dentro do R2 será lido depois como
 se falasse do produto, e por isso a distinção está escrita nele.
+
+`2026-08-02-r2-host-qualification/` tem a mesma ressalva e uma a mais: **nenhum
+host foi qualificado.** O preflight rodou apenas numa workstation que ele
+recusa, e o smoke verde ali carimba `smoke_on_unqualified_host=yes` no próprio
+relatório. O que o diretório estabelece é que o preflight passou a recusar CPU
+sets que compartilham core físico — na topologia da c5.2xlarge, `0-3` contra
+`4-7` — e que o pré-registro da campanha está commitado antes de qualquer run.
 
 **Duas campanhas de A/B estão preservadas e são inutilizáveis como medida de
 teto**, de propósito: `2026-07-30-own-marshal/ab-30k-censored/` e

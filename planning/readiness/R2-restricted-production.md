@@ -21,7 +21,7 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 | ID | Entregável | Saída principal | Estado |
 |---|---|---|---|
 | R2-WP01 | auditoria e correção do instrumento | soak capaz de explicar toda falha | **fechado** 2026-08-02 |
-| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — falta host dedicado |
+| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — pré-registro, SLO e smoke commitados 2026-08-02; falta host dedicado |
 | R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | **fechado** 2026-08-02 |
 | R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — bloqueado por WP02 |
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
@@ -175,6 +175,44 @@ SLO do serviço. Definir, por workload:
 - RTO do restart e rollback.
 
 Não copiar números de microbenchmark como SLO.
+
+#### Estado em 2026-08-02 — entregue, e o que continua faltando
+
+**Entregue e commitado**, em
+[`../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md`](../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md):
+o pré-registro completo (hipótese e não-hipóteses, identidade do candidato com
+os seis arquivos do instrumento fixados por hash, workloads, ladder, critérios
+C18–C20, abort/invalidação, comparações, repetição, owner e janela) e o SLO do
+serviço com **origem declarada por número** — `measured`, `inherited` com
+citação, ou `open` com o método de obtenção.
+
+**Um defeito do instrumento foi fechado no caminho.** O preflight comparava os
+dois CPU sets como **strings**: `0-3` contra `0,1,2,3` passava, e — o caso que
+importa — `0-3` contra `4-7` numa c5.2xlarge passava, sendo esses oito vCPU
+quatro cores físicos com dois hyperthreads cada, pareados `(0,4) (1,5) (2,6)
+(3,7)`. Os conjuntos são disjuntos por número e idênticos por core, de modo que
+o gerador competiria com o servidor em todos os cores medidos — exatamente a
+condição que a disjunção existe para impedir. `preflight.sh` agora mapeia cada
+CPU por `thread_siblings_list` e recusa por esse motivo; um positivo, o mutante
+nomeado e um mutante do próprio controle estão em
+`build/check_soak_controls.sh`. Mesma classe de INS-003 e INS-013: um controle
+verde enquanto a propriedade que ele protege é falsa.
+
+**Decisão de topologia:** host com `ThreadsPerCore=1` (oito cores físicos,
+`0-3`/`4-7` intactos), com o split por core `0,1,4,5` / `2,3,6,7` numa
+c5.2xlarge pré-aprovado como fallback — e o fallback exige editar e commitar o
+pré-registro antes do run, porque derruba `DRUSE_SOAK_LANES` de 4 para 2 e
+invalida a base herdada de todas as taxas. Justificativa em §3.2 do pré-registro.
+
+**Falta o host.** Nenhum host dedicado existe, então o preflight não qualificou
+nenhum e o smoke não rodou em nenhum. `ops/soak/smoke.sh` e
+`ops/soak/smoke-server/` foram escritos e exercitados numa máquina **não
+qualificada** — cujo relatório carimba `smoke_on_unqualified_host=yes` justamente
+para que esse resultado não seja lido como qualificação. Ver
+`evidence/2026-08-02-r2-host-qualification/verdict.md`, seção "What this does NOT
+establish".
+
+R2-WP02 fica **aberto**. WP04, WP05, WP07 e WP08 continuam bloqueados.
 
 ## 4. Etapa C — observabilidade que sobreviva à pressão
 
