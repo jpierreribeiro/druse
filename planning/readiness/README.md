@@ -23,6 +23,11 @@ deles autoriza adicionar features sem relação com a evidência que o gate pede
 
 ## Documentos
 
+**Se você está voltando ao projeto depois de um tempo, comece por
+[`ESTADO.md`](ESTADO.md)** — o mapa: onde o portão está, o que falta, e quais
+decisões esperam pelo dono. Os documentos abaixo são precisos e densos; aquele é
+para se orientar antes de precisar deles.
+
 | Gate | Objetivo | Plano |
 |---|---|---|
 | R1 | liberar piloto controlado | [`R1-controlled-pilot.md`](R1-controlled-pilot.md) |

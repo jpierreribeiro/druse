@@ -563,6 +563,7 @@ freeze do R2-WP08:
 | **Mitigação** | o degrau 1 roda antes de qualquer promoção; alertas e runbooks do R1 ativos; rollback ensaiado e medido (3 s, `evidence/2026-08-02-r1-pilot-exercise/`); o primeiro serviço real **é** o degrau 2 e será tratado como canário, com abort automático pela lista do §8 |
 | **Validade** | até o primeiro tráfego de usuário real existir, e no máximo até a próxima revisão do gate |
 | **Owner** | o dono do repositório — este documento propõe, não aceita: um risco aceito por quem o descobriu não é aceite |
+| **Assinatura** | **ACEITO pelo dono em 2026-08-03**, declarado em sessão ("te autorizo e assino"). Registrado com a proveniência à vista: foi uma autorização verbal numa sessão de trabalho, não um documento assinado, e é revogável dizendo-o. O que ela cobre é exatamente a linha de risco acima — os degraus 2 a 6 do §8 — e nada além |
 
 **Isto não promove nada.** Um risco aceito é uma decisão registrada sobre
 evidência que não existe; não é evidência.
