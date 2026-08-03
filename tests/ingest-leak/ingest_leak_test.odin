@@ -33,6 +33,7 @@ import "core:net"
 import "core:os"
 import "core:strconv"
 import "core:strings"
+import "core:sys/posix"
 import "core:testing"
 import "core:thread"
 import "core:time"
@@ -266,6 +267,120 @@ upload_admission_survives_abandoned_bodies :: proc(t: ^testing.T) {
 			ok && status == 201,
 			"upload after %d abandoned bodies: ok=%v status=%v after 4s of retries (503 that never clears means admission slots leaked; a leak does not recover)",
 			ABANDONS,
+			ok,
+			status,
+		)
+	}
+}
+
+// --- F2: `ingest.begin` cannot open the spool file --------------------------
+//
+// The package header has named F2 since it was written, and until now only F1
+// had a test. R2-WP06 reviewed the indirect pins against the R2 threat model and
+// this was one of two rows whose evidence was an argument rather than a run:
+// `planning/security-backlog-reconciliation.md` records F-007 as "pinned by
+// construction, argued above rather than asserted. A test would need a spool
+// directory made unwritable mid-run."
+//
+// It needs exactly that, and nothing more. `begin` reserves nothing itself — the
+// caller has already spent a slot on `admit` — and on an `os.open` failure the
+// spool never learns which admission it belongs to, so `cancel` cannot find the
+// slot. Before the fix (marker "ingest audit F2") a directory that was briefly
+// unwritable retired `max_concurrent` slots PERMANENTLY: every later upload
+// answered 503 for the life of the process, long after the disk condition
+// cleared. That is the shape being tested — not the failure, the RECOVERY.
+//
+// UNPRIVILEGED ONLY. Root ignores DAC, so `chmod 0500` does not stop root from
+// writing and the test would prove nothing while reporting green. It refuses to
+// run as root rather than passing vacuously — the same reason
+// `build/check_r1_resource_controls.sh` must not run as root.
+F2_PORT :: 41_986
+F2_ATTEMPTS :: SLOTS + 2
+
+@(test)
+upload_admission_survives_an_unopenable_spool :: proc(t: ^testing.T) {
+	if posix.getuid() == 0 {
+		testing.fail_now(
+			t,
+			"this test must run unprivileged: root ignores DAC, so an unwritable spool directory would still be writable and the test would pass without testing anything",
+		)
+	}
+
+	cache := strings.concatenate({os.get_env("HOME", context.temp_allocator), "/.cache"}, context.temp_allocator)
+	os.make_directory(cache)
+	spool := strings.concatenate({cache, "/uru-ingest-f2"}, context.temp_allocator)
+	os.make_directory(spool)
+	spool_c := strings.clone_to_cstring(spool, context.temp_allocator)
+	// Restore the mode whatever happens, or a red run leaves a directory the
+	// next run cannot use and the failure looks like a different defect.
+	defer posix.chmod(spool_c, {.IRUSR, .IWUSR, .IXUSR})
+
+	srv: Server
+	if !start(&srv, F2_PORT, spool) {
+		testing.fail_now(t, "server did not start")
+	}
+	defer stop(&srv)
+
+	// Baseline, so a later failure cannot be blamed on the fixture.
+	{
+		body := body_of(SPOOLED)
+		defer delete(body)
+		status, ok := post(F2_PORT, body)
+		testing.expectf(t, ok && status == 201, "baseline upload: ok=%v status=%v", ok, status)
+	}
+
+	// Readable and executable, NOT writable: `os.open` with O_CREATE fails.
+	if posix.chmod(spool_c, {.IRUSR, .IXUSR}) != .OK {
+		testing.fail_now(t, "could not make the spool directory unwritable")
+	}
+
+	// Every one of these must fail to spool. The status is deliberately not
+	// asserted to a single value: what the client sees when the disk refuses is
+	// an operational choice this test has no business freezing. What it does
+	// assert is that none of them SUCCEEDS, because a 201 here would mean the
+	// unwritable directory never took effect and the rest proves nothing.
+	for i in 0 ..< F2_ATTEMPTS {
+		body := body_of(SPOOLED)
+		status, ok := post(F2_PORT, body)
+		delete(body)
+		testing.expectf(
+			t,
+			!(ok && status == 201),
+			"upload %d succeeded against an unwritable spool directory; the fixture did not take effect, so nothing after this is evidence (status=%v)",
+			i,
+			status,
+		)
+	}
+
+	if posix.chmod(spool_c, {.IRUSR, .IWUSR, .IXUSR}) != .OK {
+		testing.fail_now(t, "could not restore the spool directory")
+	}
+
+	// THE ASSERTION. With the slot released on the open failure, the subsystem
+	// works again the moment the directory does. With it retired, this answers
+	// 503 forever.
+	//
+	// Polled for the same reason the F1 test polls, and the same argument makes
+	// it sound rather than wishful: a leaked slot NEVER comes back, so a 201
+	// inside the window proves the release happened and a 503 across the whole
+	// window proves it did not.
+	{
+		body := body_of(SPOOLED)
+		defer delete(body)
+		status: int
+		ok: bool
+		for _ in 0 ..< 40 {
+			status, ok = post(F2_PORT, body)
+			if ok && status == 201 {
+				break
+			}
+			time.sleep(100 * time.Millisecond)
+		}
+		testing.expectf(
+			t,
+			ok && status == 201,
+			"upload after %d unopenable spools: ok=%v status=%v after 4s of retries (a 503 that never clears means `begin` kept the slot it never used)",
+			F2_ATTEMPTS,
 			ok,
 			status,
 		)
