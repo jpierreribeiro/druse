@@ -1,6 +1,6 @@
 # R2-WP06 — assurance, first pass
 
-**Decision: R2-WP06 remains OPEN. Three items closed, four still owed. The gate
+**Decision: R2-WP06 remains OPEN. Four items closed, four still owed. The gate
 stays at R1.**
 
 This package covers what was finished in one pass and, more usefully, what the
@@ -41,14 +41,14 @@ that already answered 431 before the fix. Only the first would leave nothing to
 catch a repair that fixed one path by breaking the other.
 `raw/wp9-mutations.out`: nine guards, each detected.
 
-### 2. SECURITY.md said "five" while the ledger held forty-four
+### 2. SECURITY.md said "five" while the ledger held forty-five
 
 The vendored-dependency section had not been updated since Phase 6. A number a
 human maintains is a number that was true once, and on a security page it is
 worse than absent: a reporter reads it as the size of the divergence they are
 trusting.
 
-It now states 44, carries a `security-patch-count` marker, and
+It now states 45, carries a `security-patch-count` marker, and
 `build/check_vendor_policy.sh` checks **both** the marker and the prose against
 the ledger. Both mutants verified red, each for its own reason.
 
@@ -80,6 +80,30 @@ reprodutíveis, registrar fontes de nondeterminismo" — this is that clause bei
 honoured. A gate demanding byte identity would be red forever for a reason
 nobody can fix inside this project.
 
+### 4. Two defects in the ledger itself, found by writing the BOM
+
+The bill of materials was supposed to be bookkeeping. It disagreed with the gate
+— 45 against 44 — and the disagreement was real on both sides.
+
+- **ID 42 was used twice.** The T6/M7 deletion and the acceptor-saturation
+  bridge shared it. The source marker `DRUSE PATCH 42` in
+  `vendor/odin-http/server.odin` and the tests that cite it point at the second,
+  so the first **had no identity anyone could reach**. R3-WP02 lists "eliminar
+  numeração duplicada e definir ID estável por patch" as work; it is done, and
+  gated. The deletion is now 45, with a ledger note: the earlier evidence
+  package cites the old number and is left untouched, because evidence is
+  immutable and a note is the honest reconciliation.
+- **`DELETED` was not a disposition the gate could see.** Its pattern matched
+  only `OFFER UPSTREAM`, `CARRY` and `APPEARS FIXED UPSTREAM`, so the entry
+  resolved by removing 1,295 lines was invisible to the count — which is exactly
+  why the duplicate ID survived: 45 rows reading as 44. A divergence resolved by
+  deletion is as much a disposition as one resolved by a patch, and a gate that
+  cannot see it cannot notice it being edited or dropped.
+
+Both are now checked: duplicate IDs fail, and the row count must equal the ID
+count. The BOM counts the way the gate counts rather than producing a second
+number — a second source of truth is how this pair survived in the first place.
+
 ## What this measurement does to R2-WP08
 
 **R2-WP08's exit criteria include: *"artefato implantado é byte-idêntico ao
@@ -109,8 +133,10 @@ Named, because "first pass" otherwise reads as "done":
   phases;
 - **review of administrative, upload, static and trust-proxy endpoints**;
 - **indirect pins F8, F12 and F-007 against the R2 threat model**;
-- **a versioned BOM with hashes** — `ops/release/verify-rebuild.sh` is the
-  rebuild half; the inventory half does not exist yet.
+- **~~a versioned BOM with hashes~~** — done: `ops/release/generate-bom.sh`,
+  `druse_bom 1`. Deliberately **not** called SPDX or CycloneDX: no generator
+  understands Odin packages, and emitting their schema name would make a
+  consumer's scanner report a clean bill for a project it never examined.
 
 ## What this does NOT establish
 

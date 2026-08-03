@@ -104,8 +104,8 @@ Druse vendors the root server package of
 pinned commit. `vendor/odin-http/VENDOR.md` records provenance and
 `planning/vendor-policy.md` is the canonical, gate-counted divergence ledger.
 
-<!-- security-patch-count: 44 -->
-The ledger currently carries **44 patch dispositions**. That number is checked
+<!-- security-patch-count: 45 -->
+The ledger currently carries **45 patch dispositions**. That number is checked
 by `build/check_vendor_policy.sh` against the ledger itself, so this sentence
 cannot drift from the tree the way it did between Phase 6 and R2 — it said
 "five" for four phases.

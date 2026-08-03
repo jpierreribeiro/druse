@@ -55,9 +55,30 @@ grep -qF '112c49b' "$DRUSE_POLICY" ||
 #      re-apply. (Patches 1-5 predate numbered markers and carry the
 #      `DRUSE PATCH (WP9 D…)` form, so the source side is checked as a
 #      subset, never as an equality.)
-DRUSE_POLICY_NUMS="$(grep -oE '^\| [0-9]+ \| .* \| .* \| \*\*(OFFER UPSTREAM|CARRY|APPEARS FIXED UPSTREAM)' "$DRUSE_POLICY" |
+# R2-WP06 — `DELETED` is a disposition, and leaving it out of this pattern made
+# one entry INVISIBLE to the gate. The ledger held 45 rows and this count read
+# 44, and the missing one was the T6/M7 deletion: a divergence resolved by
+# removing 1,295 lines is as much a disposition as one resolved by a patch, and
+# a gate that cannot see it cannot notice if it is edited or dropped.
+DRUSE_POLICY_NUMS="$(grep -oE '^\| [0-9]+ \| .* \| .* \| \*\*(OFFER UPSTREAM|CARRY|APPEARS FIXED UPSTREAM|DELETED)' "$DRUSE_POLICY" |
   awk -F'|' '{gsub(/ /, "", $2); print $2}' | sort -n)"
 DRUSE_POLICY_ROWS="$(printf '%s\n' "$DRUSE_POLICY_NUMS" | grep -c . || true)"
+
+# R2-WP06 — EVERY DISPOSITION HAS ITS OWN ID.
+#
+# ID 42 was used TWICE: the T6/M7 deletion and the acceptor-saturation bridge.
+# The source marker `DRUSE PATCH 42` and the tests that cite it point at the
+# second, so the first had no identity anyone could reach — and the count read
+# 44 from unique IDs while the table held 45 rows, which is how the duplicate
+# survived. R3-WP02 names "eliminar numeração duplicada e definir ID estável por
+# patch" as work; this is the check that keeps it done.
+DRUSE_DUPES="$(printf '%s\n' "$DRUSE_POLICY_NUMS" | sort | uniq -d | tr '\n' ' ')"
+test -z "${DRUSE_DUPES// /}" ||
+  fail "vendor policy IDs are duplicated: ${DRUSE_DUPES}. A patch whose number is shared cannot be cited by a source marker or a test, and the row count stops matching the ID count."
+
+DRUSE_POLICY_TABLE_ROWS="$(grep -c '^| [0-9]\+ | ' "$DRUSE_POLICY")"
+test "$DRUSE_POLICY_TABLE_ROWS" = "$DRUSE_POLICY_ROWS" ||
+  fail "the ledger has $DRUSE_POLICY_TABLE_ROWS rows and $DRUSE_POLICY_ROWS distinct IDs; every disposition needs an identity of its own"
 test "$DRUSE_POLICY_ROWS" -gt 0 ||
   fail "the vendor policy carries no patch dispositions at all"
 if ! diff <(printf '%s\n' "$DRUSE_POLICY_NUMS") <(seq 1 "$DRUSE_POLICY_ROWS") >/dev/null; then

@@ -1,0 +1,35 @@
+druse_bom 1
+# NOT an SPDX or CycloneDX document. See the header of ops/release/generate-bom.sh.
+generated_utc=2026-08-03T05:52:55Z
+commit=1989e90c4d87b039cc892b0c6b0b55d87061bdb8
+tree=fb7d168ed7e1b6e67e4526bb143679362ee6c227
+working_tree_dirty_files=4
+
+## toolchain
+pin_release=dev-2026-07a
+pin_commit=819fdc7
+pin_asset=odin-linux-amd64-dev-2026-07a.tar.gz
+pin_asset_sha256=32a7678abc66f1af7353abb5b0b5da47d94b7e663f6d250df29bc9117e864c10
+resolved_odin=/home/jp/.local/opt/Odin/odin
+resolved_odin_sha256=6fea037515fee6c4e681a67fe86818998241f15abbadd8df67899d9f0ff32b12
+resolved_odin_version=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7
+
+## vendored
+vendor_project=laytan/odin-http
+vendor_upstream_commit=112c49b5bcee31308a695cc3f05d156d314a61a6
+vendor_patch_dispositions=45
+vendor_in_source_markers=119
+
+## sources
+tree_web_files=48
+tree_web_sha256=24175b37bb07ec36405929fa2e3359c2f870146d1042ac3def0b956f05e1b3a9
+tree_vendor_files=38
+tree_vendor_sha256=bbd0b5432461a4117a212c23b1750a2643c491c5b98b033464adf9f87fe56f87
+tree_ops_soak_soak-server_files=1
+tree_ops_soak_soak-server_sha256=c3e0e466c29e2e1eefd7e59346fd09fa332808700a4a8ac1010ebe0e67a2ef19
+
+## reproducibility
+byte_identical_rebuild=no
+note=measured by ops/release/verify-rebuild.sh: two builds of one commit
+note=with the pinned compiler differ in content at identical size.
+note=Provenance here is 'these sources, this compiler', not 'these bytes'.
