@@ -1,7 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Gate the tree BEING PUSHED, which is not necessarily the tree this hook lives
+# in. `core.hooksPath` is one absolute path for the whole repository, so
+# `${BASH_SOURCE[0]}/..` always resolves to the main checkout — and since
+# `build/check.sh` derives its own root the same way, a push from any `git
+# worktree` verified the main checkout instead of the branch being pushed. With
+# several worktrees in play that is not a corner case: it rejects good branches
+# for unrelated work in progress, and it would pass a bad one whenever the main
+# checkout happens to be clean.
+#
+# `git rev-parse --show-toplevel` answers about the pushing worktree, including
+# when git has exported GIT_DIR into this hook's environment.
 
-echo "Druse pre-push verification gate"
+DRUSE_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if test -z "$DRUSE_ROOT" || ! test -f "$DRUSE_ROOT/build/check.sh"; then
+  # Fall back to the hook's own tree rather than skipping the gate: a gate that
+  # silently does not run is the failure mode this hook exists to prevent.
+  DRUSE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  echo "pre-push: could not resolve the pushing worktree; gating $DRUSE_ROOT" >&2
+fi
+
+# git exports GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE into a hook, and GIT_DIR
+# OVERRIDES directory-based discovery, so any `git` the gate or its children run
+# would answer about this push rather than about the tree they are inspecting.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_QUARANTINE_PATH
+
+echo "Druse pre-push verification gate ($DRUSE_ROOT)"
 exec bash "$DRUSE_ROOT/build/check.sh"
