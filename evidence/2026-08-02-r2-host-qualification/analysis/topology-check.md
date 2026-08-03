@@ -106,11 +106,20 @@ mutations run against the working tree:
 
 ## 5. What this analysis does not claim
 
-It does not claim the historical measurements in `docs/reports/` were taken on
-SMT-shared cores. It claims something narrower and checkable: those campaigns
-used `0-3` / `4-7` on a c5.2xlarge, `planning/verification-campaign-plan.md`
-warned in advance that this was "almost certainly" sibling pinning and asked for
-`lscpu -e` to confirm, and **no confirmation was ever recorded**. The topology of
-that instance is unknown from the artefacts, which is why §8 of the
-pre-registration licenses no comparison with any of them. One command on that
-instance resolves it.
+**Superseded in part, on the same day.** This section previously said the
+topology of the instance behind `docs/reports/` was unknown from the artefacts.
+The instance was then designated as the campaign host, `lscpu -e` was run on it,
+and the answer is in `raw/ec2-host-topology.txt`: four physical cores, siblings
+`(0,4) (1,5) (2,6) (3,7)`, on the same Xeon 8124M and kernel `6.17.0-1017-aws`
+those reports name.
+
+So the claim is no longer "unknown". Those campaigns pinned the server to `0-3`
+and the generator to `4-7` on a machine where that is one set of four cores
+twice, and the load generator was on the server's own cores.
+
+What this analysis still does **not** claim is that any of those numbers is
+miscomputed. Each measurement did what it said. What none of them describes is
+the configuration it reports itself as having — and that is why §8 of the
+pre-registration licenses no comparison with any of them, now for a measured
+reason rather than an absent one. Whether those reports carry a correction notice
+is a decision for their owner and is deliberately not taken here.

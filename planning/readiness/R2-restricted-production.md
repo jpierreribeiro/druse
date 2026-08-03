@@ -21,7 +21,7 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 | ID | Entregável | Saída principal | Estado |
 |---|---|---|---|
 | R2-WP01 | auditoria e correção do instrumento | soak capaz de explicar toda falha | **fechado** 2026-08-02 |
-| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — pré-registro, SLO e smoke commitados 2026-08-02; falta host dedicado |
+| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — host medido e smoke verde 2026-08-02; falta disco (17 GiB de 100 GiB) |
 | R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | **fechado** 2026-08-02 |
 | R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — bloqueado por WP02 |
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
@@ -204,13 +204,28 @@ c5.2xlarge pré-aprovado como fallback — e o fallback exige editar e commitar 
 pré-registro antes do run, porque derruba `DRUSE_SOAK_LANES` de 4 para 2 e
 invalida a base herdada de todas as taxas. Justificativa em §3.2 do pré-registro.
 
-**Falta o host.** Nenhum host dedicado existe, então o preflight não qualificou
-nenhum e o smoke não rodou em nenhum. `ops/soak/smoke.sh` e
-`ops/soak/smoke-server/` foram escritos e exercitados numa máquina **não
-qualificada** — cujo relatório carimba `smoke_on_unqualified_host=yes` justamente
-para que esse resultado não seja lido como qualificação. Ver
-`evidence/2026-08-02-r2-host-qualification/verdict.md`, seção "What this does NOT
-establish".
+**O host foi designado e medido.** `c5.2xlarge` em `44.200.160.96` — e é a
+MESMA máquina das campanhas de 2026-07 (Xeon 8124M, kernel `6.17.0-1017-aws`).
+`lscpu -e` foi finalmente rodado nela: **quatro cores físicos, irmãos
+`(0,4) (1,5) (2,6) (3,7)`**. A pergunta que `planning/verification-campaign-plan.md`
+deixou aberta está respondida, e a resposta é a ruim: todas aquelas campanhas
+rodaram com o gerador nos cores físicos do próprio servidor. Registrado, não
+corrigido — emendar relatório publicado dentro de um commit de qualificação de
+host é exatamente o tipo de edição que este programa existe para impedir.
+
+Como o dono manteve a c5.2xlarge, o **fallback de §3.2 foi adotado e commitado
+antes de qualquer run**: servidor `0,1,4,5`, gerador `2,3,6,7`, lanes 4→2, e toda
+taxa de §4 rebaixada a carga oferecida inicial sem base herdada (§3.4).
+
+Com essa affinity o preflight reporta `physical_core_disjoint=yes` e o smoke de
+upload/stream/proxy fica **verde no host**, as três pernas, com o Caddy pinado.
+
+**Falta uma coisa, e é disco.** 17 GiB livres contra 100 GiB estimados para 12 h
+— treze dos catorze requisitos de §3.1 passam, e treze de catorze não é
+qualificação. É decisão de armazenamento, do dono: volume EBS de 100–150 GiB é a
+única saída que não sacrifica critério. Ver
+`evidence/2026-08-02-r2-host-qualification/verdict.md`, seções "The one blocker"
+e "What this does NOT establish".
 
 R2-WP02 fica **aberto**. WP04, WP05, WP07 e WP08 continuam bloqueados.
 

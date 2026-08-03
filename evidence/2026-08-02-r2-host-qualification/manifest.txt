@@ -8,7 +8,11 @@ raw/preflight-fixed-0-3-vs-4-7.txt          the repaired preflight, same host, s
 raw/preflight-fixed-core-split.txt          0,1,4,5 / 2,3,6,7 on the same host: physical_core_disjoint=yes
 raw/preflight-same-set-two-spellings.txt    0-3 against 0,1,2,3: refused as one set, not two
 raw/preflight-topology-unreadable.txt       an unreadable topology: refused, not assumed flat
-raw/host-topology.txt                       lscpu -e and every thread_siblings_list on this host
+raw/host-topology.txt                       lscpu -e and every thread_siblings_list on the workstation
+raw/ec2-host-topology.txt                   THE CAMPAIGN HOST: 4 physical cores, siblings (0,4) (1,5) (2,6) (3,7)
+raw/ec2-preflight-0-3-vs-4-7.txt            the campaign host under the HISTORICAL affinity: refused, by topology
+raw/ec2-preflight-core-split.txt            the campaign host under 0,1,4,5 / 2,3,6,7: disjoint=yes, one problem left (disk)
+raw/ec2-smoke.txt                           upload, stream and proxy green ON THE CAMPAIGN HOST
 raw/smoke-this-host.txt                     upload, stream and proxy, green, on an UNQUALIFIED host
 raw/smoke-stderr.txt                        the smoke's console output
 raw/check_soak_controls.out                 the full control suite, 38 assertions
