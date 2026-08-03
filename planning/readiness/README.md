@@ -1,14 +1,18 @@
 # Programa de prontidão para produção — R1, R2 e R3
 
 **Status:** R1 PROMOTED em 2026-08-02 para piloto interno não crítico. R2 em
-execução — R2-WP01 (instrumento) e R2-WP03 (observabilidade) fechados em
-2026-08-02; WP02 e WP04–WP08 abertos. R3 continua como plano bloqueado por seu
-próprio gate.
+execução — WP01, WP02 e WP03 fechados; WP04 na escada (smoke e burn-in PASS nas
+taxas re-derivadas, rehearsal em curso, finais bloqueados pelo pré-registro
+§4.2); WP06 executado com duas cláusulas abertas; WP07 degrau 1 entregue e
+degraus 2–6 como risco aceito a assinar; WP05 e WP08 abertos. R3 continua como
+plano bloqueado por seu próprio gate.
 
-O gate permanece em **R1**. R2-WP01 tornou o instrumento capaz de explicar uma
-falha; R2-WP03 tornou o servidor observável enquanto ele falha. Nenhum dos dois
-produziu evidência sobre o produto, e regra G2 é explícita: uma falha do
-instrumento reprova a campanha, não o produto. Nenhum soak foi executado.
+**O gate permanece em R1, e nada nesta linha o move.** WP01 tornou o instrumento
+capaz de explicar uma falha; WP03 tornou o servidor observável enquanto ele
+falha; WP04 até aqui produziu um teto de carga medido e nenhuma evidência de
+estabilidade — os degraus que promovem são dois finais de ≥12 h em dias
+diferentes, e nenhum rodou. Regra G2 é explícita: uma falha do instrumento
+reprova a campanha, não o produto.
 **Origem:** `docs/reports/2026-08-01-production-readiness-audit.md`.
 **Pré-condição absoluta:** R0 concluído, commit limpo e `build/check.sh`
 integralmente verde.
@@ -24,6 +28,23 @@ deles autoriza adicionar features sem relação com a evidência que o gate pede
 | R1 | liberar piloto controlado | [`R1-controlled-pilot.md`](R1-controlled-pilot.md) |
 | R2 | liberar produção restrita | [`R2-restricted-production.md`](R2-restricted-production.md) |
 | R3 | alcançar maturidade geral, se essa ambição for aceita | [`R3-general-maturity.md`](R3-general-maturity.md) |
+
+**A ambição foi declarada em 2026-08-03**, e o R3 §1 exige que ela seja
+registrada por ADR antes de qualquer implementação.
+[`R3-programa-sem-limitacoes-bloqueantes.md`](R3-programa-sem-limitacoes-bloqueantes.md)
+é essa instanciação: ele **não contorna o R3**, escolhe quais trilhas dele o
+gatilho do dono autoriza e em que ordem. Sua tese é que *"sem limitações
+bloqueantes" é muito mais barato que "sem limitações"* — as três limitações
+bloqueantes têm instrumento nomeado e medido, e as caras não são bloqueantes.
+**A Fase 0 dele é terminar o R2**, então ele não compete com este diretório: o
+sequencia.
+
+O instrumento por limitação vem de
+[`../runtime-feasibility-study.md`](../runtime-feasibility-study.md), auditado
+adversarialmente em
+[`../runtime-feasibility-audit-2026-08-03.md`](../runtime-feasibility-audit-2026-08-03.md);
+a conclusão de ambos é que **o runtime não é o instrumento** para a maioria
+delas.
 
 O backlog resumido continua em
 [`../2026-08-01-production-readiness-remediation.md`](../2026-08-01-production-readiness-remediation.md).
