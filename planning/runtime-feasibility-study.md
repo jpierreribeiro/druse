@@ -66,14 +66,16 @@ The six limitations, as listed to the owner, against what a runtime does to each
 | 1 | **A handler fault kills the process** | **No, not really** — see §0.2 | **worker processes** (R3-WP10) |
 | 2 | **Handlers are synchronous; one occupies a lane** | **Yes — by replacing them with state machines**, which removes the product's reason to exist (§3.2) | bounded worker pool (arm B) |
 | 3 | **No native TLS / HTTP2 / WebSocket** | **No.** Owning the transport is a *precondition*, not the work. HPACK, flow control, GOAWAY and the smuggling corpus remain | none — it is protocol work either way |
-| 4 | **Linux x86-64 only** | **Yes, materially.** We are pinned to io_uring through `core:nbio`. A runtime with a backend abstraction is the way out — Tina ships io_uring, kqueue and IOCP | taking ownership of the I/O layer (§4.5) |
-| 5 | **43 vendor divergences in a forked backend** | **Yes, materially.** Our own runtime + our own HTTP retires the fork entirely | R3-WP02 arm C: migrate to a future `core:net/http` |
+| 4 | **Linux x86-64 only** | **Opens the way; does not remove it.** We are pinned to io_uring through `core:nbio`, and a backend abstraction is the exit — Tina ships io_uring, kqueue and IOCP. But Tina's own dossier lists *"correção real em FreeBSD/Linux ARM"* as **not proven**, and "supported" costs the R3-WP03 campaign per platform (corpus, soak, equivalent proxy/supervisor) — which is the expensive part, runtime or not | taking ownership of the I/O layer (§4.5) |
+| 5 | **43 vendor divergences in a forked backend** | **Yes, materially** — with a trade: it retires the fork and takes on ~16.5k lines of someone else's HTTP, plus the runtime beneath it. Maintenance moves, it does not vanish | R3-WP02 arm C: migrate to a future `core:net/http` |
 | 6 | **pre-1.0, no LTS or backports** | **No.** This is release policy (R3-A) | write the policy |
+| 7 | **A reviewed reverse proxy is required in front** (`supported-profile.md:29–36`) | **No.** Tina has no TLS either, and the proxy supplies HSTS, edge rate limiting and public HTTP/2 that nobody plans to nativise. Added 2026-08-03 (audit H): it was on the list given to the owner and had been dropped from this matrix, which left the selection open to the charge of picking rows | none — and it is the cheapest limitation on the list |
+| 8 | **"An application CPU/job runtime" is explicitly outside the profile** (`supported-profile.md:38–39`) | **This is row 2 by its other name**, and it is the most literal limitation of all for a study about a runtime. Added 2026-08-03 (audit H) | see row 2 |
 
-**Two of six, clearly. One at a cost that changes the product. Three not at
-all.**
+**Two of eight clearly, one of them with a trade. One at a cost that changes the
+product — twice, since rows 2 and 8 are the same limitation. Four not at all.**
 
-### 0.2 Why the runtime does not fix limitation 1, which is the worst one
+### 0.2 Row 1 is removable only at the price of row 2
 
 This deserves care, because "supervision" sounds like it should.
 
@@ -87,19 +89,46 @@ limits:
 - and an open question it does not answer: *"O recovery com `siglongjmp`
   preserva quais garantias após corrupção que não atingiu guard page?"*
 
-Odin has no recoverable panic (ADR-020, closed in definitive). Recovering inside
-the process means `siglongjmp` out of a signal handler with unknown memory
-state — which is not containment, it is hoping.
+**Corrected 2026-08-03 after audit finding E: the first draft used the weakest
+argument available, and caricatured the alternative.**
 
-**Real containment needs an address-space boundary: separate processes.** That
-is R3-WP10, it is already measured (ADR-051: resources are *not* the obstacle),
-and it is blocked on one nameable thing — `nbio` cannot adopt a socket it did not
-create.
+Two repairs. First, the dossier discards `siglongjmp` *"para o Uruquim, que usa
+um backend e não controla todo o processo"* — a premise a runtime of our own
+would remove. And shard recovery's practical blast radius is **the same 1/N as
+worker processes**: a worker that dies also loses its in-flight connections;
+R3-WP10's positive control measures exactly that the requests *on the other
+workers* do not fail. What processes buy is not a smaller radius — it is a
+**guarantee after corruption**, an address-space boundary against Tina's own
+open question: *"o recovery com `siglongjmp` preserva quais garantias após
+corrupção…?"* So the precise formulation is **"same radius, weaker guarantee,
+and a proof obligation nobody can close"** — which still decides for processes,
+without caricaturing a mechanism a real project ships.
 
-> **The limitation the owner most needs removed is the one a runtime helps least
-> with, and it is already the closest to being solved.**
+Second, and this is the argument that actually closes it: **shard recovery is
+only honest because Tina's whole architecture was designed for reconstruction**
+— per-shard arenas, universal generational handles, transactional commit of
+effects. Druse's state was not: a request arena, `odin-http` connections, an
+`nbio` loop. **Adopting the discipline that makes `siglongjmp` defensible is the
+cost of row 2** — the state-machine model that changes the product.
 
-### 0.3 What the two "yes" rows have in common
+> **So row 1 is not "a runtime does not remove it". It is "a runtime removes it
+> only at the price of row 2"** — which unites the two worst rows of the matrix
+> under one prohibitive cost, and is a far stronger conclusion than the first
+> draft's.
+
+**Real containment therefore needs an address-space boundary: separate
+processes.** That is R3-WP10, already measured (ADR-051: resources are *not* the
+obstacle), blocked on one nameable thing — `nbio` cannot adopt a socket it did
+not create.
+
+**The evidence that would reopen this judgement**, recorded so the position is
+falsifiable: a fault-injection campaign against Tina — which has DST and death
+tests — with induced corruption, a **red negative control**, and invariants
+shown to survive `siglongjmp`. With that, "hoping" becomes engineering and row 1
+must be re-judged. Without it, and with ADR-020 closed in definitive, the
+judgement stands.
+
+### 0.3 What the two "yes" rows have in common — they are one problem
 
 Limitations 4 and 5 — platforms and the fork — are the same problem wearing two
 hats: **we do not own the I/O layer or the HTTP backend.**
@@ -129,58 +158,88 @@ performance evidence in this repository:
 
 ### 1.1 What is settled
 
-- **The framework adds no measurable overhead over bare `nbio`.** A bare nbio
-  echo with no framework at all and the full `web.app` pipeline both measured
-  ~78k req/s. The ceiling is in the I/O layer they share — not in routing,
-  parsing, lanes or the arena. (`perf-netpoller-study-and-architecture.md` §1.)
+**Corrected 2026-08-03 after audit finding B.** Two items were listed here as
+settled facts and are history: they describe code that no longer ships.
+
 - **Latency is excellent and reproducible.** The p99 results reproduced across
   re-measurement and stand; against fasthttp the framework held a *lower*
-  absolute p99.
+  absolute p99. This one is settled.
 - **Multishot recv was refuted as the throughput lever**, by measurement, not
   by argument: 216k (one-shot) vs 213k (multishot) per core, head to head. The
   obvious fix was tried and did not work.
-- **Cheap io_uring flags were refuted too.** `COOP_TASKRUN` was already on;
-  `DEFER_TASKRUN` did not help when measured.
+- ~~**The framework adds no measurable overhead over bare `nbio`** (~78k both)~~
+  — **retired.** That measurement is pre-dedicated-accept
+  (`perf-wp-multishot-scanner.md:43–52`, framework 4.97 enters/req against the
+  echo's 4.99). The default path now does **0.160 enters/req at 259k**, which is
+  3.3× above the "ceiling" the sentence asserted. A ceiling the product itself
+  cleared is not a settled fact.
+- ~~**Cheap io_uring flags were refuted**~~ — **downgraded to "provenance not
+  traceable".** The `DEFER_TASKRUN` refutation says "patched into nbio, rebuilt,
+  benchmarked — throughput flat", and the neighbouring line cites
+  `vendor/nbio/impl_linux.odin` — **a file the server does not load.** ADR-051
+  established that `vendor/nbio` is imported by two benches and nothing else,
+  and that the product uses `core:nbio` from the toolchain. If the patch went
+  into `vendor/nbio` and the benchmark ran `web.app`, "throughput flat" is the
+  guaranteed result of a no-op. The refutation may well be valid — the record
+  does not say which binary was rebuilt, and this repository's own rule is that
+  an untraceable number is an anecdote. **Re-run it if the lever matters again.**
+  The same discount applies to "`COOP_TASKRUN` was already on": the citation
+  points at the same unloaded file.
 
-### 1.2 What is NOT settled, and this is the important part
+### 1.2 The 3× "contradiction" was mine, and the repository had already resolved it
 
-**Two documents in this repository disagree about the framework's throughput,
-by roughly 3×, on the same machine, in the same week.**
+**Corrected 2026-08-03 after audit finding A. The first draft of this section
+was wrong, and it was the load-bearing argument of §1.3.**
 
-| Source | Configuration | Result |
-|---|---|---|
-| `docs/reports/2026-07-25-dedicated-accept-throughput.md` | dedicated acceptor, c100 / c400 | **259k / 283k req/s**, 91.7% / 96.6% of fasthttp, `io_uring_enter` **5.03 → 0.160 per request** |
-| `perf-netpoller-study-and-architecture.md` §"Re-measurement" | distributed load, 4 dst IPs | **~80k** (auto lanes) / **~116k** (`max_handlers=32`) — **29–42%** of fasthttp, `%iowait` ≈ 49% per core |
+It claimed the two disagreeing throughput figures — 259k/283k and ~80k/116k —
+"both describe code that ships", on the strength of `DRUSE_DEDICATED_ACCEPT`
+being `#config(..., true)` today. **They describe different code.** Verified in
+this tree:
 
-`DRUSE_DEDICATED_ACCEPT` is `#config(..., true)` in `vendor/odin-http/server.odin`,
-so the adopted path is the default and both measurements describe code that
-ships. The study itself names the problem in its own words:
+- the ~80k re-measurement is commit `44a169f` (2026-07-25 **16:14**);
+- the dedicated accept merged at `5593536` (**22:08**, six hours later);
+- `git show 44a169f:vendor/odin-http/server.odin` contains **zero** occurrences
+  of `DRUSE_DEDICATED_ACCEPT`. The flag did not exist in the code that measured
+  ~80k.
 
-> *"A benchmark number that swings 3–4× with the load-distribution setup is a
-> reproducibility problem, and this project's rule is that an unreproducible
-> number is 'an anecdote with decimal places'."*
+And the file I cited resolves it, in the addendum immediately after the section
+I quoted (`perf-netpoller-study-and-architecture.md:514–539`): *"The correction
+above accurately describes `origin/main`, but its conclusion … is superseded by
+a measured implementation."* The mechanism is quantified — `io_uring_enter` from
+~5.03 to **0.160 per request**, a 31× cut, by taking the accept cancel/re-arm
+out of the hot path. That is precisely the iowait-bound pattern the
+re-measurement had diagnosed.
 
-**And the two-box measurement is still owed.** Every number above is
-single-box loopback, where the load generator and the server contend for the
-same machine and loopback under-measures io_uring.
+The provenance of 259k/283k is the strongest in the tree: five-run A/B against
+the old bound, syscall counts by `perf stat`, full gate green, three consecutive
+C-03 campaigns.
+
+**So the honest reading is "resolved by a code change", not "an open 3×
+contradiction".**
+
+**One loose end survives, and it is a real one.** The *distributed* load shape
+(four destination IPs) that produced ~80k has never been re-run against the
+dedicated-accept code — no report from 2026-07-26 to 08-01 repeats it. Anyone
+wishing to keep the "259k is a single-destination artefact" hypothesis alive has
+a named experiment: `wrk` 4×1-thread → `127.0.0.{1..4}` on the current binary.
 
 ### 1.3 What this means for the decision
 
-We are being asked to consider building a runtime to close a performance gap
-**whose size we cannot currently state within 3×**.
+**Also corrected.** The first draft made a two-box measurement a *precondition*
+for deciding anything, on the strength of the contradiction that §1.2 has now
+dissolved.
 
-That is not an argument against the runtime. It is an argument about *order*:
+The best number from the code that ships is **259k/283k = 91.7%/96.6% of
+fasthttp**, single-box. That **already satisfies this study's own abandonment
+criterion §8.2** — "a reproducible two-box measurement shows the current
+framework within ~20% of the fasthttp class" — modulo the box count.
 
-> **A two-box measurement of the current framework is a precondition for this
-> decision, not a follow-up to it.** If the gap is 4% (the dedicated-accept
-> reading), a runtime is very hard to justify on speed. If it is 60% (the
-> re-measurement reading), the case is strong. We do not know which, and the
-> cost difference between the two answers is measured in person-years.
+The two-box round is still owed, and remains owed: loopback under-measures
+io_uring and puts the generator on the machine under test. But it is
+**confirmation and benchmark hygiene, not the gate on this decision.**
 
-The infrastructure to settle it now exists and did not before: R2-WP02 qualified
-a dedicated host with a committed pre-registration, a preflight that refuses a
-host whose cores are shared, and a smoke. A second small instance in the same
-subnet is the only missing piece.
+The effect on the recommendation is to strengthen it: the speed rationale for a
+runtime is emptier than the first draft claimed, not fuller.
 
 ---
 
@@ -241,6 +300,13 @@ Three consequences follow, and they should be read carefully:
 
 **`tina/docs/` is a 3,185-line dossier on a runtime of exactly the shape §3
 concluded was the only feasible one — and it is written in Odin.**
+
+> **Provenance.** That directory is **not in this repository** — it is excluded
+> by `.git/info/exclude`, a local exclusion rather than project policy. Every
+> file it contains is hashed in
+> [`runtime-tina-dossier-provenance.md`](runtime-tina-dossier-provenance.md) so
+> a reviewer can obtain the same bytes and check any quotation below. Audit
+> finding D: a citation a reviewer cannot audit is an assertion.
 
 Tina (`github.com/pmbanugo/tina`, studied at commit `24b2cb9`, Apache-2.0) is
 **160 files, 121 of them `.odin`, ~51k lines**, with io_uring, kqueue and IOCP
@@ -435,10 +501,32 @@ For a web framework the dominant wait is the database. So:
 - the runtimes that solved this — `tokio-postgres` (Rust), `pgx` (Go) —
   **reimplemented the PostgreSQL wire protocol** rather than wrapping libpq.
 
-**If that is confirmed (Research Block 5), then "async Druse" implies "write a
-PostgreSQL protocol implementation in Odin", and that is a second project of
-comparable size to the runtime itself.** It must be in the cost, or the cost is
-fiction.
+**Corrected 2026-08-03 after audit finding G. The first draft overstated this
+twice.**
+
+It said async "implies" writing the wire protocol. There is a production
+counter-example the research itself describes before dismissing it:
+**`psycopg3` does real async over libpq's own non-blocking API** —
+`PQconnectStart` / `PQsendQuery` / `PQconsumeInput` / `PQisBusy` driven by socket
+readiness, with pipeline mode from libpq 14. Diesel concluded "not efficiently"
+*for Diesel's architecture*. The path is thorny — single-row mode, and the weak
+cancellation B5 notes, which is equally weak on every path — but **"laborious"
+is not "requires reimplementing the wire".**
+
+The honest conclusion is a ladder of decreasing cost and decreasing gain:
+**wire protocol, or non-blocking libpq driven by the loop (precedent:
+psycopg3), or a bounded worker pool.**
+
+It also called the wire protocol "a second project of comparable size to the
+runtime itself" — a superlative with no source, contradicted by this tree:
+`planning/phase-6-plan.md:47` records that *"Odin implementations demonstrate
+protocol viability"*. The runtime was costed in team-years (B6);
+`tokio-postgres` is not that class. **The qualitative point survives** — this
+cost is real and must be in the accounting — **the "comparable size" does not.**
+
+And `pgbouncer` or a local proxy is not an escape, which is worth one line
+rather than silence: it multiplexes connections on the *server* side and does
+nothing to unblock the calling thread.
 
 ---
 
@@ -471,18 +559,39 @@ Druse's transport boundary **is** clean and substitutable by design
 is: applications keep writing ordinary synchronous handlers, and a
 thread-per-core runtime replaces `nbio` + `odin-http` underneath.
 
-**And there is one hard problem that decides whether Arm F is real:** a
-synchronous handler that blocks holds its carrier thread. Under thread-per-core
-that thread *is a shard*, so one blocking handler stalls every connection on
-that core — strictly worse than today's bounded lanes, where a blocked lane
-leaves the others running (proved by WP69/WP72). Arm F therefore requires either
+**Corrected 2026-08-03 after audit finding C. The first draft killed this arm
+with a false comparison.** It said a blocking handler under thread-per-core
+"stalls every connection on that core — strictly worse than today's bounded
+lanes". That is wrong about *today*:
 
-- handlers that never block (unenforceable in a general framework), or
-- a bounded worker pool for handler execution with the shard owning only I/O —
-  which is **arm B wearing arm F's clothes**, and arm B needs no new runtime.
+- since the dedicated accept, a connection is **affine to its lane for its
+  entire lifetime** — parsing, dispatch, sends, deadlines and teardown
+  (`docs/reports/2026-07-25-dedicated-accept-throughput.md:99–106`);
+- the handler is synchronous and occupies that lane
+  (`docs/supported-profile.md:43–44`).
 
-That tension is the first thing an Arm F design must resolve, and it may be what
-kills it.
+So **today** a blocked handler already stalls every connection assigned to its
+lane. That is the same 1/N blast radius as a stalled shard. WP69/WP72 prove the
+*other* lanes progress — exactly as other shards progress under Seastar or Tina.
+"Strictly worse" was false; it is **the same radius**. The residual difference
+is smaller and elsewhere: Druse's acceptor steers *new* connections to the least
+loaded lane, which `SO_REUSEPORT` hashing does not — though Tina's coordinator
+topology does.
+
+**What actually prices Arm F, and the first draft never computed:** adopting
+Tina as the transport trades a 43-patch fork of `odin-http` for a dependency —
+or a fork — of **~53k lines of single-maintainer, pre-1.0 runtime**, with no
+proxy/client interop evidence, **no TLS** (so it does not remove limitation 3),
+a linear-scan router, and not one valid benchmark against Druse. That pushes
+limitation 6 *down a level and makes it bigger*.
+
+**Arm F does not die of "a blocking handler stalls a shard". It dies — or is
+deferred — because its price is becoming co-maintainer of a runtime, for a net
+gain of two limitations (4 and 5) that steps 3–4 of §8b remove more cheaply.**
+
+§3.2 stands unchanged: exposing two-byte transitions to the application would
+destroy the product's reason to exist. But that argument answers **arm E exposed
+to the user**, not this hybrid.
 
 ---
 
@@ -545,14 +654,24 @@ rescued.** Balance is a design obligation, handled by static partitioning.
 The reported result of SQPOLL in an echo server is **zero syscalls per request** —
 *"nearly no syscalls are ever performed"*.
 
-**Our measured problem is ~5 `io_uring_enter` per request against fasthttp's
-0.02 `epoll_wait`.** That is a syscall-amortisation problem, and this table is a
-list of syscall-amortisation tools that require **no change to the synchronous
-programming model**.
+**Corrected 2026-08-03 after audit finding B.3.** The first draft said *"our
+measured problem is ~5 `io_uring_enter` per request"*. **That number was retired
+on 2026-07-25.** The default path does **0.160 per request** — the dedicated
+acceptor cut it 31× — so the target SQPOLL would attack largely no longer
+exists. Citing the pre-fix figure as "our measured problem" while §1.2 of the
+same document described the fix was internally inconsistent.
 
-`DEFER_TASKRUN` was already tried here and refuted; `COOP_TASKRUN` was already
-on. **`SQPOLL` was never tested.** Neither were registered buffers/files nor
-`SEND_ZC`.
+**And this tree has already analysed SQPOLL, more pessimistically than the
+external research.** `perf-wp-multishot-scanner.md:72`: it *"removes the submit
+enter, but nbio still enters for `wait_nr>0` completions … would need pairing
+with busy-poll reaping, and burns a full core"*. On a four-core budget with two
+Handler lanes, burning a core for a poller is not a free lever.
+
+So the honest status of this block: **the external evidence is real and the
+local target has moved.** Registered files/buffers and `SEND_ZC` remain
+untested here and remain plausible. Any syscall-lever track has to be
+re-derived against the current code before it is offered as a path — the first
+draft offered it against a problem the tree had already solved by other means.
 
 ### B4 — Go-style goroutines are out of reach, structurally
 
@@ -673,12 +792,32 @@ owner most needs removed.
 
 | Step | Work | Removes / unblocks |
 |---|---|---|
+| **0** | **Finish R2** (WP04–WP08). Added 2026-08-03 after audit finding I.2: the first draft treated it as a standing obligation in prose but left it out of the sequence, which is where a sequence gets ignored | defines the envelope everything else is measured against |
 | **1** | **Own the I/O layer**: vendor `core:nbio` or upstream a socket-adoption entry point. Policy decision first, code second. | prerequisite for 2, 4, 5 |
 | **2** | **R3-WP10 stage 3**: implement a worker-process arm, run the fault campaign with its **negative control in N=1 going red** | **limitation 1** — the worst one |
 | **3** | **R3-WP02**: reconcile or retire the 43 divergences | **limitation 5** |
-| **4** | **Backend abstraction**, with a second backend proving the seam is real | **limitation 4** |
+| **4** | **Backend abstraction**, with a second backend proving the seam is real — and **choose it for double duty**: kqueue/macOS pays for the seam *and* advances limitation 4, so step 5 deciding "no runtime" cannot throw the work away | **limitation 4** |
 | **5** | **Decide on the runtime**, holding steps 1–4 | limitation 2, if the cost is then acceptable |
 | **6** | **R3-A release policy**; **R3-E protocols** by requirement | limitations 6 and 3 |
+
+### The re-measurement cost, which the first draft did not declare
+
+**Added 2026-08-03 after audit finding I.1.** Step 0 produces soak, capacity and
+canary evidence for **N=1**. Step 2 adopts worker processes — **N>1** — and
+R3-WP10 already requires the resource budget to be redone for N>1. By the same
+logic, soak and capacity describe a different topology too.
+
+So one of two things is being bought, and the plan must say which:
+
+- **workers ship opt-in**, the default profile stays N=1, and the R2 envelope
+  survives intact — at the price of limitation 1 remaining in the *default*
+  supported profile until a later promotion; **or**
+- **workers become the default**, and part of the R2 campaign is re-run for N.
+
+**Recommended: opt-in first.** It keeps R2's evidence valid, makes containment
+available to anyone who wants it, and defers the re-campaign until there is
+production experience to justify it. Promotion to default is then its own
+decision with its own evidence, rather than a cost hidden inside step 2.
 
 **Steps 2, 3 and 4 are each independently valuable, each removes a declared
 limitation, and none requires committing to a runtime.** If after them a runtime
@@ -730,3 +869,45 @@ of these limitations are measured against.
 4. **Do we take ownership of `nbio`?** §4.5 shows two tracks blocked on the same
    missing entry points. Upstreaming, vendoring, or neither — but decided once,
    deliberately, rather than discovered again by a third track.
+
+---
+
+## 11. Audit corrections applied, 2026-08-03
+
+An adversarial audit of this document
+(`planning/runtime-feasibility-audit-2026-08-03.md`) was commissioned to break
+it. Its verdict was that the recommendation survives and is strengthened, and
+that nine corrections were required before the document could be a basis for
+decision. All nine are applied, and each is marked in place rather than
+silently rewritten:
+
+| # | Correction | Where |
+|---|---|---|
+| 1 | The 3× contradiction was mine — the two figures describe different code, and the repository had already resolved it | §1.2, §1.3 |
+| 2 | Two "settled" items describe retired code; the `DEFER_TASKRUN` refutation downgraded to untraceable provenance | §1.1 |
+| 3 | The measured problem is 0.160 enters/request, not ~5; the tree's own pessimistic SQPOLL analysis added | §6b/B3 |
+| 4 | Arm F's blast radius is the *same* as today's, not worse; it dies on the ownership bill instead | §6 |
+| 5 | Dossier provenance recorded with per-file hashes, so the twelve citations are auditable | `planning/runtime-tina-dossier-provenance.md` |
+| 6 | Row 1 is "removable only at the price of row 2"; the evidence that would reopen it recorded | §0.2 |
+| 7 | Two omitted limitations added; row 4 downgraded to "opens the way" | §0.1 |
+| 8 | R2 sequenced as step 0; the N=1 → N>1 re-measurement cost declared and decided | §8b |
+| 9 | The normative divergence in `supported-profile.md` raised as its own item | below |
+| — | *(also applied, audit finding G, not on the required list)* The wire-protocol necessity de-overstated; psycopg3 recorded as counter-example; "comparable size" withdrawn | §5 |
+
+### 9 — a normative divergence, raised and not resolved here
+
+The audit found, outside this study's scope but inside its duty to check the
+limitations it reasons about: `docs/supported-profile.md:46–49` says that on
+lane saturation the acceptor closes the socket *"without writing an HTTP
+response"*, while the adoption report and the gate's C-05 suite record a **full
+503 with `Retry-After: 1`**.
+
+**Two normative documents disagree about what the server does under saturation.**
+One of them is out of date, and applications are written against both. This
+study does not resolve it — it is a product question, not a runtime question —
+but it must not sit in an audit appendix: it needs its own item, its own
+measurement of the current binary, and whichever document is wrong corrected.
+
+R2-WP04's smoke touched the same behaviour from the other side: the generator
+sees `eof_on_fresh_conn`, which is consistent with *close without a response*
+and not with a 503. That is a data point, not a resolution.
