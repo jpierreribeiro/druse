@@ -159,4 +159,16 @@ must_go_red "OPTIONS * exemption removed from the authority check (H2)" \
   'is_options_star := rline.method == .Options && rline.target.(string) == "*"' \
   'is_options_star := false && rline.method == .Options && rline.target.(string) == "*"'
 
-echo "PASS: WP9 raw-wire corpus mutation controls (8 guards, each detected)"
+# Security F-005, R2-WP06. The mutation restores the exact defect: a header
+# block that overruns the budget before any complete line exists goes back to a
+# silent close. The corpus case must go red on the STATUS being absent, not on
+# some other assertion — `Rejected` in this corpus permits a bare close (WP9
+# D6), which is why the case uses `Rejected_With_Status` and why this mutation
+# is worth having: without the new outcome, a corpus case for F-005 would have
+# been green against the vulnerable server.
+must_go_red "oversized header block closes silently again (F-005)" \
+  "vendor/odin-http/server.odin" \
+  'if err == .Too_Long {' \
+  'if false && err == .Too_Long {'
+
+echo "PASS: WP9 raw-wire corpus mutation controls (9 guards, each detected)"

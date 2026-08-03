@@ -30,6 +30,10 @@ Wire_Outcome :: enum {
 	// The request is rejected. A status response is allowed but not required;
 	// an immediate close is equally acceptable (WP9 D6).
 	Rejected,
+	// The request is rejected AND the status is mandatory. Security F-005:
+	// a bare close is exactly the defect, so `Rejected` cannot express this
+	// case — it permits the very outcome under test.
+	Rejected_With_Status,
 }
 
 // Wire_Case is one raw-wire scenario.
@@ -568,7 +572,54 @@ corpus_storage := []Wire_Case{
 			"inside a field value. A control-byte rule that swept it up would refuse " +
 			"conforming traffic, and nothing else in this corpus would have noticed.",
 		},
+		// --- security F-005: an oversized header block ANSWERS ---------------
+		//
+		// Two requests that both exceed `limit_headers` used to get two
+		// different protocol outcomes, decided by how the bytes happened to be
+		// split across lines. A block made of complete lines tripped the budget
+		// check and answered 431; a SINGLE line larger than the budget reached
+		// the scanner's `.Too_Long` first and the connection was closed with no
+		// response and no log. Measured at limit_headers=8000: 8,032 bytes ->
+		// 431, 8,532 bytes -> silence.
+		//
+		// The outcome here is `Rejected_With_Status` and not `Rejected` for a
+		// precise reason: `Rejected` permits a bare close (WP9 D6), which is the
+		// defect itself. A corpus case that allowed it would have been green
+		// against the vulnerable server.
+		{
+			name = "a single header line larger than the budget answers 431",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\nX-Big: " +
+			OVERSIZED_HEADER_VALUE + "\r\nConnection: close\r\n\r\n",
+			outcome = .Rejected_With_Status,
+			allowed_status = {431},
+			connection_must_close = true,
+			notes = "security F-005. The value alone is over the 8,000-byte header budget, " +
+			"so the scanner reaches .Too_Long before any complete line exists and the " +
+			"budget check below it never runs. A silent close here is indistinguishable " +
+			"from a network fault to the client and produces no log line for an operator.",
+		},
+		{
+			name = "a header block of many lines over the budget also answers 431",
+			bytes = "GET /ping HTTP/1.1\r\nHost: localhost\r\n" + MANY_HEADER_LINES +
+			"Connection: close\r\n\r\n",
+			outcome = .Rejected_With_Status,
+			allowed_status = {431},
+			connection_must_close = true,
+			notes = "the PAIR of the case above, and the reason both are here: this shape " +
+			"already answered 431 before F-005 was fixed. Keeping only the single-line case " +
+			"would leave nothing to catch a fix that repaired one path by breaking the other.",
+		},
 }
+
+// A single header value larger than the 8,000-byte header budget. Built rather
+// than typed so the size is stated once and cannot drift from the comment.
+@(private)
+OVERSIZED_HEADER_VALUE :: #load("oversized-header-value.txt", string)
+
+// The same excess, split across many complete lines: each one parses, and the
+// running budget is what refuses them.
+@(private)
+MANY_HEADER_LINES :: #load("many-header-lines.txt", string)
 
 wire_corpus :: proc() -> []Wire_Case {
 	return corpus_storage
