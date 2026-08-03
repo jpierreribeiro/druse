@@ -62,7 +62,7 @@ README.md, odinfmt.json, .editorconfig, .gitignore — repo tooling
 ## Local divergence record
 
 The **canonical live ledger** is `../../planning/vendor-policy.md`; its row
-count is derived by `build/check_vendor_policy.sh` and currently records 43
+count is derived by `build/check_vendor_policy.sh` and currently records 45
 dispositions. The table below preserves the first 24 historical patch groups
 because they explain the bootstrap server's original delta. It is a historical
 subset, not the current count; later bridge patches and deletions live only in

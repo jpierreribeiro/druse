@@ -14,7 +14,7 @@ and WP46 is the first work package held to them.
 
 `vendor/odin-http/` is a snapshot of the root server package of
 `laytan/odin-http` at commit `112c49b` (2026-04-11), vendored 2026-07-19, MIT.
-The table below is the canonical live ledger and currently contains **43
+The table below is the canonical live ledger and currently contains **45
 dispositions**. It includes patches, later bridge work and one recorded
 deletion, so “disposition” is the exact term. Every retained divergence is
 marked `DRUSE PATCH` at its site and covered by executable evidence.

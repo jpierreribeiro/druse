@@ -321,7 +321,13 @@ Every profile that will run, and every profile that will not. A profile absent
 without a pre-registered reason fails the run; a profile absent *with* one does
 not. Both directions are enforced by the analyser.
 
-| Profile | Path | Rate | Connections | Expected status | In this campaign? |
+> **Superseded by §4.1 on 2026-08-03.** The rates below are the ones this
+> campaign started with and are kept so the derivation can be read against them.
+> **The rates of record are in §4.1**, and criterion C21 checks the manifest
+> against that table, not against this one. The connection counts, the expected
+> statuses and the injected-fault schedule are unchanged.
+
+| Profile | Path | Rate (superseded) | Connections | Expected status | In this campaign? |
 |---|---|---:|---:|---|---|
 | health | `/health` | 20/s | 16 | 200 | yes |
 | tiny | `/tiny` | 10,000/s | 128 | 200 | yes |
@@ -331,7 +337,113 @@ not. Both directions are enforced by the analyser.
 | blocking | `/wait/40ms` | 15/s | 32 | 200 | yes |
 | 1 MiB | `/bytes/1m` | — | — | — | **not as a rated profile.** The route is exercised — it is the target of the slow-reader injection below, 24 sockets abandoned mid-response (`run-soak.sh`) — but it carries no rate, no connection count and no expected status, so it has no SLO row in §6.2. Giving it one now would be a new profile with no history, decided during a stability campaign. Recorded in `control/short.txt` at run time. |
 
-**These rates are offered load, not promises.** They come from
+### 4.1 Quarta emenda — as taxas, re-derivadas por medição (2026-08-03)
+
+**Emendada depois do burn-in e antes do próximo degrau.** §3.4 ponto 3 escreveu,
+antes de qualquer run, que estas taxas perderiam sua base herdada com duas lanes
+e que *"o burn-in e o rehearsal decidem se elas são sustentáveis"*. O burn-in
+decidiu: não são.
+
+#### A medição que forçou a emenda
+
+O burn-in de 15 ciclos (`6bff82f`) reprovou por **`health transport errors`** —
+o ciclo 3 teve 8 erros em `/health`, 6 `eof_on_fresh_conn` e 2 `peer_reset`. O
+critério 1 exige **zero**, e continua exigindo: `/health` é liveness, e um
+orquestrador que recebe recusa nele tira o processo de rotação qualquer que seja
+a razão.
+
+**O que foi medido não é a taxa em que `/health` suja; é a taxa em que o
+acceptor recusa.** `vendor/odin-http/server.odin:1206` recusa um socket aceito
+somente quando **toda** lane está dentro de um handler naquele instante, e
+`/health` abre 16 conexões novas por ciclo num total de ~624. Se `/health` é o
+workload que come a recusa é sorte; se o servidor recusa **alguma coisa** é
+mecanismo. No f=0,60 abaixo o `/health` ficou limpo e o servidor ainda recusou
+79 conexões — passar ali seria passar por sorte.
+
+Escada de derivação, três ciclos por ponto, mesma affinity e mesmas lanes
+(`~/rate-derivation/` no host de campanha; artefatos e vereditos preservados):
+
+| fator | carga agregada | recusas do servidor | erros em `/health` | erros de transporte totais |
+|---:|---:|---:|---:|---:|
+| 1,00 | 15.685/s | **1.913** (15 ciclos) | **8** | 1.682 |
+| 0,60 | 9.411/s | 79 | 0 | 49 |
+| 0,40 | 6.274/s | 62 | 0 | 20 |
+| 0,25 | 3.922/s | 38 | 0 | 34 |
+| 0,20 | 3.137/s | 1 | 0 | 1 |
+| 0,18 | 2.824/s | 2 | 0 | 2 |
+| **0,15** | **2.352/s** | **0** | **0** | **0** |
+| 0,10 | 1.569/s | 0 | 0 | 0 |
+| 0,06 | 941/s | 0 | 0 | 0 |
+| 0,03 | 471/s | 0 | 0 | 0 |
+
+**O teto livre de recusa está em 2.352/s agregados; a primeira recusa reaparece
+em 2.824/s.** O zero não é de um ponto só — quatro pontos consecutivos abaixo do
+limiar deram zero, o que distingue "abaixo do limiar" de "teve sorte uma vez".
+
+**As recusas se concentram na borda do ciclo.** A telemetria por segundo mostra
+os picos nos instantes em que os seis geradores reabrem suas ~624 conexões, não
+distribuídos pela carga permanente. Com capacidade de 2 handlers, uma conexão
+que chega enquanto as duas lanes estão dentro de handlers é recusada, e uma
+rajada de reconexão é onde isso é mais provável. É informação de capacidade que
+o R2-WP05 quer, e está registrada aqui porque foi este degrau que a produziu.
+
+#### As taxas de registro, a partir de agora
+
+| Profile | Path | Taxa | Conexões | Status esperado |
+|---|---|---:|---:|---|
+| health | `/health` | **20/s — inalterada** | 16 | 200 |
+| tiny | `/tiny` | **1.500/s** | 128 | 200 |
+| json encode | `/json/medium` | **225/s** | 128 | 200 |
+| json decode | `/json/medium/decode` | **600/s** | 256 | 204 |
+| 64 KiB | `/bytes/64k` | **22/s** | 64 | 200 |
+| blocking | `/wait/40ms` | **2/s** | 32 | 200 |
+
+Agregado: **2.369/s**. As cinco cargas escalam por 0,15; **`/health` não escala**
+— é uma sonda, não carga, e reduzi-la de 20/s para 3/s daria quatro vezes menos
+amostras para o critério que esta emenda existe para respeitar. Os 17/s de
+diferença são 0,7% do agregado.
+
+#### O que esta emenda não resolve, dito antes do run
+
+- **Seis minutos não provam doze horas.** Cada ponto acima é de três ciclos. Um
+  final de 12 h tem ~360 rajadas de reconexão contra 3; zero em três rajadas
+  limita muito pouco a probabilidade por rajada. **O burn-in (15 ciclos) e o
+  rehearsal (60) são a confirmação, e não são formalidade.** Se qualquer recusa
+  aparecer neles, a taxa desce de novo — nesta seção, em seu próprio commit,
+  antes do final. Uma taxa baixada depois de um final vermelho invalidaria aquele
+  final (G3).
+- **A margem é estreita e está declarada:** 2.369/s de registro contra 2.824/s
+  onde a recusa reaparece — cerca de 16%. Foi escolhida assim de propósito:
+  descer mais troca cobertura de estresse real por margem que os degraus longos
+  vão testar de qualquer forma.
+- **Isto não é o knee.** É o teto abaixo do qual o acceptor não recusa, que é uma
+  pergunta diferente de capacidade máxima. O envelope é R2-WP05.
+- **A recomendação que sai daqui e não pertence a este WP:** com
+  `max_handlers = lanes`, uma implantação que precise manter `/health` limpo sob
+  carga tem de ficar abaixo do limiar de recusa, ou pôr liveness fora das lanes
+  de aplicação — que é exatamente o argumento que a ADR-050 já fez para métrica.
+  Registrado como entrada do R2-WP05, não decidido aqui.
+
+#### C21 — a taxa do run é a taxa desta seção
+
+Critério novo, congelado antes do próximo run, no mesmo espírito do C18:
+
+> as taxas em `manifest.txt` (`health_rate`, `tiny_rate`, `json_encode_rate`,
+> `json_decode_rate`, `bytes_64k_rate`, `wait_40ms_rate`) têm de ser exatamente
+> as da tabela acima.
+
+Razão de existir: a affinity tem um preflight que **recusa** e o critério C18; as
+taxas não tinham nem um nem outro, e um run que ajustasse a taxa no prompt
+produziria um artefato que discorda do seu plano sem que nada percebesse. O
+`run-soak.sh` **não** é modificado — os seus defaults continuam sendo os
+históricos, as taxas de campanha são parâmetros do runner e ficam gravadas no
+manifesto, e é a comparação manifesto↔§4 que fecha o laço. Mudar os defaults
+mudaria o hash do instrumento em §2.1 por uma escolha que é de campanha, não de
+instrumento.
+
+---
+
+**As taxas originais abaixo ficam registradas como o que foram.** Elas vêm de
 `ops/soak/CRITERIA.md` §"The criteria have a history", where they were halved
 after a red 10-second smoke on 2026-07-29 — on the topology §3.3 describes. They
 are inherited for continuity of the instrument, and §6.2 is where that inheritance
@@ -355,11 +467,17 @@ reach twelve hours.
 
 | Step | Duration | Question | Can promote? | Result |
 |---|---:|---|---|---|
-| host qualification | — | `preflight.sh` green, `smoke.sh` green | no | pending — no host |
-| smoke | 10 min | wiring, schema, clocks, hashes | no | |
-| burn-in | 30 min | every workload and fault class appears | no | |
+| host qualification | — | `preflight.sh` green, `smoke.sh` green | no | **PASS** 2026-08-03, `184.72.201.140` |
+| smoke | 10 min | wiring, schema, clocks, hashes | no | **PASS** 2026-08-03 at the fourth attempt (`9905509`); three red runs, all instrument. `evidence/2026-08-03-r2-soak-smoke/` |
+| burn-in | 30 min | every workload and fault class appears | no | **FAIL** 2026-08-03 (`6bff82f`) — `health transport errors`. Re-derivation in §4.1; the ladder restarts at smoke |
 | rehearsal | 2 h | fast drift, evidence volume, first latency distributions | no | |
 | final | ≥12 h | R2 stability criterion + §6 SLO | yes, if PASS | |
+
+**The rate change of §4.1 is a new candidate and the ladder restarts at smoke.**
+G1 counts load-bearing configuration as part of a candidate's identity, and the
+offered load is load-bearing by construction. Restarting costs ten minutes and
+keeps the rule intact; carrying the old smoke forward would mean citing a green
+step taken at rates the campaign no longer uses.
 
 The rehearsal is also where the two open estimates from R2-WP01's accepted risks
 are corrected: the 100 GiB disk figure in `preflight.sh` and the 2%
