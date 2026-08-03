@@ -181,7 +181,14 @@ taskset -c "$SERVER_CPUS" "$SERVER" "$LANES" "$PORT" "$SNAPSHOT_PATH" \
 server_pid=$!
 echo "$server_pid" >"$OUT/control/server.pid"
 for _ in $(seq 1 200); do
+  # READY MEANS BOTH CHANNELS, not just the request path. The exporter writes
+  # its first snapshot on its own schedule, so a sampler started the instant
+  # /health answers takes its first sample against a file that does not exist
+  # yet and records `missing` for a server that is perfectly healthy. R2-WP04's
+  # second smoke did exactly that: 1 of 656 samples, cause 101, entirely an
+  # artefact of the start-up race.
   curl -fsS --max-time 0.5 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 &&
+    { [[ -z "$SNAPSHOT_PATH" ]] || [[ -s "$SNAPSHOT_PATH" ]]; } &&
     break
   kill -0 "$server_pid" 2>/dev/null || {
     ABORT_REASON="release-candidate server exited before readiness"
@@ -267,6 +274,7 @@ SAMPLER_START_EPOCH="$(date +%s)"
   sample=0
   started=$SECONDS
   while kill -0 "$server_pid" 2>/dev/null; do
+    sample_start_ns="$(date -u +%s%N)"
     status="/proc/$server_pid/status"
     rss="$(awk '/^VmRSS:/ {print $2}' "$status" 2>/dev/null || echo 0)"
     hwm="$(awk '/^VmHWM:/ {print $2}' "$status" 2>/dev/null || echo 0)"
@@ -358,7 +366,26 @@ SAMPLER_START_EPOCH="$(date +%s)"
     # One second, not five. A saturation refusal burst has a median of one
     # refusal, so a five-second window buries it in a bucket four seconds wider
     # than the event.
-    sleep "$SAMPLE_SECONDS"
+    #
+    # SLEEP THE REMAINDER, NOT THE WHOLE INTERVAL. `sleep $SAMPLE_SECONDS` after
+    # a body that costs real time makes the true period `interval + work`, and
+    # the drift is silent: R2-WP04's smoke recorded 658 samples where the
+    # manifest expected 681, and the analyser called it "telemetry stopped
+    # early". The sampler had not stopped. Measured gaps were 1.03-1.06 s with
+    # NOT ONE above 1.5 s — it was simply costing ~4% more than the 2% tolerance
+    # allows, so criterion 11 would have failed every run of any length.
+    #
+    # `expected_samples` is elapsed/interval, so the fix belongs here rather
+    # than in the tolerance: a sampler that keeps its own cadence makes the
+    # arithmetic true instead of making the rule lenient.
+    sample_end_ns="$(date -u +%s%N)"
+    remaining_ns=$(( SAMPLE_SECONDS * 1000000000 - (sample_end_ns - sample_start_ns) ))
+    if (( remaining_ns > 0 )); then
+      sleep "$(awk -v ns="$remaining_ns" 'BEGIN {printf "%.3f", ns / 1000000000}')"
+    fi
+    # A body that overran the interval is not silently absorbed: the next sample
+    # starts late and the deficit is visible in the timestamps, which is the
+    # only honest way to report a sampler that cannot keep up.
   done
 ) >"$OUT/telemetry/process.csv" &
 sampler_pid=$!

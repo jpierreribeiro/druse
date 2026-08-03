@@ -46,6 +46,20 @@ TELEMETRY_COLUMNS = (
 KERNEL_COLUMNS = ("listen_overflows", "listen_drops", "tcp_abort_on_close", "tcp_retrans")
 
 # curl's exit codes, so a /stats failure arrives as a cause rather than a count.
+# The second telemetry stats field. Two eras share this column, deliberately —
+# `soak/1` artefacts and the eight committed fixtures stay readable.
+#
+#   0-99   curl exit codes, from when the sampler scraped /stats over HTTP.
+#          Kept so an artefact from before R2-WP04 still explains itself.
+#   101+   ADR-050's closed absence taxonomy, from the out-of-band snapshot.
+#          Every one of these names the APPLICATION, which is the property the
+#          arm was chosen for: there is no network between the metric and its
+#          reader, so "the exchange was lost" is not among the possibilities.
+#
+# An unmapped code is a worse diagnostic than a wrong one, because it reads as a
+# typo rather than as a cause. R2-WP04's second smoke printed
+# "1x exit 101 (unmapped curl exit)" for what was simply the first sample
+# arriving before the exporter had written anything.
 CURL_EXIT_MEANING = {
     "0": "no error",
     "6": "could not resolve host",
@@ -55,6 +69,12 @@ CURL_EXIT_MEANING = {
     "52": "empty reply from server",
     "55": "send failure",
     "56": "receive failure",
+    "101": "snapshot missing",
+    "102": "snapshot unreadable",
+    "103": "snapshot malformed",
+    "104": "snapshot stale",
+    "105": "the exporting process is gone",
+    "106": "the snapshot channel was not configured",
 }
 
 # A sampler is allowed to miss a few ticks under load; it is not allowed to
@@ -717,7 +737,7 @@ def analyse(root):
         if code in (None, "", "0"):
             stats_uncaptured += 1
         else:
-            label = f"{code} ({CURL_EXIT_MEANING.get(code, 'unmapped curl exit')})"
+            label = f"{code} ({CURL_EXIT_MEANING.get(code, 'unmapped cause')})"
             stats_causes[label] = stats_causes.get(label, 0) + 1
     summary["stats_missing_samples"] = len(stats_missing)
     summary["stats_failure_causes"] = stats_causes
