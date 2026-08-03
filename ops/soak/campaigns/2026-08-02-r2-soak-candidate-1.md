@@ -96,21 +96,35 @@ change** before running. Do not narrow the affinity at the prompt.
 
 ### 3.1 The requirement
 
-**Amended 2026-08-02, before any run.** The owner has designated the host: an
-existing `c5.2xlarge` at `44.200.160.96`. That is the fallback branch of §3.2,
-and this section is the committed form of it — the affinity, the lane count and
-the consequences, written down before `started_utc` rather than adapted at the
-prompt. §3.4 records what the amendment costs.
+**Amended twice on 2026-08-02, both times before any run.**
+
+The first amendment took the fallback branch of §3.2: the owner designated an
+existing `c5.2xlarge` at `44.200.160.96`, so the affinity changed to a
+core-disjoint split and the lane count dropped. That host qualified on thirteen
+of fourteen requirements and failed on free disk — 17 GiB against an estimated
+100 GiB (`evidence/2026-08-02-r2-host-qualification/raw/ec2-preflight-core-split.txt`).
+
+The second amendment is this one. The owner provisioned a **new instance**,
+`184.72.201.140`, with 143 GiB free. It is the host of record below.
+
+**It is not the same machine, and G1 does not let that pass quietly.** Same
+instance type, same four-core SMT topology, and three differences that are part
+of the candidate's identity: a Xeon **8275CL** instead of an 8124M, Ubuntu
+**26.04** instead of 24.04, and kernel **7.0.0-1006-aws** instead of
+6.17.0-1017-aws. No measurement taken on the previous host carries over, and none
+was — nothing beyond a smoke ever ran there.
 
 | Field | Required value |
 |---|---|
-| hostname / provider | AWS `c5.2xlarge`, `ip-172-31-7-128`, Xeon Platinum 8124M @ 3.00 GHz |
+| hostname / provider | AWS `c5.2xlarge`, `i-05c3c8168b18776a5`, `us-east-1b`, Xeon Platinum 8275CL @ 3.00 GHz |
+| OS / kernel | Ubuntu 26.04, `7.0.0-1006-aws` |
 | logical CPUs online | ≥ 8 — **measured: 8** |
 | physical cores | 4 (2 threads each), siblings `(0,4) (1,5) (2,6) (3,7)` — **measured, not assumed** |
 | **isolation** | **`preflight.sh` must report `physical_core_disjoint=yes`** |
 | server CPU set | `0,1,4,5` — physical cores `{0,1}` |
 | generator CPU set | `2,3,6,7` — physical cores `{2,3}` |
 | lanes (`DRUSE_SOAK_LANES`) | **2** (was 4; see §3.4) |
+| **`memlock` (`RLIMIT_MEMLOCK`)** | **unlimited — see §3.5. The stock 8 MiB is a known startup crash (F-C03-2), not a tuning preference.** |
 | governor / turbo | recorded, not constrained |
 | NUMA nodes | recorded; a multi-node host needs this file amended before running |
 | RAM | ≥ 8 GiB (the RSS safety stop is 4 GiB) |
@@ -169,6 +183,28 @@ It is not a runtime switch. Setting `DRUSE_SOAK_SERVER_CPUS` in the environment
 to make the preflight pass is the thing `preflight.sh` refuses by name — *"Do
 not adapt the affinity silently during a campaign"* — and it produces a run
 whose manifest disagrees with its plan.
+
+### 3.5 `RLIMIT_MEMLOCK`, and why it is a requirement rather than tuning
+
+The new host ships the stock AMI default: `memlock` 8 MiB. Every io_uring ring
+this framework allocates pins memory against that limit, and this repository has
+already recorded what happens when it is too small — **F-C03-2**, diagnosed as a
+startup crash and validated in production, with the cause named in
+`planning/verification-campaign-plan.md`: *"Each lane's io_uring rings pin memory
+against `RLIMIT_MEMLOCK`. This is the documented cause of F-C03-2."*
+
+So it is listed in §3.1 as a host requirement, not left to whoever runs the
+campaign. It must be raised **persistently** — `/etc/security/limits.conf` and
+`LimitMEMLOCK=` on any unit — because a twelve-hour run started from a login
+shell that inherited the default fails for a reason nobody traces back to a
+limit.
+
+`preflight.sh` did not check it, which was a gap in the instrument — and
+`R2-restricted-production.md` §3 lists "nofile, memlock, cgroup e kernel
+compatíveis" among the preflight's own requirements, so the gap was this work
+package's to close rather than the next one's. It now refuses a host whose
+`memlock` cannot hold the rings, with a control in
+`build/check_soak_controls.sh`.
 
 ### 3.4 What the amendment costs, stated before the run
 

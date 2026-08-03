@@ -1,0 +1,6 @@
+# STREAM-001 — files in this package.
+
+verdict.md              the finding, its arms, and what it does not establish
+raw/reproduction.txt    the three arms, verbatim, on the R2 campaign host
+environment.txt         the host it was found on
+commands.txt            how to reproduce it

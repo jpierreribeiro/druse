@@ -31,6 +31,8 @@ PASS (soak preflight, R2-WP02): on the same SMT host, the core-disjoint split 0,
 PASS (soak preflight, R2-WP02): overlapping CPU sets are refused however they are spelled
 PASS (soak preflight, R2-WP02): a topology that cannot be read is refused rather than assumed flat
 PASS (soak preflight, R2-WP02 control-of-the-control): removing the physical-core refusal makes the mutant case red
+PASS (soak preflight, R2-WP02): the pinned compiler is proved to BUILD, and one that only answers 'version' is refused
+PASS (soak preflight, R2-WP02): a host whose RLIMIT_MEMLOCK cannot hold the io_uring rings is refused, naming F-C03-2's mechanism
 PASS (soak smoke, R2-WP02): the smoke refuses to run on a host the preflight has not qualified
 PASS (soak smoke, R2-WP02): overriding the qualification stamps the artefact with the override and the reasons
 PASS (soak smoke, R2-WP02): a leg cannot be skipped — a missing dependency refuses the host

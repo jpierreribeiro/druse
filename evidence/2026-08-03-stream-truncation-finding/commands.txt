@@ -1,0 +1,26 @@
+# STREAM-001 — reproduce. Any host; found on the R2 campaign host.
+# Toolchain: odin-version.txt pin (dev-2026-07a / 819fdc7), sha256 verified.
+
+odin build ops/soak/smoke-server -collection:druse=$PWD -o:speed -out:/tmp/srv
+mkdir -p /tmp/spool && /tmp/srv 18093 /tmp/spool &
+
+# ARM 1 — back to back. Alternates 10, 7, 10, 7.
+for i in 1 2 3 4 5 6; do
+  echo "$(curl -N -sS http://127.0.0.1:18093/stream | grep -c frame-)"
+done
+
+# ARM 2 — the same requests with 3 s of idle between them. All complete.
+for i in 1 2 3 4; do
+  sleep 3
+  echo "$(curl -N -sS http://127.0.0.1:18093/stream | grep -c frame-)"
+done
+
+# ARM 3 — the gated R1 fixture, whose stream is 10 x 200 ms. Alternates 10, 1.
+odin build tests/r1-real-proxy/server -collection:druse=$PWD -o:speed -out:/tmp/r1
+DRUSE_PORT=18091 /tmp/r1 &
+for i in 1 2 3 4; do
+  echo "$(curl -N -sS http://127.0.0.1:18091/stream | grep -c event-)"
+done
+
+# Which frames are lost: the LAST ones.
+curl -N -sS http://127.0.0.1:18093/stream | grep frame-

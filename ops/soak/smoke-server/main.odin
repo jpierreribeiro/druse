@@ -52,8 +52,21 @@ Stream_Job :: struct {
 	stream: web.Stream,
 }
 
-stream_job: Stream_Job
-stream_thread: ^thread.Thread
+// No globals here, and that is a correction rather than a style preference.
+//
+// The first edition kept ONE `Stream_Job` and one `^Thread` for the whole
+// process, joining the previous thread at the top of the next handler — the
+// shape `tests/r1-real-proxy/server/main.odin` uses, where exactly one stream is
+// ever requested. This smoke asks for two (direct, then through the proxy), and
+// with a shared job the second request could overwrite `stream_job.stream` while
+// the first producer was still reading it. Measured: ten frames, then SEVEN,
+// then ten again.
+//
+// A non-deterministic fixture cannot qualify anything. Worse, it was failing in
+// the direction that looks like a proxy swallowing frames, which is exactly the
+// fault the proxy leg exists to detect — an instrument that manufactures its own
+// positive. Each request now owns its job; the thread frees it and cleans itself
+// up.
 
 on_signal :: proc "c" (_: posix.Signal) {
 	context = runtime.default_context()
@@ -121,26 +134,23 @@ stream_producer :: proc(job: ^Stream_Job) {
 		}
 	}
 	web.stream_close(job.stream)
+	free(job)
 }
 
-// GET /stream — the detached-stream shape, copied deliberately from
-// `tests/r1-real-proxy/server/main.odin` rather than reinvented. A synchronous
-// handler that sleeps and sends cannot let the transport driver progress, so
-// admission happens in the handler and sending happens after it returns. One
-// stream at a time is enough for a smoke and keeps the joining trivial.
+// GET /stream — the detached-stream shape. A synchronous handler that sleeps and
+// sends cannot let the transport driver progress, so admission happens in the
+// handler and sending happens after it returns.
 stream_handler :: proc(ctx: ^web.Context) {
-	if stream_thread != nil {
-		thread.join(stream_thread)
-		thread.destroy(stream_thread)
-		stream_thread = nil
-	}
 	stream, accepted := web.stream(ctx, "text/event-stream")
 	if !accepted {
 		web.text(ctx, .Service_Unavailable, "stream-refused")
 		return
 	}
-	stream_job.stream = stream
-	stream_thread = thread.create_and_start_with_poly_data(&stream_job, stream_producer)
+	job := new(Stream_Job)
+	job.stream = stream
+	// `self_cleanup` so the ^Thread is reclaimed when the producer returns: this
+	// handler must not join, and nothing else is left holding the handle.
+	_ = thread.create_and_start_with_poly_data(job, stream_producer, self_cleanup = true)
 }
 
 main :: proc() {
@@ -179,10 +189,4 @@ main :: proc() {
 	posix.signal(.SIGINT, on_signal)
 
 	web.serve(&app, port)
-
-	if stream_thread != nil {
-		thread.join(stream_thread)
-		thread.destroy(stream_thread)
-		stream_thread = nil
-	}
 }

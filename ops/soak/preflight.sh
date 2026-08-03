@@ -278,6 +278,28 @@ fi
 if [[ -n "$odin_bin" && -x "$odin_bin" ]]; then
   note "odin=$odin_bin"
   note "odin_version=$("$odin_bin" version 2>&1 | head -n 1)"
+
+  # A compiler that EXISTS is not a compiler that BUILDS. Odin shells out to a
+  # linker — clang on Linux — and a host with the toolchain unpacked but no
+  # clang answers `odin version` perfectly and then fails at link time with
+  # `sh: 1: clang: not found`. That was found here the expensive way: this
+  # preflight passed a host, and the smoke it is supposed to run before failed
+  # on the first build.
+  #
+  # So the check is a real build of a real program, not a version string. It
+  # costs about a second and it is the difference between qualifying a host and
+  # qualifying a filename.
+  odin_probe="$(mktemp -d -t druse-odin-probe-XXXXXX)"
+  printf 'package main\nimport "core:fmt"\nmain :: proc() { fmt.println("ok") }\n' \
+    >"$odin_probe/main.odin"
+  if env ODIN_ROOT="$(cd "$(dirname "$(readlink -f "$odin_bin")")" && pwd)" \
+       "$odin_bin" build "$odin_probe" -out:"$odin_probe/probe" \
+       >"$odin_probe/build.log" 2>&1 && [[ -x "$odin_probe/probe" ]]; then
+    note "odin_can_build=yes"
+  else
+    problem "the Odin compiler is present and cannot BUILD on this host: $(tr '\n' ' ' <"$odin_probe/build.log" | cut -c1-200). A version string is not a toolchain — Odin links through clang, and a missing linker surfaces at the first build of the campaign rather than here."
+  fi
+  rm -rf "$odin_probe"
 else
   problem "no Odin compiler: set DRUSE_ODIN_BIN or put odin on PATH"
 fi
@@ -320,6 +342,24 @@ nofile_hard="$(ulimit -Hn 2>/dev/null || echo 0)"
 note "nofile_hard=$nofile_hard"
 if [[ "$nofile_hard" != unlimited ]] && (( nofile_hard < 8192 )); then
   problem "hard nofile limit is $nofile_hard and the run raises it to 8192"
+fi
+
+# RLIMIT_MEMLOCK. Every io_uring ring the framework allocates pins memory against
+# this limit, and a host that cannot hold the rings does not fail at the limit —
+# it fails at STARTUP, which this repository has already recorded once as
+# F-C03-2 and diagnosed the expensive way. The stock AWS AMI ships 8 MiB.
+#
+# So it is refused here rather than discovered at hour zero of a twelve-hour run,
+# where "the server exited before readiness" is a sentence about the product
+# produced by a host that was never configured to run it. R2-WP02, and
+# R2-restricted-production.md §3 lists memlock among the preflight's own checks.
+memlock_kib="$(ulimit -Hl 2>/dev/null || echo 0)"
+note "memlock_hard_kib=$memlock_kib"
+memlock_min_kib="${DRUSE_SOAK_MIN_MEMLOCK_KIB:-65536}"
+if [[ "$memlock_kib" != unlimited ]]; then
+  if [[ "$memlock_kib" =~ ^[0-9]+$ ]] && (( memlock_kib < memlock_min_kib )); then
+    problem "RLIMIT_MEMLOCK is ${memlock_kib} KiB and the campaign needs at least ${memlock_min_kib} KiB (unlimited is preferred): io_uring rings pin against it, and a ring allocation that fails surfaces as a server that died before readiness — this project has already paid for that once as F-C03-2. Raise it persistently in /etc/security/limits.conf and LimitMEMLOCK=, not just in this shell."
+  fi
 fi
 
 note "cgroup=$(awk -F: 'NR==1 {print $3}' /proc/self/cgroup 2>/dev/null || echo unavailable)"

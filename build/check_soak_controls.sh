@@ -890,6 +890,78 @@ fi
 echo "PASS (soak preflight, R2-WP02 control-of-the-control): removing the physical-core refusal makes the mutant case red"
 
 # ---------------------------------------------------------------------------
+# The compiler BUILDS, it does not merely exist.
+#
+# Found on a real campaign host, and found by the smoke rather than by the
+# preflight that is supposed to run first: the pinned toolchain was unpacked and
+# `odin version` answered correctly, but the box had no clang. Odin links through
+# clang on Linux, so the first build of the campaign died with
+# `sh: 1: clang: not found` — on a host the preflight had already passed.
+#
+# Qualifying a filename is not qualifying a toolchain. The positive case is the
+# gate's own compiler, which must build; the mutant is a compiler that exists,
+# answers, and cannot.
+# ---------------------------------------------------------------------------
+env DRUSE_ODIN_BIN="$DRUSE_SOAK_ODIN" bash "$SOAK/preflight.sh" "$TMP/pf-odin-ok.txt" >/dev/null 2>&1 || true
+grep -q '^odin_can_build=yes$' "$TMP/pf-odin-ok.txt" ||
+  { cat "$TMP/pf-odin-ok.txt" >&2
+    fail "the preflight did not prove the pinned compiler can build. It checked that a file exists and reports a version, which is the state a host with no linker is also in."; }
+
+# The mutant: a compiler that answers `version` and cannot build anything.
+cat >"$TMP/fake-odin" <<'FAKE'
+#!/usr/bin/env bash
+case "$1" in
+  version) echo "odin version dev-2026-07-nightly:819fdc7"; exit 0 ;;
+  *) echo "sh: 1: clang: not found" >&2; exit 1 ;;
+esac
+FAKE
+chmod +x "$TMP/fake-odin"
+env DRUSE_ODIN_BIN="$TMP/fake-odin" bash "$SOAK/preflight.sh" "$TMP/pf-odin-bad.txt" >/dev/null 2>&1 || true
+grep -q '^problem=the Odin compiler is present and cannot BUILD' "$TMP/pf-odin-bad.txt" ||
+  { cat "$TMP/pf-odin-bad.txt" >&2
+    fail "the preflight qualified a compiler that reports a version and cannot build. That is the exact host state that passed the preflight and failed the smoke."; }
+grep -q '^odin_can_build=yes$' "$TMP/pf-odin-bad.txt" &&
+  fail "the preflight recorded odin_can_build=yes for a compiler that cannot build"
+echo "PASS (soak preflight, R2-WP02): the pinned compiler is proved to BUILD, and one that only answers 'version' is refused"
+
+# ---------------------------------------------------------------------------
+# RLIMIT_MEMLOCK — a host that cannot hold the io_uring rings is refused.
+#
+# The stock AWS AMI ships 8 MiB. Every lane's rings pin against that limit, and a
+# ring allocation that fails does not degrade — the server dies before readiness,
+# and the run reports "server exited before readiness", a sentence about the
+# product produced by a host that was never configured to run it. This project
+# has already diagnosed exactly that once, as F-C03-2.
+#
+# Driven through the threshold rather than through the host's real limit, so the
+# control means the same thing on a workstation, in CI and on a campaign box.
+# ---------------------------------------------------------------------------
+env DRUSE_SOAK_MIN_MEMLOCK_KIB=1 bash "$SOAK/preflight.sh" "$TMP/pf-memlock-ok.txt" >/dev/null 2>&1 || true
+grep -q '^memlock_hard_kib=' "$TMP/pf-memlock-ok.txt" ||
+  { cat "$TMP/pf-memlock-ok.txt" >&2
+    fail "the preflight does not record the host's RLIMIT_MEMLOCK. A limit nobody wrote down is a limit nobody can compare a failed run against."; }
+grep -q '^problem=RLIMIT_MEMLOCK' "$TMP/pf-memlock-ok.txt" &&
+  fail "the preflight refused a memlock that satisfies the threshold"
+
+# The mutant: a threshold this host cannot meet must be refused, and the reason
+# must name F-C03-2's mechanism rather than merely say 'limit too small'. A
+# refusal that does not name io_uring sends the reader to the wrong place.
+env DRUSE_SOAK_MIN_MEMLOCK_KIB=999999999 bash "$SOAK/preflight.sh" "$TMP/pf-memlock-bad.txt" >/dev/null 2>&1 || true
+if ! grep -q '^problem=RLIMIT_MEMLOCK' "$TMP/pf-memlock-bad.txt"; then
+  # `unlimited` is the one host state the threshold cannot fail; say so rather
+  # than reporting a broken control.
+  grep -q '^memlock_hard_kib=unlimited$' "$TMP/pf-memlock-bad.txt" ||
+    { cat "$TMP/pf-memlock-bad.txt" >&2
+      fail "the preflight accepted a memlock below the required threshold"; }
+  echo "PASS (soak preflight, R2-WP02): memlock is recorded; this host reports unlimited, so the threshold cannot be driven red here"
+else
+  grep -q '^problem=RLIMIT_MEMLOCK.*io_uring rings pin against it' "$TMP/pf-memlock-bad.txt" ||
+    { cat "$TMP/pf-memlock-bad.txt" >&2
+      fail "the preflight refused a small memlock without naming io_uring as the mechanism. 'Limit too small' sends the reader to the wrong subsystem; F-C03-2 took a production diagnosis to find."; }
+  echo "PASS (soak preflight, R2-WP02): a host whose RLIMIT_MEMLOCK cannot hold the io_uring rings is refused, naming F-C03-2's mechanism"
+fi
+
+# ---------------------------------------------------------------------------
 # The SMOKE runs after qualification, and its escape hatch is loud.
 #
 # The smoke itself is not a gate — it builds a server, starts a container and

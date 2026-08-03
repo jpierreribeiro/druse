@@ -1,0 +1,61 @@
+campaign=2026-08-02-r2-host-qualification
+work_package=R2-WP02
+utc=2026-08-02T21:22:58Z
+git_head=66f2019e1554bfd8d85393854bdad3eb79644ca4
+branch=r2/wp02-host-preregistration
+kernel=Linux 6.8.0-86-generic x86_64 GNU/Linux
+cpus_online=8
+cpu_model=Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+physical_cores=4
+threads_per_core=2
+thread_siblings=(0,4) (1,5) (2,6) (3,7)
+mem_total_kib=24418260
+nofile_hard=1048576
+free_gib_at_repo=40
+odin=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7
+odin_pin_release=dev-2026-07a
+odin_pin_commit=819fdc7
+go=go version go1.26.1 linux/amd64
+python=Python 3.12.3
+docker=Docker version 28.2.2, build 28.2.2-0ubuntu1~24.04.1
+caddy_image=docker.io/library/caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+nstat=/usr/bin/nstat
+
+# THIS HOST IS NOT THE CAMPAIGN HOST AND IS NOT QUALIFIED.
+# It is a workstation. It is recorded because it happens to have the exact
+# topology R2-WP02 is about: 8 logical CPUs over 4 physical cores, siblings
+# (0,4) (1,5) (2,6) (3,7) — the AWS c5.2xlarge Nitro layout. That makes it a
+# faithful substrate for the defect and for its fix, and it makes it useless
+# as a soak host. See raw/preflight-fixed-0-3-vs-4-7.txt for the full list of
+# reasons the preflight refuses it.
+
+# ============================================================
+# THE DESIGNATED CAMPAIGN HOST — measured 2026-08-02
+# ============================================================
+campaign_host=44.200.160.96 (ip-172-31-7-128)
+instance_type=c5.2xlarge
+kernel=6.17.0-1017-aws
+cpu_model=Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz
+logical_cpus=8
+physical_cores=4
+threads_per_core=2
+thread_siblings=(0,4) (1,5) (2,6) (3,7)
+mem_total_kib=15876076
+swap_kib=0
+nofile_hard=1048576
+memlock=unlimited
+free_gib_root=17
+root_volume_total=29G
+ntp_synchronized=yes
+uptime=up 1 week, 1 day, 5 hours, 58 minutes
+docker=Docker version 29.1.3, build 29.1.3-0ubuntu3~24.04.2
+odin=dev-2026-07-nightly:819fdc7 (installed by ops/ci/install-odin.sh, sha256 verified)
+go=go version go1.22.2 linux/amd64
+
+# Prepared during this work package: the pinned Odin toolchain and docker.
+# Neither existed on the host; both are needed to qualify it at all.
+#
+# THIS IS THE MACHINE THAT PRODUCED THE 2026-07 PERFORMANCE REPORTS.
+# Same Xeon 8124M, same kernel 6.17.0-1017-aws. Its four physical cores and
+# (0,4) (1,5) (2,6) (3,7) siblings are now measured rather than assumed --
+# see raw/ec2-host-topology.txt and the pre-registration §3.3.

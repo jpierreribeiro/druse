@@ -240,56 +240,39 @@ upload_leg() {
 # deliver ten frames. The proxy leg exists precisely because a reverse proxy
 # that buffers turns a stream into a slow 200, so the arrival of the FIRST frame
 # well before the LAST is the assertion that matters.
+#
+# CURL READS THE STREAM, not a hand-rolled socket. The first edition parsed the
+# raw wire and split on the SSE frame terminator, which works against Druse and
+# breaks through the proxy: Caddy re-encodes the response with `Transfer-
+# Encoding: chunked`, and a reader that does not de-chunk sees one frame and then
+# framing it cannot parse. It reported "1 of 10" — indistinguishable, from the
+# outside, from a proxy that had actually swallowed nine frames. curl de-chunks;
+# python only stamps arrival times.
 stream_leg() {
   local label="$1" url="$2" cafile="${3:-}" resolve="${4:-}"
-  local out
-  out="$(python3 - "$url" "$cafile" "$resolve" "$STREAM_FRAMES" <<'PY'
-import socket, ssl, sys, time
-from urllib.parse import urlsplit
+  local out args
+  args=(--noproxy '*' -sS -N --max-time 30 -H 'Accept: text/event-stream')
+  [[ -n "$cafile" ]] && args+=(--cacert "$cafile")
+  [[ -n "$resolve" ]] && args+=(--resolve "$resolve")
 
-url, cafile, resolve, want = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
-parts = urlsplit(url)
-host, port = parts.hostname, parts.port
-connect_host, connect_port = host, port
-if resolve:
-    rhost, rport, raddr = resolve.split(":")
-    connect_host, connect_port = raddr, int(rport)
-
+  out="$(curl "${args[@]}" "$url" 2>/dev/null | python3 -c '
+import sys, time
 started = time.monotonic()
-sock = socket.create_connection((connect_host, connect_port), timeout=15)
-if parts.scheme == "https":
-    ctx = ssl.create_default_context(cafile=cafile or None)
-    sock = ctx.wrap_socket(sock, server_hostname=host)
-sock.sendall(
-    f"GET {parts.path} HTTP/1.1\r\nHost: {host}\r\nAccept: text/event-stream\r\n"
-    "Connection: close\r\n\r\n".encode()
-)
-sock.settimeout(15)
-
-buf, frames = b"", []
+frames = []
+# readline(), not "for line in stdin": iteration read-aheads and would collapse
+# every arrival time into the moment the buffer filled, which is precisely the
+# distinction this leg exists to make.
 while True:
-    try:
-        chunk = sock.recv(4096)
-    except socket.timeout:
+    line = sys.stdin.buffer.readline()
+    if not line:
         break
-    if not chunk:
-        break
-    buf += chunk
-    # Stamp the moment each frame's terminator lands, not the moment the whole
-    # body is parsed: the timing is the evidence.
-    while b"\n\n" in buf:
-        head, buf = buf.split(b"\n\n", 1)
-        if b"frame-" in head:
-            frames.append(time.monotonic() - started)
-sock.close()
-
-status = "unknown"
-print(f"frames={len(frames)} want={want}")
+    if b"frame-" in line:
+        frames.append(time.monotonic() - started)
+print(f"frames={len(frames)}")
 if frames:
     print(f"first_frame_s={frames[0]:.3f} last_frame_s={frames[-1]:.3f}")
     print(f"spread_s={frames[-1] - frames[0]:.3f}")
-PY
-)" || true
+')" || true
 
   local frames spread
   frames="$(sed -n 's/^frames=\([0-9]*\).*/\1/p' <<<"$out")"
@@ -331,8 +314,20 @@ fi
 # shellcheck disable=SC1090
 . "$IMAGE_ENV"
 
+# basicConstraints and keyUsage are NOT decoration. `openssl req -x509` mints a
+# CA without a keyUsage extension, curl accepts it, and Python's ssl module from
+# 3.13 onwards does not:
+#
+#   ssl.SSLCertVerificationError: CA cert does not include key usage extension
+#
+# The proxy leg's stream check is a Python client, so on a host with a newer
+# Python the leg failed while the curl-driven upload leg through the same proxy
+# passed — an instrument fault that reads exactly like a proxy that buffers
+# streams. Found on Ubuntu 26.04 with Python 3.14.
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
   -subj '/CN=druse-smoke-ca' \
+  -addext 'basicConstraints=critical,CA:TRUE' \
+  -addext 'keyUsage=critical,keyCertSign,cRLSign' \
   -keyout "$WORK/certs/ca-key.pem" -out "$WORK/certs/ca.pem" >/dev/null 2>&1
 openssl req -new -newkey rsa:2048 -nodes \
   -subj '/CN=proxy.test' -addext 'subjectAltName=DNS:proxy.test' \
