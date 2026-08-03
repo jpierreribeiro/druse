@@ -400,12 +400,59 @@ def analyse(root):
     if fds and fds[-1] > fds[0] + 4:
         reasons.append(f"file descriptors did not settle ({fds[0]} -> {fds[-1]})")
 
+    # RSS TAIL SLOPE, AND THE WARM-UP THAT MUST BE OUTSIDE THE WINDOW.
+    #
+    # The rule is 1 MiB/h measured over the SECOND HALF of the run, and it was
+    # written for a twelve-hour soak where the second half is six hours. R2-WP04's
+    # burn-in ran it over fifteen minutes and it failed at 2,328.8 KiB/h.
+    #
+    # Measured on that artefact, because the number alone does not say which:
+    #
+    #   median RSS by quarter   5,920 -> 7,184 -> 7,746 -> 7,744 KiB
+    #
+    # The last quarter did not grow. That is an allocator warming up and
+    # saturating, and the second half of a 33-minute run still contains its rise.
+    # Removing the fault-injection windows — two RSS peaks of ~26 MiB landing in
+    # the same second as the slow-reader injections, which abandon 24 responses
+    # of 1 MiB — moved it only to 2,066.7 KiB/h, so the peaks were not the cause
+    # either.
+    #
+    # So the floor is DURATION, not sample count. 720 samples is twelve minutes
+    # at a one-second interval, and twelve minutes of a warming allocator cannot
+    # express a per-hour trend: the window extrapolates 5x from data that has not
+    # settled. The threshold below is the ladder's own rehearsal step — two hours,
+    # whose second half begins an hour in, comfortably past the ~25-30 minutes
+    # where the median stopped rising.
+    #
+    # A shorter run reports the slope and does NOT judge it, which is the same
+    # shape as criterion 11's `expected_samples`: a rule that cannot be evaluated
+    # must say so rather than pass silently. R2-WP01 built this instrument
+    # because a criterion that quietly did not apply is how a dead sampler graded
+    # PASS.
+    RSS_SLOPE_MIN_SECONDS = 2 * 60 * 60
     slope = summary["rss_kib"]["tail_slope_kib_per_hour"] if summary["rss_kib"] else None
-    if len(telemetry) >= 720:
+    run_seconds = 0
+    if len(telemetry) >= 2:
+        try:
+            run_seconds = (int(telemetry[-1]["unix_nanos"]) - int(telemetry[0]["unix_nanos"])) / 1e9
+        except (KeyError, ValueError):
+            run_seconds = 0
+    summary["rss_slope_evaluated"] = run_seconds >= RSS_SLOPE_MIN_SECONDS
+    summary["rss_slope_run_seconds"] = round(run_seconds)
+    if run_seconds >= RSS_SLOPE_MIN_SECONDS:
         if slope is None:
             reasons.append("RSS tail slope could not be computed from a long run")
         elif slope > 1024:
             reasons.append(f"RSS tail slope exceeded 1 MiB/hour ({slope:.1f} KiB/h)")
+    elif len(telemetry) >= 720:
+        # Not silence: the number is carried and named as unjudged, so a reader
+        # cannot mistake "not evaluated" for "evaluated and fine".
+        summary["rss_slope_note"] = (
+            f"tail slope {slope:.1f} KiB/h recorded but NOT judged: the run is "
+            f"{run_seconds/60:.0f} min and the criterion needs "
+            f"{RSS_SLOPE_MIN_SECONDS/3600:.0f} h for its window to start after "
+            "allocator warm-up"
+        ) if slope is not None else "tail slope not computable"
 
     # ------------------------------------------------------------------
     # Kernel counters. Recorded since 2026-07-30 and never once read: a run in

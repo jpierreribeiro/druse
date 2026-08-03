@@ -68,7 +68,19 @@ fault the framework produced.
 4. **The process survives**: no death, no `SIGKILL`, exit status zero.
 5. **Threads constant** for the whole run.
 6. **File descriptors** back within baseline + 4 after the settling window.
-7. **RSS tail slope** at most 1 MiB/h over the second half of the run.
+7. **RSS tail slope** at most 1 MiB/h over the second half of the run — **and
+   only for runs of two hours or more**. R2-WP04's burn-in failed this at
+   2,328.8 KiB/h over thirty-three minutes; the median RSS by quarter on that
+   same artefact was 5,920 → 7,184 → 7,746 → **7,744** KiB. The last quarter did
+   not grow: an allocator warming up and saturating, with the second half of a
+   short run still containing its rise. Removing the fault-injection windows
+   (two ~26 MiB peaks landing in the same second as the slow-reader injections,
+   which abandon 24 responses of 1 MiB) moved it only to 2,066.7 KiB/h, so the
+   peaks were not the cause either. The floor is duration rather than sample
+   count, because 720 samples is twelve minutes and twelve minutes of a warming
+   allocator cannot express a per-hour trend. A shorter run **records the slope
+   and does not judge it**, and says so in the artefact — a rule that quietly
+   did not apply is how a dead sampler once graded PASS.
 8. **The metric snapshot is readable on every sample**, and a sample that is not
    carries the reason — one cause from ADR-050's closed taxonomy, in the
    telemetry's second stats field.
