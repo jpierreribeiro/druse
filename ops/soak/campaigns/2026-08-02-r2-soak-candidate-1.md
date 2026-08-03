@@ -470,8 +470,8 @@ reach twelve hours.
 | host qualification | — | `preflight.sh` green, `smoke.sh` green | no | **PASS** 2026-08-03, `184.72.201.140` |
 | smoke | 10 min | wiring, schema, clocks, hashes | no | **PASS** 2026-08-03 at the fourth attempt (`9905509`); three red runs, all instrument. `evidence/2026-08-03-r2-soak-smoke/`. **Re-run PASS** at the §4.1 rates (`6b4f3d4`) |
 | burn-in | 30 min | every workload and fault class appears | no | **FAIL** at the original rates (`6bff82f`) — `health transport errors`, which produced §4.1. **PASS** at the §4.1 rates (`6b4f3d4`), health 0 errors in 36,000 — but see §4.2 |
-| rehearsal | 2 h | fast drift, evidence volume, first latency distributions | no | running 2026-08-03 |
-| final | ≥12 h | R2 stability criterion + §6 SLO | yes, if PASS | **blocked by §4.2 until the rate question is settled** |
+| rehearsal | 2 h | fast drift, evidence volume, first latency distributions | no | **PASS** 2026-08-03 — health 0 errors in 144,000, RSS slope 30.7 KiB/h, and 345 refusals which fire §4.2's rule (see §4.3) |
+| final | ≥12 h | R2 stability criterion + §6 SLO | yes, if PASS | **settled: run at f = 0.10** (§4.3). Two runs, different days (§9) |
 
 ### 4.2 The burn-in passed and the rule of §4.1 fired anyway
 
@@ -523,6 +523,54 @@ Either way this is the ladder working. A rate that passes a 30-minute step and
 fails a 12-hour one is precisely what the intermediate steps exist to find
 *before* twelve hours are spent, and finding it here costs two hours instead of
 invalidating a final under G3.
+
+### 4.3 The rehearsal answered, and it contradicted the reason the rule existed
+
+**Rehearsal: PASS**, 60 cycles, every criterion green.
+
+| | |
+|---|---:|
+| `/health` transport errors | **0** in 144,000 requests |
+| `/health` p99, median / max cycle | 10.6 ms / 13.0 ms |
+| total transport errors, all workloads | 26 |
+| RSS tail slope | **30.7 KiB/h** against a 1 MiB/h ceiling |
+| **server-counted refusals** | **345** |
+
+345 is not zero, so §4.2's rule fires and **the finals run at f = 0.10**.
+
+**But the reasoning behind that rule turned out to be wrong, and saying so is the
+point of writing it down in advance.** §4.1 argued that whether `/health` eats a
+refusal is *luck* — that its 16 fresh connections per cycle are exposed in
+proportion to the 624 total. Under that assumption 345 refusals should have cost
+`/health` about **8.8** of them. It cost **zero**, across 960 fresh connections.
+
+Zero against 8.8 expected is not luck; it is a mechanism nobody had named.
+`run-soak.sh` launches the workloads with a one-second stagger and **`/health`
+goes first**, so it reconnects while the lanes are still draining the previous
+cycle rather than while the other five are saturating them. That protection is
+systematic — and it is also why the original burn-in *did* hurt `/health` at
+15,685 req/s: there, the previous cycle's work was still occupying both lanes
+when `/health`'s turn came.
+
+**The conclusion survives the correction even though the argument does not.**
+Zero events in 960 trials bounds the per-connection refusal probability at about
+0.31% (rule of three, 95%), and a twelve-hour final is ~5,760 fresh `/health`
+connections — six times the exposure. **The observed zero does not exclude a
+failure at that scale.** So the pre-registered rule is followed, and it is
+followed because the margin argument still holds, not because the luck argument
+did.
+
+**Following a rule written in advance needs no justification; overriding one
+does.** That asymmetry is the whole reason §4.2 was committed before this run.
+
+### 4.4 The two open estimates of §5, now measured
+
+§5 said the rehearsal is where R2-WP01's two accepted risks get corrected.
+
+| Estimate | Was | Measured |
+|---|---|---|
+| disk for a 12 h run (`preflight.sh` demands ≥ 100 GiB) | a guess | **1.7 GiB for 2 h** → ~10.2 GiB for 12 h. The 100 GiB floor is ~10× the need; it is left as-is because it costs nothing on this host and refusing a nearly-full disk is the safer error, but it is no longer *unmeasured* |
+| evidence volume | unknown | 60 cycle directories, 7,761 telemetry samples, 1.7 GiB per 2 h |
 
 **The rate change of §4.1 is a new candidate and the ladder restarts at smoke.**
 G1 counts load-bearing configuration as part of a candidate's identity, and the
