@@ -55,17 +55,24 @@ ODIN="$(readlink -f "$ODIN")"
 mkdir -p "$OUT/raw" "$OUT/analysis" "$WORK/certs" "$WORK/logs"
 chmod 0777 "$WORK/logs"
 
-# The origin is the R1 real-proxy fixture: it is already gated, already behind
-# this exact Caddy in another campaign, and it serves the routes the corpus
-# targets.
+# THE ORIGIN MUST SERVE THE CORPUS'S OWN ROUTES. The first run of this script
+# used tests/r1-real-proxy/server and was INVALID: that fixture serves /health,
+# /ok and /body while the corpus targets /ping, /echo and /smuggled, so every
+# handler-dependent case answered 404 on both legs and nothing could be read.
+#
+# tests/support/wire_origin is the wp9 fixture as a standalone binary, with the
+# same routes and the same status codes -- including /smuggled, which is the
+# instrument: a request that crosses the pair as TWO requests shows up as a hit
+# on a route nobody addressed, and that is the finding a single hop cannot
+# produce.
 env ODIN_ROOT="$(cd "$(dirname "$ODIN")" && pwd)" "$ODIN" build \
-  "$ROOT/tests/r1-real-proxy/server" -collection:druse="$ROOT" -o:speed \
+  "$ROOT/tests/support/wire_origin" -collection:druse="$ROOT" -o:speed \
   -out:"$WORK/origin" >"$WORK/build.log" 2>&1 || { cat "$WORK/build.log" >&2; fail "origin build failed"; }
 
-DRUSE_PORT="$ORIGIN_PORT" "$WORK/origin" >"$WORK/origin.log" 2>&1 &
+"$WORK/origin" "$ORIGIN_PORT" >"$WORK/origin.log" 2>&1 &
 SERVER_PID=$!
 for _ in $(seq 1 200); do
-  curl --noproxy '*' -fsS --max-time 1 "http://127.0.0.1:$ORIGIN_PORT/health" >/dev/null 2>&1 && break
+  curl --noproxy '*' -fsS --max-time 1 "http://127.0.0.1:$ORIGIN_PORT/ping" >/dev/null 2>&1 && break
   sleep 0.1
 done
 
@@ -102,7 +109,14 @@ DRUSE_PROXY_PORT="$PROXY_PORT" DRUSE_CORPUS="$ROOT/tests/support/transport_confo
 python3 "$ROOT/ops/verification/proxy_framing_compare.py" \
   >"$OUT/raw/comparison.txt" 2>"$OUT/raw/comparison.err"
 
+# The origin prints its counters on shutdown. `/smuggled` at anything but zero
+# is the headline result of this whole comparison.
+kill -TERM "$SERVER_PID" 2>/dev/null
+for _ in $(seq 1 100); do kill -0 "$SERVER_PID" 2>/dev/null || break; sleep 0.1; done
+SERVER_PID=""
 cp "$WORK/origin.log" "$OUT/raw/origin.log" 2>/dev/null
+grep -h "wire_origin_counters" "$WORK/origin.log" >"$OUT/raw/origin-counters.txt" 2>/dev/null ||
+  echo "wire_origin_counters=UNAVAILABLE (the origin did not print them)" >"$OUT/raw/origin-counters.txt"
 docker logs "$CADDY" >"$OUT/raw/caddy.log" 2>&1
 {
   echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
