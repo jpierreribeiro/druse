@@ -25,7 +25,7 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 | R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | **fechado** 2026-08-02 |
 | R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — smoke e burn-in PASS nas taxas re-derivadas (pré-registro §4.1); rehearsal em curso; finais bloqueados por §4.2 |
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
-| R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto — 8 de 8 itens executados 2026-08-03: F-005, SECURITY.md, rebuild, BOM, framing pelo proxy, fuzz, revisão de endpoints, pins F8/F12/F-007. Achados abertos: TRUST-001, SHADOW-001 |
+| R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto — 8 de 8 itens executados 2026-08-03: F-005, SECURITY.md, rebuild, BOM, framing pelo proxy, fuzz, revisão de endpoints, pins F8/F12/F-007. Achados abertos: TRUST-001, SHADOW-001. **Uma cláusula não fecha: assinatura de release** — ver §7.1 |
 | R2-WP07 | canário e rollback produtivo | composição real validada | aberto — degrau 1 (shadow) entregue 2026-08-03; degraus 2–6 como risco aceito (§8.1) |
 | R2-WP08 | freeze/aceite de risco | decisão Tier 2 | aberto — critério de saída emendado 2026-08-03 (§9.1) |
 
@@ -434,6 +434,24 @@ reprodução, fix, teste e disclosure handling; não é corrigido apenas no repo
 - comparar hashes de dois builds no mesmo ambiente; se não reprodutíveis,
   registrar fontes de nondeterminismo;
 - assinar checksums/release conforme política do projeto.
+
+#### 7.1 A cláusula que não fecha — assinatura, 2026-08-03
+
+O §7 pede "assinar checksums/release **conforme política do projeto**". Não
+existe política. Nenhum arquivo em `docs/`, `planning/`, `SECURITY.md` ou
+`ops/release/` define chave, formato, custódia ou verificação, e não há nada em
+`gpg`, `minisign` ou `cosign` no repositório.
+
+**Isto não é um item esquecido, é um item que não pode ser executado como
+escrito**, e assinar com uma chave inventada durante um work package seria pior
+que não assinar: uma assinatura cuja custódia ninguém decidiu não prova nada e
+convida a ser confiada.
+
+O que o R2-WP08 §9.1 já entrega no lugar é a metade verificável — o hash do
+artefato aprovado, gravado e conferido no alvo. Uma assinatura acrescenta *quem*
+aprovou àquele hash, e isso é uma decisão de custódia do dono, não uma tarefa de
+engenharia deste WP. Registrado como cláusula aberta com o motivo, e não marcado
+como concluída.
 
 #### Arquivos previstos
 
