@@ -111,6 +111,9 @@ bash -n "$DRUSE_ROOT/build/check_pilot_runbooks.sh"
 bash -n "$DRUSE_ROOT/build/check_pilot_exercise.sh"
 bash -n "$DRUSE_ROOT/build/check_r1_freeze.sh"
 bash -n "$DRUSE_ROOT/build/check_vendor_policy.sh"
+bash -n "$DRUSE_ROOT/build/check_release_identity.sh"
+bash -n "$DRUSE_ROOT/ops/release/approve-artefact.sh"
+bash -n "$DRUSE_ROOT/ops/release/verify-deployed.sh"
 bash -n "$DRUSE_ROOT/build/check_wp38_controls.sh"
 bash -n "$DRUSE_ROOT/build/install-hooks.sh"
 bash -n "$DRUSE_ROOT/experiments/run_checks.sh"
@@ -1716,6 +1719,16 @@ env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_soak_controls
 # indistinguishable from a control that is broken.
 echo "--- R2-WP03 observability: saturation is visible, and absence has a cause ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_r2_observability_controls.sh"
+
+# R2-WP08 — the deployment-identity criterion, amended on 2026-08-03 after
+# `verify-rebuild.sh` measured that this toolchain does not build byte-identical
+# output for identical input. The criterion stopped asking the BUILD to be
+# reproducible and started asking the ARTEFACT to be the same file. That is a
+# stronger claim, and like every claim here it needs a mutant: M2 deploys a file
+# of exactly the approved size with different content, which is the precise
+# shape the rebuild measurement produced.
+echo "--- R2-WP08 release identity: the deployed hash is the approved hash ---"
+bash "$DRUSE_ROOT/build/check_release_identity.sh"
 
 # The benchmark summary must notice when two servers did not do the same work.
 # It did not, once, and a comparison of four servers went out in which one

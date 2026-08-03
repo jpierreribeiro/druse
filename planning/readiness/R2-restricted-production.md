@@ -27,7 +27,7 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
 | R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto |
 | R2-WP07 | canário e rollback produtivo | composição real validada | aberto — bloqueado por WP04/06 |
-| R2-WP08 | freeze/aceite de risco | decisão Tier 2 | aberto |
+| R2-WP08 | freeze/aceite de risco | decisão Tier 2 | aberto — critério de saída emendado 2026-08-03 (§9.1) |
 
 ### R2-WP01 — fechado
 
@@ -507,7 +507,78 @@ mesmo artefato.
 - observabilidade mantém diagnóstico sob saturação;
 - proxy real, segurança e rebuild aprovados;
 - canário e rollback concluídos;
-- artefato implantado é byte-idêntico ao aprovado.
+- **o hash do artefato implantado é o hash aprovado** — emendado em 2026-08-03,
+  ver §9.1.
+
+### 9.1 Emenda de 2026-08-03 — o objeto do critério mudou, o rigor não
+
+**O critério anterior era “artefato implantado é byte-idêntico ao aprovado”, e
+está medido como insatisfazível.**
+
+`ops/release/verify-rebuild.sh` clonou o mesmo commit duas vezes, compilou com o
+mesmo compilador fixado, na mesma máquina, e obteve
+(`evidence/2026-08-03-r2-wp06-assurance/raw/rebuild-two-clean-clones.txt`):
+
+```text
+build_a_sha256=396138bbfa137a316085ff3e7e46b007e715e68f2a3c134959f751eced4eb83f
+build_b_sha256=96d61da8e3f8818d509cb6cf47181f52fd1bca0050ffefa9c1760ff9de4ccb54
+build_a_bytes=918640
+build_b_bytes=918640
+byte_identical=no
+size_delta_bytes=0
+```
+
+Bytes diferentes, **tamanho idêntico**. A causa está fora do alcance deste
+repositório — é a toolchain — e um critério vermelho para sempre por um motivo
+que ninguém aqui pode remover não é rigor, é um critério que as pessoas aprendem
+a ignorar.
+
+**O que mudou é o objeto, não a exigência.** A leitura antiga exigia que *o
+build* fosse reproduzível. A nova exige que *o artefato* seja o mesmo arquivo:
+
+> compilar uma vez → hashear aquele arquivo → implantar **aquele** arquivo →
+> provar que os bytes no alvo hasheiam para o valor aprovado.
+
+**Isso é mais forte do que reproduzir o build, e a diferença é verificável.** Um
+build reprodutível prova que dois compiladores concordaram; ele não diz nada
+sobre o que foi para o alvo. Este critério tira a máquina de build da cadeia de
+confiança inteira: os bytes revisados são os bytes que rodam, e a afirmação é
+sobre o único artefato que serve tráfego.
+
+**O que a emenda perde, dito porque perde mesmo.** Byte-identidade daria uma
+segunda propriedade — qualquer pessoa poderia reconstruir o artefato a partir da
+fonte e conferir. Isso não é recuperado aqui e não é reivindicado em lugar
+nenhum: a nota de release diz *“construído a partir deste commit com este
+compilador”*, e `approve-artefact.sh` grava essa distinção dentro do próprio
+registro (`not_claimed=`), para que um leitor do artefato não precise achar este
+parágrafo.
+
+**Instrumento**, com controle positivo e cinco mutantes (G2):
+
+| Arquivo | Papel |
+|---|---|
+| `ops/release/approve-artefact.sh` | grava o registro de aprovação: hash, tamanho, commit, tree, toolchain; **recusa** árvore suja |
+| `ops/release/verify-deployed.sh` | hasheia o arquivo no alvo e compara; `deployed_identity=match` ou falha |
+| `build/check_release_identity.sh` | positivo verde + M1 byte trocado, M2 mesmo tamanho e conteúdo diferente, M3 registro editado, M4 arquivo ausente, M5 registro sem hash |
+
+O mutante **M2 é o que importa**: ele reproduz exatamente a forma que a medição
+acima produziu — mesmo tamanho, conteúdo diferente — porque qualquer atalho que
+compare comprimento passaria nele. Aqui isso é errado por demonstração, não por
+princípio.
+
+**Por que isto respeita G3.** G3 congela critérios antes do *run* que promove.
+Nenhum run de promoção do R2-WP08 aconteceu — o WP08 é a decisão final e está
+aberto. A emenda nomeia a medição que a forçou, preserva o artefato dessa
+medição, e a medição é sobre a toolchain, não sobre um resultado do candidato
+que alguém quisesse contornar. O critério continua exigindo uma prova
+criptográfica sobre o artefato implantado; mudou de qual artefato ela fala.
+
+`ops/release/verify-rebuild.sh` **continua no lugar** e continua sendo rodado:
+ele não é mais um critério de saída, é a medição que mantém a fonte de
+não-determinismo registrada. Se um dia a toolchain passar a reproduzir,
+`byte_identical=yes` aparece nele e a byte-identidade volta a ser exigível — o
+controle falha de propósito se aquele arquivo deixar de dizer
+`byte_identical=no`, para que a volta seja uma decisão e não um esquecimento.
 
 ### Resultado permitido
 
