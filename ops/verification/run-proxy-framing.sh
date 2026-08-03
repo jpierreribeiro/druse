@@ -117,6 +117,92 @@ SERVER_PID=""
 cp "$WORK/origin.log" "$OUT/raw/origin.log" 2>/dev/null
 grep -h "wire_origin_counters" "$WORK/origin.log" >"$OUT/raw/origin-counters.txt" 2>/dev/null ||
   echo "wire_origin_counters=UNAVAILABLE (the origin did not print them)" >"$OUT/raw/origin-counters.txt"
+
+# --- ISOLATION PASS ----------------------------------------------------------
+#
+# The pass above answers "did the pair execute a request nobody addressed?" and
+# CANNOT answer "which case did it". One origin served all 47 cases, so its
+# shutdown counter belongs to the run. That is the state R2-WP06 was left in:
+# `/smuggled` at 1, and a case-by-case replay against Druse ALONE showing that
+# none of the 47 reaches it — so the hit belongs to the pair, and the pair is
+# where smuggling lives.
+#
+# This pass restarts the origin between cases and speaks the PROXY LEG ONLY, so
+# a non-zero counter names one case. Proxy-leg-only matters: with both legs
+# running, the direct request could be the one that reached `/smuggled` and the
+# result would not say which hop delivered it.
+#
+# WHAT A ZERO HERE WOULD MEAN, written before the run so the answer cannot be
+# reinterpreted afterwards: if every case is clean in isolation and the combined
+# pass is not, the hit REQUIRES state that outlives a single case — a poisoned
+# upstream keep-alive connection reused for the next request. That is not a
+# weaker finding than "case N is bad". It is the textbook shape of request
+# smuggling, and it would move the question from "which bytes" to "which pair of
+# cases in sequence", which the combined pass cannot resolve either.
+echo "--- isolation pass: one case, one origin ---" >&2
+: >"$OUT/raw/isolation.txt"
+# The case names come from the same parser the comparison uses, so the isolation
+# pass can never iterate a different set of cases than the pass it explains.
+mapfile -t DRUSE_CASE_NAMES < <(
+  DRUSE_CA="$WORK/certs/ca.pem" DRUSE_ORIGIN_PORT="$ORIGIN_PORT" \
+  DRUSE_PROXY_PORT="$PROXY_PORT" \
+  DRUSE_CORPUS="$ROOT/tests/support/transport_conformance/corpus.odin" \
+  DRUSE_FRAMING_LIST=1 \
+  python3 "$ROOT/ops/verification/proxy_framing_compare.py" 2>/dev/null
+)
+echo "isolation_cases=${#DRUSE_CASE_NAMES[@]}" >>"$OUT/raw/isolation.txt"
+
+for druse_case in "${DRUSE_CASE_NAMES[@]}"; do
+  "$WORK/origin" "$ORIGIN_PORT" >"$WORK/iso-origin.log" 2>&1 &
+  SERVER_PID=$!
+  for _ in $(seq 1 200); do
+    curl --noproxy '*' -fsS --max-time 1 "http://127.0.0.1:$ORIGIN_PORT/ping" >/dev/null 2>&1 && break
+    sleep 0.1
+  done
+
+  druse_status="$(
+    DRUSE_CA="$WORK/certs/ca.pem" DRUSE_ORIGIN_PORT="$ORIGIN_PORT" \
+    DRUSE_PROXY_PORT="$PROXY_PORT" DRUSE_CORPUS="$ROOT/tests/support/transport_conformance/corpus.odin" \
+    DRUSE_FRAMING_ONLY="$druse_case" DRUSE_FRAMING_LEG=proxy \
+    python3 "$ROOT/ops/verification/proxy_framing_compare.py" 2>/dev/null |
+      awk '/^  /{print $2; exit}'
+  )"
+
+  kill -TERM "$SERVER_PID" 2>/dev/null
+  for _ in $(seq 1 100); do kill -0 "$SERVER_PID" 2>/dev/null || break; sleep 0.1; done
+  SERVER_PID=""
+
+  # The readiness probe above is one GET /ping and it is counted, so ping=1 is
+  # the floor rather than a hit. Stated here because a reader comparing this
+  # file with the combined pass would otherwise read every line as a ping.
+  druse_counters="$(grep -h "wire_origin_counters" "$WORK/iso-origin.log" 2>/dev/null | tail -n 1)"
+  printf 'case=%s proxied=%s %s\n' "$druse_case" "${druse_status:-NONE}" \
+    "${druse_counters:-wire_origin_counters=UNAVAILABLE}" >>"$OUT/raw/isolation.txt"
+done
+
+# The headline of the isolation pass, computed rather than left to a reader.
+{
+  echo "# isolation summary"
+  awk '/^case=/ {
+         match($0, /smuggled=[0-9]+/);           s = substr($0, RSTART+9,  RLENGTH-9)
+         match($0, /smuggled_via_proxy=[0-9]+/); v = substr($0, RSTART+19, RLENGTH-19)
+         total += s; via += v; desync += (s - v)
+         if (s+0 > 0) { hits = hits $1 " " }
+         if (s - v > 0) { desync_cases = desync_cases $1 " " }
+         n++
+       }
+       END {
+         printf "cases_replayed=%d\n", n
+         printf "isolated_smuggled_total=%d\n", total
+         printf "isolated_smuggled_via_proxy=%d\n", via
+         # The only number that is a finding. A hit carrying the proxy own
+         # forwarding headers is the proxy re-emitting a pipelined request; a hit
+         # without them is a request the two hops framed differently.
+         printf "isolated_desync_hits=%d\n", desync
+         printf "cases_with_smuggled_hit=%s\n", (hits == "" ? "none" : hits)
+         printf "cases_with_desync=%s\n", (desync_cases == "" ? "none" : desync_cases)
+       }' "$OUT/raw/isolation.txt"
+} >>"$OUT/raw/isolation.txt"
 docker logs "$CADDY" >"$OUT/raw/caddy.log" 2>&1
 {
   echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

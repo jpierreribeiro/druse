@@ -26,7 +26,7 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 | R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — desbloqueado; host qualificado |
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
 | R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto |
-| R2-WP07 | canário e rollback produtivo | composição real validada | aberto — bloqueado por WP04/06 |
+| R2-WP07 | canário e rollback produtivo | composição real validada | aberto — degrau 1 (shadow) entregue 2026-08-03; degraus 2–6 como risco aceito (§8.1) |
 | R2-WP08 | freeze/aceite de risco | decisão Tier 2 | aberto — critério de saída emendado 2026-08-03 (§9.1) |
 
 ### R2-WP01 — fechado
@@ -482,6 +482,72 @@ tempo sozinho não é critério. Promoção é manual e registrada.
 
 Rollback preserva logs antes de retirar o candidato. Não “corrigir ao vivo” no
 mesmo artefato.
+
+### 8.1 O degrau 1 não precisa de tráfego real — corrigido em 2026-08-03
+
+O R2-WP07 esteve registrado como **“bloqueado em tráfego produtivo real”**, e
+essa leitura estava errada. O degrau 1 da progressão acima é *“shadow ou replay
+sanitizado, **sem resposta ao usuário**”* — um degrau cuja definição é a ausência
+de usuário. Ele precisa de candidato, da borda suportada e de tráfego em forma de
+produção; os três existem. Bloqueado estavam os degraus 2 a 6, não o primeiro.
+
+**Entregue:** `ops/canary/run-shadow.sh`, `ops/canary/shadow_replay.py`,
+`ops/canary/containment_check.py`, o perfil declarado em
+`ops/canary/shadow-profile.md` e o controle
+`build/check_shadow_containment.sh` — positivo verde e cinco mutantes vermelhos.
+
+**“Sem resposta ao usuário” é feito de quatro coisas**, três asseguradas e uma
+que virou achado:
+
+| # | Propriedade | Como se obtém |
+|---|---|---|
+| K1 | endereço de escuta do candidato | **registrado, não asseverado** — ver abaixo |
+| K1b | todo peer que falou com o candidato era o proxy | observação amostrada durante toda a janela |
+| K2 | o proxy fixado publica só em `127.0.0.1` | `docker inspect`, todo `HostIp` tem de ser loopback |
+| K3 | a contabilidade **fecha** sem resto | log de acesso do proxy reconciliado contra a contagem do próprio driver, com os health probes internos do Caddy declarados e contados à parte |
+
+K3 é a única que sobrevive a outra topologia: *toda requisição que a borda serviu
+é uma que o shadow enviou*. Uma resposta que chegou a um usuário é uma requisição
+servida que ninguém aqui enviou, e isso aparece como **resto não contabilizado**
+em vez de como uma ausência que alguém precisa notar.
+
+#### SHADOW-001 — o Druse não sabe escutar só em loopback
+
+`web.serve(&app, port)` recebe uma porta e **nenhum endereço**, e o transporte
+faz bind em dual-stack Any — `::`, caindo para `0.0.0.0`
+(`web/internal/transport/odin_http_adapter.odin`). **Não há como pedir a uma
+aplicação Druse que escute apenas em loopback.**
+
+Para o shadow isso remove a contenção natural. Para qualquer implantação
+significa que o processo é alcançável em toda interface que o host tiver, e
+confiná-lo é trabalho do firewall do host e não da aplicação — uma restrição
+operacional real que `docs/supported-profile.md` hoje **não** enuncia.
+
+Nenhuma API é inventada aqui (G5: um plano pode nomear uma necessidade pública,
+não pode inventar assinatura). A necessidade fica nomeada; K1b é o substituto e é
+**mais fraco em espécie** — uma propriedade vale sempre, uma observação vale
+sobre a janela em que observou — e o manifesto rotula assim.
+
+#### Degraus 2–6: risco aceito formal, não “bloqueado”
+
+Os degraus de 1%, 5%, 25%, 50% e 100% exigem tráfego de usuários reais. Este
+projeto não tem nenhum. “Bloqueado” não é um estado de encerramento — o README
+do programa lista três: concluído, **risco aceito** (com owner, escopo, validade
+e mitigação) e fora do perfil. Este é o segundo, redigido para ser assinado no
+freeze do R2-WP08:
+
+| Campo | Conteúdo |
+|---|---|
+| **Risco** | a composição do candidato com tráfego real nunca foi exercida. Diversidade de cliente, distribuição de keep-alive, mistura de rotas, tamanhos de corpo e concorrência reais são todos **declarados** (`shadow-profile.md` §2), não amostrados |
+| **O que já cobre parte dele** | o shadow exercita a topologia suportada inteira — Caddy fixado, TLS, keep-alive, streams, corpos variados — e o R1 já exerceu shutdown, rollback e o contrato do proxy na mesma borda |
+| **O que continua descoberto** | qualquer falha que só apareça sob distribuição real: cabeçalhos de clientes que ninguém previu, padrões de conexão de CDN, picos correlacionados, e o comportamento do rollback com usuários em voo |
+| **Escopo** | somente o perfil de `docs/supported-profile.md`, atrás do proxy revisado, num serviço restrito |
+| **Mitigação** | o degrau 1 roda antes de qualquer promoção; alertas e runbooks do R1 ativos; rollback ensaiado e medido (3 s, `evidence/2026-08-02-r1-pilot-exercise/`); o primeiro serviço real **é** o degrau 2 e será tratado como canário, com abort automático pela lista do §8 |
+| **Validade** | até o primeiro tráfego de usuário real existir, e no máximo até a próxima revisão do gate |
+| **Owner** | o dono do repositório — este documento propõe, não aceita: um risco aceito por quem o descobriu não é aceite |
+
+**Isto não promove nada.** Um risco aceito é uma decisão registrada sobre
+evidência que não existe; não é evidência.
 
 ## 9. R2-WP08 — freeze e decisão
 

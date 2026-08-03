@@ -1,0 +1,55 @@
+isolation_cases=47
+case=valid GET proxied=200 wire_origin_counters ping=2 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=keep-alive serves two PIPELINED requests proxied=200 wire_origin_counters ping=3 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=204 carries no body and no Content-Length proxied=204 wire_origin_counters ping=1 echo=0 nobody=1 smuggled=0 smuggled_via_proxy=0
+case=Connection: close closes after the response proxied=200 wire_origin_counters ping=2 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=valid Content-Length body proxied=201 wire_origin_counters ping=1 echo=1 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=CL+TE is rejected (smuggling vector) proxied=400 wire_origin_counters ping=1 echo=1 nobody=0 smuggled=1 smuggled_via_proxy=1
+case=duplicate identical Content-Length is rejected proxied=201 wire_origin_counters ping=1 echo=1 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=duplicate differing Content-Length is rejected proxied=400 wire_origin_counters ping=0 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=comma-list Content-Length is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=negative Content-Length is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=signed and overflowing Content-Length is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=valid chunked body proxied=201 wire_origin_counters ping=1 echo=1 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=non-hex chunk size is rejected proxied=502 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=negative chunk size is rejected proxied=502 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=chunked body with a trailer field is accepted proxied=201 wire_origin_counters ping=1 echo=1 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=truncated chunk is rejected proxied=200 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=chunk without CRLF is rejected proxied=502 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=missing zero terminator is rejected proxied=200 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=unsupported Transfer-Encoding is rejected proxied=501 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=chunked that is not the final coding is rejected proxied=501 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=an unregistered coding ending in 'chunked' is rejected proxied=501 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=chunked applied twice is rejected proxied=501 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=the chunked coding is matched case-insensitively proxied=201 wire_origin_counters ping=1 echo=1 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=truncated fixed body is rejected proxied=200 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=whitespace before the header colon is rejected proxied=400 wire_origin_counters ping=0 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=obs-fold header continuation is rejected proxied=200 wire_origin_counters ping=2 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=tab obs-fold header continuation is rejected proxied=200 wire_origin_counters ping=2 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=overflowing Content-Length is rejected, its bytes never a second request proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=invalid request line is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=unread body does not desynchronize a following request proxied=200 wire_origin_counters ping=3 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=over-limit body is 413 and its bytes are never a second request proxied=413 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=Expect: 100-continue is honored — body read, handler runs (C6) proxied=100 wire_origin_counters ping=1 echo=1 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=an unknown Expect is still refused with 417 proxied=417 wire_origin_counters ping=0 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=valid unknown method reaches the core, not a backend 501 proxied=405 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=bare LF line termination is rejected proxied=200 wire_origin_counters ping=2 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=a lone CR inside a header value is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=chunk size with a leading plus is rejected proxied=502 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=chunk size with a digit separator is rejected proxied=502 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=a NUL inside a header value is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=a C0 control inside a header value is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=a control byte inside a header NAME is rejected proxied=400 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=absolute-form whose authority AGREES with Host is served proxied=200 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=absolute-form whose authority DISAGREES with Host is rejected proxied=200 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=OPTIONS * is still answered, not read as an authority proxied=200 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=a horizontal tab inside a header value is still accepted proxied=200 wire_origin_counters ping=2 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=a single header line larger than the budget answers 431 proxied=431 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+case=a header block of many lines over the budget also answers 431 proxied=431 wire_origin_counters ping=1 echo=0 nobody=0 smuggled=0 smuggled_via_proxy=0
+# isolation summary
+cases_replayed=47
+isolated_smuggled_total=1
+isolated_smuggled_via_proxy=1
+isolated_desync_hits=0
+cases_with_smuggled_hit=case=CL+TE 
+cases_with_desync=none
