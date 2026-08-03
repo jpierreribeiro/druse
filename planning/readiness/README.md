@@ -25,6 +25,23 @@ deles autoriza adicionar features sem relação com a evidência que o gate pede
 | R2 | liberar produção restrita | [`R2-restricted-production.md`](R2-restricted-production.md) |
 | R3 | alcançar maturidade geral, se essa ambição for aceita | [`R3-general-maturity.md`](R3-general-maturity.md) |
 
+**A ambição foi declarada em 2026-08-03**, e o R3 §1 exige que ela seja
+registrada por ADR antes de qualquer implementação.
+[`R3-programa-sem-limitacoes-bloqueantes.md`](R3-programa-sem-limitacoes-bloqueantes.md)
+é essa instanciação: ele **não contorna o R3**, escolhe quais trilhas dele o
+gatilho do dono autoriza e em que ordem. Sua tese é que *"sem limitações
+bloqueantes" é muito mais barato que "sem limitações"* — as três limitações
+bloqueantes têm instrumento nomeado e medido, e as caras não são bloqueantes.
+**A Fase 0 dele é terminar o R2**, então ele não compete com este diretório: o
+sequencia.
+
+O instrumento por limitação vem de
+[`../runtime-feasibility-study.md`](../runtime-feasibility-study.md), auditado
+adversarialmente em
+[`../runtime-feasibility-audit-2026-08-03.md`](../runtime-feasibility-audit-2026-08-03.md);
+a conclusão de ambos é que **o runtime não é o instrumento** para a maioria
+delas.
+
 O backlog resumido continua em
 [`../2026-08-01-production-readiness-remediation.md`](../2026-08-01-production-readiness-remediation.md).
 Os planos deste diretório são a decomposição executável daquele backlog.

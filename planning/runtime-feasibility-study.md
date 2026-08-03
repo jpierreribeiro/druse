@@ -38,6 +38,14 @@ arm exist at all, and can it be built in this language?**
 host is qualified and idle. Nothing in this study licenses leaving a readiness
 gate half-open.
 
+**Where this study is executed.** Its recommendation became a sequenced
+programme in
+[`readiness/R3-programa-sem-limitacoes-bloqueantes.md`](readiness/R3-programa-sem-limitacoes-bloqueantes.md),
+which instantiates R3 §1's ambition decision, classifies which declared
+limitations are actually *blocking*, and orders the phases. Its Phase 0 is
+finishing R2. This document decides the instrument per limitation; that one
+decides the order and the cost.
+
 ---
 
 ## 0. The question this study is actually answering

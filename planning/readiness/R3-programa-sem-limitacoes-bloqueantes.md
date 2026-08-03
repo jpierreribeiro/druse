@@ -322,10 +322,57 @@ runtime — foi o critério de desenho da ordem.
 
 ## 7. O que o dono precisa decidir para o programa começar
 
-1. Ratificar a decisão de ambição (§2) por ADR — inclusive o que ela **não**
-   compra.
-2. Fase 1: vendorizar vs upstream-e-esperar (recomendação: vendorizar, com
-   upstream em paralelo).
-3. R2-WP07: existe tráfego real para o canário, ou waiver com escopo reduzido?
-4. O custo máximo aceitável da Fase 4, que é onde o programa fica caro — e se
-   ela entra agora ou após as Fases 0-3 provarem o resto.
+Quatro itens. **Três deles têm recomendação fechada abaixo** — o dono pediu
+orientação, não um menu, e devolver decisão técnica com o rótulo de "decisão do
+dono" é a falha que esta seção corrige. Só o primeiro é irredutivelmente dele.
+
+**1. Ratificar a decisão de ambição (§2) por ADR — inclusive o que ela NÃO
+compra.** Esta é do dono por definição: é uma declaração sobre o produto, não
+uma escolha de engenharia. Nada mais começa sem ela.
+
+**2. Fase 1: vendorizar vs upstream-e-esperar → VENDORIZAR, com upstream em
+paralelo.** Recomendação fechada. Esperar upstream põe duas trilhas (WP10 e
+qualquer executor) na fila de um repositório que não controlamos, sem prazo, e
+`core:nbio` já está no toolchain fixado — vendorizar não aumenta a superfície
+de fork de forma nova, apenas move um pacote que já é dependência dura. O
+upstream segue em paralelo porque o entry point de adotar socket é útil a
+qualquer consumidor do nbio, e porque ser aceito lá elimina o vendor depois.
+
+**3. R2-WP07 (canário): NÃO é um bloqueio à espera de tráfego.** Recomendação
+fechada, e ela corrige uma leitura errada anterior. O R2 §8 abre a progressão
+com *"shadow ou replay sanitizado, sem resposta ao usuário"* — degrau que roda
+com carga sintética em forma de produção e não precisa de um único usuário
+real. A sequência é:
+
+  a. rodar o shadow com mix de rotas, keep-alive e corpos realistas, atrás do
+     Caddy pinado, com o controle explícito de que nenhuma resposta sai;
+  b. se depois disso os degraus de 1%/5%/25% continuarem sem onde rodar, a
+     saída **não é "bloqueado"** — é o que o `README.md` do programa de
+     prontidão já prevê: **risco aceito, com owner, escopo, validade e
+     mitigação**, escrito no freeze do R2-WP08.
+
+O que o dono decide aqui é apenas se existe um serviço restrito para (b). Se
+não existir, o waiver é o caminho e ele é legítimo.
+
+**4. Custo máximo da Fase 4 → ADIAR a decisão até as Fases 0–3 fecharem.**
+Recomendação fechada. A Fase 4 é a cara, e as Fases 0–3 removem a limitação
+bloqueante (L1), a de adoção (L6) e a dívida do fork (L5) sem tocá-la. Decidir
+o teto de custo de uma fase antes de saber o que as anteriores entregaram é
+comprar no escuro. Quando ela chegar, o §4 do programa terá números reais em
+vez de estimativas.
+
+### O item que não estava nesta lista e devia estar
+
+**R2-WP08 não fecha como escrito.** Seu critério de saída exige *"artefato
+implantado byte-idêntico ao aprovado"*, e a Fase 0 mediu que dois builds do
+mesmo commit, com o mesmo compilador, na mesma máquina, produzem bytes
+diferentes com tamanho idêntico
+(`evidence/2026-08-03-r2-wp06-assurance/`). Isso não é disciplina que falta —
+é a toolchain.
+
+**Recomendação fechada: mudar o objeto do critério, não o rigor.** Em vez de
+exigir que o *build* seja reprodutível, exigir que o *artefato* seja o mesmo
+arquivo: build once → hash → implanta aquele binário → o critério passa a ser
+"o hash implantado é o hash aprovado". É mais forte que reproduzir o build,
+porque remove a máquina de build da equação, e `ops/release/verify-rebuild.sh`
+já produz o hash. A emenda ao R2-WP08 é trabalho da Fase 0.

@@ -13,6 +13,19 @@ restrita saudável é um estado final válido.
 
 ## 1. Decisão de ambição
 
+> **Instanciada em 2026-08-03.** O dono declarou a ambição — *"pronto para
+> produção, sem limitações bloqueantes"*, com custo alto aceito — e
+> [`R3-programa-sem-limitacoes-bloqueantes.md`](R3-programa-sem-limitacoes-bloqueantes.md)
+> é o documento que a registra, classifica quais limitações declaradas são de
+> fato bloqueantes, e sequencia as trilhas abaixo que o gatilho autoriza. Ele
+> **não substitui** esta seção: a ratificação por ADR que ela exige continua
+> pendente e é o primeiro item do §7 daquele programa.
+>
+> O resultado da classificação, resumido: o conjunto bloqueante é {L1 fault de
+> handler, L6 release/LTS, L2 handlers síncronos — condicional}, e **nenhum dos
+> três é um dos alvos caros** (R3-C plataformas, R3-D async amplo, R3-E
+> protocolos). Esses ficam por gatilho, `DEFERRED` sem vergonha.
+
 Antes de qualquer implementação, o owner escolhe um alvo:
 
 | Alvo | Promessa | Custo permanente |
