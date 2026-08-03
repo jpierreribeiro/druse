@@ -1,6 +1,7 @@
 # STREAM-001 — files in this package.
 
-verdict.md              the finding, its arms, and what it does not establish
-raw/reproduction.txt    the three arms, verbatim, on the R2 campaign host
+verdict.md              the defect, its root cause, the fix, and what it does not establish
+raw/reproduction.txt    the three arms BEFORE the fix, verbatim, on the R2 campaign host
+raw/after-fix.txt       the same commands after the fix: 8 of 8 and 6 of 6 complete
 environment.txt         the host it was found on
-commands.txt            how to reproduce it
+commands.txt            how to reproduce it, and how to make the regression test go red

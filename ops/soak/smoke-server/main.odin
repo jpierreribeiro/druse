@@ -129,7 +129,9 @@ stream_producer :: proc(job: ^Stream_Job) {
 	for i in 1 ..= STREAM_FRAMES {
 		time.sleep(STREAM_INTERVAL)
 		frame := fmt.tprintf("data: frame-%d\n\n", i)
-		if web.stream_send(job.stream, transmute([]u8)frame) != .Sent {
+		result := web.stream_send(job.stream, transmute([]u8)frame)
+		if result != .Sent {
+			log.errorf("stream_send frame-%d -> %v (STREAM-001 probe)", i, result)
 			break
 		}
 	}
@@ -150,7 +152,16 @@ stream_handler :: proc(ctx: ^web.Context) {
 	job.stream = stream
 	// `self_cleanup` so the ^Thread is reclaimed when the producer returns: this
 	// handler must not join, and nothing else is left holding the handle.
-	_ = thread.create_and_start_with_poly_data(job, stream_producer, self_cleanup = true)
+	// `init_context` matters: without it the producer thread runs on the default
+	// context, whose logger is nil, and `framework_report` returns early on
+	// exactly that condition. A probe whose output is discarded is the defect
+	// this file's header is about.
+	_ = thread.create_and_start_with_poly_data(
+		job,
+		stream_producer,
+		init_context = context,
+		self_cleanup = true,
+	)
 }
 
 main :: proc() {

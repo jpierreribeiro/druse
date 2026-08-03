@@ -24,3 +24,23 @@ done
 
 # Which frames are lost: the LAST ones.
 curl -N -sS http://127.0.0.1:18093/stream | grep frame-
+
+# ---------------------------------------------------------------------------
+# THE FIX, and proving the regression test can detect its absence.
+# ---------------------------------------------------------------------------
+
+# Green with the fix in place:
+odin test tests/stream001-slot-reuse -collection:druse=$PWD -out:/tmp/t
+
+# Red without it. Remove both calls and re-run: the suite reports a truncated
+# stream and names the producer's outcome as Closed.
+#   web/internal/transport/odin_http_adapter.odin
+#     - stream_forget_teardown(conn)        in on_stream_terminator_sent
+#     - stream_forget_teardown(link.conn)   in stream_teardown_error
+#
+#   [ERROR] stream 4 delivered 4 of 10 frames (all six: [10, 10, 10, 4, 10, 10])
+#           ... Last send refusal: Closed.
+#   [ERROR] a producer was refused 1 time(s), last outcome Closed
+#
+# Note that only ONE of the six was truncated on that run. Two requests would
+# have passed. That is why the suite asks for six.

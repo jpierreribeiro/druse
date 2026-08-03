@@ -1,0 +1,18 @@
+## AFTER THE FIX — ops/soak/smoke-server, 8 back-to-back streams (was 10,7,10,7...)
+request 1 frames=10
+request 2 frames=10
+request 3 frames=10
+request 4 frames=10
+request 5 frames=10
+request 6 frames=10
+request 7 frames=10
+request 8 frames=10
+producer_refusals=0
+
+## AFTER THE FIX — tests/r1-real-proxy/server, 6 back-to-back streams (was 10,1,10,1)
+request 1 frames=10
+request 2 frames=10
+request 3 frames=10
+request 4 frames=10
+request 5 frames=10
+request 6 frames=10

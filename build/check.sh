@@ -1826,6 +1826,22 @@ timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/b
   "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
   -out:"$DRUSE_BIN_TMP/wp96-public-stream" ||
   fail "the WP96 public streaming API did not pass within the timeout"
+# STREAM-001 — a stream must not be killed by the PREVIOUS stream's connection
+# teardown. `runtime.links` is indexed by registry slot and `retire` frees the
+# slot immediately, so back-to-back streams reuse one `Stream_Link`; the finished
+# stream's connection still carried a teardown hook pointing at it, and the hook
+# closed and retired the NEW stream's token. Truncated response, 200 status,
+# clean close, no log line — found while qualifying the R2 campaign host, on two
+# independent servers, one of them in this gate.
+#
+# The suite requests six streams because the defect ALTERNATED: two requests pass
+# half the time by landing on the good phase.
+echo "--- STREAM-001 back-to-back streams are not truncated (odin test) ---"
+timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/stream001-slot-reuse" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$DRUSE_BIN_TMP/stream001-slot-reuse" ||
+  fail "STREAM-001 regression: a detached stream was truncated by the previous stream's teardown"
 echo "--- WP96 registry scale: 3,000 streams open/receive/drain (odin test) ---"
 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
   "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/wp96-scale" \
