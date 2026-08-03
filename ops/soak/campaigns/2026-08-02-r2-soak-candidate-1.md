@@ -73,9 +73,9 @@ instrument change cannot silently keep an old pre-registration:
 
 | File | sha256 |
 |---|---|
-| `ops/soak/CRITERIA.md` | `456abe821d51511040e418adb0b3847c57f087c942ccbb1940460a7c820275ae` |
+| `ops/soak/CRITERIA.md` | `834ed848a6993537fa40f3379f7818fd4b7b562e6e4f2ad9b938649c5c5ca676` |
 | `ops/soak/schema.md` | `e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640` |
-| `ops/soak/run-soak.sh` | `5844528c0f7215429cc9f42b2df41d835f1f0e62e70983dfb2cb1623f8be710e` |
+| `ops/soak/run-soak.sh` | `7e6aed14be8f2c0f2ba147678da8cf247e044cc0e17f174c10f71c02a0d245ca` |
 | `ops/soak/analyze-soak.py` | `b46aafa75f605672309dc3221e7a20b100cc37adf5e6713d852087aa2921a008` |
 | `ops/soak/soak-server/main.odin` | `59e22b0b7cd017acb7658023950e3ac35bceb4dfb3e25b21e6d9c717e2823b54` |
 | `ops/soak/openload/main.go` | `3382a965e18bb1e714fe36cb6b4ec2ff71b27dfa3818e260c970980d132c48dd` |
@@ -205,6 +205,44 @@ compatíveis" among the preflight's own requirements, so the gap was this work
 package's to close rather than the next one's. It now refuses a host whose
 `memlock` cannot hold the rings, with a control in
 `build/check_soak_controls.sh`.
+
+### 3.6 Third amendment — the metric channel, after the smoke measured it
+
+**Amended 2026-08-03, after the smoke step and before the burn-in.**
+
+The smoke ran and graded **FAIL**, and the instrument named why. One of the three
+reasons is this amendment:
+
+> `/stats did not answer 200 on 322 of 658 samples (295x exit 52 (empty reply
+> from server), 27x exit 56 (receive failure))`
+
+`run-soak.sh` was scraping `/stats` over HTTP, once per second, on the same
+Handler lanes it was sampling. At two lanes that is half the machine taken from
+the measurement to take a measurement. **ADR-050 had already decided against
+this channel** (R2-WP03, AUD-P2-009) and the soak server had already grown the
+out-of-band exporter — the runner had simply never passed `argv[3]`, so the
+channel this project shipped had never once run in a campaign.
+
+Changed, before the next step:
+
+- the runner passes the snapshot path, turning the exporter on;
+- the sampler and the per-cycle capture read the **file**, not the route;
+- absence carries one cause from ADR-050's closed taxonomy — `missing` (101),
+  `unreadable` (102), `malformed` (103), `stale` (104), `no_process` (105),
+  `disabled` (106) — every one of which names the application;
+- `CRITERIA.md` criterion 8 is rewritten to match, and negative control 1 in
+  `build/check_soak_controls.sh` is ported to drive every branch of the new
+  taxonomy, including a **positive** case.
+
+**Why this is not a criterion moved to fit a result (G3).** The smoke step
+cannot promote — §5 says so, and it was run to find exactly this class of fault
+before the twelve-hour run. The change is committed *before* the next step, the
+failing artefact is preserved, and the amendment names the measurement that
+caused it. What is forbidden is editing a criterion after a run that *could*
+have promoted; this is the ladder doing its job.
+
+**The instrument hashes in §2.1 are updated in the same commit**, which the gate
+enforces.
 
 ### 3.4 What the amendment costs, stated before the run
 

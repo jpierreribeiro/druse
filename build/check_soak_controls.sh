@@ -328,7 +328,7 @@ base() { # destination
 }
 
 # ---------------------------------------------------------------------------
-# NEGATIVE CONTROL 1 — the /stats curl exit is zeroed.
+# NEGATIVE CONTROL 1 — the absence of a metric sample is recorded with a CAUSE.
 #
 # THE DEFECT THIS WORK PACKAGE IS NAMED FOR. The sampler read
 #
@@ -337,38 +337,65 @@ base() { # destination
 #
 # and `$?` there is the exit status of `true`. Every failed scrape in the
 # history of this harness recorded 0, so the taxonomy promised in the comment
-# above it — 7 refused, 28 timeout, 52 empty reply, 56 receive failure — was
-# unreachable for the whole life of the field.
+# above it was unreachable for the whole life of the field.
 #
-# This control is behavioural and it runs the REAL BLOCK from run-soak.sh,
-# extracted from the shipped file rather than retyped here. A copy of the idiom
-# would prove only that the copy works.
+# THE CHANNEL CHANGED IN R2-WP04, AND THE PROPERTY DID NOT. The scrape is gone —
+# ADR-050 moved the metric out of the request path, and the smoke measured why:
+# 322 of 658 samples failed because `/stats` competed for the lanes it was
+# sampling. What must still hold is the thing this control has always been
+# about: **an absent sample carries a cause, and the cause is not zero.**
+#
+# So the control now drives the shipped block through every branch of ADR-050's
+# closed taxonomy, extracted from run-soak.sh rather than retyped, and requires
+# each one to record its own code. A control that only checked "not zero" would
+# pass an instrument that reported `missing` for a stale snapshot.
 # ---------------------------------------------------------------------------
 RUNNER="$SOAK/run-soak.sh"
-# The sampler's block specifically — run-soak.sh captures /stats twice, once per
-# telemetry sample and once per cycle, and a range pattern would splice the two
-# together. Stop at the first `fi`.
-awk '/^ *if stats_http="\$\(curl/ {found=1} found {print} found && /^ *fi$/ {exit}' \
+# The sampler's block specifically — run-soak.sh reads the snapshot twice, once
+# per telemetry sample and once per cycle. Stop at the closing `fi` of the first.
+awk '/^ *stats_curl_exit=0$/ {found=1} found {print} found && /^ *fi$/ {depth++; if (depth==2) exit}' \
   "$RUNNER" >"$TMP/capture.sh"
 test -s "$TMP/capture.sh" ||
-  fail "could not find the /stats capture block in run-soak.sh; this control cannot test what it claims"
-grep -q 'stats_curl_exit=\$?' "$TMP/capture.sh" ||
-  fail "the extracted block does not capture a curl exit status at all; this control cannot test what it claims"
+  fail "could not find the snapshot capture block in run-soak.sh; this control cannot test what it claims"
+grep -q 'SNAPSHOT_CAUSE_' "$TMP/capture.sh" ||
+  fail "the extracted block records no ADR-050 cause at all; this control cannot test what it claims"
 
-cat >"$TMP/capture-live.sh" <<EOF
-set -euo pipefail
-PORT=$CLOSED_PORT
-stats_file="$TMP/stats-live.json"
+# drive CASE SNAPSHOT-CONTENT -> "http exit"
+drive() {
+  local label="$1" snap="$2"
+  cat >"$TMP/drive.sh" <<EOF
+set -uo pipefail
+SNAPSHOT_PATH="$snap"
+SNAPSHOT_MAX_AGE_SECONDS=5
+SNAPSHOT_CAUSE_MISSING=101
+SNAPSHOT_CAUSE_UNREADABLE=102
+SNAPSHOT_CAUSE_MALFORMED=103
+SNAPSHOT_CAUSE_STALE=104
+SNAPSHOT_CAUSE_NO_PROCESS=105
+SNAPSHOT_CAUSE_DISABLED=106
+server_pid=\$\$
+stats_file="$TMP/stats-$label.json"
 $(cat "$TMP/capture.sh")
-echo "\$stats_curl_exit"
+echo "\$stats_http \$stats_curl_exit"
 EOF
-live_exit="$(bash "$TMP/capture-live.sh")"
-if [ "$live_exit" = "0" ]; then
-  fail "the shipped /stats capture recorded curl exit 0 for a refused connection: the cause of every failed scrape is still being discarded"
-fi
-if [ "$live_exit" != "7" ]; then
-  fail "a refused /stats scrape recorded curl exit $live_exit; 7 (connection refused) is what makes the failure nameable"
-fi
+  bash "$TMP/drive.sh"
+}
+
+now_ns="$(date -u +%s%N)"
+printf 'druse_snapshot 1\npid 1\nunix_ns %s\n' "$now_ns" >"$TMP/snap-ok.txt"
+printf 'druse_snapshot 1\npid 1\nunix_ns %s\n' "$(( now_ns - 60000000000 ))" >"$TMP/snap-stale.txt"
+printf 'not_a_snapshot\n' >"$TMP/snap-bad.txt"
+
+test "$(drive ok "$TMP/snap-ok.txt")" = "200 0" ||
+  fail "a fresh, well-formed snapshot did not record 200: $(drive ok "$TMP/snap-ok.txt"). Without a positive case every assertion below is satisfied by a reader that fails everything."
+test "$(drive missing "$TMP/does-not-exist.txt")" = "000 101" ||
+  fail "an absent snapshot did not record cause 101 (missing): $(drive missing "$TMP/does-not-exist.txt")"
+test "$(drive malformed "$TMP/snap-bad.txt")" = "000 103" ||
+  fail "a snapshot with the wrong schema line did not record cause 103 (malformed): $(drive malformed "$TMP/snap-bad.txt")"
+test "$(drive stale "$TMP/snap-stale.txt")" = "000 104" ||
+  fail "a snapshot 60 s older than max_age did not record cause 104 (stale): $(drive stale "$TMP/snap-stale.txt"). A wedged exporter that keeps its last record must not read as healthy."
+test "$(drive disabled "")" = "000 106" ||
+  fail "an unconfigured snapshot path did not record cause 106 (disabled): $(drive disabled "")"
 
 # The mutant: the old idiom, restored. It must go blind.
 cat >"$TMP/capture-mutant.sh" <<EOF
@@ -384,7 +411,7 @@ mutant_exit="$(bash "$TMP/capture-mutant.sh")"
 if [ "$mutant_exit" != "0" ]; then
   fail "the mutant did not reproduce the original defect (recorded $mutant_exit, expected 0); this control is not testing what it claims"
 fi
-echo "PASS (soak negative 1): a refused /stats scrape records curl exit 7, and the old '|| true' idiom is proved to record 0"
+echo "PASS (soak negative 1): every ADR-050 absence cause is recorded with its own code, and the old '|| true' idiom is proved to record 0"
 
 # And the analyser must act on it: a cause captured is a NAMED cause, a cause
 # discarded is a red run that says so.

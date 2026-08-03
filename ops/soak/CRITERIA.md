@@ -50,10 +50,24 @@ fault the framework produced.
 5. **Threads constant** for the whole run.
 6. **File descriptors** back within baseline + 4 after the settling window.
 7. **RSS tail slope** at most 1 MiB/h over the second half of the run.
-8. **`/stats` answers 200 on every sample**, and a sample that does not carries
-   the reason it did not — curl's exit code alongside the HTTP code. This was
-   measured and never enforced: a 12-hour run recorded 111 failures of 8,611,
-   passed, and the number sat in the artefact with no cause and no consequence.
+8. **The metric snapshot is readable on every sample**, and a sample that is not
+   carries the reason — one cause from ADR-050's closed taxonomy, in the
+   telemetry's second stats field.
+
+   This criterion used to read *"`/stats` answers 200 on every sample"*, over an
+   HTTP scrape of an ordinary route. R2-WP04's smoke is what finally measured
+   the cost of that: with the pre-registered two-lane affinity, **322 of 658
+   samples failed** — 295 empty replies, 27 receive failures — because the
+   scrape competed for the very Handler lanes it was sampling. The observer took
+   a lane from the observed and then could not report it.
+
+   ADR-050 had already decided against that channel (AUD-P2-009), and the soak
+   server had already grown the exporter. The runner had simply never passed the
+   path that turns it on, so the out-of-band channel R2-WP03 shipped had never
+   run in a campaign. Now it does, and the causes are `missing` (101),
+   `unreadable` (102), `malformed` (103), `stale` (104), `no_process` (105) and
+   `disabled` (106) — every one of which names the **application**, which is the
+   whole reason the arm was chosen.
 9. Safety stop: RSS above 4 GiB ends the run and fails it.
 
 ## What R2-WP01 added
