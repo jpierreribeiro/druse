@@ -1,0 +1,11 @@
+utc=2026-08-03T14:51:39Z
+commit=8cb21e82d981530442af7af707993a8ad17dc82f
+working_tree_dirty_files=5
+candidate=tests/support/wire_origin
+candidate_sha256=e50e4b24f4c8312fbf92b60974f1e57b1dec57fdab75454f84c313e1205a13a0
+odin=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7
+cases=1500
+seed=20260803
+oracle1_server_alive_at_end=yes
+oracle2_smuggled_executions=0
+oracle3_4_violations=0

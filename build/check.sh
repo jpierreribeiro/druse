@@ -1730,6 +1730,14 @@ env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_r2_observabil
 echo "--- R2-WP08 release identity: the deployed hash is the approved hash ---"
 bash "$DRUSE_ROOT/build/check_release_identity.sh"
 
+# R2-WP07 — the shadow's containment claim. K3 is the half that survives being
+# moved to another topology: every request the edge served is one the shadow
+# sent. Five mutants keep "containment=proven" from being a string the script
+# always prints, and the last assertion notices if `web.serve` ever gains the
+# bind address whose absence the whole design works around.
+echo "--- R2-WP07 shadow containment: no response reached a user ---"
+bash "$DRUSE_ROOT/build/check_shadow_containment.sh"
+
 # The benchmark summary must notice when two servers did not do the same work.
 # It did not, once, and a comparison of four servers went out in which one
 # answered with 21.6% more bytes than the others.

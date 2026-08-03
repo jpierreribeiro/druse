@@ -1,0 +1,32 @@
+{
+ "seed": 20260803,
+ "cases": 1500,
+ "timeout_seconds": 2.0,
+ "outcomes": {
+  "closed-no-response": 569,
+  "status:200": 63,
+  "status:201": 30,
+  "status:204": 3,
+  "status:400": 483,
+  "status:404": 8,
+  "status:405": 17,
+  "status:413": 7,
+  "status:417": 11,
+  "status:431": 38,
+  "status:500": 5,
+  "status:505": 9,
+  "timeout": 257
+ },
+ "mutators": {
+  "append-seed": 167,
+  "bit-flip": 177,
+  "byte-flip": 184,
+  "crlf-to-lf": 182,
+  "duplicate-tail": 172,
+  "insert-interesting": 150,
+  "lie-about-length": 145,
+  "splice": 158,
+  "truncate": 165
+ },
+ "violations": []
+}
