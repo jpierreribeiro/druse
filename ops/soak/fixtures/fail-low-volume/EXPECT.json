@@ -1,0 +1,10 @@
+{
+  "note": "One error in 9,000 \u2014 0.011%, over the ceiling arithmetically but below the volume the ceiling needs. Red for ATTRIBUTION, not rate. The paired positive is `saturation-refused`, where the same volume and the same count pass because the class is explained.",
+  "reasons_must_include": [
+    "below the 10000 needed to measure a 0.01% ceiling"
+  ],
+  "reasons_must_not_include": [
+    "ratio exceeded"
+  ],
+  "result": "FAIL"
+}

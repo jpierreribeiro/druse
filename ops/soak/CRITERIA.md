@@ -40,8 +40,27 @@ fault the framework produced.
 ## What makes a run green
 
 1. **Health**: zero transport errors, and p99 under 250 ms in every cycle.
-2. **Other profiles**: transport error ratio at most 0.01%, and no HTTP status
-   outside the expected one.
+2. **Other profiles**: **spontaneous** transport error ratio at most 0.01%, and
+   no HTTP status outside the expected one. Two qualifications, both added by
+   R2-WP04 after the ladder's smoke step measured what the plain rule did:
+
+   - **Saturation refusals are not spontaneous failures.** When every Handler
+     lane is occupied the acceptor closes newly accepted sockets without writing
+     a response and increments `saturation_refusals` — `docs/supported-profile.md`
+     promises exactly that. The generator sees it as `eof_on_fresh_conn`.
+     Counting it here made the server fail a criterion for keeping its own
+     promise, so it is reported **beside** the spontaneous failures and never
+     netted against them, on the same principle as criterion 14. The exemption
+     is checked: more fresh-connection EOFs than the server counted refusals is
+     a red run, because the difference is not explained by the documented path.
+   - **A ratio needs the volume to express it.** The ceiling is 0.01%, so below
+     `1/ceiling` = **10,000** requests it cannot be stated: at 9,000 offered,
+     one error is 0.011% and the smallest non-zero rate the profile can produce
+     is already a failure. That is not a tolerance, it is a demand for
+     perfection. Below that volume the rule is the one this file is built on —
+     **accounting, not tolerance**: every error must be attributable, and there
+     is no rate to exceed. `wait-40ms` at 15/s is the profile this describes,
+     and it failed a smoke on one error in 9,000.
 3. **Every failure is explained.** Each failure carries a class from the
    generator's closed taxonomy and its verbatim error text. A failure that
    arrives `unclassified`, or a failure counted with no class at all, is a RED

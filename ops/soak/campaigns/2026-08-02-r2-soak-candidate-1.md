@@ -73,10 +73,10 @@ instrument change cannot silently keep an old pre-registration:
 
 | File | sha256 |
 |---|---|
-| `ops/soak/CRITERIA.md` | `834ed848a6993537fa40f3379f7818fd4b7b562e6e4f2ad9b938649c5c5ca676` |
+| `ops/soak/CRITERIA.md` | `dd305ac9d528ed6c0445935d852f41fc83b321bdcf222b2171d99da306569fb7` |
 | `ops/soak/schema.md` | `e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640` |
 | `ops/soak/run-soak.sh` | `0ef0dd841f64715aa7a13eab68c3a8e8de483fba430fa604c9469852d47be2e8` |
-| `ops/soak/analyze-soak.py` | `fe10c09657d6f0e47aeb61f9e2486b893d28e5afd007189c49cc29a64fdd7546` |
+| `ops/soak/analyze-soak.py` | `19733211622d579a426fd80e88fa197d50c0eee67eccf452c06b687e22e69bbb` |
 | `ops/soak/soak-server/main.odin` | `59e22b0b7cd017acb7658023950e3ac35bceb4dfb3e25b21e6d9c717e2823b54` |
 | `ops/soak/openload/main.go` | `3382a965e18bb1e714fe36cb6b4ec2ff71b27dfa3818e260c970980d132c48dd` |
 

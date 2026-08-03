@@ -1,0 +1,19 @@
+{
+  "completed": 9000,
+  "failures": [
+    {
+      "class": "eof_on_fresh_conn",
+      "count": 1,
+      "example_error": "EOF on a fresh connection before any response byte"
+    }
+  ],
+  "latency_p99_us": 1800,
+  "planned": 9000,
+  "status": {
+    "0": 1,
+    "200": 8999
+  },
+  "succeeded": 8999,
+  "transport_errors": 1,
+  "unclassified": 0
+}

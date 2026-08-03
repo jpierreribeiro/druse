@@ -607,6 +607,7 @@ def analyse(root):
             "completed": completed,
             "succeeded": succeeded,
             "transport_errors": transport_errors,
+            "failure_classes": dict(failure_counts),
             "status": statuses,
             "status_total": status_total,
             "failures": [
@@ -669,8 +670,26 @@ def analyse(root):
                 f"{workload['transport_errors']} != completed {completed}"
             )
 
+        # SATURATION REFUSALS ARE A DECLARED BEHAVIOUR, NOT A SPONTANEOUS FAULT.
+        #
+        # `docs/supported-profile.md`: when every Handler lane is occupied the
+        # dedicated acceptor "closes newly accepted sockets without writing an
+        # HTTP response and increments `saturation_refusals`". From the
+        # generator's side that is exactly `eof_on_fresh_conn`. Counting it as a
+        # transport error makes the server fail a criterion for doing the thing
+        # its own profile promises.
+        #
+        # So it is separated, on the same principle criterion 14 already applies
+        # to injected faults: reported beside the spontaneous failures, never
+        # netted against them, and the arithmetic closed against the SERVER's own
+        # counter. The correlation is checked globally after this loop — more
+        # `eof_on_fresh_conn` than the server counted refusals means some of
+        # those EOFs were something else, and that is red.
+        refused = workload.get("failure_classes", {}).get("eof_on_fresh_conn", 0)
+        workload["saturation_refused"] = refused
+        workload["spontaneous_errors"] = workload["transport_errors"] - refused
         workload["transport_error_ratio"] = (
-            workload["transport_errors"] / planned if planned else 1.0
+            workload["spontaneous_errors"] / planned if planned else 1.0
         )
         unexpected = {
             status: count
@@ -680,12 +699,80 @@ def analyse(root):
         workload["unexpected_http_status"] = unexpected
         if name == "health" and workload["transport_errors"]:
             reasons.append("health workload transport errors")
-        elif name != "health" and workload["transport_error_ratio"] > 0.0001:
-            reasons.append(f"{name} transport error ratio exceeded 0.01%")
+        elif name != "health":
+            # A RATIO NEEDS THE VOLUME TO MEASURE IT.
+            #
+            # `wait-40ms` offers 9,000 requests in a smoke. A 0.01% ceiling over
+            # 9,000 permits 0.9 errors, so the smallest non-zero rate the
+            # workload can produce — one — is already a failure. The criterion
+            # was not a tolerance there, it was a demand for perfection, and
+            # R2-WP04's third smoke failed on exactly that: one error in 9,000.
+            #
+            # The floor is not a chosen number. It is 1/ceiling: below that
+            # volume the ceiling cannot be expressed, so the rule that applies is
+            # the one this file is built on — accounting, not tolerance. Every
+            # error must be classified and attributable; there is no rate to
+            # exceed.
+            min_volume = int(round(1 / 0.0001))
+            if planned >= min_volume:
+                if workload["transport_error_ratio"] > 0.0001:
+                    reasons.append(
+                        f"{name} spontaneous transport error ratio exceeded 0.01% "
+                        f"({workload['spontaneous_errors']} of {planned}; "
+                        f"{refused} saturation refusal(s) counted separately)"
+                    )
+            elif workload["spontaneous_errors"]:
+                reasons.append(
+                    f"{name} offered {planned} requests, below the {min_volume} "
+                    "needed to measure a 0.01% ceiling, and produced "
+                    f"{workload['spontaneous_errors']} error(s) that are neither "
+                    "saturation refusals nor injected: at this volume every "
+                    "failure must be attributable"
+                )
         if unexpected:
             reasons.append(f"{name} returned unexpected HTTP status")
 
     summary["workloads"] = workloads
+
+    # ------------------------------------------------------------------
+    # The saturation separation must CLOSE against the server's own counter.
+    #
+    # Excusing `eof_on_fresh_conn` because the acceptor is documented to refuse
+    # under saturation is only honest if the acceptor says it refused that many.
+    # Otherwise the exemption becomes a place for real EOFs to hide — a
+    # connection reset by a bug reaching the generator as the same class.
+    #
+    # `saturation_refusals` is a whole-process counter and the workloads are
+    # concurrent, so the check is one-sided: the total the generators saw may be
+    # LOWER than the server's count (a refusal the generator retried past, or
+    # counted in a cycle whose report is not in this artefact), never higher.
+    # ------------------------------------------------------------------
+    refused_total = sum(w.get("saturation_refused", 0) for w in workloads.values())
+    server_refusals = None
+    final_stats = root / "control/final-stats.json"
+    if final_stats.exists():
+        try:
+            server_refusals = int(json.loads(final_stats.read_text())["saturation_refusals"])
+        except (ValueError, KeyError, OSError):
+            server_refusals = None
+    summary["saturation"] = {
+        "refused_seen_by_generators": refused_total,
+        "refusals_counted_by_server": server_refusals,
+    }
+    if refused_total:
+        if server_refusals is None:
+            reasons.append(
+                f"{refused_total} connection(s) were excused as saturation refusals and "
+                "control/final-stats.json does not carry saturation_refusals: the "
+                "exemption cannot be checked against the server that supposedly made it"
+            )
+        elif refused_total > server_refusals:
+            reasons.append(
+                f"generators saw {refused_total} fresh-connection EOF(s) and the server "
+                f"counted only {server_refusals} saturation refusal(s): "
+                f"{refused_total - server_refusals} of them are not explained by the "
+                "documented refusal path and must not be excused as one"
+            )
 
     # ------------------------------------------------------------------
     # Accounting, not tolerance. Every failure carries a class; a class the
