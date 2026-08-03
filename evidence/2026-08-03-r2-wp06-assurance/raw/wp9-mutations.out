@@ -1,0 +1,10 @@
+wp9-mutation: Content-Length 19-digit overflow guard removed -> corpus RED as required
+wp9-mutation: CL+TE smuggling pair accepted -> corpus RED as required
+wp9-mutation: chunk size accepts non-hex -> corpus RED as required
+wp9-mutation: whitespace before the header colon accepted -> corpus RED as required
+wp9-mutation: transfer-coding matched by suffix instead of token (H3) -> corpus RED as required
+wp9-mutation: field-line control check narrowed to the splitting bytes (H1) -> corpus RED as required
+wp9-mutation: absolute-form authority no longer reconciled with Host (H2) -> corpus RED as required
+wp9-mutation: OPTIONS * exemption removed from the authority check (H2) -> corpus RED as required
+wp9-mutation: oversized header block closes silently again (F-005) -> corpus RED as required
+PASS: WP9 raw-wire corpus mutation controls (9 guards, each detected)

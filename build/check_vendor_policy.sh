@@ -109,5 +109,21 @@ if grep -nE '\b(TODO|FIXME|XXX|TBD)\b' "$DRUSE_POLICY"; then
   fail "the vendor policy contains an unfinished-work marker"
 fi
 
+# R2-WP06 — SECURITY.md's patch count is CHECKED, not typed.
+#
+# That page said "five" for four phases while the ledger grew past forty. A
+# number a human maintains is a number that was true once, and on a security
+# page it is worse than absent: a reader treats it as the size of the divergence
+# they are trusting.
+DRUSE_SECURITY="$DRUSE_ROOT/SECURITY.md"
+DRUSE_CLAIMED="$(sed -n 's/^<!-- security-patch-count: \([0-9]\+\) -->$/\1/p' "$DRUSE_SECURITY")"
+test -n "$DRUSE_CLAIMED" ||
+  fail "SECURITY.md lost its security-patch-count marker; the vendored-dependency section states a number this gate can no longer check"
+test "$DRUSE_CLAIMED" = "$DRUSE_POLICY_ROWS" ||
+  fail "SECURITY.md claims $DRUSE_CLAIMED vendor patch dispositions and planning/vendor-policy.md records $DRUSE_POLICY_ROWS. The security page is what a reporter reads to size the divergence they are trusting."
+grep -q "\*\*$DRUSE_POLICY_ROWS patch dispositions\*\*" "$DRUSE_SECURITY" ||
+  fail "SECURITY.md's prose does not state $DRUSE_POLICY_ROWS patch dispositions; the marker and the sentence a human reads must agree"
+
 echo "vendor policy: provenance pinned at 112c49b; $DRUSE_POLICY_ROWS patch dispositions recorded; $DRUSE_PATCH_MARKS in-source markers; corpus rule intact"
+
 echo "PASS: vendor maintenance policy gate (WP51)"
