@@ -1,7 +1,7 @@
 # R2 — plano para produção restrita
 
-**Status:** EM EXECUÇÃO. R2-WP01 e R2-WP03 fechados em 2026-08-02; WP02 e
-WP04–WP08 abertos.
+**Status:** EM EXECUÇÃO. R2-WP01 e R2-WP03 fechados em 2026-08-02; R2-WP02
+fechado em 2026-08-03; WP04–WP08 abertos.
 **Objetivo:** autorizar workloads de produção dentro de um envelope explícito,
 com SLO, observabilidade, capacidade, segurança e rollback provados.
 **Entrada:** R1 promovido e um candidato de release imutável.
@@ -21,9 +21,9 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 | ID | Entregável | Saída principal | Estado |
 |---|---|---|---|
 | R2-WP01 | auditoria e correção do instrumento | soak capaz de explicar toda falha | **fechado** 2026-08-02 |
-| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — host medido e smoke verde 2026-08-02; falta disco (17 GiB de 100 GiB) |
+| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | **fechado** 2026-08-03 |
 | R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | **fechado** 2026-08-02 |
-| R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — bloqueado por WP02 |
+| R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — desbloqueado; host qualificado |
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
 | R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto |
 | R2-WP07 | canário e rollback produtivo | composição real validada | aberto — bloqueado por WP04/06 |
@@ -176,58 +176,41 @@ SLO do serviço. Definir, por workload:
 
 Não copiar números de microbenchmark como SLO.
 
-#### Estado em 2026-08-02 — entregue, e o que continua faltando
+#### R2-WP02 — fechado 2026-08-03
 
-**Entregue e commitado**, em
-[`../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md`](../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md):
-o pré-registro completo (hipótese e não-hipóteses, identidade do candidato com
-os seis arquivos do instrumento fixados por hash, workloads, ladder, critérios
-C18–C20, abort/invalidação, comparações, repetição, owner e janela) e o SLO do
-serviço com **origem declarada por número** — `measured`, `inherited` com
-citação, ou `open` com o método de obtenção.
+**Host qualificado:** `184.72.201.140`, `c5.2xlarge`, Xeon 8275CL, Ubuntu 26.04,
+kernel `7.0.0-1006-aws`, 143 GiB livres. `preflight=pass`, `smoke=pass` nas três
+pernas sem override. Evidência: `evidence/2026-08-02-r2-host-qualification/`.
 
-**Um defeito do instrumento foi fechado no caminho.** O preflight comparava os
-dois CPU sets como **strings**: `0-3` contra `0,1,2,3` passava, e — o caso que
-importa — `0-3` contra `4-7` numa c5.2xlarge passava, sendo esses oito vCPU
-quatro cores físicos com dois hyperthreads cada, pareados `(0,4) (1,5) (2,6)
-(3,7)`. Os conjuntos são disjuntos por número e idênticos por core, de modo que
-o gerador competiria com o servidor em todos os cores medidos — exatamente a
-condição que a disjunção existe para impedir. `preflight.sh` agora mapeia cada
-CPU por `thread_siblings_list` e recusa por esse motivo; um positivo, o mutante
-nomeado e um mutante do próprio controle estão em
-`build/check_soak_controls.sh`. Mesma classe de INS-003 e INS-013: um controle
-verde enquanto a propriedade que ele protege é falsa.
+**Pré-registro commitado antes de qualquer run**, em
+[`../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md`](../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md),
+com o SLO do serviço e **origem declarada por número** — 1 `measured`,
+11 `inherited` com citação, 18 `open` com o método de obtenção. Emendado duas
+vezes, sempre antes de rodar: uma para a affinity, outra para a máquina.
 
-**Decisão de topologia:** host com `ThreadsPerCore=1` (oito cores físicos,
-`0-3`/`4-7` intactos), com o split por core `0,1,4,5` / `2,3,6,7` numa
-c5.2xlarge pré-aprovado como fallback — e o fallback exige editar e commitar o
-pré-registro antes do run, porque derruba `DRUSE_SOAK_LANES` de 4 para 2 e
-invalida a base herdada de todas as taxas. Justificativa em §3.2 do pré-registro.
+**Affinity de registro:** servidor `0,1,4,5`, gerador `2,3,6,7`, `DRUSE_SOAK_LANES=2`.
+Toda taxa de §4 rebaixada a carga oferecida inicial, sem base herdada (§3.4).
 
-**O host foi designado e medido.** `c5.2xlarge` em `44.200.160.96` — e é a
-MESMA máquina das campanhas de 2026-07 (Xeon 8124M, kernel `6.17.0-1017-aws`).
-`lscpu -e` foi finalmente rodado nela: **quatro cores físicos, irmãos
-`(0,4) (1,5) (2,6) (3,7)`**. A pergunta que `planning/verification-campaign-plan.md`
-deixou aberta está respondida, e a resposta é a ruim: todas aquelas campanhas
-rodaram com o gerador nos cores físicos do próprio servidor. Registrado, não
-corrigido — emendar relatório publicado dentro de um commit de qualificação de
-host é exatamente o tipo de edição que este programa existe para impedir.
+**Três defeitos do instrumento fechados, cada um com positivo e mutante:**
 
-Como o dono manteve a c5.2xlarge, o **fallback de §3.2 foi adotado e commitado
-antes de qualquer run**: servidor `0,1,4,5`, gerador `2,3,6,7`, lanes 4→2, e toda
-taxa de §4 rebaixada a carga oferecida inicial sem base herdada (§3.4).
+1. o preflight comparava os CPU sets como **strings** — `0-3` contra `4-7` numa
+   c5.2xlarge passava, sendo os dois conjuntos as duas metades dos mesmos quatro
+   cores. Mesma classe de INS-003 e INS-013;
+2. **`RLIMIT_MEMLOCK` não era checado.** A AMI vem com 8 MiB e os rings do
+   io_uring pinam contra isso — é o F-C03-2, que aparece como crash de startup;
+3. o compilador era checado por **existir**, não por **compilar**. Um host com a
+   toolchain pinada e sem `clang` passava no preflight e morria no primeiro link.
 
-Com essa affinity o preflight reporta `physical_core_disjoint=yes` e o smoke de
-upload/stream/proxy fica **verde no host**, as três pernas, com o Caddy pinado.
+**A pergunta de topologia de 2026-07 está respondida.** O primeiro host designado
+era a máquina das campanhas antigas; `lscpu -e` finalmente rodou nela: quatro
+cores físicos, irmãos `(0,4) (1,5) (2,6) (3,7)`. Todas aquelas campanhas rodaram
+com o gerador nos cores físicos do próprio servidor. Registrado, não corrigido —
+emendar relatório publicado é decisão do dono.
 
-**Falta uma coisa, e é disco.** 17 GiB livres contra 100 GiB estimados para 12 h
-— treze dos catorze requisitos de §3.1 passam, e treze de catorze não é
-qualificação. É decisão de armazenamento, do dono: volume EBS de 100–150 GiB é a
-única saída que não sacrifica critério. Ver
-`evidence/2026-08-02-r2-host-qualification/verdict.md`, seções "The one blocker"
-e "What this does NOT establish".
-
-R2-WP02 fica **aberto**. WP04, WP05, WP07 e WP08 continuam bloqueados.
+**Achado de produto, fora do escopo deste WP:** `STREAM-001`, em
+`evidence/2026-08-03-stream-truncation-finding/`. Um stream destacado pedido duas
+vezes seguidas é truncado em silêncio (200 OK, zero diagnóstico). Reproduz em
+dois servidores independentes, um deles no gate. Não corrigido aqui.
 
 ## 4. Etapa C — observabilidade que sobreviva à pressão
 

@@ -12,7 +12,10 @@ raw/host-topology.txt                       lscpu -e and every thread_siblings_l
 raw/ec2-host-topology.txt                   THE CAMPAIGN HOST: 4 physical cores, siblings (0,4) (1,5) (2,6) (3,7)
 raw/ec2-preflight-0-3-vs-4-7.txt            the campaign host under the HISTORICAL affinity: refused, by topology
 raw/ec2-preflight-core-split.txt            the campaign host under 0,1,4,5 / 2,3,6,7: disjoint=yes, one problem left (disk)
-raw/ec2-smoke.txt                           upload, stream and proxy green ON THE CAMPAIGN HOST
+raw/ec2-smoke.txt                           upload/stream/proxy on the FIRST designated host (disk-refused)
+raw/ec2b-host-topology.txt                  THE QUALIFIED HOST 184.72.201.140: 4 physical cores, same sibling map
+raw/ec2b-preflight-qualified.txt            preflight=pass on the qualified host
+raw/ec2b-smoke-qualified.txt                smoke=pass, three legs, no override
 raw/smoke-this-host.txt                     upload, stream and proxy, green, on an UNQUALIFIED host
 raw/smoke-stderr.txt                        the smoke's console output
 raw/check_soak_controls.out                 the full control suite, 38 assertions

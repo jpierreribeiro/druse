@@ -1,24 +1,31 @@
-# R2-WP02 verdict — the host exists, and one thing disqualifies it
+# R2-WP02 verdict — the host is qualified
 
-**Decision: R2-WP02 remains OPEN. R2 remains blocked; the gate stays at R1.**
+**Decision: R2-WP02 CLOSED. R2-WP04 is unblocked. The gate stays at R1.**
 
-The owner designated the host mid-work-package: an existing `c5.2xlarge` at
-`44.200.160.96`. It was inventoried, prepared and measured, and the campaign
-pre-registration was amended and committed **before** anything ran on it.
+The owner designated a host mid-work-package, then provisioned a second one when
+the first failed on disk. The second qualifies:
 
-The result is narrow and specific. Of the fourteen host requirements in §3.1,
-thirteen are met on this machine. **One is not: it has 17 GiB of free disk
-against an estimated 100 GiB for a twelve-hour run**, and that is now the only
-thing between this host and a qualified one. It is a decision about storage, not
-about Druse, and it belongs to the owner — see "The one blocker" below.
+```text
+preflight=pass                 physical_core_disjoint=yes
+odin_can_build=yes             memlock_hard_kib=unlimited
+free_gib_at=...:140            smoke=pass  (no override)
+```
 
-Everything else this work package owes is delivered: the pre-registration with
-its service SLO, an instrument defect closed with a positive control and three
-mutants, an upload/stream/proxy smoke that did not exist before and is **green on
-the designated host**, and the SMT question that had been open since 2026-07
-answered by measurement.
+`184.72.201.140` — a `c5.2xlarge`, Xeon 8275CL, Ubuntu 26.04, kernel
+`7.0.0-1006-aws`, 143 GiB free. The pre-registration was amended for it and
+committed **before** anything ran, twice: once for the affinity when the first
+host was designated (§3.1, §3.4), once for the machine itself when the second
+replaced it. Under G1 they are different environments and nothing carried over.
 
-**None of this is evidence about Druse.** No soak was run.
+Everything this work package owes is delivered: the pre-registration with its
+service SLO, the topology defect closed with a positive control and three
+mutants, two further preflight gaps found by running it on real hardware, an
+upload/stream/proxy smoke that did not exist before and is green on the qualified
+host, and the SMT question open since 2026-07 answered by measurement.
+
+**None of this is evidence about Druse, and one thing found along the way is a
+defect in it** — see `evidence/2026-08-03-stream-truncation-finding/`. No soak
+was run.
 
 ## What was accepted
 
@@ -32,8 +39,8 @@ Against the acceptance list in `planning/readiness/R2-restricted-production.md`
 | the pre-registration is committed before the first run | met — no run has occurred, and the affinity amendment was committed before the smoke | `ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md` §3.1/§3.4 |
 | every SLO has a declared origin | met | `analysis/slo-origins.md`: 1 measured, 11 inherited, 18 open |
 | `preflight.sh` runs on the host | met | `raw/ec2-preflight-0-3-vs-4-7.txt`, `raw/ec2-preflight-core-split.txt` |
-| …and **qualifies** it | **NOT met** — 13 of 14 requirements pass; free disk does not | `raw/ec2-preflight-core-split.txt`: one `problem=` line, and it is storage |
-| upload/stream/proxy smoke green on the host | met, with the override stamped | `raw/ec2-smoke.txt`: `smoke=pass`, all three legs |
+| …and **qualifies** it | **met** | `raw/ec2b-preflight-qualified.txt`: `preflight=pass` |
+| upload/stream/proxy smoke green on the host | **met, no override** | `raw/ec2b-smoke-qualified.txt`: `smoke=pass`, all three legs, `preflight=pass` |
 
 `build/check_soak_controls.sh` is at 38 assertions, up from 26. The twelve new
 ones are six for the topology check, three for the smoke's ordering and its
@@ -177,9 +184,17 @@ as if it were about the product.
 
 - **No soak was run.** Not 12 h, not 2 h, not the burn-in, not the smoke step of
   the ladder. Nothing here measures Druse.
-- **The host is still not qualified.** Thirteen of fourteen requirements pass;
-  free disk does not, and "thirteen of fourteen" is not a qualification. The
-  acceptance criterion is **not met**.
+- **A qualified host is not a measured product.** `preflight=pass` and
+  `smoke=pass` say the machine can run the campaign. They say nothing about
+  whether Druse survives twelve hours on it. That is R2-WP04.
+- **The smoke does NOT detect STREAM-001, and it passes partly because of the
+  bug's own hiding condition.** The proxy leg mints certificates, starts a
+  container and waits for TLS between the direct stream and the proxy stream —
+  about four seconds, comfortably more than the three that make the truncation
+  disappear. A smoke that ran the two streams back to back would have gone red.
+  It is left as it is, deliberately: the smoke's job is to qualify a host, and
+  turning it into a regression test for a framework defect would conflate the
+  two. The regression test belongs in `tests/`, and the finding says so.
 - **The green smoke was taken with the override on.** All three legs passed on
   the designated host — a 64 KiB body spooled and checksummed byte-for-byte, ten
   stream frames delivered incrementally, and both again through the pinned Caddy
