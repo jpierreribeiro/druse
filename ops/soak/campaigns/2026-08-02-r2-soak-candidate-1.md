@@ -468,10 +468,61 @@ reach twelve hours.
 | Step | Duration | Question | Can promote? | Result |
 |---|---:|---|---|---|
 | host qualification | — | `preflight.sh` green, `smoke.sh` green | no | **PASS** 2026-08-03, `184.72.201.140` |
-| smoke | 10 min | wiring, schema, clocks, hashes | no | **PASS** 2026-08-03 at the fourth attempt (`9905509`); three red runs, all instrument. `evidence/2026-08-03-r2-soak-smoke/` |
-| burn-in | 30 min | every workload and fault class appears | no | **FAIL** 2026-08-03 (`6bff82f`) — `health transport errors`. Re-derivation in §4.1; the ladder restarts at smoke |
-| rehearsal | 2 h | fast drift, evidence volume, first latency distributions | no | |
-| final | ≥12 h | R2 stability criterion + §6 SLO | yes, if PASS | |
+| smoke | 10 min | wiring, schema, clocks, hashes | no | **PASS** 2026-08-03 at the fourth attempt (`9905509`); three red runs, all instrument. `evidence/2026-08-03-r2-soak-smoke/`. **Re-run PASS** at the §4.1 rates (`6b4f3d4`) |
+| burn-in | 30 min | every workload and fault class appears | no | **FAIL** at the original rates (`6bff82f`) — `health transport errors`, which produced §4.1. **PASS** at the §4.1 rates (`6b4f3d4`), health 0 errors in 36,000 — but see §4.2 |
+| rehearsal | 2 h | fast drift, evidence volume, first latency distributions | no | running 2026-08-03 |
+| final | ≥12 h | R2 stability criterion + §6 SLO | yes, if PASS | **blocked by §4.2 until the rate question is settled** |
+
+### 4.2 The burn-in passed and the rule of §4.1 fired anyway
+
+**Recorded before the rehearsal finished, so it cannot be read as a reaction to
+its result.**
+
+The burn-in at the §4.1 rates is a PASS by every criterion: `/health` took 36,000
+requests with **zero** transport errors, the only two errors in the whole run
+were `eof_on_fresh_conn` on `tiny`, RSS tail slope was 737 KiB/h against a
+1 MiB/h ceiling, and kernel `listen_drops`/`listen_overflows` stayed at zero.
+
+**And the server still refused 3 connections.**
+
+§4.1 wrote the rule before this run: *"Se qualquer recusa aparecer neles, a taxa
+desce de novo — nesta seção, em seu próprio commit, antes do final."* Three is
+any. The rule fired.
+
+It fired for the reason §4.1 gave in advance, which is the part worth keeping:
+**three cycles measured zero and fifteen cycles measured three.** Six minutes did
+not predict thirty. A twelve-hour final is ~360 cycles, and if refusals scale
+with cycles at all, the arithmetic is not comforting:
+
+| | |
+|---|---|
+| refusals per cycle, measured at 15 cycles | 0.2 |
+| projected over a 360-cycle final | ~72 |
+| `/health`'s share of connection attempts | 16 of 624 ≈ 2.6% |
+| expected `/health` refusals in one final | **~1.8** |
+
+Criterion 1 allows zero. **On this projection a twelve-hour final at the current
+rate is more likely to fail than to pass**, and it would fail for the mechanism
+this campaign already understands rather than for anything new.
+
+**So the burn-in's green is not permission to run the final.** It says the rate is
+no longer catastrophic; it does not say it is under the threshold. What settles
+it is the rehearsal — 60 cycles, four times the burn-in's evidence — and the
+decision waits for that number rather than for this projection, because a
+projection from one point is exactly what §4.1 warned against.
+
+**The decision, stated in advance so the rehearsal cannot be read selectively:**
+
+- rehearsal refusals **= 0** → the rate stands and the final may run;
+- rehearsal refusals **> 0** → the rate comes down again, in this section, in its
+  own commit, before the final. The next step down is f = 0.10 (1,569/s
+  aggregate, health still 20/s), which the derivation measured clean and which
+  has two further clean points below it.
+
+Either way this is the ladder working. A rate that passes a 30-minute step and
+fails a 12-hour one is precisely what the intermediate steps exist to find
+*before* twelve hours are spent, and finding it here costs two hours instead of
+invalidating a final under G3.
 
 **The rate change of §4.1 is a new candidate and the ladder restarts at smoke.**
 G1 counts load-bearing configuration as part of a candidate's identity, and the
