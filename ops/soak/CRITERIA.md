@@ -12,7 +12,16 @@ The artefact these criteria are read from is defined in
 ## The run
 
 One server process, pinned to CPUs 0-3, with the load generators on CPUs 4-7,
-driving six profiles at once for the configured number of hours:
+driving six profiles at once for the configured number of hours.
+
+**Those must be eight PHYSICAL cores, not eight logical CPUs.** On an SMT host
+`0-3` and `4-7` are routinely the two thread halves of the same four cores — an
+AWS c5.2xlarge pairs them `(0,4) (1,5) (2,6) (3,7)` — and then the generator
+runs on the server's own cores, which is the single condition the split exists to
+prevent. `ops/soak/preflight.sh` maps every CPU through
+`thread_siblings_list` and refuses the host when the two sets share a core; a run
+whose preflight report does not carry `physical_core_disjoint=yes` describes a
+server that was competing with its own load generator (R2-WP02).
 
 | Profile | Rate | Connections | Expected status |
 |---|---:|---:|---|
@@ -31,8 +40,27 @@ fault the framework produced.
 ## What makes a run green
 
 1. **Health**: zero transport errors, and p99 under 250 ms in every cycle.
-2. **Other profiles**: transport error ratio at most 0.01%, and no HTTP status
-   outside the expected one.
+2. **Other profiles**: **spontaneous** transport error ratio at most 0.01%, and
+   no HTTP status outside the expected one. Two qualifications, both added by
+   R2-WP04 after the ladder's smoke step measured what the plain rule did:
+
+   - **Saturation refusals are not spontaneous failures.** When every Handler
+     lane is occupied the acceptor closes newly accepted sockets without writing
+     a response and increments `saturation_refusals` — `docs/supported-profile.md`
+     promises exactly that. The generator sees it as `eof_on_fresh_conn`.
+     Counting it here made the server fail a criterion for keeping its own
+     promise, so it is reported **beside** the spontaneous failures and never
+     netted against them, on the same principle as criterion 14. The exemption
+     is checked: more fresh-connection EOFs than the server counted refusals is
+     a red run, because the difference is not explained by the documented path.
+   - **A ratio needs the volume to express it.** The ceiling is 0.01%, so below
+     `1/ceiling` = **10,000** requests it cannot be stated: at 9,000 offered,
+     one error is 0.011% and the smallest non-zero rate the profile can produce
+     is already a failure. That is not a tolerance, it is a demand for
+     perfection. Below that volume the rule is the one this file is built on —
+     **accounting, not tolerance**: every error must be attributable, and there
+     is no rate to exceed. `wait-40ms` at 15/s is the profile this describes,
+     and it failed a smoke on one error in 9,000.
 3. **Every failure is explained.** Each failure carries a class from the
    generator's closed taxonomy and its verbatim error text. A failure that
    arrives `unclassified`, or a failure counted with no class at all, is a RED
@@ -40,11 +68,37 @@ fault the framework produced.
 4. **The process survives**: no death, no `SIGKILL`, exit status zero.
 5. **Threads constant** for the whole run.
 6. **File descriptors** back within baseline + 4 after the settling window.
-7. **RSS tail slope** at most 1 MiB/h over the second half of the run.
-8. **`/stats` answers 200 on every sample**, and a sample that does not carries
-   the reason it did not — curl's exit code alongside the HTTP code. This was
-   measured and never enforced: a 12-hour run recorded 111 failures of 8,611,
-   passed, and the number sat in the artefact with no cause and no consequence.
+7. **RSS tail slope** at most 1 MiB/h over the second half of the run — **and
+   only for runs of two hours or more**. R2-WP04's burn-in failed this at
+   2,328.8 KiB/h over thirty-three minutes; the median RSS by quarter on that
+   same artefact was 5,920 → 7,184 → 7,746 → **7,744** KiB. The last quarter did
+   not grow: an allocator warming up and saturating, with the second half of a
+   short run still containing its rise. Removing the fault-injection windows
+   (two ~26 MiB peaks landing in the same second as the slow-reader injections,
+   which abandon 24 responses of 1 MiB) moved it only to 2,066.7 KiB/h, so the
+   peaks were not the cause either. The floor is duration rather than sample
+   count, because 720 samples is twelve minutes and twelve minutes of a warming
+   allocator cannot express a per-hour trend. A shorter run **records the slope
+   and does not judge it**, and says so in the artefact — a rule that quietly
+   did not apply is how a dead sampler once graded PASS.
+8. **The metric snapshot is readable on every sample**, and a sample that is not
+   carries the reason — one cause from ADR-050's closed taxonomy, in the
+   telemetry's second stats field.
+
+   This criterion used to read *"`/stats` answers 200 on every sample"*, over an
+   HTTP scrape of an ordinary route. R2-WP04's smoke is what finally measured
+   the cost of that: with the pre-registered two-lane affinity, **322 of 658
+   samples failed** — 295 empty replies, 27 receive failures — because the
+   scrape competed for the very Handler lanes it was sampling. The observer took
+   a lane from the observed and then could not report it.
+
+   ADR-050 had already decided against that channel (AUD-P2-009), and the soak
+   server had already grown the exporter. The runner had simply never passed the
+   path that turns it on, so the out-of-band channel R2-WP03 shipped had never
+   run in a campaign. Now it does, and the causes are `missing` (101),
+   `unreadable` (102), `malformed` (103), `stale` (104), `no_process` (105) and
+   `disabled` (106) — every one of which names the **application**, which is the
+   whole reason the arm was chosen.
 9. Safety stop: RSS above 4 GiB ends the run and fails it.
 
 ## What R2-WP01 added
@@ -85,6 +139,17 @@ describes an artefact that used to grade PASS:
     writing anything. `soak/0` raised `FileNotFoundError` on precisely the
     artefact a bad night produces, so the run with the most to say produced no
     grade at all.
+
+## What R2-WP02 added
+
+18. **The host was qualified.** `manifest.txt` records `preflight=pass`. The
+    field has existed since `soak/1` and was read by NOTHING, so a run taken
+    with `DRUSE_SOAK_SKIP_PREFLIGHT=1` graded exactly like a run on a qualified
+    host — the same shape as criterion 11's finding, one level up. It matters
+    more since R2-WP02, because the preflight is now also what refuses a host
+    whose server and generator CPU sets are SMT siblings of the same physical
+    cores; a run that skipped it establishes neither that the host could run the
+    campaign nor that the generator stayed off the server's cores.
 
 ## Accounting, not tolerance
 

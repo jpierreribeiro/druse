@@ -1,0 +1,25 @@
+# candidate
+commit=(rsync, ver manifest do WP02)
+smoke_server_sha256=9112d1fc133fda6ee35406715f568437455493d344f62ea916966831e235e03a
+r1_server_sha256=37b333e2a1e3eb2f87a89f2ad716f51fd4b5e8b22dfe2861e0ff474bf5976d91
+
+## ARM 1 — ops/soak/smoke-server, 10 frames x 50ms, max_handlers=4
+request 1 frames=10
+request 2 frames=7
+request 3 frames=10
+request 4 frames=7
+request 5 frames=10
+request 6 frames=7
+server_stderr_bytes=0
+
+## ARM 2 — mesma coisa, 3s de pausa entre requests
+request 1 frames=10
+request 2 frames=10
+request 3 frames=10
+request 4 frames=10
+
+## ARM 3 — tests/r1-real-proxy/server (no gate), 10 frames x 200ms
+request 1 frames=10
+request 2 frames=1
+request 3 frames=10
+request 4 frames=1

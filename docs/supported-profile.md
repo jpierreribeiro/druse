@@ -20,7 +20,7 @@ that every possible deployment topology is production-ready.
   are no backports or LTS branches. A breaking public change increments MINOR.
 - The transport is the pinned `laytan/odin-http` snapshot. The canonical
   divergence ledger is `planning/vendor-policy.md`; it currently contains
-  **43 dispositions**. `vendor/odin-http/VENDOR.md` records provenance and
+  **45 dispositions**. `vendor/odin-http/VENDOR.md` records provenance and
   delegates the live ledger to that file.
 
 ## Network and HTTP boundary

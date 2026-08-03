@@ -111,6 +111,9 @@ bash -n "$DRUSE_ROOT/build/check_pilot_runbooks.sh"
 bash -n "$DRUSE_ROOT/build/check_pilot_exercise.sh"
 bash -n "$DRUSE_ROOT/build/check_r1_freeze.sh"
 bash -n "$DRUSE_ROOT/build/check_vendor_policy.sh"
+bash -n "$DRUSE_ROOT/build/check_release_identity.sh"
+bash -n "$DRUSE_ROOT/ops/release/approve-artefact.sh"
+bash -n "$DRUSE_ROOT/ops/release/verify-deployed.sh"
 bash -n "$DRUSE_ROOT/build/check_wp38_controls.sh"
 bash -n "$DRUSE_ROOT/build/install-hooks.sh"
 bash -n "$DRUSE_ROOT/experiments/run_checks.sh"
@@ -119,6 +122,8 @@ bash -n "$DRUSE_ROOT/ops/ci/run.sh"
 bash -n "$DRUSE_ROOT/ops/ci/status.sh"
 bash -n "$DRUSE_ROOT/ops/ci/install-odin.sh"
 bash -n "$DRUSE_ROOT/ops/verification/run-r1-freeze.sh"
+bash -n "$DRUSE_ROOT/ops/soak/preflight.sh"
+bash -n "$DRUSE_ROOT/ops/soak/smoke.sh"
 
 # `odin test` writes its runner executable into the CURRENT WORKING DIRECTORY.
 # It removes it again on success — but NOT when the test run fails, which drops
@@ -1715,6 +1720,24 @@ env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_soak_controls
 echo "--- R2-WP03 observability: saturation is visible, and absence has a cause ---"
 env DRUSE_COMPILER="$DRUSE_COMPILER" bash "$DRUSE_ROOT/build/check_r2_observability_controls.sh"
 
+# R2-WP08 — the deployment-identity criterion, amended on 2026-08-03 after
+# `verify-rebuild.sh` measured that this toolchain does not build byte-identical
+# output for identical input. The criterion stopped asking the BUILD to be
+# reproducible and started asking the ARTEFACT to be the same file. That is a
+# stronger claim, and like every claim here it needs a mutant: M2 deploys a file
+# of exactly the approved size with different content, which is the precise
+# shape the rebuild measurement produced.
+echo "--- R2-WP08 release identity: the deployed hash is the approved hash ---"
+bash "$DRUSE_ROOT/build/check_release_identity.sh"
+
+# R2-WP07 — the shadow's containment claim. K3 is the half that survives being
+# moved to another topology: every request the edge served is one the shadow
+# sent. Five mutants keep "containment=proven" from being a string the script
+# always prints, and the last assertion notices if `web.serve` ever gains the
+# bind address whose absence the whole design works around.
+echo "--- R2-WP07 shadow containment: no response reached a user ---"
+bash "$DRUSE_ROOT/build/check_shadow_containment.sh"
+
 # The benchmark summary must notice when two servers did not do the same work.
 # It did not, once, and a comparison of four servers went out in which one
 # answered with 21.6% more bytes than the others.
@@ -1824,6 +1847,22 @@ timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/b
   "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
   -out:"$DRUSE_BIN_TMP/wp96-public-stream" ||
   fail "the WP96 public streaming API did not pass within the timeout"
+# STREAM-001 — a stream must not be killed by the PREVIOUS stream's connection
+# teardown. `runtime.links` is indexed by registry slot and `retire` frees the
+# slot immediately, so back-to-back streams reuse one `Stream_Link`; the finished
+# stream's connection still carried a teardown hook pointing at it, and the hook
+# closed and retired the NEW stream's token. Truncated response, 200 status,
+# clean close, no log line — found while qualifying the R2 campaign host, on two
+# independent servers, one of them in this gate.
+#
+# The suite requests six streams because the defect ALTERNATED: two requests pass
+# half the time by landing on the good phase.
+echo "--- STREAM-001 back-to-back streams are not truncated (odin test) ---"
+timeout 120 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/stream001-slot-reuse" \
+  "-collection:druse=$DRUSE_ROOT" -define:ODIN_TEST_THREADS=1 \
+  -out:"$DRUSE_BIN_TMP/stream001-slot-reuse" ||
+  fail "STREAM-001 regression: a detached stream was truncated by the previous stream's teardown"
 echo "--- WP96 registry scale: 3,000 streams open/receive/drain (odin test) ---"
 env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
   "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/wp96-scale" \

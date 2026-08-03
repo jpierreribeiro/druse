@@ -1,0 +1,1 @@
+wire_origin_counters ping=85 echo=70 nobody=6 smuggled=0 smuggled_via_proxy=0

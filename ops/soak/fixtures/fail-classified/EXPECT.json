@@ -1,7 +1,7 @@
 {
-  "note": "Every failure carries a class and its text; the run is red for the RATE alone. Proves the rate rule and the accounting rule are independent.",
+  "note": "Every failure carries a class and its text; the run is red for the RATE alone. Proves the rate rule and the accounting rule are independent. Volume is above 1/ceiling so the rate branch is the one under test.",
   "reasons_must_include": [
-    "tiny transport error ratio exceeded 0.01%"
+    "tiny spontaneous transport error ratio exceeded 0.01%"
   ],
   "reasons_must_not_include": [
     "not classified",

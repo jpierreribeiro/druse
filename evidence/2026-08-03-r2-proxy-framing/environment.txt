@@ -1,0 +1,4 @@
+utc=2026-08-03T13:57:10Z
+commit=cd859101064953c5b999dd3481ca260df1b4bea2
+caddy_image=docker.io/library/caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+odin=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7

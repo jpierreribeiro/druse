@@ -92,10 +92,25 @@ grep -q 'lane.handler_active' "$DRUSE_ADAPTER" ||
 grep -q 'server.opts.max_connections - server.opts.reserved_connections' "$DRUSE_ADAPTER" ||
   fail "connection_capacity no longer subtracts reserved_connections; it would report a ceiling admission does not enforce"
 
-# The vendor ledger must not have grown for this. Every one of the four is a
-# READ of state the backend already keeps.
-grep -q 'DRUSE PATCH 44' "$DRUSE_ROOT/vendor/odin-http/server.odin" &&
-  fail "a patch 44 appeared in the backend. R2-WP03 added no vendor patch by design; if one is genuinely needed it belongs in the vendor ledger with a disposition, not here."
+# The vendor ledger must not have grown FOR THIS. Every one of the four fields is
+# a READ of state the backend already keeps.
+#
+# DERIVED FROM THE INTENT, NOT FROM A NUMBER. This used to assert that no patch
+# *44* existed, which expressed "R2-WP03 added no vendor patch" only for as long
+# as 43 stayed the highest patch. R2-WP06 then added patch 44 for an entirely
+# unrelated reason — F-005, the oversized header block that answers 431 — and
+# this control failed a change it has no opinion about, naming a work package
+# that had nothing to do with it. A gate that a later legitimate change makes
+# wrong is a gate people learn to edit rather than read.
+#
+# The claim it should make is about the REASON on a marker, not its ordinal: no
+# vendor patch may cite observability or WP03. That stays true however far the
+# ledger grows, and it still catches the thing worth catching — someone reaching
+# for a vendor patch to expose a counter instead of reading state that exists.
+if grep -nE 'DRUSE PATCH [0-9]+ \([^)]*(observabilit|WP03|wp03)' \
+     "$DRUSE_ROOT/vendor/odin-http/server.odin"; then
+  fail "a vendor patch in the backend cites observability or WP03. R2-WP03 added no vendor patch by design — its four fields are reads of state the backend already keeps. If one is genuinely needed it belongs in the vendor ledger with a disposition, not here."
+fi
 
 # ---------------------------------------------------------------------------
 # 3. The exporter never writes in place

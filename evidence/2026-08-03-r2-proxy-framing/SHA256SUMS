@@ -1,0 +1,12 @@
+e33c157c329433d024559289edaf48267fd3731c54677a78a6e38059eb0efcae  ./environment.txt
+308f574ffbb60ce17b718d782b00b779fd022c3038cd4acb9bb1de3277dca7f3  ./raw/caddy.log
+c6067af198e3ea2208ead1557e0551946f0ffcfb9f3052f723211ce9dbc36f2d  ./raw/clte-upstream-forwarded.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./raw/comparison.err
+78f9c3da4a8a8edf1f5df070e9770c5b73b36ba52283f212ed815894cea18921  ./raw/comparison-preliminary.txt
+0fbb36e0a6ba1375bdcd49b10312cea742c79d03f3b27eff9026a4060957aba3  ./raw/comparison.txt
+4c06408a31d163e3d2c464978d58e48d4bd77577554c6d97b1989c0ca862f9b2  ./raw/isolation.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./raw/origin-counters.txt
+178d493d03b437f55ac9de8b7305da293bf75b6df7b0f4b7c04bcbc37e663075  ./raw/origin.log
+f43f46b9c40b7c35a0bdcf4b1446e371c93940d3df31476e1eadfa2f0a4c57f5  ./raw/upstream_recorder.py
+b2969bf24a0827adf7de41e9da1639b571f7c37426bf2ad4a0ef0fb2512910e4  ./verdict.md
+a6837228f4ec161bbbfe8cb813448b9b3688fb5d06f86ff229da9d2cd8492c56  ./verdict-preliminary-INVALID.md

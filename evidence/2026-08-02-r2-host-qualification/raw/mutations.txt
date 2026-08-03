@@ -1,0 +1,24 @@
+# Mutation log — R2-WP02. Each mutation is applied to the working tree,
+# build/check_soak_controls.sh is run, and its refusal is recorded verbatim.
+# The tree is restored between mutations; 'git status' is clean at the end.
+
+=== M1: the physical-core refusal is deleted from ops/soak/preflight.sh ===
+PASS (soak preflight, R2-WP02 positive): CPU sets on four distinct physical cores are qualified, and the mapping is recorded
+SOAK-CONTROL-FAIL: the preflight refused the SMT host for some OTHER reason. A refusal for the wrong reason would let the same host through the moment its disk grew, and the campaign would run with the generator on the server's cores.
+exit=1
+
+=== M2: the physical-core comparison is reverted to the shipped string equality ===
+SOAK-CONTROL-FAIL: the preflight did not confirm physical-core disjointness on a host where the two CPU sets are four whole cores. A preflight that can only refuse cannot be told apart from a broken one.
+exit=1
+
+=== M3: the instrument moves and the pre-registration does not (G1) ===
+SOAK-CONTROL-FAIL: the instrument moved and the pre-registration did not:
+    pinned:  ff25766041819d56af0dc1511e7b7f056f752f8820062f6fdc68961675515730
+    on disk: cfd4d6df0ebe328c6d4e01080a3a2b9f8106d13db4d0f92fbfd0803d1b74bb80
+Readiness rule G1: a change to the instrument creates a NEW CANDIDATE, and
+exit=1
+
+=== M4: the manifest says the preflight was skipped (criterion 18) ===
+negative 12 (preflight skipped): expected FAIL, got PASS
+SOAK-CONTROL-FAIL: control failed: negative 12 (preflight skipped)
+exit=1

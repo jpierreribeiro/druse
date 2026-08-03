@@ -1,7 +1,7 @@
 # R2 — plano para produção restrita
 
-**Status:** EM EXECUÇÃO. R2-WP01 e R2-WP03 fechados em 2026-08-02; WP02 e
-WP04–WP08 abertos.
+**Status:** EM EXECUÇÃO. R2-WP01 e R2-WP03 fechados em 2026-08-02; R2-WP02
+fechado em 2026-08-03; WP04–WP08 abertos.
 **Objetivo:** autorizar workloads de produção dentro de um envelope explícito,
 com SLO, observabilidade, capacidade, segurança e rollback provados.
 **Entrada:** R1 promovido e um candidato de release imutável.
@@ -21,13 +21,13 @@ framework geral nem compatibilidade com qualquer aplicação Odin.
 | ID | Entregável | Saída principal | Estado |
 |---|---|---|---|
 | R2-WP01 | auditoria e correção do instrumento | soak capaz de explicar toda falha | **fechado** 2026-08-02 |
-| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | aberto — falta host dedicado |
+| R2-WP02 | pré-registro e qualificação do host | ambiente/candidato congelados | **fechado** 2026-08-03 |
 | R2-WP03 | observabilidade fora da zona cega | saturation e scrape distinguíveis | **fechado** 2026-08-02 |
-| R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — bloqueado por WP02 |
+| R2-WP04 | soak escalonado e final de 12 h | estabilidade do candidato | aberto — smoke e burn-in PASS nas taxas re-derivadas (pré-registro §4.1); rehearsal em curso; finais bloqueados por §4.2 |
 | R2-WP05 | capacidade, knee e degradação | envelope e SLO operacional | aberto — bloqueado por WP04 |
-| R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto |
-| R2-WP07 | canário e rollback produtivo | composição real validada | aberto — bloqueado por WP04/06 |
-| R2-WP08 | freeze/aceite de risco | decisão Tier 2 | aberto |
+| R2-WP06 | segurança e supply chain | corpus, SBOM, rebuild e vendor policy | aberto — 8 de 8 itens executados 2026-08-03: F-005, SECURITY.md, rebuild, BOM, framing pelo proxy, fuzz, revisão de endpoints, pins F8/F12/F-007. Achados abertos: TRUST-001, SHADOW-001. **Uma cláusula não fecha: assinatura de release** — ver §7.1 |
+| R2-WP07 | canário e rollback produtivo | composição real validada | aberto — degrau 1 (shadow) entregue 2026-08-03; degraus 2–6 como risco aceito (§8.1) |
+| R2-WP08 | freeze/aceite de risco | decisão Tier 2 | aberto — critério de saída emendado 2026-08-03 (§9.1) |
 
 ### R2-WP01 — fechado
 
@@ -175,6 +175,42 @@ SLO do serviço. Definir, por workload:
 - RTO do restart e rollback.
 
 Não copiar números de microbenchmark como SLO.
+
+#### R2-WP02 — fechado 2026-08-03
+
+**Host qualificado:** `184.72.201.140`, `c5.2xlarge`, Xeon 8275CL, Ubuntu 26.04,
+kernel `7.0.0-1006-aws`, 143 GiB livres. `preflight=pass`, `smoke=pass` nas três
+pernas sem override. Evidência: `evidence/2026-08-02-r2-host-qualification/`.
+
+**Pré-registro commitado antes de qualquer run**, em
+[`../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md`](../../ops/soak/campaigns/2026-08-02-r2-soak-candidate-1.md),
+com o SLO do serviço e **origem declarada por número** — 1 `measured`,
+11 `inherited` com citação, 18 `open` com o método de obtenção. Emendado duas
+vezes, sempre antes de rodar: uma para a affinity, outra para a máquina.
+
+**Affinity de registro:** servidor `0,1,4,5`, gerador `2,3,6,7`, `DRUSE_SOAK_LANES=2`.
+Toda taxa de §4 rebaixada a carga oferecida inicial, sem base herdada (§3.4).
+
+**Três defeitos do instrumento fechados, cada um com positivo e mutante:**
+
+1. o preflight comparava os CPU sets como **strings** — `0-3` contra `4-7` numa
+   c5.2xlarge passava, sendo os dois conjuntos as duas metades dos mesmos quatro
+   cores. Mesma classe de INS-003 e INS-013;
+2. **`RLIMIT_MEMLOCK` não era checado.** A AMI vem com 8 MiB e os rings do
+   io_uring pinam contra isso — é o F-C03-2, que aparece como crash de startup;
+3. o compilador era checado por **existir**, não por **compilar**. Um host com a
+   toolchain pinada e sem `clang` passava no preflight e morria no primeiro link.
+
+**A pergunta de topologia de 2026-07 está respondida.** O primeiro host designado
+era a máquina das campanhas antigas; `lscpu -e` finalmente rodou nela: quatro
+cores físicos, irmãos `(0,4) (1,5) (2,6) (3,7)`. Todas aquelas campanhas rodaram
+com o gerador nos cores físicos do próprio servidor. Registrado, não corrigido —
+emendar relatório publicado é decisão do dono.
+
+**Achado de produto, fora do escopo deste WP:** `STREAM-001`, em
+`evidence/2026-08-03-stream-truncation-finding/`. Um stream destacado pedido duas
+vezes seguidas é truncado em silêncio (200 OK, zero diagnóstico). Reproduz em
+dois servidores independentes, um deles no gate. Não corrigido aqui.
 
 ## 4. Etapa C — observabilidade que sobreviva à pressão
 
@@ -399,6 +435,24 @@ reprodução, fix, teste e disclosure handling; não é corrigido apenas no repo
   registrar fontes de nondeterminismo;
 - assinar checksums/release conforme política do projeto.
 
+#### 7.1 A cláusula que não fecha — assinatura, 2026-08-03
+
+O §7 pede "assinar checksums/release **conforme política do projeto**". Não
+existe política. Nenhum arquivo em `docs/`, `planning/`, `SECURITY.md` ou
+`ops/release/` define chave, formato, custódia ou verificação, e não há nada em
+`gpg`, `minisign` ou `cosign` no repositório.
+
+**Isto não é um item esquecido, é um item que não pode ser executado como
+escrito**, e assinar com uma chave inventada durante um work package seria pior
+que não assinar: uma assinatura cuja custódia ninguém decidiu não prova nada e
+convida a ser confiada.
+
+O que o R2-WP08 §9.1 já entrega no lugar é a metade verificável — o hash do
+artefato aprovado, gravado e conferido no alvo. Uma assinatura acrescenta *quem*
+aprovou àquele hash, e isso é uma decisão de custódia do dono, não uma tarefa de
+engenharia deste WP. Registrado como cláusula aberta com o motivo, e não marcado
+como concluída.
+
 #### Arquivos previstos
 
 - `tests/wp9-wire/` ou corpus de suporte correspondente;
@@ -447,6 +501,72 @@ tempo sozinho não é critério. Promoção é manual e registrada.
 Rollback preserva logs antes de retirar o candidato. Não “corrigir ao vivo” no
 mesmo artefato.
 
+### 8.1 O degrau 1 não precisa de tráfego real — corrigido em 2026-08-03
+
+O R2-WP07 esteve registrado como **“bloqueado em tráfego produtivo real”**, e
+essa leitura estava errada. O degrau 1 da progressão acima é *“shadow ou replay
+sanitizado, **sem resposta ao usuário**”* — um degrau cuja definição é a ausência
+de usuário. Ele precisa de candidato, da borda suportada e de tráfego em forma de
+produção; os três existem. Bloqueado estavam os degraus 2 a 6, não o primeiro.
+
+**Entregue:** `ops/canary/run-shadow.sh`, `ops/canary/shadow_replay.py`,
+`ops/canary/containment_check.py`, o perfil declarado em
+`ops/canary/shadow-profile.md` e o controle
+`build/check_shadow_containment.sh` — positivo verde e cinco mutantes vermelhos.
+
+**“Sem resposta ao usuário” é feito de quatro coisas**, três asseguradas e uma
+que virou achado:
+
+| # | Propriedade | Como se obtém |
+|---|---|---|
+| K1 | endereço de escuta do candidato | **registrado, não asseverado** — ver abaixo |
+| K1b | todo peer que falou com o candidato era o proxy | observação amostrada durante toda a janela |
+| K2 | o proxy fixado publica só em `127.0.0.1` | `docker inspect`, todo `HostIp` tem de ser loopback |
+| K3 | a contabilidade **fecha** sem resto | log de acesso do proxy reconciliado contra a contagem do próprio driver, com os health probes internos do Caddy declarados e contados à parte |
+
+K3 é a única que sobrevive a outra topologia: *toda requisição que a borda serviu
+é uma que o shadow enviou*. Uma resposta que chegou a um usuário é uma requisição
+servida que ninguém aqui enviou, e isso aparece como **resto não contabilizado**
+em vez de como uma ausência que alguém precisa notar.
+
+#### SHADOW-001 — o Druse não sabe escutar só em loopback
+
+`web.serve(&app, port)` recebe uma porta e **nenhum endereço**, e o transporte
+faz bind em dual-stack Any — `::`, caindo para `0.0.0.0`
+(`web/internal/transport/odin_http_adapter.odin`). **Não há como pedir a uma
+aplicação Druse que escute apenas em loopback.**
+
+Para o shadow isso remove a contenção natural. Para qualquer implantação
+significa que o processo é alcançável em toda interface que o host tiver, e
+confiná-lo é trabalho do firewall do host e não da aplicação — uma restrição
+operacional real que `docs/supported-profile.md` hoje **não** enuncia.
+
+Nenhuma API é inventada aqui (G5: um plano pode nomear uma necessidade pública,
+não pode inventar assinatura). A necessidade fica nomeada; K1b é o substituto e é
+**mais fraco em espécie** — uma propriedade vale sempre, uma observação vale
+sobre a janela em que observou — e o manifesto rotula assim.
+
+#### Degraus 2–6: risco aceito formal, não “bloqueado”
+
+Os degraus de 1%, 5%, 25%, 50% e 100% exigem tráfego de usuários reais. Este
+projeto não tem nenhum. “Bloqueado” não é um estado de encerramento — o README
+do programa lista três: concluído, **risco aceito** (com owner, escopo, validade
+e mitigação) e fora do perfil. Este é o segundo, redigido para ser assinado no
+freeze do R2-WP08:
+
+| Campo | Conteúdo |
+|---|---|
+| **Risco** | a composição do candidato com tráfego real nunca foi exercida. Diversidade de cliente, distribuição de keep-alive, mistura de rotas, tamanhos de corpo e concorrência reais são todos **declarados** (`shadow-profile.md` §2), não amostrados |
+| **O que já cobre parte dele** | o shadow exercita a topologia suportada inteira — Caddy fixado, TLS, keep-alive, streams, corpos variados — e o R1 já exerceu shutdown, rollback e o contrato do proxy na mesma borda |
+| **O que continua descoberto** | qualquer falha que só apareça sob distribuição real: cabeçalhos de clientes que ninguém previu, padrões de conexão de CDN, picos correlacionados, e o comportamento do rollback com usuários em voo |
+| **Escopo** | somente o perfil de `docs/supported-profile.md`, atrás do proxy revisado, num serviço restrito |
+| **Mitigação** | o degrau 1 roda antes de qualquer promoção; alertas e runbooks do R1 ativos; rollback ensaiado e medido (3 s, `evidence/2026-08-02-r1-pilot-exercise/`); o primeiro serviço real **é** o degrau 2 e será tratado como canário, com abort automático pela lista do §8 |
+| **Validade** | até o primeiro tráfego de usuário real existir, e no máximo até a próxima revisão do gate |
+| **Owner** | o dono do repositório — este documento propõe, não aceita: um risco aceito por quem o descobriu não é aceite |
+
+**Isto não promove nada.** Um risco aceito é uma decisão registrada sobre
+evidência que não existe; não é evidência.
+
 ## 9. R2-WP08 — freeze e decisão
 
 ### Pacote de decisão
@@ -471,7 +591,78 @@ mesmo artefato.
 - observabilidade mantém diagnóstico sob saturação;
 - proxy real, segurança e rebuild aprovados;
 - canário e rollback concluídos;
-- artefato implantado é byte-idêntico ao aprovado.
+- **o hash do artefato implantado é o hash aprovado** — emendado em 2026-08-03,
+  ver §9.1.
+
+### 9.1 Emenda de 2026-08-03 — o objeto do critério mudou, o rigor não
+
+**O critério anterior era “artefato implantado é byte-idêntico ao aprovado”, e
+está medido como insatisfazível.**
+
+`ops/release/verify-rebuild.sh` clonou o mesmo commit duas vezes, compilou com o
+mesmo compilador fixado, na mesma máquina, e obteve
+(`evidence/2026-08-03-r2-wp06-assurance/raw/rebuild-two-clean-clones.txt`):
+
+```text
+build_a_sha256=396138bbfa137a316085ff3e7e46b007e715e68f2a3c134959f751eced4eb83f
+build_b_sha256=96d61da8e3f8818d509cb6cf47181f52fd1bca0050ffefa9c1760ff9de4ccb54
+build_a_bytes=918640
+build_b_bytes=918640
+byte_identical=no
+size_delta_bytes=0
+```
+
+Bytes diferentes, **tamanho idêntico**. A causa está fora do alcance deste
+repositório — é a toolchain — e um critério vermelho para sempre por um motivo
+que ninguém aqui pode remover não é rigor, é um critério que as pessoas aprendem
+a ignorar.
+
+**O que mudou é o objeto, não a exigência.** A leitura antiga exigia que *o
+build* fosse reproduzível. A nova exige que *o artefato* seja o mesmo arquivo:
+
+> compilar uma vez → hashear aquele arquivo → implantar **aquele** arquivo →
+> provar que os bytes no alvo hasheiam para o valor aprovado.
+
+**Isso é mais forte do que reproduzir o build, e a diferença é verificável.** Um
+build reprodutível prova que dois compiladores concordaram; ele não diz nada
+sobre o que foi para o alvo. Este critério tira a máquina de build da cadeia de
+confiança inteira: os bytes revisados são os bytes que rodam, e a afirmação é
+sobre o único artefato que serve tráfego.
+
+**O que a emenda perde, dito porque perde mesmo.** Byte-identidade daria uma
+segunda propriedade — qualquer pessoa poderia reconstruir o artefato a partir da
+fonte e conferir. Isso não é recuperado aqui e não é reivindicado em lugar
+nenhum: a nota de release diz *“construído a partir deste commit com este
+compilador”*, e `approve-artefact.sh` grava essa distinção dentro do próprio
+registro (`not_claimed=`), para que um leitor do artefato não precise achar este
+parágrafo.
+
+**Instrumento**, com controle positivo e cinco mutantes (G2):
+
+| Arquivo | Papel |
+|---|---|
+| `ops/release/approve-artefact.sh` | grava o registro de aprovação: hash, tamanho, commit, tree, toolchain; **recusa** árvore suja |
+| `ops/release/verify-deployed.sh` | hasheia o arquivo no alvo e compara; `deployed_identity=match` ou falha |
+| `build/check_release_identity.sh` | positivo verde + M1 byte trocado, M2 mesmo tamanho e conteúdo diferente, M3 registro editado, M4 arquivo ausente, M5 registro sem hash |
+
+O mutante **M2 é o que importa**: ele reproduz exatamente a forma que a medição
+acima produziu — mesmo tamanho, conteúdo diferente — porque qualquer atalho que
+compare comprimento passaria nele. Aqui isso é errado por demonstração, não por
+princípio.
+
+**Por que isto respeita G3.** G3 congela critérios antes do *run* que promove.
+Nenhum run de promoção do R2-WP08 aconteceu — o WP08 é a decisão final e está
+aberto. A emenda nomeia a medição que a forçou, preserva o artefato dessa
+medição, e a medição é sobre a toolchain, não sobre um resultado do candidato
+que alguém quisesse contornar. O critério continua exigindo uma prova
+criptográfica sobre o artefato implantado; mudou de qual artefato ela fala.
+
+`ops/release/verify-rebuild.sh` **continua no lugar** e continua sendo rodado:
+ele não é mais um critério de saída, é a medição que mantém a fonte de
+não-determinismo registrada. Se um dia a toolchain passar a reproduzir,
+`byte_identical=yes` aparece nele e a byte-identidade volta a ser exigível — o
+controle falha de propósito se aquele arquivo deixar de dizer
+`byte_identical=no`, para que a volta seja uma decisão e não um esquecimento.
 
 ### Resultado permitido
 

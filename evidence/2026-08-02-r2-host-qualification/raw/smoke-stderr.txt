@@ -1,0 +1,1 @@
+smoke: upload, stream and proxy are green on this host

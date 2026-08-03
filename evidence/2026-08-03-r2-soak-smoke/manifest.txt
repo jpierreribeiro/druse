@@ -1,0 +1,17 @@
+# R2-WP04 smoke step — files in this package.
+
+verdict.md                     PASS, after three red runs that were all instrument
+analysis/verdict.json          the analyser's grade of the passing run (smoke 4)
+raw/smoke-1-verdict.json       322 of 658 /stats absences, telemetry short, ratio
+raw/smoke-2-verdict.json       1 of 656 absences, telemetry still short
+raw/smoke-3-verdict.json       instrument clean; two ratio criteria still red
+                               (RE-GRADED by the current analyser — diagnostic only)
+raw/manifest.txt               the passing run's identity: commit, tree, binaries
+raw/cycles.csv                 five cycles, health status and p99 per cycle
+raw/final-state.txt            how the run ended
+raw/final-stats.json           the server's own counters, including saturation_refusals
+raw/preflight.txt              the host qualification this run was gated on
+raw/injected.txt               the deliberate faults, declared
+config/pre-registration.md     the campaign as committed, with its three amendments
+commands.txt                   how to reproduce the ladder
+environment.txt                the qualified host

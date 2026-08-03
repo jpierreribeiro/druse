@@ -1,0 +1,14 @@
+driver_requests_sent=467
+proxy_requests_served=467
+proxy_internal_health_probes=0
+accounted=467
+malformed_access_log_lines=0
+route GET /headers sent=61 served=61
+route GET /health sent=12 served=12
+route GET /ok sent=249 served=249
+route GET /stream sent=24 served=24
+route GET /whoami sent=17 served=17
+route POST /body sent=87 served=87
+route POST /proxy-limit sent=17 served=17
+responses_delivered_to_a_user=0
+containment=proven

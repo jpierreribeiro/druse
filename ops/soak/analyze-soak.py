@@ -46,6 +46,20 @@ TELEMETRY_COLUMNS = (
 KERNEL_COLUMNS = ("listen_overflows", "listen_drops", "tcp_abort_on_close", "tcp_retrans")
 
 # curl's exit codes, so a /stats failure arrives as a cause rather than a count.
+# The second telemetry stats field. Two eras share this column, deliberately —
+# `soak/1` artefacts and the eight committed fixtures stay readable.
+#
+#   0-99   curl exit codes, from when the sampler scraped /stats over HTTP.
+#          Kept so an artefact from before R2-WP04 still explains itself.
+#   101+   ADR-050's closed absence taxonomy, from the out-of-band snapshot.
+#          Every one of these names the APPLICATION, which is the property the
+#          arm was chosen for: there is no network between the metric and its
+#          reader, so "the exchange was lost" is not among the possibilities.
+#
+# An unmapped code is a worse diagnostic than a wrong one, because it reads as a
+# typo rather than as a cause. R2-WP04's second smoke printed
+# "1x exit 101 (unmapped curl exit)" for what was simply the first sample
+# arriving before the exporter had written anything.
 CURL_EXIT_MEANING = {
     "0": "no error",
     "6": "could not resolve host",
@@ -55,6 +69,12 @@ CURL_EXIT_MEANING = {
     "52": "empty reply from server",
     "55": "send failure",
     "56": "receive failure",
+    "101": "snapshot missing",
+    "102": "snapshot unreadable",
+    "103": "snapshot malformed",
+    "104": "snapshot stale",
+    "105": "the exporting process is gone",
+    "106": "the snapshot channel was not configured",
 }
 
 # A sampler is allowed to miss a few ticks under load; it is not allowed to
@@ -204,6 +224,27 @@ def analyse(root):
         reasons.append(
             "the run was taken with DRUSE_SOAK_ALLOW_DIRTY=1: it is a diagnostic, "
             "not evidence for a promotion decision"
+        )
+
+    # R2-WP02 — the host was qualified.
+    #
+    # `preflight` has been in the manifest and in schema.md since soak/1, and
+    # NOTHING READ IT. That is INS-003's exact shape: a field recorded for a
+    # criterion nobody evaluates, so a run taken with DRUSE_SOAK_SKIP_PREFLIGHT=1
+    # graded identically to a run on a qualified host.
+    #
+    # It is not a formality. Until R2-WP02 the preflight compared the server and
+    # generator CPU sets as strings, so `0-3` against `4-7` on an SMT host — a
+    # c5.2xlarge is four physical cores with two threads each — passed while the
+    # generator ran on the server's own cores. A run that skipped the preflight
+    # entirely rules out even less than that.
+    preflight_state = manifest.get("preflight")
+    if manifest and preflight_state != "pass":
+        reasons.append(
+            f"the host was not qualified (manifest preflight="
+            f"{preflight_state or 'missing'}): nothing in this artefact rules out "
+            "the load generator having competed with the server for CPU, so the "
+            "numbers describe a measurement whose isolation was never established"
         )
 
     # The binaries that finished must be the binaries that started.
@@ -359,12 +400,59 @@ def analyse(root):
     if fds and fds[-1] > fds[0] + 4:
         reasons.append(f"file descriptors did not settle ({fds[0]} -> {fds[-1]})")
 
+    # RSS TAIL SLOPE, AND THE WARM-UP THAT MUST BE OUTSIDE THE WINDOW.
+    #
+    # The rule is 1 MiB/h measured over the SECOND HALF of the run, and it was
+    # written for a twelve-hour soak where the second half is six hours. R2-WP04's
+    # burn-in ran it over fifteen minutes and it failed at 2,328.8 KiB/h.
+    #
+    # Measured on that artefact, because the number alone does not say which:
+    #
+    #   median RSS by quarter   5,920 -> 7,184 -> 7,746 -> 7,744 KiB
+    #
+    # The last quarter did not grow. That is an allocator warming up and
+    # saturating, and the second half of a 33-minute run still contains its rise.
+    # Removing the fault-injection windows — two RSS peaks of ~26 MiB landing in
+    # the same second as the slow-reader injections, which abandon 24 responses
+    # of 1 MiB — moved it only to 2,066.7 KiB/h, so the peaks were not the cause
+    # either.
+    #
+    # So the floor is DURATION, not sample count. 720 samples is twelve minutes
+    # at a one-second interval, and twelve minutes of a warming allocator cannot
+    # express a per-hour trend: the window extrapolates 5x from data that has not
+    # settled. The threshold below is the ladder's own rehearsal step — two hours,
+    # whose second half begins an hour in, comfortably past the ~25-30 minutes
+    # where the median stopped rising.
+    #
+    # A shorter run reports the slope and does NOT judge it, which is the same
+    # shape as criterion 11's `expected_samples`: a rule that cannot be evaluated
+    # must say so rather than pass silently. R2-WP01 built this instrument
+    # because a criterion that quietly did not apply is how a dead sampler graded
+    # PASS.
+    RSS_SLOPE_MIN_SECONDS = 2 * 60 * 60
     slope = summary["rss_kib"]["tail_slope_kib_per_hour"] if summary["rss_kib"] else None
-    if len(telemetry) >= 720:
+    run_seconds = 0
+    if len(telemetry) >= 2:
+        try:
+            run_seconds = (int(telemetry[-1]["unix_nanos"]) - int(telemetry[0]["unix_nanos"])) / 1e9
+        except (KeyError, ValueError):
+            run_seconds = 0
+    summary["rss_slope_evaluated"] = run_seconds >= RSS_SLOPE_MIN_SECONDS
+    summary["rss_slope_run_seconds"] = round(run_seconds)
+    if run_seconds >= RSS_SLOPE_MIN_SECONDS:
         if slope is None:
             reasons.append("RSS tail slope could not be computed from a long run")
         elif slope > 1024:
             reasons.append(f"RSS tail slope exceeded 1 MiB/hour ({slope:.1f} KiB/h)")
+    elif len(telemetry) >= 720:
+        # Not silence: the number is carried and named as unjudged, so a reader
+        # cannot mistake "not evaluated" for "evaluated and fine".
+        summary["rss_slope_note"] = (
+            f"tail slope {slope:.1f} KiB/h recorded but NOT judged: the run is "
+            f"{run_seconds/60:.0f} min and the criterion needs "
+            f"{RSS_SLOPE_MIN_SECONDS/3600:.0f} h for its window to start after "
+            "allocator warm-up"
+        ) if slope is not None else "tail slope not computable"
 
     # ------------------------------------------------------------------
     # Kernel counters. Recorded since 2026-07-30 and never once read: a run in
@@ -566,6 +654,7 @@ def analyse(root):
             "completed": completed,
             "succeeded": succeeded,
             "transport_errors": transport_errors,
+            "failure_classes": dict(failure_counts),
             "status": statuses,
             "status_total": status_total,
             "failures": [
@@ -628,8 +717,26 @@ def analyse(root):
                 f"{workload['transport_errors']} != completed {completed}"
             )
 
+        # SATURATION REFUSALS ARE A DECLARED BEHAVIOUR, NOT A SPONTANEOUS FAULT.
+        #
+        # `docs/supported-profile.md`: when every Handler lane is occupied the
+        # dedicated acceptor "closes newly accepted sockets without writing an
+        # HTTP response and increments `saturation_refusals`". From the
+        # generator's side that is exactly `eof_on_fresh_conn`. Counting it as a
+        # transport error makes the server fail a criterion for doing the thing
+        # its own profile promises.
+        #
+        # So it is separated, on the same principle criterion 14 already applies
+        # to injected faults: reported beside the spontaneous failures, never
+        # netted against them, and the arithmetic closed against the SERVER's own
+        # counter. The correlation is checked globally after this loop — more
+        # `eof_on_fresh_conn` than the server counted refusals means some of
+        # those EOFs were something else, and that is red.
+        refused = workload.get("failure_classes", {}).get("eof_on_fresh_conn", 0)
+        workload["saturation_refused"] = refused
+        workload["spontaneous_errors"] = workload["transport_errors"] - refused
         workload["transport_error_ratio"] = (
-            workload["transport_errors"] / planned if planned else 1.0
+            workload["spontaneous_errors"] / planned if planned else 1.0
         )
         unexpected = {
             status: count
@@ -639,12 +746,80 @@ def analyse(root):
         workload["unexpected_http_status"] = unexpected
         if name == "health" and workload["transport_errors"]:
             reasons.append("health workload transport errors")
-        elif name != "health" and workload["transport_error_ratio"] > 0.0001:
-            reasons.append(f"{name} transport error ratio exceeded 0.01%")
+        elif name != "health":
+            # A RATIO NEEDS THE VOLUME TO MEASURE IT.
+            #
+            # `wait-40ms` offers 9,000 requests in a smoke. A 0.01% ceiling over
+            # 9,000 permits 0.9 errors, so the smallest non-zero rate the
+            # workload can produce — one — is already a failure. The criterion
+            # was not a tolerance there, it was a demand for perfection, and
+            # R2-WP04's third smoke failed on exactly that: one error in 9,000.
+            #
+            # The floor is not a chosen number. It is 1/ceiling: below that
+            # volume the ceiling cannot be expressed, so the rule that applies is
+            # the one this file is built on — accounting, not tolerance. Every
+            # error must be classified and attributable; there is no rate to
+            # exceed.
+            min_volume = int(round(1 / 0.0001))
+            if planned >= min_volume:
+                if workload["transport_error_ratio"] > 0.0001:
+                    reasons.append(
+                        f"{name} spontaneous transport error ratio exceeded 0.01% "
+                        f"({workload['spontaneous_errors']} of {planned}; "
+                        f"{refused} saturation refusal(s) counted separately)"
+                    )
+            elif workload["spontaneous_errors"]:
+                reasons.append(
+                    f"{name} offered {planned} requests, below the {min_volume} "
+                    "needed to measure a 0.01% ceiling, and produced "
+                    f"{workload['spontaneous_errors']} error(s) that are neither "
+                    "saturation refusals nor injected: at this volume every "
+                    "failure must be attributable"
+                )
         if unexpected:
             reasons.append(f"{name} returned unexpected HTTP status")
 
     summary["workloads"] = workloads
+
+    # ------------------------------------------------------------------
+    # The saturation separation must CLOSE against the server's own counter.
+    #
+    # Excusing `eof_on_fresh_conn` because the acceptor is documented to refuse
+    # under saturation is only honest if the acceptor says it refused that many.
+    # Otherwise the exemption becomes a place for real EOFs to hide — a
+    # connection reset by a bug reaching the generator as the same class.
+    #
+    # `saturation_refusals` is a whole-process counter and the workloads are
+    # concurrent, so the check is one-sided: the total the generators saw may be
+    # LOWER than the server's count (a refusal the generator retried past, or
+    # counted in a cycle whose report is not in this artefact), never higher.
+    # ------------------------------------------------------------------
+    refused_total = sum(w.get("saturation_refused", 0) for w in workloads.values())
+    server_refusals = None
+    final_stats = root / "control/final-stats.json"
+    if final_stats.exists():
+        try:
+            server_refusals = int(json.loads(final_stats.read_text())["saturation_refusals"])
+        except (ValueError, KeyError, OSError):
+            server_refusals = None
+    summary["saturation"] = {
+        "refused_seen_by_generators": refused_total,
+        "refusals_counted_by_server": server_refusals,
+    }
+    if refused_total:
+        if server_refusals is None:
+            reasons.append(
+                f"{refused_total} connection(s) were excused as saturation refusals and "
+                "control/final-stats.json does not carry saturation_refusals: the "
+                "exemption cannot be checked against the server that supposedly made it"
+            )
+        elif refused_total > server_refusals:
+            reasons.append(
+                f"generators saw {refused_total} fresh-connection EOF(s) and the server "
+                f"counted only {server_refusals} saturation refusal(s): "
+                f"{refused_total - server_refusals} of them are not explained by the "
+                "documented refusal path and must not be excused as one"
+            )
 
     # ------------------------------------------------------------------
     # Accounting, not tolerance. Every failure carries a class; a class the
@@ -696,7 +871,7 @@ def analyse(root):
         if code in (None, "", "0"):
             stats_uncaptured += 1
         else:
-            label = f"{code} ({CURL_EXIT_MEANING.get(code, 'unmapped curl exit')})"
+            label = f"{code} ({CURL_EXIT_MEANING.get(code, 'unmapped cause')})"
             stats_causes[label] = stats_causes.get(label, 0) + 1
     summary["stats_missing_samples"] = len(stats_missing)
     summary["stats_failure_causes"] = stats_causes

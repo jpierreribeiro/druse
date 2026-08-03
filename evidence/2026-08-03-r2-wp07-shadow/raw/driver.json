@@ -1,0 +1,22 @@
+{
+ "finished_utc": "2026-08-03T14:09:55Z",
+ "requests_by_route": {
+  "GET /headers": 61,
+  "GET /health": 12,
+  "GET /ok": 249,
+  "GET /stream": 24,
+  "GET /whoami": 17,
+  "POST /body": 87,
+  "POST /proxy-limit": 17
+ },
+ "requests_total": 467,
+ "response_bytes_discarded": 5138,
+ "responses_delivered_to_a_user": 0,
+ "seed": 20260803,
+ "started_utc": "2026-08-03T14:08:54Z",
+ "statuses": {
+  "200": 467
+ },
+ "target_rate_per_second": 40.0,
+ "transport_errors": {}
+}

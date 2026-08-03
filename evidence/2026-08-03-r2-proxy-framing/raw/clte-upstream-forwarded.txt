@@ -1,0 +1,2 @@
+b'POST /echo HTTP/1.1\r\nHost: proxy.test\r\nTransfer-Encoding: chunked\r\nVia: 1.1 Caddy\r\nX-Forwarded-For: 172.17.0.1\r\nX-Forwarded-Host: proxy.test\r\nX-Forwarded-Proto: https\r\nAccept-Encoding: gzip\r\n\r\n'
+b'GET /smuggled HTTP/1.1\r\nHost: proxy.test\r\nVia: 1.1 Caddy\r\nX-Forwarded-For: 172.17.0.1\r\nX-Forwarded-Host: proxy.test\r\nX-Forwarded-Proto: https\r\nAccept-Encoding: gzip\r\n\r\n'

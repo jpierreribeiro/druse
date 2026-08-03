@@ -1,0 +1,60 @@
+# R2-WP02 — commands, in order.
+# Run from the repository root. The toolchain is the pin in odin-version.txt
+# (dev-2026-07a / 819fdc7), downloaded from the release and verified against its
+# recorded sha256 before use; DRUSE_ODIN_BIN and PATH both point at it.
+
+# 1. What the SHIPPED preflight said about this host's topology. The host is
+#    8 logical CPUs over 4 physical cores with siblings (0,4) (1,5) (2,6) (3,7),
+#    so server 0-3 and generator 4-7 are the two thread halves of the same four
+#    cores. The shipped preflight reports no topology problem at all.
+git show origin/main:ops/soak/preflight.sh > /tmp/preflight-shipped.sh
+bash /tmp/preflight-shipped.sh raw/preflight-shipped-this-host.txt
+
+# 2. The topology itself, verbatim, so the claim above is checkable.
+lscpu -e
+for f in /sys/devices/system/cpu/cpu[0-9]*/topology/thread_siblings_list; do
+  echo "$(basename "$(dirname "$(dirname "$f")")")=$(cat "$f")"
+done | sort -V
+# -> raw/host-topology.txt
+
+# 3. The repaired preflight, same host, same affinity. Now refused, by name.
+bash ops/soak/preflight.sh raw/preflight-fixed-0-3-vs-4-7.txt
+
+# 4. The core-disjoint split of the SAME host. Qualified on the topology axis,
+#    which is what makes the refusal in (3) a statement about the affinity and
+#    not about the machine.
+env DRUSE_SOAK_SERVER_CPUS=0,1,4,5 DRUSE_SOAK_GENERATOR_CPUS=2,3,6,7 \
+  bash ops/soak/preflight.sh raw/preflight-fixed-core-split.txt
+
+# 5. Two more paths the string comparison could not see.
+env DRUSE_SOAK_SERVER_CPUS=0-3 DRUSE_SOAK_GENERATOR_CPUS=0,1,2,3 \
+  bash ops/soak/preflight.sh raw/preflight-same-set-two-spellings.txt
+env DRUSE_SOAK_TOPOLOGY_DIR=/nonexistent-topology \
+  bash ops/soak/preflight.sh raw/preflight-topology-unreadable.txt
+
+# 6. The upload/stream/proxy smoke. DRUSE_SOAK_SMOKE_ALLOW_UNQUALIFIED is set
+#    because this host is refused by (3); the report stamps itself with the
+#    override, which is the only reason running it here is honest.
+DRUSE_SOAK_SMOKE_ALLOW_UNQUALIFIED=1 bash ops/soak/smoke.sh raw/smoke-this-host.txt
+
+# 7. The controls, including the six new ones for the topology check, the three
+#    for the smoke and the one for the pre-registration.
+bash build/check_soak_controls.sh > raw/check_soak_controls.out
+
+# 8. The mutations. Each is applied to the working tree, the controls are run,
+#    and the refusal is recorded; the tree is restored between them.
+#    -> raw/mutations.txt
+sed -i '/share physical core(s)/d' ops/soak/preflight.sh          # M1
+bash build/check_soak_controls.sh; git checkout ops/soak/preflight.sh
+# M2 replaces the physical-core block with the shipped string equality.
+# M3 appends a line to ops/soak/analyze-soak.py so its hash no longer matches
+#    the table the pre-registration pinned.
+printf '\n# drift\n' >> ops/soak/analyze-soak.py                  # M3
+bash build/check_soak_controls.sh; git checkout ops/soak/analyze-soak.py
+# M4 disables the criterion-18 check in the analyser (`if False:`) and requires
+#    negative control 12 to go red.
+
+# 9. The full gate. NOT as root: build/check_r1_resource_controls.sh chmods a
+#    spool to 0500 and requires the preflight to see it non-writable, and root
+#    ignores DAC.
+bash build/check.sh

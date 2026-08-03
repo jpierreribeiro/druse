@@ -1,0 +1,8 @@
+# R2-WP06 first pass — files in this package.
+
+verdict.md                            three items closed, four owed, and what the
+                                      rebuild measurement does to R2-WP08
+raw/rebuild-two-clean-clones.txt      two builds of one commit: different bytes,
+                                      identical size
+raw/wp9-mutations.out                 nine raw-wire guards, each proved detectable
+raw/vendor-policy.out                 44 dispositions, 119 in-source markers

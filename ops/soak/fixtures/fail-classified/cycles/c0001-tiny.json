@@ -1,5 +1,5 @@
 {
-  "completed": 1000,
+  "completed": 20000,
   "failures": [
     {
       "class": "peer_reset",
@@ -8,12 +8,12 @@
     }
   ],
   "latency_p99_us": 1800,
-  "planned": 1000,
+  "planned": 20000,
   "status": {
     "0": 40,
-    "200": 960
+    "200": 19960
   },
-  "succeeded": 960,
+  "succeeded": 19960,
   "transport_errors": 40,
   "unclassified": 0
 }

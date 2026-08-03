@@ -1,0 +1,16 @@
+utc=2026-08-03T14:09:57Z
+commit=cd859101064953c5b999dd3481ca260df1b4bea2
+working_tree_dirty_files=22
+candidate=tests/r1-real-proxy/server
+candidate_sha256=4d44c19989607b71e2feffa217ca45b52217ef585d3baa897b5150e4609f071d
+caddy_image=docker.io/library/caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+odin=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7
+upstream_port=18601
+proxy_publish=127.0.0.1:18643
+shadow_seconds=60
+k1_candidate_listen_address=wildcard
+k1_note=web.serve takes no bind address; a wildcard listen is the framework's only option and is recorded, not asserted
+k1b_foreign_peers=none
+k1b_peer_observation=pass
+k2_proxy_published_to_loopback_only=pass
+k3_accounting_closed=pass

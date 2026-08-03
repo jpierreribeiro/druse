@@ -1,0 +1,32 @@
+smoke_utc=2026-08-02T21:20:11Z
+hostname=jp-Latitude-5400
+kernel=Linux 6.8.0-86-generic x86_64 GNU/Linux
+server_cpus=0-3
+preflight=fail
+smoke_on_unqualified_host=yes (DRUSE_SOAK_SMOKE_ALLOW_UNQUALIFIED=1) — a green result below is a fact about this SCRIPT, not a qualified host
+preflight_problem=server (0-3) and generator (4-7) are disjoint by CPU NUMBER and share physical core(s) [0 4;1 5;2 6;3 7]: those CPUs are SMT sibling threads of one core, so the load generator would compete with the process under measurement on the very cores being measured — which is the condition the disjoint sets exist to rule out
+preflight_problem=port 8080 already has a listener
+preflight_problem=40 GiB free at /home/jp/Desktop/uruquim-odin; a 12h run is estimated to need 100 GiB of raw CSV
+odin=/home/jp/.local/opt/Odin/odin
+odin_version=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7
+smoke_server_sha256=4e749f8ce7f6384ed487decfa106d5757155f9cfcd4611b4103c8f6367d3d6fd
+time_to_ready_ms=21 (100 ms poll granularity, upper bound)
+origin_port=18081
+expected_upload_reply=size=65536 sum=df04d79db8262325
+direct_upload_spooled=ok (size=65536 sum=df04d79db8262325)
+direct_upload_buffered=ok
+direct_stream_frames=10 want=10
+direct_stream_first_frame_s=0.053 last_frame_s=0.504
+direct_stream_spread_s=0.451
+direct_stream_incremental=ok
+caddy_image=docker.io/library/caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+caddy_image_id=sha256:af555904a0961945f16bb323a501457b13a4f7e9bde969b145b97da80b38ecbe
+proxy_upload_spooled=ok (size=65536 sum=df04d79db8262325)
+proxy_upload_buffered=ok
+proxy_stream_frames=10 want=10
+proxy_stream_first_frame_s=0.103 last_frame_s=0.554
+proxy_stream_spread_s=0.451
+proxy_stream_incremental=ok
+server_alive_after_smoke=yes
+spool_files_left=0
+smoke=pass

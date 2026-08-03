@@ -33,6 +33,22 @@ LANES="${DRUSE_SOAK_LANES:-4}"
 SERVER_CPUS="${DRUSE_SOAK_SERVER_CPUS:-0-3}"
 GENERATOR_CPUS="${DRUSE_SOAK_GENERATOR_CPUS:-4-7}"
 END_EPOCH=$(( $(date +%s) + HOURS * 3600 ))
+
+# ADR-050's out-of-band metric channel. The server writes a snapshot from a
+# thread that owns no Handler lane; the sampler reads the file. Empty disables
+# it, which is refused by the analyser rather than tolerated.
+SNAPSHOT_PATH="${DRUSE_SOAK_SNAPSHOT_PATH:-$OUT/control/snapshot.txt}"
+SNAPSHOT_MAX_AGE_SECONDS="${DRUSE_SOAK_SNAPSHOT_MAX_AGE_SECONDS:-5}"
+# The closed absence taxonomy of ADR-050, carried in the second telemetry field.
+# Numbers, not names, because the column is `soak/1`'s integer `stats_curl_exit`
+# and the artefact schema is not being broken to add a word. They are far from
+# curl's 0-99 so an artefact from either era reads unambiguously.
+SNAPSHOT_CAUSE_MISSING=101     # the path does not exist
+SNAPSHOT_CAUSE_UNREADABLE=102  # it exists and could not be read
+SNAPSHOT_CAUSE_MALFORMED=103   # wrong schema line, or no timestamp
+SNAPSHOT_CAUSE_STALE=104       # readable, and older than max_age
+SNAPSHOT_CAUSE_NO_PROCESS=105  # the server named by the run is gone
+SNAPSHOT_CAUSE_DISABLED=106    # no snapshot path configured at all
 mkdir -p "$OUT"/{bin,control,cycles,telemetry}
 
 SERVER="$OUT/bin/server"
@@ -157,11 +173,22 @@ openload_sha256="$(sha256sum "$OPENLOAD" | awk '{print $1}')"
 # taken with the preflight skipped must not die here for an unrelated reason.
 ulimit -n 8192 2>/dev/null || echo "nofile_raise_failed=1" >>"$OUT/control/notes.txt"
 
-taskset -c "$SERVER_CPUS" "$SERVER" "$LANES" "$PORT" >"$OUT/server.log" 2>&1 &
+# argv[3] is the snapshot path, and passing it is what turns ADR-050's exporter
+# on. It was optional in the soak server and this runner never supplied it, so
+# the out-of-band channel R2-WP03 shipped had never once run during a campaign.
+taskset -c "$SERVER_CPUS" "$SERVER" "$LANES" "$PORT" "$SNAPSHOT_PATH" \
+  >"$OUT/server.log" 2>&1 &
 server_pid=$!
 echo "$server_pid" >"$OUT/control/server.pid"
 for _ in $(seq 1 200); do
+  # READY MEANS BOTH CHANNELS, not just the request path. The exporter writes
+  # its first snapshot on its own schedule, so a sampler started the instant
+  # /health answers takes its first sample against a file that does not exist
+  # yet and records `missing` for a server that is perfectly healthy. R2-WP04's
+  # second smoke did exactly that: 1 of 656 samples, cause 101, entirely an
+  # artefact of the start-up race.
   curl -fsS --max-time 0.5 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 &&
+    { [[ -z "$SNAPSHOT_PATH" ]] || [[ -s "$SNAPSHOT_PATH" ]]; } &&
     break
   kill -0 "$server_pid" 2>/dev/null || {
     ABORT_REASON="release-candidate server exited before readiness"
@@ -247,6 +274,7 @@ SAMPLER_START_EPOCH="$(date +%s)"
   sample=0
   started=$SECONDS
   while kill -0 "$server_pid" 2>/dev/null; do
+    sample_start_ns="$(date -u +%s%N)"
     status="/proc/$server_pid/status"
     rss="$(awk '/^VmRSS:/ {print $2}' "$status" 2>/dev/null || echo 0)"
     hwm="$(awk '/^VmHWM:/ {print $2}' "$status" 2>/dev/null || echo 0)"
@@ -255,28 +283,61 @@ SAMPLER_START_EPOCH="$(date +%s)"
     proc_ticks="$(awk '{print $14+$15}' "/proc/$server_pid/stat" 2>/dev/null || echo 0)"
     host_ticks="$(awk 'NR==1 {for(i=2;i<=NF;i++) s+=$i; print s}' /proc/stat)"
     stats_file="$OUT/telemetry/stats-$(printf '%06d' "$sample").json"
-    # CURL'S EXIT CODE, AND IT IS ACTUALLY CAPTURED.
+    # THE METRIC DOES NOT TRAVEL THE PATH IT MEASURES (ADR-050).
     #
-    # This is the defect R2-WP01 was opened for. The line below used to read
+    # This block used to `curl http://127.0.0.1:$PORT/stats`, and R2-WP04's smoke
+    # is what proved that wrong at last: with the pre-registered two-lane
+    # affinity, 322 of 658 samples failed — 295 empty replies and 27 receive
+    # failures — because `/stats` is an ordinary route competing for the very
+    # Handler lanes the sample is trying to describe. Under load the observer
+    # took a lane away from the observed, and then could not report it.
     #
-    #     stats_http="$(curl ...)" || true
-    #     stats_curl_exit=$?
+    # That is exactly AUD-P2-009, and R2-WP03 had already decided it: ADR-050
+    # moved the metric to a snapshot file written by a thread that owns no lane,
+    # read by a sampler outside the process. The decision shipped, the soak
+    # server grew the exporter — and this harness kept scraping HTTP. WP01 closed
+    # the instrument and WP03 closed the observability; nobody closed the gap
+    # between them.
     #
-    # and `$?` there is the exit status of `true`. Every failed scrape in the
-    # history of this harness recorded 0. The taxonomy the comment promised —
-    # 7 refused, 28 timeout, 52 empty reply, 56 receive failure — was
-    # unreachable for the whole life of the field, and the analyser's rule about
-    # samples that "captured no cause" could therefore never be satisfied by any
-    # real failure. An `if` captures the status without `set -e` killing the run.
-    if stats_http="$(curl -sS --max-time 1 -o "$stats_file" -w '%{http_code}' \
-      "http://127.0.0.1:$PORT/stats" 2>/dev/null)"; then
-      stats_curl_exit=0
+    # So the sample now READS THE SNAPSHOT. There is no network between the
+    # metric and this reader, and no lane is consumed to take a measurement.
+    #
+    # The two fields keep their names and their meaning is widened, deliberately,
+    # rather than renamed: `soak/1` artefacts and the eight committed fixtures
+    # stay readable, and the analyser's accounting rule is unchanged. `200` still
+    # means "this sample carries a value"; a non-200 still carries a cause in the
+    # second field. What changed is which causes are possible — from curl's
+    # 7/28/52/56, which cannot distinguish a stopped application from a lost
+    # exchange, to ADR-050's closed taxonomy, which can.
+    stats_curl_exit=0
+    if [[ -z "$SNAPSHOT_PATH" ]]; then
+      stats_http=000; stats_curl_exit=$SNAPSHOT_CAUSE_DISABLED
+    elif [[ ! -e "$SNAPSHOT_PATH" ]]; then
+      stats_http=000; stats_curl_exit=$SNAPSHOT_CAUSE_MISSING
+    elif ! cp "$SNAPSHOT_PATH" "$stats_file" 2>/dev/null; then
+      stats_http=000; stats_curl_exit=$SNAPSHOT_CAUSE_UNREADABLE
+    elif ! head -n 1 "$stats_file" | grep -q '^druse_snapshot 1$'; then
+      stats_http=000; stats_curl_exit=$SNAPSHOT_CAUSE_MALFORMED
+    elif ! kill -0 "$server_pid" 2>/dev/null; then
+      stats_http=000; stats_curl_exit=$SNAPSHOT_CAUSE_NO_PROCESS
     else
-      stats_curl_exit=$?
+      # `stale` is the one cause that needs the record's own clock: a snapshot
+      # can be present, well-formed and written by a process that has since
+      # wedged. Age is measured against the record, not the file's mtime, so a
+      # rename that touched the inode cannot pass for a fresh write.
+      snap_ns="$(awk '/^unix_ns / {print $2; exit}' "$stats_file" 2>/dev/null || echo 0)"
+      now_ns="$(date -u +%s%N)"
+      if [[ -z "$snap_ns" || "$snap_ns" == 0 ]]; then
+        stats_http=000; stats_curl_exit=$SNAPSHOT_CAUSE_MALFORMED
+      elif (( (now_ns - snap_ns) / 1000000000 > SNAPSHOT_MAX_AGE_SECONDS )); then
+        stats_http=000; stats_curl_exit=$SNAPSHOT_CAUSE_STALE
+      else
+        stats_http=200
+      fi
     fi
-    # curl -o truncates its output file before it knows whether it can fill it,
-    # so a failed scrape leaves a zero-byte JSON that is indistinguishable on
-    # disk from a successful scrape of an empty body. The size says which.
+    # A snapshot that "answered" must carry a body, for the same reason the curl
+    # form did: an empty file and a successful read of nothing look identical on
+    # disk. The size says which.
     stats_bytes="$(stat -c %s "$stats_file" 2>/dev/null || echo 0)"
     # Kernel counters. A request the kernel dropped before the server ever saw
     # it looks identical, from userspace, to a request the server refused —
@@ -305,7 +366,26 @@ SAMPLER_START_EPOCH="$(date +%s)"
     # One second, not five. A saturation refusal burst has a median of one
     # refusal, so a five-second window buries it in a bucket four seconds wider
     # than the event.
-    sleep "$SAMPLE_SECONDS"
+    #
+    # SLEEP THE REMAINDER, NOT THE WHOLE INTERVAL. `sleep $SAMPLE_SECONDS` after
+    # a body that costs real time makes the true period `interval + work`, and
+    # the drift is silent: R2-WP04's smoke recorded 658 samples where the
+    # manifest expected 681, and the analyser called it "telemetry stopped
+    # early". The sampler had not stopped. Measured gaps were 1.03-1.06 s with
+    # NOT ONE above 1.5 s — it was simply costing ~4% more than the 2% tolerance
+    # allows, so criterion 11 would have failed every run of any length.
+    #
+    # `expected_samples` is elapsed/interval, so the fix belongs here rather
+    # than in the tolerance: a sampler that keeps its own cadence makes the
+    # arithmetic true instead of making the rule lenient.
+    sample_end_ns="$(date -u +%s%N)"
+    remaining_ns=$(( SAMPLE_SECONDS * 1000000000 - (sample_end_ns - sample_start_ns) ))
+    if (( remaining_ns > 0 )); then
+      sleep "$(awk -v ns="$remaining_ns" 'BEGIN {printf "%.3f", ns / 1000000000}')"
+    fi
+    # A body that overran the interval is not silently absorbed: the next sample
+    # starts late and the deficit is visible in the timestamps, which is the
+    # only honest way to report a sampler that cannot keep up.
   done
 ) >"$OUT/telemetry/process.csv" &
 sampler_pid=$!
@@ -451,12 +531,19 @@ while [[ "$(date +%s)" -lt "$END_EPOCH" ]]; do
     health_errors=0
     health_p99=0
   fi
+  # Same channel as the per-sample read, for the same reason (ADR-050). This one
+  # fired once per cycle rather than once per second, so it was never going to
+  # produce the 49% the sampler did — but a campaign that reads the metric two
+  # ways, one of which competes with the load, cannot say which reading it
+  # trusts.
   cycle_stats_file="$OUT/cycles/c$(printf '%04d' "$cycle")-stats.json"
-  if stats_http="$(curl -sS --max-time 2 -o "$cycle_stats_file" \
-    -w '%{http_code}' "http://127.0.0.1:$PORT/stats" 2>/dev/null)"; then
-    stats_curl_exit=0
+  stats_curl_exit=0
+  if [[ -n "$SNAPSHOT_PATH" ]] && cp "$SNAPSHOT_PATH" "$cycle_stats_file" 2>/dev/null &&
+     head -n 1 "$cycle_stats_file" | grep -q '^druse_snapshot 1$'; then
+    stats_http=200
   else
-    stats_curl_exit=$?
+    stats_http=000
+    stats_curl_exit=$SNAPSHOT_CAUSE_MISSING
   fi
   printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
     "$cycle" "$started_utc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \

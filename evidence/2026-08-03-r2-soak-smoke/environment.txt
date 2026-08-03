@@ -1,0 +1,9 @@
+campaign_host=184.72.201.140 (ip-172-31-94-146, i-05c3c8168b18776a5)
+instance_type=c5.2xlarge
+cpu=Intel(R) Xeon(R) Platinum 8275CL CPU @ 3.00GHz
+kernel=7.0.0-1006-aws
+physical_cores=4 threads_per_core=2 siblings=(0,4)(1,5)(2,6)(3,7)
+server_cpus=0,1,4,5  generator_cpus=2,3,6,7  lanes=2
+odin=dev-2026-07-nightly:819fdc7
+go=go version go1.26.0 linux/amd64
+free_gib=136

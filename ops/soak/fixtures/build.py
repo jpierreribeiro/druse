@@ -160,6 +160,16 @@ def base_files():
         "telemetry/process.csv": telemetry(),
         "cycles.csv": cycles(),
         "control/final-state.txt": "forced_kill=0\nserver_exit=0\nsampler_exit=0\n",
+        # The server's own saturation counter. R2-WP04 excuses
+        # `eof_on_fresh_conn` as a documented refusal, and the excuse is only
+        # honest if the acceptor agrees it refused that many — so every fixture
+        # carries the counter the analyser checks the exemption against.
+        "control/final-stats.json": json.dumps({
+            "refused_connections": 0,
+            "saturation_refusals": 8,
+            "responses_sent": 1000,
+            "send_errors": 0,
+        }) + "\n",
         "control/final-binaries.txt":
             f"server_sha256={SERVER_SHA}\nopenload_sha256={OPENLOAD_SHA}\n",
         "COMPLETE": "",
@@ -183,9 +193,17 @@ write("pass", base_files(), {
 # The failures are explained, and the run is still red because the RATE is over
 # budget. Rate and explanation are separate criteria and this fixture is what
 # keeps them separate.
+#
+# `planned` is 20,000 and not the 1,000 it was until R2-WP04. The ratio ceiling
+# is 0.01%, so it cannot be expressed below 10,000 requests — at 1,000 this
+# fixture had stopped exercising the rate branch at all and would have proved
+# the volume rule instead, silently. The class is `peer_reset` rather than
+# `eof_on_fresh_conn` for the same reason: the latter is now excused as a
+# documented saturation refusal, and a fixture for the RATE rule must not be
+# built out of the one class the rate rule no longer counts.
 files = base_files()
 files["cycles/c0001-tiny.json"] = workload(
-    "tiny", planned=1000, transport_errors=40,
+    "tiny", planned=20000, transport_errors=40,
     failures=[{
         "class": "peer_reset", "count": 40,
         "example_error": "read tcp 127.0.0.1:44002->127.0.0.1:8080: connection reset by peer",
@@ -193,11 +211,65 @@ files["cycles/c0001-tiny.json"] = workload(
 )
 write("fail-classified", files, {
     "result": "FAIL",
-    "reasons_must_include": ["tiny transport error ratio exceeded 0.01%"],
+    "reasons_must_include": ["tiny spontaneous transport error ratio exceeded 0.01%"],
     "reasons_must_not_include": ["not classified", "unrecognised class"],
     "note": "Every failure carries a class and its text; the run is red for the "
             "RATE alone. Proves the rate rule and the accounting rule are "
-            "independent.",
+            "independent. Volume is above 1/ceiling so the rate branch is the "
+            "one under test.",
+})
+
+# --- 2b. low-volume attribution --------------------------------------------
+# The branch R2-WP04 added, and the reason it exists: `wait-40ms` offers 9,000
+# requests, a 0.01% ceiling permits 0.9 errors, so ONE error — the smallest
+# non-zero rate the workload can produce — failed the run. That was a demand for
+# perfection wearing a tolerance's clothes.
+#
+# Below 1/ceiling the rule is accounting, not rate: every error must be
+# attributable. One unattributable error is red here, at a rate far under the
+# ceiling, which is the opposite of the fixture above.
+files = base_files()
+files["cycles/c0001-wait-40ms.json"] = workload(
+    "wait-40ms", planned=9000, transport_errors=1,
+    failures=[{
+        "class": "peer_reset", "count": 1,
+        "example_error": "read tcp 127.0.0.1:44010->127.0.0.1:8080: connection reset by peer",
+    }],
+)
+write("fail-low-volume", files, {
+    "result": "FAIL",
+    "reasons_must_include": ["below the 10000 needed to measure a 0.01% ceiling"],
+    "reasons_must_not_include": ["ratio exceeded"],
+    "note": "One error in 9,000 — 0.011%, over the ceiling arithmetically but "
+            "below the volume the ceiling needs. Red for ATTRIBUTION, not rate. "
+            "The paired positive is `saturation-refused`, where the same volume "
+            "and the same count pass because the class is explained.",
+})
+
+# --- 2c. saturation refusals are excused, and the excuse is checked ---------
+# The acceptor is documented to close fresh sockets without a response when every
+# lane is busy (`docs/supported-profile.md`), incrementing `saturation_refusals`.
+# From the generator that is `eof_on_fresh_conn`. Counting it as a spontaneous
+# transport error made the server fail a criterion for keeping its own promise.
+#
+# The POSITIVE case: same volume and same count as the fixture above, and it
+# passes, because the class is attributable and the server's counter agrees.
+files = base_files()
+files["cycles/c0001-wait-40ms.json"] = workload(
+    "wait-40ms", planned=9000, transport_errors=1,
+    failures=[{
+        "class": "eof_on_fresh_conn", "count": 1,
+        "example_error": "EOF on a fresh connection before any response byte",
+    }],
+)
+write("saturation-refused", files, {
+    "result": "PASS",
+    "reasons_must_include": [],
+    "note": "A documented saturation refusal, corroborated by the server's own "
+            "saturation_refusals counter, is reported beside the spontaneous "
+            "failures and never netted against them (criterion 14's principle). "
+            "Without this positive, the separation could be an analyser that "
+            "excuses everything.",
 })
 
 # --- 3. unclassified FAIL ---------------------------------------------------

@@ -1706,6 +1706,37 @@ conn_handle_req :: proc(c: ^Connection, allocator := context.temp_allocator) {
 	on_header_line :: proc(loop: rawptr, token: string, err: bufio.Scanner_Error) {
 		l := cast(^Loop)loop
 
+		// DRUSE PATCH 44 (security F-005) — AN OVERSIZED HEADER BLOCK ANSWERS,
+		// IT DOES NOT VANISH.
+		//
+		// The budget check further down returns 431 when a *parsed* header line
+		// takes `max_token_size` to zero. It never runs for a header line that
+		// is itself larger than the remaining budget: the scanner reaches
+		// `.Too_Long` before it can produce a complete token, and this branch
+		// closed the connection with no response and no log line.
+		//
+		// Measured in the F-005 report, with `limit_headers = 8000`:
+		//
+		//   7,932 bytes -> 200
+		//   8,032 bytes -> 431   (a complete line, budget hits zero)
+		//   8,532 bytes -> connection closed silently, no response, no log
+		//
+		// Two requests that both exceed the same limit got two different
+		// protocol outcomes depending on how the bytes were split across
+		// header lines. The client cannot tell the silent close from a network
+		// fault, and an operator gets nothing at all.
+		//
+		// `.Too_Long` here has exactly one meaning: the header section did not
+		// fit in the budget this connection was given. That is what 431 is for.
+		// Every other scanner error keeps the old behaviour, because a truncated
+		// or malformed stream is not a request anyone can answer.
+		if err == .Too_Long {
+			log.warn("request headers too large (scanner budget exceeded before a complete line)")
+			headers_set_close(&l.res.headers)
+			l.res.status = .Request_Header_Fields_Too_Large
+			respond(&l.res)
+			return
+		}
 		if err != nil {
 			log.warnf("request scanning error: %v", err)
 			clean_request_loop(l.conn, close = true)

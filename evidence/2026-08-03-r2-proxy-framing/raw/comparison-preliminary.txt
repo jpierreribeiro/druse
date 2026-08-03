@@ -1,0 +1,50 @@
+# cases parsed from the corpus: 47
+# direct               proxied              case
+  404                  404                  valid GET
+  404                  404                  keep-alive serves two PIPELINED requests
+  404                  404                  204 carries no body and no Content-Length
+  404                  404                  Connection: close closes after the response
+  CLOSED-NO-RESPONSE   504                  valid Content-Length body  <-- DIVERGES
+  400                  404                  CL+TE is rejected (smuggling vector)  <-- DIVERGES
+  400                  404                  duplicate identical Content-Length is rejected  <-- DIVERGES
+  400                  400                  duplicate differing Content-Length is rejected
+  400                  400                  comma-list Content-Length is rejected
+  400                  400                  negative Content-Length is rejected
+  400                  400                  signed and overflowing Content-Length is rejected
+  CLOSED-NO-RESPONSE   504                  valid chunked body  <-- DIVERGES
+  400                  502                  non-hex chunk size is rejected  <-- DIVERGES
+  400                  502                  negative chunk size is rejected  <-- DIVERGES
+  CLOSED-NO-RESPONSE   504                  chunked body with a trailer field is accepted  <-- DIVERGES
+  CLOSED-NO-RESPONSE   502                  truncated chunk is rejected  <-- DIVERGES
+  400                  502                  chunk without CRLF is rejected  <-- DIVERGES
+  CLOSED-NO-RESPONSE   504                  missing zero terminator is rejected  <-- DIVERGES
+  400                  501                  unsupported Transfer-Encoding is rejected  <-- DIVERGES
+  400                  501                  chunked that is not the final coding is rejected  <-- DIVERGES
+  400                  501                  an unregistered coding ending in 'chunked' is rejected  <-- DIVERGES
+  400                  501                  chunked applied twice is rejected  <-- DIVERGES
+  CLOSED-NO-RESPONSE   504                  the chunked coding is matched case-insensitively  <-- DIVERGES
+  CLOSED-NO-RESPONSE   504                  truncated fixed body is rejected  <-- DIVERGES
+  400                  400                  whitespace before the header colon is rejected
+  400                  404                  obs-fold header continuation is rejected  <-- DIVERGES
+  400                  404                  tab obs-fold header continuation is rejected  <-- DIVERGES
+  400                  400                  overflowing Content-Length is rejected, its bytes never a second request
+  CLOSED-NO-RESPONSE   400                  invalid request line is rejected  <-- DIVERGES
+  404                  404                  unread body does not desynchronize a following request
+  413                  413                  over-limit body is 413 and its bytes are never a second request
+  CLOSED-NO-RESPONSE   100                  Expect: 100-continue is honored — body read, handler runs (C6)  <-- DIVERGES
+  417                  417                  an unknown Expect is still refused with 417
+  404                  404                  valid unknown method reaches the core, not a backend 501
+  CLOSED-NO-RESPONSE   404                  bare LF line termination is rejected  <-- DIVERGES
+  CLOSED-NO-RESPONSE   400                  a lone CR inside a header value is rejected  <-- DIVERGES
+  400                  502                  chunk size with a leading plus is rejected  <-- DIVERGES
+  400                  502                  chunk size with a digit separator is rejected  <-- DIVERGES
+  404                  404                  a NUL inside a header value is rejected
+  404                  404                  a C0 control inside a header value is rejected
+  404                  400                  a control byte inside a header NAME is rejected  <-- DIVERGES
+  404                  200                  absolute-form whose authority AGREES with Host is served  <-- DIVERGES
+  400                  200                  absolute-form whose authority DISAGREES with Host is rejected  <-- DIVERGES
+  200                  200                  OPTIONS * is still answered, not read as an authority
+  404                  404                  a horizontal tab inside a header value is still accepted
+  CLOSED-NO-RESPONSE   CLOSED-NO-RESPONSE   a single header line larger than the budget answers 431
+  CLOSED-NO-RESPONSE   CLOSED-NO-RESPONSE   a header block of many lines over the budget also answers 431
+# diverged: 27 of 47

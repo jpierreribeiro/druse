@@ -115,6 +115,37 @@ inside synchronous application code, it emits a complete 503 with
 budget. A bounded two-item handoff queue per lane prevents a connect/RST flood
 from building an unobserved callback backlog.
 
+> **Superseded on 2026-08-03 — the paragraph above is no longer the behaviour.**
+> Vendor Patch 42 removed the acceptor's HTTP write. At the moment the acceptor
+> refuses, it has accepted a TCP socket but has **not parsed a request**, so
+> manufacturing an HTTP response there was answering a request that did not
+> exist yet. It now **closes the socket without writing anything** and
+> increments `saturation_refusals`
+> (`vendor/odin-http/server.odin`, `accept_refuse_handler_saturation`).
+>
+> `docs/supported-profile.md` §"Execution, saturation and failure domain" carries
+> the current contract, and it is the one to read. **Request-aware** overload
+> paths — where a request *has* been parsed — still answer 503 with
+> `Retry-After`, so the two statements in this repository were never about the
+> same code path; this one is simply the old behaviour of the transport path.
+>
+> Pinned in both directions rather than asserted: `build/check_c05_controls.sh`
+> restores the pre-request 503 write in an isolated tree and requires
+> `tests/c05-saturation` to go red naming *"HTTP 503 responses were emitted
+> before a request was parsed"*, and separately requires the request-aware path
+> to keep its `Retry-After`.
+>
+> Confirmed against the running binary, not only against the source: in the
+> 2026-08-03 R2-WP04 burn-in (candidate `6bff82f`, two lanes) the server counted
+> **1,913 saturation refusals** while the load generators recorded **zero 503
+> responses** across 28.2 M requests — the only statuses observed were 200, 204,
+> and the generator's "no HTTP status at all" for a connection closed before a
+> reply. The refusals appear on the client side as `eof_on_fresh_conn`.
+>
+> The two sentences below in "Gate status" — "C-05 saturation passed with
+> complete 503 responses" and "57 complete lane-saturation 503s" — describe the
+> same superseded path and are true only of the 2026-07-25/26 builds.
+
 Two disabled-timeout timestamp costs were also removed: disabled response-write and
 idle deadlines no longer call `time.now()`. The request timestamp is likewise
 skipped when its read deadline is disabled.

@@ -1,0 +1,26 @@
+preflight_utc=2026-08-02T21:19:30Z
+hostname=jp-Latitude-5400
+kernel=Linux 6.8.0-86-generic x86_64 GNU/Linux
+online_cpus=8
+server_cpus=0-3 (4)
+generator_cpus=4-7 (4)
+nstat=/usr/bin/nstat
+odin=/home/jp/.local/bin/odin
+odin_version=/home/jp/.local/bin/odin version dev-2026-07-nightly:819fdc7
+go_version=go version go1.26.1 linux/amd64
+cpu_governors=powersave 
+intel_pstate_no_turbo=0
+numa_nodes=1
+cpu_model=Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz
+mem_total_kib=24418260
+swap_total_kib=0
+swappiness=60
+nofile_hard=1048576
+cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-881b60ec-31ee-43d6-a5d6-ee5a5cd17cb2.scope
+ntp_synchronized=yes
+utc_now=2026-08-02T21:19:30Z
+free_gib_at=/home/jp/Desktop/uruquim-odin:40
+estimated_need_gib=100 (for 12h at sample_seconds=1)
+preflight=fail
+problem=port 8080 already has a listener
+problem=40 GiB free at /home/jp/Desktop/uruquim-odin; a 12h run is estimated to need 100 GiB of raw CSV

@@ -234,7 +234,7 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 			)
 		}
 
-	case .Rejected:
+	case .Rejected, .Rejected_With_Status:
 		// The handler must NOT have run: no application code may observe an
 		// ambiguous or partial request.
 		testing.expectf(
@@ -243,6 +243,23 @@ run_wire_case :: proc(t: ^testing.T, port: int, c: tc.Wire_Case) {
 			"%s: the handler RAN on a request that must be rejected",
 			c.name,
 		)
+
+		// SECURITY F-005. `Rejected` permits a bare close (WP9 D6) because for
+		// most malformed framing there is nothing truthful to answer. An
+		// oversized header block is not that case: the server knows exactly why
+		// it is refusing and 431 exists to say so. A silent close is
+		// indistinguishable from a network fault at the client and leaves the
+		// operator nothing, so for this outcome the status is MANDATORY.
+		if c.outcome == .Rejected_With_Status {
+			testing.expectf(
+				t,
+				len(result.statuses) > 0,
+				"%s: the connection was closed with NO response. That is exactly F-005: " +
+				"the client cannot tell this from a network fault and no log line is " +
+				"produced. A status is required for this case, not optional.",
+				c.name,
+			)
+		}
 
 		// A status is optional (a bare close is acceptable, WP9 D6) but when one
 		// is sent it must be an allowed one.

@@ -1117,6 +1117,7 @@ on_stream_terminator_sent :: proc(op: ^nbio.Operation, link: ^Stream_Link) {
 	link.terminated = true
 	_ = stream.close(&link.runtime.streams, link.tok) // idempotent; refuses stragglers
 	_ = stream.retire(&link.runtime.streams, link.tok.slot)
+	stream_forget_teardown(conn)
 	if op.send.err != nil {
 		http.stream_abort(conn)
 		return
@@ -1133,7 +1134,41 @@ stream_teardown_error :: proc(link: ^Stream_Link) {
 	stream.note_abort(&link.runtime.streams)
 	_ = stream.close(&link.runtime.streams, link.tok)
 	_ = stream.retire(&link.runtime.streams, link.tok.slot)
+	stream_forget_teardown(link.conn)
 	http.stream_abort(link.conn)
+}
+
+// stream_forget_teardown — STREAM-001.
+//
+// `retire` puts the slot back on the free list, and `runtime.links` is indexed
+// BY SLOT, so the next `stream` call on this server takes the same slot and
+// overwrites this very `Stream_Link` — `terminated` back to false, `tok` and
+// `conn` belonging to the new stream.
+//
+// The connection this stream ran on is torn down asynchronously, some time
+// after its last write. Until this call existed it still carried
+// `on_teardown = stream_conn_torn_down` with `user` pointing at the recycled
+// link, so a teardown that landed after the next `stream` opened would sail
+// through the `link.terminated` guard (reset by the new stream) and close and
+// retire THE NEW STREAM'S token — which passes the generation check, because
+// the link is holding the new token.
+//
+// MEASURED, on two independent servers: requesting a detached stream twice in a
+// row truncated the second one, silently, with a 200 and a clean close. Ten
+// frames, then seven, then ten, then seven. Three seconds of idle between the
+// requests made it vanish, because the teardown had landed by then.
+//
+// So a stream that has already released its slot un-registers the hook. The
+// hook exists for the OTHER order — an externally-initiated end (deadline
+// sweep, shutdown force-close, scanner error) where teardown comes first and
+// must silence the pump — and that path is untouched.
+@(private)
+stream_forget_teardown :: proc(conn: ^http.Connection) {
+	if conn == nil {
+		return
+	}
+	conn.on_teardown = nil
+	conn.on_teardown_user = nil
 }
 
 // neutral_headers copies the backend request headers into neutral pairs. The

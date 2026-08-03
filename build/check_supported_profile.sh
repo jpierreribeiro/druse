@@ -83,7 +83,14 @@ need '`web.upload`/`web.upload_persist` API exists' "public upload capability mi
 # The vendor count is derived from the canonical disposition table. No literal
 # in this checker changes when the ledger grows.
 POLICY="$ROOT/planning/vendor-policy.md"
-POLICY_NUMS="$(grep -oE '^\| [0-9]+ \| .* \| .* \| \*\*(OFFER UPSTREAM|CARRY|APPEARS FIXED UPSTREAM)' "$POLICY" |
+# `DELETED` belongs in this set, and its absence is the same defect R2-WP06 fixed
+# in `build/check_vendor_policy.sh` — fixed there and missed here, so the two
+# gates derived DIFFERENT counts from the same ledger (44 against 45) while the
+# documents cited a third number (43). The ledger's own prose has always said the
+# count "includes patches, later bridge work and one recorded deletion", so 45 is
+# the number and a disposition the gate cannot see is how the duplicate patch ID
+# survived in the first place.
+POLICY_NUMS="$(grep -oE '^\| [0-9]+ \| .* \| .* \| \*\*(OFFER UPSTREAM|CARRY|APPEARS FIXED UPSTREAM|DELETED)' "$POLICY" |
   awk -F'|' '{gsub(/ /, "", $2); print $2}' | sort -n)"
 POLICY_ROWS="$(printf '%s\n' "$POLICY_NUMS" | grep -c . || true)"
 test "$POLICY_ROWS" -gt 0 || fail "canonical vendor disposition ledger is empty"
@@ -172,8 +179,14 @@ mutant missing-ceiling 'multi-server ceiling missing' \
   's/up to 16 concurrent servers per process/up to an implementation-defined number of concurrent servers per process/'
 mutant oom-guarantee 'response cap is being presented as an OOM guarantee' \
   's/does not prevent OOM/prevents OOM/'
+# DERIVED, NOT PINNED. This mutant used to hardcode `**43 dispositions**`, so the
+# moment the ledger grew the substitution matched nothing, the mutant changed no
+# bytes, and the check passed a document it had not perturbed — reported as
+# "vendor-count mutant was accepted". A mutant that silently stops mutating is
+# worse than an absent one, because it reports green. The number now comes from
+# the same derivation the assertion uses.
 mutant vendor-count 'vendor disposition count drifted' \
-  's/\*\*43 dispositions\*\*/\*\*42 dispositions\*\*/'
+  "s/\\*\\*$POLICY_ROWS dispositions\\*\\*/\\*\\*$((POLICY_ROWS - 1)) dispositions\\*\\*/"
 mutant native-http2 'native HTTP/2 exclusion missing' \
   's/does not provide a native HTTP\/2 server/provides a native HTTP\/2 server/'
 mutant native-tls 'TLS delegation missing' \

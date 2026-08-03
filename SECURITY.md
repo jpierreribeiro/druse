@@ -104,19 +104,73 @@ Druse vendors the root server package of
 pinned commit. `vendor/odin-http/VENDOR.md` records provenance and
 `planning/vendor-policy.md` is the canonical, gate-counted divergence ledger.
 
+<!-- security-patch-count: 45 -->
+The ledger currently carries **45 patch dispositions**. That number is checked
+by `build/check_vendor_policy.sh` against the ledger itself, so this sentence
+cannot drift from the tree the way it did between Phase 6 and R2 — it said
+"five" for four phases.
+
 If the problem is in that upstream package, please tell us as well as upstream —
 the vendored copy is patched independently and may need its own fix.
 
 ## What has already been found and fixed
 
-Phase 1's transport conformance work (WP9) found and fixed two remotely
-triggerable crashes and one request-smuggling vector before any release. The
-raw-wire corpus that proves those fixes lives in `tests/wp9-wire/` and runs on
-every build.
+**Phase 1 (WP9), transport conformance.** Two remotely triggerable crashes and
+one request-smuggling vector, before any release. The raw-wire corpus that proves
+the fixes lives in `tests/wp9-wire/` and runs on every build, with a mutation
+control per guard in `build/check_wp9_mutations.sh`.
 
-The Phase-6-freeze security scan found five more in the vendored transport, all
-fixed and all recorded in `vendor/odin-http/VENDOR.md`: two chunked-body
-process crashes (a negative chunk size, and a trailer field parsed while the
-header map was marked read-only), a `Content-Length` overflow that could desync
-a proxy, a bare carriage return that escaped the header-injection sanitiser, and
-an obs-fold horizontal tab accepted where a space would have been rejected.
+**Phase 6 freeze, security scan.** Five more in the vendored transport, all
+fixed: two chunked-body process crashes (a negative chunk size, and a trailer
+field parsed while the header map was marked read-only), a `Content-Length`
+overflow that could desync a proxy, a bare carriage return that escaped the
+header-injection sanitiser, and an obs-fold horizontal tab accepted where a
+space would have been rejected.
+
+**Audits H1, H2, M4, M7, M9, T6.** Field values carrying control bytes,
+absolute-form targets whose authority disagreed with `Host`, a write deadline
+that fired under the wrong name and closed gracefully into a reader that had
+stopped reading, and a scanner buffer retained at body size across keep-alive.
+Each carries its disposition and its evidence in the ledger.
+
+**WP123 / ADR-018 — cross-server state.** `web.stats`, `stream_send` and the
+shutdown path resolved against a single global transport slot, so in a process
+running more than one server they could answer about the wrong one. Server
+identity is now carried in the handle. `web.stop` also moved its framework-side
+drain off the caller's thread: it is documented as callable from a `SIGTERM`
+handler, and a signal delivered to a thread already holding either mutex
+deadlocked the process on the stop path — widest exactly when the server was
+busiest.
+
+**F-005 (R2-WP06) — an oversized header block vanished.** A header section over
+`limit_headers` answered `431` when a complete line exhausted the budget, and
+**closed the connection with no response and no log line** when a single line was
+larger than the remaining budget. Measured at `limit_headers = 8000`: 8,032 bytes
+answered 431; 8,532 bytes was silence. Two requests over the same limit received
+two different protocol outcomes decided by how the bytes fell across lines, and
+the client could not distinguish the close from a network fault. Fixed in patch
+44; two paired corpus cases and a mutation control prove it.
+
+**STREAM-001 — a stream truncated by the previous stream's teardown.** Not a
+remote-triggerable vulnerability, recorded here because the failure was
+*silent*: `200`, a clean close, frames missing off the end, and nothing in the
+log from a server with both a logger and an observer installed. A recycled
+registry slot let a late teardown close the stream that had taken its place.
+Evidence and the regression test are in
+`evidence/2026-08-03-stream-truncation-finding/`.
+
+## What has NOT been done
+
+Stated plainly, because a security policy that lists only successes reads as a
+completeness claim:
+
+- **No third-party audit.** Every finding above is from this project's own
+  review or its own scans.
+- **No fuzzing campaign against the current candidate.** R2-WP06 owns it and it
+  has not run; the corpus work above is hand-written cases, not generated ones.
+- **No CVE process.** There is no advisory feed, no backport branch and no
+  embargo policy. Pre-1.0 means the fix lands on `main` and in the next tag.
+- **The supported profile is the boundary of the claim.** Anything outside
+  `docs/supported-profile.md` — a different proxy, another platform, more than
+  one server per process in production — has not been reviewed and is not
+  covered by anything on this page.

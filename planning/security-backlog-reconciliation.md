@@ -77,11 +77,48 @@ findings of one bug is information about the coverage, not a bookkeeping error.
 | **F-004** | stream pump holds a zero-copy ring slice across an async send | HIGH *if triggered* | ⊘ **never reproduced.** Filed as a design concern with the guard that appears to save it, explicitly "not as a live exploit" | n/a — there is no defect to pin. Recorded so the next reader does not re-open it as an unfixed HIGH |
 | **F-005** | oversized header block dropped silently instead of answered | LOW-MED | ✅ fixed — `vendor/odin-http/server.odin:1703` answers `431 Request Header Fields Too Large` and closes | ◑ **no dedicated case.** The behaviour is on the raw-wire path where the corpus lives; a case belongs there and is not yet written. Recorded as a gap rather than claimed |
 | **F-006** | cookie `Max-Age` integer overflow | LOW here | ◑ **unguarded, deliberately.** `vendor/odin-http/cookie.odin:148` still parses without a range check | n/a — the code path is the CLIENT cookie parser. Druse is a server and never runs it; the report says so and rates it LOW for that reason. It becomes real only if a future work package uses the vendored client |
-| **F-007** | spool admission slot leak when `begin` fails after `admit` | LOW (CWE-772) | ✅ fixed — and NOT where the report proposed. `ingest.begin` calls `release_slot(a)` on the `os.open` failure (marker "ingest audit F2"), so every caller benefits rather than one call site. The other failure return (`!a.initialized`) cannot leak: `admit` refuses on the same guard *before* incrementing | ◑ pinned by construction, argued above rather than asserted. A test would need a spool directory made unwritable mid-run |
+| **F-007** | spool admission slot leak when `begin` fails after `admit` | LOW (CWE-772) | ✅ fixed — and NOT where the report proposed. `ingest.begin` calls `release_slot(a)` on the `os.open` failure (marker "ingest audit F2"), so every caller benefits rather than one call site. The other failure return (`!a.initialized`) cannot leak: `admit` refuses on the same guard *before* incrementing | ✅ **`tests/ingest-leak/ingest_leak_test.odin::upload_admission_survives_an_unopenable_spool`** (R2-WP06, 2026-08-03) — it does exactly what the old row said a test would need: `chmod 0500` on the spool directory mid-run, `SLOTS+2` uploads that must all fail, then the mode restored and an upload that must succeed. Mutant proven: delete `release_slot(a)` from the `os.open` failure path and it goes red with *"a 503 that never clears means `begin` kept the slot it never used"*. Refuses to run as root, because root ignores DAC and the test would pass vacuously |
 
 **Five fixed, one never a defect, one unreachable-by-construction. Three pinned
 by a named control, one (F-002) newly pinned here, three recorded as indirect
 with the reason.**
+
+### R2-WP06 review of the indirect pins, 2026-08-03
+
+R2-WP06 asks to "revisar pins indiretos F8, F12 e F-007 contra o threat model
+R2". Reviewed; two rows moved and one did not, and reading the record against the
+tree is what moved them.
+
+**F-007 → pinned by a named test.** The row said a test "would need a spool
+directory made unwritable mid-run". It needed exactly that and nothing more, so
+it is written. The package `tests/ingest-leak` had named F1/F2/F3 in its own
+header since it was created while carrying a test for F1 only — an overclaim in a
+comment, which is the quietest kind.
+
+**F12 → its reachable half was already pinned, and the row did not say so.**
+The argument is "no public API lets an application put a CR into a response
+header", and that is true for a stronger reason than the row gives:
+`web.set_header` rejects a value containing any control byte
+(`header_field_has_control`) and requires the name to be a bare token, *before*
+the escaping sink is reached at all. Both refusals are pinned on the response
+side by `tests/c2-response-surface/contract_test.odin` —
+`c2_set_header_refuses_reserved_and_injection` covers `"a\r\nInjected: yes"` as a
+value and `"X\r\nSet-Cookie"` as a name, and
+`c2_set_header_refuses_every_control_byte` sweeps the rest of the C0 range. The
+row cited only the *request*-side pin (`request_id_acceptable`). **What stays
+indirect is the sink itself** — `write_escaped_newlines`' defence-in-depth behind
+a check that already refuses — and that is the half a test would have to reach
+privately. Downgrading the whole row to "no test" understated the coverage;
+upgrading it to "pinned" would overstate it. Both halves are now named.
+
+**F8 → unchanged, and the reason is still the right one.** The finding is a
+memory-shape property under a hostile body: a unit test asserting "no OOM" is a
+soak, and the R2 threat model does not change that. What the R2 work *does* add
+is the place to assert it — `ops/soak/CRITERIA.md` 7 and 9 already bound RSS tail
+slope and set a hard stop, and the JSON encode/decode workloads run for the whole
+campaign. The honest statement is that F8's assertion belongs to R2-WP04's
+twelve-hour run and that run has not passed yet, so the row stays `◑` rather than
+borrowing credit from a campaign still in its ladder.
 
 **The gap this section closes.** F-002's fix was validated "ad-hoc, ASan+debug
 build" — 20 manual rounds — and then carried no test for a week. §0 of this

@@ -1,0 +1,24 @@
+# host: c5.2xlarge 44.200.160.96 (ip-172-31-7-128)
+# Model name: Intel(R) Xeon(R) Platinum 8124M CPU @ 3.00GHz
+# kernel: 6.17.0-1017-aws
+
+## lscpu -e
+CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE
+  0    0      0    0 0:0:0:0          yes
+  1    0      0    1 1:1:1:0          yes
+  2    0      0    2 2:2:2:0          yes
+  3    0      0    3 3:3:3:0          yes
+  4    0      0    0 0:0:0:0          yes
+  5    0      0    1 1:1:1:0          yes
+  6    0      0    2 2:2:2:0          yes
+  7    0      0    3 3:3:3:0          yes
+
+## thread_siblings_list
+cpu0=0,4
+cpu1=1,5
+cpu2=2,6
+cpu3=3,7
+cpu4=0,4
+cpu5=1,5
+cpu6=2,6
+cpu7=3,7

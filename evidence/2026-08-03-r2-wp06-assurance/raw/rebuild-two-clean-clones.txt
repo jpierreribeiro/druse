@@ -1,0 +1,15 @@
+rebuild_utc=2026-08-03T05:45:27Z
+commit=318b178bea41f0e59e3240055a2c31c238997ecb
+working_tree_dirty_files=0
+odin=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7
+odin_sha256=6fea037515fee6c4e681a67fe86818998241f15abbadd8df67899d9f0ff32b12
+pin_release=dev-2026-07a
+pin_commit=819fdc7
+build_a_sha256=396138bbfa137a316085ff3e7e46b007e715e68f2a3c134959f751eced4eb83f
+build_b_sha256=96d61da8e3f8818d509cb6cf47181f52fd1bca0050ffefa9c1760ff9de4ccb54
+build_a_bytes=918640
+build_b_bytes=918640
+byte_identical=no
+size_delta_bytes=0
+nondeterminism=the pinned toolchain does not produce byte-identical output for identical input; this is measured, not assumed, and the release claim is 'built from this commit with this compiler' rather than 'byte-identical'
+rebuild=pass

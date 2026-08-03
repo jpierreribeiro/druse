@@ -129,4 +129,20 @@ must_go_red "multipart delimiter requires the boundary" \
 			}' \
   "multipart-content"
 
-echo "PASS: merged-fix mutation controls (4 of the 44bdcda fixes, each detected)"
+# R2-WP06 — the attack-lab F-007 fix (marker "ingest audit F2"). Not one of the
+# 44bdcda nine; it lives here because this is where "a fix is guarded by a suite
+# that can actually notice" is enforced, and F-007's guard was written on
+# 2026-08-03 to replace an argument.
+#
+# Reverting it is one line: `begin` stops returning the slot it never used, so a
+# spool directory that is briefly unwritable retires `max_concurrent` slots
+# permanently and every later upload answers 503 for the life of the process.
+must_go_red "ingest F2 releases the slot begin never used" \
+  "web/internal/ingest/ingest.odin" \
+  '		release_slot(a)
+		return .Disk_Full' \
+  '		return .Disk_Full' \
+  "ingest-leak"
+
+
+echo "PASS: merged-fix mutation controls (4 of the 44bdcda fixes plus attack-lab F-007, each detected)"

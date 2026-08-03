@@ -1,0 +1,5 @@
+{
+  "note": "A documented saturation refusal, corroborated by the server's own saturation_refusals counter, is reported beside the spontaneous failures and never netted against them (criterion 14's principle). Without this positive, the separation could be an analyser that excuses everything.",
+  "reasons_must_include": [],
+  "result": "PASS"
+}

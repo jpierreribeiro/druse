@@ -1,0 +1,28 @@
+smoke_utc=2026-08-03T01:17:29Z
+hostname=ip-172-31-94-146
+kernel=Linux 7.0.0-1006-aws x86_64 GNU/Linux
+server_cpus=0,1,4,5
+preflight=pass
+odin=/home/ubuntu/odin-pinned/odin
+odin_version=/home/ubuntu/odin-pinned/odin version dev-2026-07-nightly:819fdc7
+smoke_server_sha256=1808d54eb4ccf92f2d1e7fd436e9a22696dc599d5e794ec036463bea95832270
+time_to_ready_ms=11 (100 ms poll granularity, upper bound)
+origin_port=18081
+expected_upload_reply=size=65536 sum=df04d79db8262325
+direct_upload_spooled=ok (size=65536 sum=df04d79db8262325)
+direct_upload_buffered=ok
+direct_stream_frames=10
+direct_stream_first_frame_s=0.046 last_frame_s=0.497
+direct_stream_spread_s=0.451
+direct_stream_incremental=ok
+caddy_image=docker.io/library/caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+caddy_image_id=sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+proxy_upload_spooled=ok (size=65536 sum=df04d79db8262325)
+proxy_upload_buffered=ok
+proxy_stream_frames=10
+proxy_stream_first_frame_s=0.048 last_frame_s=0.499
+proxy_stream_spread_s=0.451
+proxy_stream_incremental=ok
+server_alive_after_smoke=yes
+spool_files_left=0
+smoke=pass
