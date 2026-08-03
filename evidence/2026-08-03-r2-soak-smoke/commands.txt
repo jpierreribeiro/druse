@@ -1,0 +1,28 @@
+# R2-WP04 ladder — how each step is run.
+#
+# BASE must contain `repo/` (a clean git checkout of the candidate) and the
+# runner writes `soak/` beside it. A shallow clone preserves the real commit SHA
+# and keeps the transfer at ~20 MB:
+#
+#   git clone --depth 1 --branch <branch> file://$PWD /tmp/candidate
+#   rsync -az /tmp/candidate/ host:~/soak-runs/repo/
+
+export DRUSE_ODIN_BIN=$HOME/odin-pinned/odin
+export PATH=$HOME/odin-pinned:$PATH
+export DRUSE_SOAK_SERVER_CPUS=0,1,4,5      # pre-registration §3.1
+export DRUSE_SOAK_GENERATOR_CPUS=2,3,6,7
+export DRUSE_SOAK_LANES=2
+
+# MAX_CYCLES is what makes a ladder step short ON PURPOSE; expected_samples is
+# computed from the sampler's real elapsed time, so a step stopped by cycle count
+# is not mistaken for a sampler that died.
+DRUSE_SOAK_MAX_CYCLES=5  bash ops/soak/run-soak.sh ~/soak-runs 1    # smoke,     10 min
+DRUSE_SOAK_MAX_CYCLES=15 bash ops/soak/run-soak.sh ~/soak-runs 2    # burn-in,   30 min
+DRUSE_SOAK_MAX_CYCLES=60 bash ops/soak/run-soak.sh ~/soak-runs 3    # rehearsal,  2 h
+                         bash ops/soak/run-soak.sh ~/soak-runs 12   # final,    >=12 h
+
+# Grade any artefact. The analyser always prints a verdict and always exits 0.
+python3 ops/soak/analyze-soak.py ~/soak-runs/soak
+
+# The instrument's own controls, including the ten fixtures:
+bash build/check_soak_controls.sh

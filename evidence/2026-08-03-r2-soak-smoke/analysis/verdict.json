@@ -1,0 +1,344 @@
+{
+  "complete_marker": true,
+  "cycles": 5,
+  "expected_samples": 681,
+  "failure_classes": {
+    "broken_pipe": 4,
+    "dial_other": 1,
+    "eof_on_fresh_conn": 168,
+    "peer_reset": 9,
+    "request_write_failed": 55,
+    "server_closed_idle_conn": 35
+  },
+  "failure_examples": {
+    "broken_pipe": "Post \"http://127.0.0.1:8080/json/medium/decode\": readfrom tcp 127.0.0.1:52868->127.0.0.1:8080: write tcp 127.0.0.1:52868->127.0.0.1:8080: write: broken pipe",
+    "dial_other": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:44564->127.0.0.1:8080: use of closed network connection",
+    "eof_on_fresh_conn": "Get \"http://127.0.0.1:8080/tiny\": EOF",
+    "peer_reset": "Get \"http://127.0.0.1:8080/tiny\": read tcp 127.0.0.1:33622->127.0.0.1:8080: read: connection reset by peer",
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:51980->127.0.0.1:8080: use of closed network connection",
+    "server_closed_idle_conn": "Get \"http://127.0.0.1:8080/tiny\": http: server closed idle connection"
+  },
+  "failures_classified": 272,
+  "failures_counted": 272,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 10,
+    "last": 10,
+    "max": 289
+  },
+  "final_state": {
+    "forced_kill": "0",
+    "sampler_exit": "143",
+    "server_exit": "0"
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 32822,
+    "median_p99_us": 3366,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 25256
+  },
+  "injected_faults": {
+    "attempted": 128,
+    "by_phase": {},
+    "campaigns": 1,
+    "declared": {
+      "rst": 1,
+      "slow_readers": 1
+    },
+    "errors": 0,
+    "unreadable": []
+  },
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 120,
+    "tcp_retrans": 22184
+  },
+  "manifest": {
+    "allow_dirty": "0",
+    "analyzer_sha256": "19733211622d579a426fd80e88fa197d50c0eee67eccf452c06b687e22e69bbb",
+    "bytes_64k_rate": "150",
+    "compiler": "/home/ubuntu/odin-pinned/odin version dev-2026-07-nightly:819fdc7",
+    "completed_utc": "2026-08-03T05:15:57Z",
+    "criteria_sha256": "dd305ac9d528ed6c0445935d852f41fc83b321bdcf222b2171d99da306569fb7",
+    "cycles": "5",
+    "expected_samples": "681",
+    "final_settle_seconds": "35",
+    "generator_cpus": "2,3,6,7",
+    "git_dirty": "0",
+    "git_head": "9905509cd0b8a2ed71d956ba09196b7519fa56f1",
+    "git_tree": "078cbc969adc26229cbdab5d1e03845b10586fb1",
+    "harness_head": "9905509cd0b8a2ed71d956ba09196b7519fa56f1",
+    "health_rate": "20",
+    "hours": "1",
+    "json_decode_rate": "4000",
+    "json_encode_rate": "1500",
+    "kernel": "Linux 7.0.0-1006-aws x86_64 GNU/Linux",
+    "lanes": "2",
+    "launch_stagger_seconds": "1",
+    "max_cycles": "5",
+    "max_rss_kib": "4194304",
+    "nofile": "8192",
+    "nstat": "present",
+    "openload_sha256": "cdb7752dc37935c7aeef0ea3640127efc8b9be369fed2ba21a16683bd055df9f",
+    "phase_seconds": "120",
+    "preflight": "pass",
+    "runner_sha256": "0ef0dd841f64715aa7a13eab68c3a8e8de483fba430fa604c9469852d47be2e8",
+    "sample_seconds": "1",
+    "schema_sha256": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+    "schema_version": "soak/1",
+    "server_cpus": "0,1,4,5",
+    "server_sha256": "c42c7f699f63a3d53203be758e28b413359000335b4cf574b6a6b241822f6385",
+    "started_utc": "2026-08-03T05:04:36Z",
+    "tiny_rate": "10000",
+    "wait_40ms_rate": "15"
+  },
+  "nstat": "present",
+  "pins": {
+    "criteria": {
+      "run": "dd305ac9d528ed6c0445935d852f41fc83b321bdcf222b2171d99da306569fb7",
+      "tree": "dd305ac9d528ed6c0445935d852f41fc83b321bdcf222b2171d99da306569fb7"
+    },
+    "schema": {
+      "run": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+      "tree": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640"
+    }
+  },
+  "reasons": [],
+  "result": "PASS",
+  "rss_kib": {
+    "first": 3660,
+    "last": 6856,
+    "max": 9992,
+    "min": 3660,
+    "tail_slope_kib_per_hour": 17452.83234169188
+  },
+  "run_directory": "/home/ubuntu/soak-runs/soak",
+  "sample_shortfall": 4,
+  "saturation": {
+    "refusals_counted_by_server": 394,
+    "refused_seen_by_generators": 168
+  },
+  "schema_version": "soak/1",
+  "schema_version_expected": "soak/1",
+  "short_workloads": {},
+  "skipped_workloads": {},
+  "stats_empty_bodies": 0,
+  "stats_failure_causes": {},
+  "stats_failures_uncaptured": 0,
+  "stats_missing_samples": 0,
+  "telemetry_samples": 677,
+  "threads": {
+    "max": 4,
+    "min": 4
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 90000,
+      "failure_classes": {
+        "eof_on_fresh_conn": 8
+      },
+      "failures": [
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 8,
+          "example_error": "Get \"http://127.0.0.1:8080/bytes/64k\": EOF"
+        }
+      ],
+      "max_p99_us": 4554,
+      "median_p99_us": 3652,
+      "planned": 90000,
+      "runs": 5,
+      "saturation_refused": 8,
+      "spontaneous_errors": 0,
+      "status": {
+        "0": 8,
+        "200": 89992
+      },
+      "status_total": 90000,
+      "succeeded": 89992,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 8,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 12000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 32822,
+      "median_p99_us": 3366,
+      "planned": 12000,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 12000
+      },
+      "status_total": 12000,
+      "succeeded": 12000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 2400000,
+      "failure_classes": {
+        "broken_pipe": 4,
+        "dial_other": 1,
+        "eof_on_fresh_conn": 19,
+        "peer_reset": 7,
+        "request_write_failed": 55,
+        "server_closed_idle_conn": 9
+      },
+      "failures": [
+        {
+          "class": "request_write_failed",
+          "count": 55,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:51980->127.0.0.1:8080: use of closed network connection"
+        },
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 19,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": EOF"
+        },
+        {
+          "class": "server_closed_idle_conn",
+          "count": 9,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": http: server closed idle connection"
+        },
+        {
+          "class": "peer_reset",
+          "count": 7,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": read tcp 127.0.0.1:41630->127.0.0.1:8080: read: connection reset by peer"
+        },
+        {
+          "class": "broken_pipe",
+          "count": 4,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": readfrom tcp 127.0.0.1:52868->127.0.0.1:8080: write tcp 127.0.0.1:52868->127.0.0.1:8080: write: broken pipe"
+        },
+        {
+          "class": "dial_other",
+          "count": 1,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:44564->127.0.0.1:8080: use of closed network connection"
+        }
+      ],
+      "max_p99_us": 40779,
+      "median_p99_us": 30772,
+      "planned": 2400000,
+      "runs": 5,
+      "saturation_refused": 19,
+      "spontaneous_errors": 76,
+      "status": {
+        "0": 95,
+        "204": 2399905
+      },
+      "status_total": 2400000,
+      "succeeded": 2399905,
+      "transport_error_ratio": 3.1666666666666666e-05,
+      "transport_errors": 95,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 900000,
+      "failure_classes": {
+        "eof_on_fresh_conn": 28,
+        "peer_reset": 1,
+        "server_closed_idle_conn": 3
+      },
+      "failures": [
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 28,
+          "example_error": "Get \"http://127.0.0.1:8080/json/medium\": EOF"
+        },
+        {
+          "class": "server_closed_idle_conn",
+          "count": 3,
+          "example_error": "Get \"http://127.0.0.1:8080/json/medium\": http: server closed idle connection"
+        },
+        {
+          "class": "peer_reset",
+          "count": 1,
+          "example_error": "Get \"http://127.0.0.1:8080/json/medium\": read tcp 127.0.0.1:41620->127.0.0.1:8080: read: connection reset by peer"
+        }
+      ],
+      "max_p99_us": 40785,
+      "median_p99_us": 39957,
+      "planned": 900000,
+      "runs": 5,
+      "saturation_refused": 28,
+      "spontaneous_errors": 4,
+      "status": {
+        "0": 32,
+        "200": 899968
+      },
+      "status_total": 900000,
+      "succeeded": 899968,
+      "transport_error_ratio": 4.444444444444444e-06,
+      "transport_errors": 32,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 6000000,
+      "failure_classes": {
+        "eof_on_fresh_conn": 113,
+        "peer_reset": 1,
+        "server_closed_idle_conn": 23
+      },
+      "failures": [
+        {
+          "class": "eof_on_fresh_conn",
+          "count": 113,
+          "example_error": "Get \"http://127.0.0.1:8080/tiny\": EOF"
+        },
+        {
+          "class": "server_closed_idle_conn",
+          "count": 23,
+          "example_error": "Get \"http://127.0.0.1:8080/tiny\": http: server closed idle connection"
+        },
+        {
+          "class": "peer_reset",
+          "count": 1,
+          "example_error": "Get \"http://127.0.0.1:8080/tiny\": read tcp 127.0.0.1:33622->127.0.0.1:8080: read: connection reset by peer"
+        }
+      ],
+      "max_p99_us": 40888,
+      "median_p99_us": 38337,
+      "planned": 6000000,
+      "runs": 5,
+      "saturation_refused": 113,
+      "spontaneous_errors": 24,
+      "status": {
+        "0": 137,
+        "200": 5999863
+      },
+      "status_total": 6000000,
+      "succeeded": 5999863,
+      "transport_error_ratio": 4e-06,
+      "transport_errors": 137,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 9000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 42300,
+      "median_p99_us": 41807,
+      "planned": 9000,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 9000
+      },
+      "status_total": 9000,
+      "succeeded": 9000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}
