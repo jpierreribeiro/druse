@@ -198,18 +198,41 @@ A linha existe para impedir exatamente a saída fácil — serializar a suíte e
 declarar resolvido. Um teste que reprova uma vez em quarenta e duas e nomeia um
 mecanismo específico é candidato a corrida rara, não a ruído.
 
+### O gate limpo respondeu, e a resposta não encerra o assunto
+
+Rodei `build/check.sh` de novo sem nenhuma atividade concorrente minha:
+**`GATE2_EXIT=0`, 249 passes, zero falhas**, `wp123` inclusive.
+
+**Então a hipótese sobrevivente é a que eu tinha escrito antes de rodar:** o
+`wp123` reprova sob **contenção de I/O local**. Isso é uma resposta sobre *quando*
+e continua sem resposta sobre *o quê* — e a diferença importa, porque as duas
+leituras levam a lugares opostos:
+
+- **"É o teste."** O caminho de spool é fixo, `/tmp/druse-wp123-uploads`, e sob
+  pressão de fd ou de `/tmp` a abertura pode falhar por razões que não são do
+  produto. Nesse caso o reparo é isolar o spool por run.
+- **"É o produto."** `ingest.begin` falhando ao abrir tem consequência
+  documentada: o slot de admissão pode não voltar. Um servidor real num host sob
+  pressão veria a mesma coisa, e aí 507 sob contenção é comportamento, não ruído.
+
+**Não dá para escolher entre as duas com os dados que tenho**, e escolher a
+primeira porque é mais confortável seria exatamente o que o `check_test.sh:132`
+proíbe. Fica aberto.
+
 ### O que fica devido
 
-1. **Um gate limpo**, sem atividade concorrente minha — o run vermelho aconteceu
-   enquanto eu fazia `scp`/`ssh` para o host de campanha. Se ficar verde, a
-   hipótese vira *"o `wp123` é sensível a contenção de I/O local"*, o que ainda é
-   um achado sobre o teste ou sobre o produto, não um encerramento.
-2. **Se reproduzir**, a pista é a abertura do spool sob pressão de fd ou de
-   `/tmp`, e a pergunta é se o slot de admissão volta ou fica retido.
-3. **De qualquer forma**, o caminho fixo `/tmp/druse-wp123-uploads` é frágil por
-   construção: nada garante que dois runs concorrentes do gate não o
-   compartilhem. Isso é reparo de instrumento e é barato.
+1. **Reproduzir sob contenção de I/O**, não de CPU — foi o que eu testei e não
+   era a variável certa. `scp` de arquivos grandes concorrente, ou `fio` contra
+   `/tmp`, com o teste em laço.
+2. **Instrumentar `ingest.begin`** para distinguir "abriu e falhou" de "não
+   abriu", e verificar se o slot de `max_concurrent` volta em cada caminho. Essa
+   é a pergunta que decide entre teste e produto.
+3. **Isolar o spool por run** — `/tmp/druse-wp123-uploads` fixo é frágil por
+   construção e nada impede dois gates concorrentes de compartilhá-lo. Barato, e
+   vale mesmo se a causa for outra.
 
 **Não fiz nenhum dos três agora** porque nenhum é sobre a escada, e mexer em
 `web/` ou `ingest/` durante a campanha criaria candidato novo (G1) e jogaria fora
-os degraus já rodados.
+os degraus já rodados. O item 3 é o único seguro de fazer durante ela — toca só
+`tests/` — e mesmo assim esperei, porque `tests/` entra no hash da árvore que o
+`manifest.txt` grava.
