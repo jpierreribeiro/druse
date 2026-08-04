@@ -391,6 +391,43 @@ else
 fi
 note "utc_now=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# --- 6b. the host must not change itself under the measurement ---------------
+# FOUND BY LOSING A HOST, 2026-08-04. The qualified campaign host was pinned at
+# kernel 7.0.0-1006-aws (pre-registration §3.1) and came back from a reboot
+# running 7.0.0-1009-aws. Nothing in this script had an opinion about that,
+# because every other check reads the host AT REST and this one is about the
+# host's future.
+#
+# Why it is a refusal and not a note. G1 counts the kernel as part of the
+# candidate's identity. A twelve-hour final that begins on one kernel and is
+# graded on a host that upgraded itself in hour seven is not a run with a
+# caveat — it is a run whose environment changed while it was the thing being
+# measured, and no artefact records that. §3 already requires "known
+# neighbours: none; the host runs nothing else for the window"; an auto-upgrader
+# IS something else running, and it was never enumerated.
+#
+# The refusal is overridable, because a host that upgrades only user-space
+# packages is a different risk from one that reboots into a new kernel, and that
+# judgement belongs to whoever commits the amendment — not to this script.
+auto_upgrade_units=""
+if command -v systemctl >/dev/null 2>&1; then
+  for unit in unattended-upgrades.service apt-daily-upgrade.timer apt-daily.timer; do
+    if systemctl is-enabled "$unit" >/dev/null 2>&1; then
+      auto_upgrade_units="$auto_upgrade_units $unit"
+    fi
+  done
+fi
+auto_upgrade_units="${auto_upgrade_units# }"
+note "auto_upgrade_units=${auto_upgrade_units:-none}"
+note "kernel_running=$(uname -r)"
+if [[ -n "$auto_upgrade_units" ]]; then
+  if [[ "${DRUSE_SOAK_ALLOW_AUTO_UPGRADE:-}" == "1" ]]; then
+    note "auto_upgrade_override=yes"
+  else
+    problem "the host upgrades itself while the campaign runs: $auto_upgrade_units enabled. A run whose kernel or libc changes mid-flight has no artefact that records it (G1). Disable them for the window — 'systemctl disable --now unattended-upgrades.service apt-daily-upgrade.timer apt-daily.timer' — or set DRUSE_SOAK_ALLOW_AUTO_UPGRADE=1 to accept the risk, which stamps the report"
+  fi
+fi
+
 # --- 7. disk for the raw evidence -------------------------------------------
 target_dir="${DRUSE_SOAK_BASE:-$PWD}"
 free_kib="$(df -Pk "$target_dir" 2>/dev/null | awk 'NR==2 {print $4}')"

@@ -917,6 +917,76 @@ fi
 echo "PASS (soak preflight, R2-WP02 control-of-the-control): removing the physical-core refusal makes the mutant case red"
 
 # ---------------------------------------------------------------------------
+# A HOST THAT UPGRADES ITSELF IS REFUSED — found by losing one, 2026-08-04.
+#
+# The qualified campaign host was pinned at kernel 7.0.0-1006-aws and came back
+# from a reboot on 7.0.0-1009-aws. Every other check in preflight.sh reads the
+# host AT REST; this one is about what the host will do to itself during the
+# twelve hours it is being measured, which is why nothing caught it.
+#
+# The assertion is on the CAUSE, not on the refusal count: a preflight that
+# refuses for four unrelated reasons must not be read as having caught this one.
+# ---------------------------------------------------------------------------
+# POSITIVE — a host whose timers are enabled is refused, and the report names
+# which units, so the operator can act without guessing.
+mkdir -p "$TMP/fakebin-enabled"
+printf '#!/bin/sh\n[ "$1" = is-enabled ] && exit 0\nexit 1\n' >"$TMP/fakebin-enabled/systemctl"
+chmod +x "$TMP/fakebin-enabled/systemctl"
+env PATH="$TMP/fakebin-enabled:$PATH" \
+    DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-distinct" \
+    DRUSE_SOAK_SERVER_CPUS="0-3" DRUSE_SOAK_GENERATOR_CPUS="4-7" \
+    bash "$SOAK/preflight.sh" "$TMP/pf-upgrade-on.txt" >/dev/null 2>&1 || true
+grep -q '^problem=.*upgrades itself while the campaign runs' "$TMP/pf-upgrade-on.txt" ||
+  { cat "$TMP/pf-upgrade-on.txt" >&2
+    fail "a host with unattended-upgrades enabled was qualified for a twelve-hour campaign. The kernel it is graded on would not be the kernel it started on, and no artefact records the change (G1)."; }
+grep -q '^auto_upgrade_units=.*unattended-upgrades' "$TMP/pf-upgrade-on.txt" ||
+  fail "the refusal did not record WHICH units are enabled; an operator cannot act on 'the host upgrades itself'"
+echo "PASS (soak preflight): a host that upgrades itself mid-campaign is refused, naming the units"
+
+# NEGATIVE — with the units disabled the refusal is absent, so the check is
+# reading the units and not simply always firing.
+mkdir -p "$TMP/fakebin-disabled"
+printf '#!/bin/sh\nexit 1\n' >"$TMP/fakebin-disabled/systemctl"
+chmod +x "$TMP/fakebin-disabled/systemctl"
+env PATH="$TMP/fakebin-disabled:$PATH" \
+    DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-distinct" \
+    DRUSE_SOAK_SERVER_CPUS="0-3" DRUSE_SOAK_GENERATOR_CPUS="4-7" \
+    bash "$SOAK/preflight.sh" "$TMP/pf-upgrade-off.txt" >/dev/null 2>&1 || true
+grep -q '^problem=.*upgrades itself while the campaign runs' "$TMP/pf-upgrade-off.txt" &&
+  { cat "$TMP/pf-upgrade-off.txt" >&2
+    fail "the auto-upgrade refusal fired on a host with the units DISABLED. A check that always refuses cannot distinguish a safe host from an unsafe one."; }
+grep -q '^auto_upgrade_units=none$' "$TMP/pf-upgrade-off.txt" ||
+  fail "a host with no auto-upgrade units did not record auto_upgrade_units=none"
+echo "PASS (soak preflight): with the units disabled the refusal is absent, and the report says so"
+
+# THE OVERRIDE IS STAMPED, never silent — the same rule as
+# smoke_on_unqualified_host. Accepting the risk is allowed; hiding that it was
+# accepted is what produces an artefact nobody can grade.
+env PATH="$TMP/fakebin-enabled:$PATH" DRUSE_SOAK_ALLOW_AUTO_UPGRADE=1 \
+    DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-distinct" \
+    DRUSE_SOAK_SERVER_CPUS="0-3" DRUSE_SOAK_GENERATOR_CPUS="4-7" \
+    bash "$SOAK/preflight.sh" "$TMP/pf-upgrade-override.txt" >/dev/null 2>&1 || true
+grep -q '^auto_upgrade_override=yes$' "$TMP/pf-upgrade-override.txt" ||
+  { cat "$TMP/pf-upgrade-override.txt" >&2
+    fail "the auto-upgrade override did not stamp the report. An accepted risk that leaves no trace in the artefact is indistinguishable from a host that never had the problem."; }
+grep -q '^problem=.*upgrades itself while the campaign runs' "$TMP/pf-upgrade-override.txt" &&
+  fail "the override did not suppress the refusal it exists to override"
+echo "PASS (soak preflight): the auto-upgrade override is stamped into the report, never silent"
+
+# CONTROL-OF-THE-CONTROL — delete the refusal and the positive case must go red.
+sed '/upgrades itself while the campaign runs/d' "$SOAK/preflight.sh" >"$TMP/preflight-noupgrade.sh"
+cmp -s "$SOAK/preflight.sh" "$TMP/preflight-noupgrade.sh" &&
+  fail "the auto-upgrade refusal could not be located in preflight.sh to mutate it; this control has gone stale against the script it guards"
+env PATH="$TMP/fakebin-enabled:$PATH" \
+    DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-distinct" \
+    DRUSE_SOAK_SERVER_CPUS="0-3" DRUSE_SOAK_GENERATOR_CPUS="4-7" \
+    bash "$TMP/preflight-noupgrade.sh" "$TMP/pf-upgrade-mutant.txt" >/dev/null 2>&1 || true
+if grep -q '^problem=.*upgrades itself while the campaign runs' "$TMP/pf-upgrade-mutant.txt"; then
+  fail "a preflight with the auto-upgrade refusal removed still produced it. The positive case above is not reading what it claims to read."
+fi
+echo "PASS (soak preflight, control-of-the-control): removing the auto-upgrade refusal makes the positive case red"
+
+# ---------------------------------------------------------------------------
 # The compiler BUILDS, it does not merely exist.
 #
 # Found on a real campaign host, and found by the smoke rather than by the
