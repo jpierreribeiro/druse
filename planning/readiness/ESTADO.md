@@ -48,7 +48,7 @@ O custo alto é deliberado. As seis regras globais estão no
 | WP01 | o instrumento consegue explicar uma falha | **fechado** |
 | WP02 | o host e o candidato estão congelados | **fechado** |
 | WP03 | o servidor é observável enquanto falha | **fechado** |
-| **WP04** | **o candidato aguenta 12 h sem degradar** | **falta a evidência que promove** |
+| **WP04** | **o candidato aguenta 12 h sem degradar** | **em execução desde 2026-08-04** — escada rodando, ver §6.2 |
 | WP05 | qual é o teto de capacidade e como degrada | depende do WP04 |
 | WP06 | segurança e cadeia de suprimentos | executado; 2 itens são decisão do dono |
 | WP07 | composição sob tráfego real | degrau 1 entregue; degraus 2–6 = risco aceito |
@@ -161,7 +161,40 @@ Continua não sendo um dia, e continua cabendo antes do Final 1 no mesmo dia.
 Carregar os degraus antigos para a frente significaria citar verdes tomados a uma
 taxa que a campanha não usa mais.
 
-### 6.2 A quinta emenda está commitada; os finais não dependem de mais nenhum papel
+### 6.2 A escada está rodando, e já desceu a taxa uma vez
+
+**2026-08-04.** O host novo (§3.7) qualificou e a escada começou. Dois degraus
+fecharam e o segundo custou os outros dois:
+
+| Degrau | Taxa | Analisador | Recusas: total / injetadas / **carga** |
+|---|---|---|---|
+| smoke, 5 ciclos | f = 0,10 | **PASS** | 56 / 56 / **0** |
+| burn-in, 15 ciclos | f = 0,10 | **PASS** | 105 / 104 / **1** |
+
+**Aquele 1 disparou o C22 e a taxa desceu para f = 0,06** (agregado 960/s,
+§4.7). A escada reiniciou no smoke — G1, taxa nova é candidato novo — a ~2h40 de
+custo.
+
+**Duas coisas que essa linha esconde e valem saber.**
+
+A primeira é que o C22 **precisou ser emendado antes de poder disparar**. Ele
+dizia "recusa do servidor > 0", e o smoke contou 56 recusas que a telemetria por
+segundo mostrou terem acontecido *todas no mesmo segundo* em que 24 leitores
+lentos foram injetados. A sexta emenda (§4.6) corrigiu o critério para ler
+recusa **atribuível à carga**, e essa emenda favorecia continuar — está escrita
+em vez de aplicada em silêncio por isso. No degrau seguinte o mesmo critério
+reprovou o run.
+
+A segunda é o que o número diz: **o limiar de recusa é propriedade do framework
+num ambiente, não do framework sozinho.** Três hosts, três taxas de registro. É a
+entrada mais útil que esta escada produziu para o WP05, e não é o Druse piorando.
+
+O pacote vive em
+[`../../evidence/2026-08-04-r2-wp04-ladder/`](../../evidence/2026-08-04-r2-wp04-ladder/)
+e cresce a cada degrau — desta vez desde o primeiro, porque quando o host
+anterior morreu as conclusões sobreviveram e os dados brutos não.
+
+### 6.3 A quinta emenda está commitada; os finais não dependem de mais nenhum papel
 
 A regra da §4.1 obrigava a taxa a descer "em seu próprio commit, antes do final".
 Foi feito: **§4.5 do pré-registro** registra a tabela de f = 0.10 (agregado
