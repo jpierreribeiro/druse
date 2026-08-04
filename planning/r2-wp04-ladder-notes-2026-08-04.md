@@ -139,3 +139,77 @@ sustentavam, não. Por isso a dúvida do §4.6 — se aquelas recusas eram injet
 
 Um degrau cujo artefato vive só no host é um degrau que um host leva embora. O
 pacote desta escada existe desde o primeiro degrau por essa razão.
+
+## 7. O gate ficou vermelho no `wp123-two-servers`, e não consegui reproduzir
+
+**Aberto em 2026-08-04. Não é bloqueio da escada — é outro assunto que apareceu
+enquanto ela rodava, e está aqui para não sumir.**
+
+Rodei `build/check.sh` durante o rehearsal e ele reprovou em:
+
+```
+test_wp123_two_servers.wp123_stopping_a_server_does_not_drain_another_servers_uploads
+  server A answered 507 (ok=true) after server B was stopped:
+  B's drain closed A's upload admission, which A never asked for
+```
+
+**Não é timeout — é semântico.** O servidor A respondeu 507 a um upload que devia
+aceitar, depois que o servidor B (outro `App`, mesmo processo) foi parado.
+
+### O que a medição diz
+
+| contexto | execuções | falhas |
+|---|---:|---:|
+| `origin/main` limpo, isolado | 3 | 0 |
+| HEAD, isolado | 5 | 0 |
+| HEAD, sob 6 processos de carga de CPU | 8 | 0 |
+| HEAD, repetição isolada | 25 | 0 |
+| **`build/check.sh` completo** | **1** | **1** |
+
+**41 verdes contra 1 vermelho, e o vermelho só no gate completo.**
+
+### O que não pode ser
+
+**Não pode ser minha mudança.** Esta sessão tocou `ops/soak/`, `build/check_soak_controls.sh`,
+`evidence/` e documentos — **zero** arquivos em `web/`, `ingest/` ou `vendor/`. O
+teste exercita `web/internal/transport`.
+
+### De onde vem o 507, que estreita a busca
+
+`web/internal/transport/odin_http_adapter.odin:645`: o 507 sai quando
+**`ingest.begin` falha ao abrir o arquivo de spool** — não quando a admissão
+recusa (essa dá 503). O spool do teste é um caminho **fixo**,
+`/tmp/druse-wp123-uploads`.
+
+Isso casa com uma classe de defeito que este repositório já documentou, no
+relatório de auditoria de subsistemas: *"`ingest.begin` fails to open the spool...
+A briefly unwritable spool directory retired `max_concurrent` slots
+permanently."* Uma falha transitória de abertura tem consequência persistente.
+
+### Por que NÃO estou chamando isso de flake
+
+Porque o próprio gate já decidiu essa questão antes de mim.
+`build/check_test.sh:132`, sobre estas duas suítes paralelas:
+
+> *"If they became flaky, the fault is in the per-server state, not in the
+> runner."*
+
+A linha existe para impedir exatamente a saída fácil — serializar a suíte e
+declarar resolvido. Um teste que reprova uma vez em quarenta e duas e nomeia um
+mecanismo específico é candidato a corrida rara, não a ruído.
+
+### O que fica devido
+
+1. **Um gate limpo**, sem atividade concorrente minha — o run vermelho aconteceu
+   enquanto eu fazia `scp`/`ssh` para o host de campanha. Se ficar verde, a
+   hipótese vira *"o `wp123` é sensível a contenção de I/O local"*, o que ainda é
+   um achado sobre o teste ou sobre o produto, não um encerramento.
+2. **Se reproduzir**, a pista é a abertura do spool sob pressão de fd ou de
+   `/tmp`, e a pergunta é se o slot de admissão volta ou fica retido.
+3. **De qualquer forma**, o caminho fixo `/tmp/druse-wp123-uploads` é frágil por
+   construção: nada garante que dois runs concorrentes do gate não o
+   compartilhem. Isso é reparo de instrumento e é barato.
+
+**Não fiz nenhum dos três agora** porque nenhum é sobre a escada, e mexer em
+`web/` ou `ingest/` durante a campanha criaria candidato novo (G1) e jogaria fora
+os degraus já rodados.
