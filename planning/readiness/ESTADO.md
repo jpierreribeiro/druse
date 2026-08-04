@@ -176,8 +176,28 @@ como um run de 12 h sobrevive à queda do ssh, e as decisões congeladas — est
 
 ## 7. Como retomar
 
-- **Host de campanha:** `184.72.201.140`, usuário `ubuntu`, chave
-  `~/Downloads/colossus.pem`. c5.2xlarge, 4 núcleos físicos com irmãos SMT.
+- **Host de campanha:** `44.212.50.252`, usuário `ubuntu`, chave
+  `~/Downloads/colossus.pem`. c5.2xlarge `i-08c31e483e890fd16`, us-east-1a,
+  Ubuntu 24.04.4, kernel `6.17.0-1017-aws`, Xeon 8275CL, 4 núcleos físicos com
+  irmãos SMT. **Qualificado em 2026-08-04** — `preflight=pass`, `smoke=pass`,
+  sem override. Validade 7 dias, expira **2026-08-11**. A troca de host está
+  registrada na **§3.7** do pré-registro; o host anterior
+  (`184.72.201.140`) foi perdido e **não** deve ser usado.
+
+  > **Preparação do host, para reproduzir:** `clang`, `docker.io`, `golang-go`;
+  > Odin fixado via `ops/ci/install-odin.sh` em `~/odin-pinned` (hash conferido,
+  > `819fdc7`); `memlock unlimited` em `/etc/security/limits.d/99-druse-campaign.conf`
+  > **e** `/etc/systemd/system/user@.service.d/99-druse.conf`; `ubuntu` no grupo
+  > `docker`; e **auto-upgrade desligado** — `systemctl disable --now
+  > unattended-upgrades.service apt-daily-upgrade.timer apt-daily.timer`. Esta
+  > última não é higiene opcional: foi um kernel trocado sozinho que criou a §3.7.
+
+  > **Histórico da máquina anterior, se alguém a encontrar:**
+  > `184.72.201.140` / `i-05c3c8168b18776a5` travou o `sshd` — TCP aceita, banner
+  > nunca chega, sobrevive a reboot — e tinha derivado para o kernel
+  > `7.0.0-1009-aws` sozinha. Os artefatos de `~/ladder2/` e `~/rate-derivation/`
+  > estão só nela; se for recuperada, **tire um snapshot do EBS antes de
+  > qualquer coisa**.
 
   > **INACESSÍVEL desde 2026-08-03, ~23h (BRT).** O WP04 foi autorizado a
   > começar e não começou por isto. O sintoma é específico e vale registrar
