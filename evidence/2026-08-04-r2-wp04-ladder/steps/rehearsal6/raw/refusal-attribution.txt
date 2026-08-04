@@ -1,0 +1,30 @@
+run:                    /home/ubuntu/ladder3/rehearsal6-20260804T075250Z
+telemetry samples:      7760 (0 unreadable)
+declared injections:    24
+
+saturation_refusals:    461
+  inside an injection:  454
+  attributable to load: 7   <-- C22 reads THIS
+
+C22: DESCENT REQUIRED — offered load produced refusals at this rate.
+
+steps:
+  +1     -> 1      load       (no declared injection active)
+  +55    -> 56     injection  (cycle=5 kind=rst; cycle=5 kind=slow_readers)
+  +53    -> 109    injection  (cycle=10 kind=rst; cycle=10 kind=slow_readers)
+  +1     -> 110    load       (no declared injection active)
+  +4     -> 114    injection  (cycle=15 kind=rst; cycle=15 kind=slow_readers)
+  +48    -> 162    injection  (cycle=20 kind=rst; cycle=20 kind=slow_readers)
+  +1     -> 163    load       (no declared injection active)
+  +60    -> 223    injection  (cycle=25 kind=rst; cycle=25 kind=slow_readers)
+  +1     -> 224    load       (no declared injection active)
+  +23    -> 247    injection  (cycle=30 kind=rst; cycle=30 kind=slow_readers)
+  +40    -> 287    injection  (cycle=35 kind=rst; cycle=35 kind=slow_readers)
+  +58    -> 345    injection  (cycle=40 kind=rst; cycle=40 kind=slow_readers)
+  +1     -> 346    load       (no declared injection active)
+  +1     -> 347    load       (no declared injection active)
+  +4     -> 351    injection  (cycle=45 kind=rst; cycle=45 kind=slow_readers)
+  +7     -> 358    injection  (cycle=50 kind=rst; cycle=50 kind=slow_readers)
+  +50    -> 408    injection  (cycle=55 kind=rst; cycle=55 kind=slow_readers)
+  +1     -> 409    load       (no declared injection active)
+  +52    -> 461    injection  (cycle=60 kind=rst; cycle=60 kind=slow_readers)

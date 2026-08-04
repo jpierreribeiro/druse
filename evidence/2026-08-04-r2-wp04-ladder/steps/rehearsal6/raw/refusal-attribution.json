@@ -1,0 +1,146 @@
+{
+  "run_directory": "/home/ubuntu/ladder3/rehearsal6-20260804T075250Z",
+  "telemetry_samples": 7760,
+  "unreadable_samples": 0,
+  "declared_injections": 24,
+  "unknown_injection_kinds": [],
+  "saturation_refusals_total": 461,
+  "refusals_inside_injection_window": 454,
+  "refusals_attributable_to_load": 7,
+  "c22_descent_required": true,
+  "steps": [
+    {
+      "unix_s": 1785822313.548,
+      "delta": 1,
+      "running_total": 1,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785822701.639,
+      "delta": 55,
+      "running_total": 56,
+      "attributed_to": "injection",
+      "window": "cycle=5 kind=rst; cycle=5 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785823347.807,
+      "delta": 53,
+      "running_total": 109,
+      "attributed_to": "injection",
+      "window": "cycle=10 kind=rst; cycle=10 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785823865.957,
+      "delta": 1,
+      "running_total": 110,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785823994.995,
+      "delta": 4,
+      "running_total": 114,
+      "attributed_to": "injection",
+      "window": "cycle=15 kind=rst; cycle=15 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785824641.189,
+      "delta": 48,
+      "running_total": 162,
+      "attributed_to": "injection",
+      "window": "cycle=20 kind=rst; cycle=20 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785825029.286,
+      "delta": 1,
+      "running_total": 163,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785825288.349,
+      "delta": 60,
+      "running_total": 223,
+      "attributed_to": "injection",
+      "window": "cycle=25 kind=rst; cycle=25 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785825417.378,
+      "delta": 1,
+      "running_total": 224,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785825934.52,
+      "delta": 23,
+      "running_total": 247,
+      "attributed_to": "injection",
+      "window": "cycle=30 kind=rst; cycle=30 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785826580.699,
+      "delta": 40,
+      "running_total": 287,
+      "attributed_to": "injection",
+      "window": "cycle=35 kind=rst; cycle=35 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785827227.874,
+      "delta": 58,
+      "running_total": 345,
+      "attributed_to": "injection",
+      "window": "cycle=40 kind=rst; cycle=40 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785827615.98,
+      "delta": 1,
+      "running_total": 346,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785827745.009,
+      "delta": 1,
+      "running_total": 347,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785827874.045,
+      "delta": 4,
+      "running_total": 351,
+      "attributed_to": "injection",
+      "window": "cycle=45 kind=rst; cycle=45 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785828521.22,
+      "delta": 7,
+      "running_total": 358,
+      "attributed_to": "injection",
+      "window": "cycle=50 kind=rst; cycle=50 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785829167.402,
+      "delta": 50,
+      "running_total": 408,
+      "attributed_to": "injection",
+      "window": "cycle=55 kind=rst; cycle=55 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785829555.515,
+      "delta": 1,
+      "running_total": 409,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785829814.589,
+      "delta": 52,
+      "running_total": 461,
+      "attributed_to": "injection",
+      "window": "cycle=60 kind=rst; cycle=60 kind=slow_readers"
+    }
+  ]
+}

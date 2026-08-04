@@ -1,6 +1,11 @@
 # R2-WP04 — a escada, no host `44.212.50.252`
 
-**Status: EM EXECUÇÃO.** Este arquivo é atualizado quando um degrau fecha.
+**Status: ESCADA ENCERRADA em 2026-08-04. O R2-WP04 PAROU** por regra C22, com
+achado de capacidade para o R2-WP05. Os finais não rodaram.
+
+**O veredito está em [`verdict.md`](verdict.md)** — leia aquele arquivo primeiro.
+Este é o índice do pacote.
+
 Ele **não promove nada**; o portão continua em R1.
 
 O contrato do run é
@@ -43,9 +48,9 @@ host, anexados na raiz deste pacote.
 | — | *(escada reinicia a f = 0,06 — §4.7)* | | | |
 | 3 | smoke | 5 | **PASS** | 1 / 0 / **1** |
 | 4 | burn-in | 15 | **PASS** | 72 / 72 / **0** |
-| 5 | rehearsal | 60 | em execução — **é ele que decide** | — |
-| 6 | Final 1 | ~360 | — | — |
-| 7 | Final 2 | ~360 | — | — |
+| 5 | rehearsal | 60 | **PASS** — e **C22 PAROU o WP04** | 461 / 454 / **7** |
+| — | Final 1 | ~360 | **não rodou** (C22) | — |
+| — | Final 2 | ~360 | **não rodou** (C22) | — |
 
 A coluna que decide é a última. O C22 desce a taxa por recusa **de carga**; o
 C23 exige que a divisão exista em vez de um total ambíguo. Ela é produzida por
