@@ -1261,3 +1261,76 @@ test "$DRUSE_PINNED" -ge 6 ||
 echo "PASS (soak pre-registration, R2-WP02): the campaign criteria are present, every SLO row has a declared origin, and the $DRUSE_PINNED pinned instrument files still hash to what was frozen"
 
 echo "PASS (soak): the R2-WP01 instrument controls are green"
+
+# ---------------------------------------------------------------------------
+# C23 — THE REFUSAL ATTRIBUTION, AND THE INSTRUMENT THAT PRODUCES IT.
+#
+# C22 descends the rate on refusals ATTRIBUTABLE TO OFFERED LOAD; C23 requires
+# the split. `attribute-refusals.py` computes it. The split was done by hand
+# once, on the 2026-08-04 smoke, and by hand is how a criterion quietly becomes
+# optional.
+#
+# The bias under test matters more than the arithmetic: a refusal that does NOT
+# coincide with a declared injection must count as LOAD. Getting that backwards
+# reads as a clean bill on a rate that is actually refusing.
+# ---------------------------------------------------------------------------
+DRUSE_ATTR="$SOAK/attribute-refusals.py"
+test -f "$DRUSE_ATTR" ||
+  fail "attribute-refusals.py is missing; criterion C23 has no instrument and the split would go back to being done by hand"
+
+attr_fixture() {  # $1 = dir, $2 = injection utc (or empty), $3.. = "offset:total"
+  local dir="$1" inject="$2"; shift 2
+  rm -rf "$dir"; mkdir -p "$dir/control" "$dir/telemetry"
+  if [[ -n "$inject" ]]; then
+    printf 'cycle=5 kind=slow_readers attempted=24 utc=%s\n' "$inject" >"$dir/control/injected.txt"
+  else
+    : >"$dir/control/injected.txt"
+  fi
+  local i=0
+  for spec in "$@"; do
+    printf 'druse_snapshot 1\nunix_ns %s000000000\nsaturation_refusals %s\n' \
+      "${spec%%:*}" "${spec##*:}" >"$dir/telemetry/stats-$(printf '%06d' "$i").json"
+    i=$((i + 1))
+  done
+}
+
+# Injection declared at unix 1000; a refusal at 1002 is inside its 8 s window.
+attr_fixture "$TMP/attr-injected" "$(date -u -d @1000 +%Y-%m-%dT%H:%M:%SZ)" \
+  999:0 1002:40 1005:40
+DRUSE_ATTR_OUT="$(python3 "$DRUSE_ATTR" "$TMP/attr-injected" --json)"
+echo "$DRUSE_ATTR_OUT" | grep -q '"refusals_attributable_to_load": 0' ||
+  { echo "$DRUSE_ATTR_OUT" >&2
+    fail "a refusal inside a declared injection window was charged to offered load. C22 would descend the rate for 24 slow readers, which lowering the rate does not remove."; }
+echo "$DRUSE_ATTR_OUT" | grep -q '"c22_descent_required": false' ||
+  fail "an injection-only run demanded a rate descent"
+echo "PASS (soak C23): refusals inside a declared injection window are not charged to offered load"
+
+# The same run with the refusal well outside the window: it is LOAD, and C22
+# fires. This is the direction that must never be softened.
+attr_fixture "$TMP/attr-load" "$(date -u -d @1000 +%Y-%m-%dT%H:%M:%SZ)" \
+  999:0 1400:40 1405:40
+DRUSE_ATTR_OUT="$(python3 "$DRUSE_ATTR" "$TMP/attr-load" --json)"
+echo "$DRUSE_ATTR_OUT" | grep -q '"refusals_attributable_to_load": 40' ||
+  { echo "$DRUSE_ATTR_OUT" >&2
+    fail "a refusal 400 s away from any declared injection was credited to injection. That is a clean bill issued on a rate that is refusing under load."; }
+echo "$DRUSE_ATTR_OUT" | grep -q '"c22_descent_required": true' ||
+  fail "load-attributable refusals did not demand the C22 descent"
+echo "PASS (soak C23): refusals outside every injection window are charged to load, and C22 fires"
+
+# A run with NO declared injection at all: every refusal is load. An empty
+# injected.txt must not become a blanket excuse.
+attr_fixture "$TMP/attr-noinject" "" 999:0 1002:7
+python3 "$DRUSE_ATTR" "$TMP/attr-noinject" --json | grep -q '"refusals_attributable_to_load": 7' ||
+  fail "with no injection declared, refusals were still excused. An absent declaration is not a declaration."
+echo "PASS (soak C23): with nothing injected, every refusal is charged to load"
+
+# CONTROL-OF-THE-CONTROL — widen the window to swallow everything and the load
+# case must stop being detected.
+sed 's/^UNKNOWN_KIND_SECONDS = .*/UNKNOWN_KIND_SECONDS = 10.0/; s/^    "slow_readers": 8.0,/    "slow_readers": 100000.0,/' \
+  "$DRUSE_ATTR" >"$TMP/attribute-widened.py"
+cmp -s "$DRUSE_ATTR" "$TMP/attribute-widened.py" &&
+  fail "the injection duration could not be located in attribute-refusals.py to mutate it; this control has gone stale against the script it guards"
+if python3 "$TMP/attribute-widened.py" "$TMP/attr-load" --json | grep -q '"c22_descent_required": true'; then
+  fail "an attribution script whose window swallows the whole run still reported a load refusal. The load case above is not reading what it claims to read."
+fi
+echo "PASS (soak C23, control-of-the-control): widening the injection window hides the load refusal, so the load case is real"
