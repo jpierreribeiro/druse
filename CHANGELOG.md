@@ -7,6 +7,48 @@ Versioning is **pre-1.0 semantic**: while the MAJOR is `0`, a breaking change
 moves the MINOR. The series is `v0.9.0-pilot` and `v0.9.1-pilot`, both
 controlled pilots, then `v0.10.0` — the first release not marked a pilot.
 
+## [Unreleased]
+
+### Breaking
+
+- **`trust_proxies` deixou de casar prefixos sem âncora (TRUST-001).** Uma
+  entrada terminada em `.` ou `:` continua sendo um prefixo; **qualquer outra
+  passa a casar o endereço inteiro.**
+
+  **O que estava errado:** escrever `"127.0.0.1"` para nomear um proxy também
+  confiava em `127.0.0.10` até `127.0.0.199` — cerca de cento e dez endereços que
+  ninguém nomeou — e não havia como dizer "este endereço e só ele". O defeito
+  também falsificava o argumento que a própria documentação usava para preferir
+  casamento textual a CIDR: *"a wrong prefix can only fail to trust one you
+  did"*.
+
+  **Ação necessária:** nenhuma, se suas entradas já terminavam em `.` ou `:`
+  (`"10."`, `"192.168."`, `"fd00:"`) ou se já eram endereços completos
+  (`"127.0.0.1"`, `"::1"`) — os dois casos passam a significar exatamente o que
+  um leitor assumiria. **Confira se alguma entrada sua era um endereço
+  truncado** como `"127.0.0"` ou `"10.0.0"`: essas confiavam por acidente e agora
+  não confiam em nada.
+
+  **Sem janela de depreciação, e a razão é a regra:** uma janela sobre uma API
+  insegura prolonga a insegurança. Quando a assinatura *é* o defeito, a remoção é
+  imediata (`docs/compatibility-policy.md` §3).
+
+  Pinado por `tests/trust001-anchoring`, seis casos sobre socket real, com
+  mutante.
+
+### Added
+
+- **`docs/release-policy.md`, `docs/compatibility-policy.md` e
+  `docs/release-integrity-policy.md`** — as três políticas que faltavam para a
+  limitação **L6** (*pre-1.0, sem backports nem LTS*), classificada como
+  bloqueante para adoção. Elas dizem, respectivamente: quando publicamos, o que
+  continua valendo entre releases, e o que a verificação de um artefato prova.
+
+  A de integridade decide que **releases são verificados por hash e não
+  assinados**, com três gatilhos nomeados que tornam a assinatura obrigatória — e
+  declara, para quem for avaliar adoção, que este framework foi gerado
+  inteiramente por IA sem revisão humana linha a linha.
+
 ## [0.10.0] — 2026-07-30
 
 The first release under the name **Druse**, and the first that is not marked a
