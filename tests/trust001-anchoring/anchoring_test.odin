@@ -47,7 +47,7 @@ import web "druse:web"
 // carries the fix in a comment: giving each test its own row REMOVES the race
 // instead of surviving it. Retries would have hidden it.
 @(private = "file")
-ROWS :: 7
+ROWS :: 8
 @(private = "file")
 PORTS :: [ROWS][3]int {
 	{34811, 34871, 34931},
@@ -57,6 +57,7 @@ PORTS :: [ROWS][3]int {
 	{34815, 34875, 34935},
 	{34816, 34876, 34936},
 	{34817, 34877, 34937},
+	{34818, 34878, 34938},
 }
 
 @(private = "file")
@@ -290,7 +291,53 @@ trust001_the_separator_is_what_makes_a_prefix :: proc(t: ^testing.T) {
 	)
 }
 
-// --- 3. the untrusted default is unchanged -----------------------------------
+// --- 3. the shared matcher, and the chain walk that also used it ---------------
+//
+// `trusted_prefix_match` decides trust in TWO places: the connected peer, and
+// every hop of the right-to-left `X-Forwarded-For` walk (ADR-037). The widening
+// therefore applied to both, and the walk is where it moves a value rather than
+// merely blurring a set.
+//
+// THE WALK'S RULE: scan right to left; the first hop that is NOT a trusted proxy
+// is the answer. So over-trusting a hop makes the walk step PAST it, one place
+// further left — and left is the direction the client controls.
+//
+// Peer 127.0.0.1, trusted exactly. Header `"9.9.9.9, 127.0.0.199"`.
+//
+//	unanchored: "127.0.0.199" matched the entry "127.0.0.1", was skipped as a
+//	            trusted proxy, and the walk returned "9.9.9.9"
+//	anchored:   "127.0.0.199" is not the entry, the walk stops there
+//
+// WHAT THIS DOES AND DOES NOT SHOW, because the difference matters. Both values
+// here come from the same client, so this case demonstrates the MECHANISM — the
+// walk stepping one hop too far — not a completed forgery. Reaching a fully
+// forged value additionally requires a proxy that passes `X-Forwarded-For`
+// through instead of appending to it, which some do and this suite does not
+// model. Claiming more than the fixture proves would be the same kind of
+// overclaim the doc's own CIDR argument made.
+@(test)
+trust001_the_chain_walk_stops_at_a_lookalike_hop :: proc(t: ^testing.T) {
+	s: Server
+	if !start(&s, "127.0.0.1", 7) {
+		testing.expect(t, false, "no candidate port produced a working server")
+		return
+	}
+	defer stop(&s)
+
+	body, got := raw_get(s.port, "9.9.9.9, 127.0.0.199")
+	if !got {
+		testing.expect(t, false, "the server did not answer /whoami")
+		return
+	}
+	testing.expectf(
+		t,
+		body == "127.0.0.199",
+		`the walk must stop at the first hop that is not the trusted entry. Got %q: under the unanchored matcher "127.0.0.199" was accepted as the proxy "127.0.0.1" and the walk stepped one hop further left, which is the direction a client controls`,
+		body,
+	)
+}
+
+// --- 4. the untrusted default is unchanged -----------------------------------
 //
 // An entry that names an unrelated network must leave the header ignored and
 // report the socket peer. This is the fail-closed default the public doc

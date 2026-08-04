@@ -33,7 +33,19 @@ controlled pilots, then `v0.10.0` — the first release not marked a pilot.
   insegura prolonga a insegurança. Quando a assinatura *é* o defeito, a remoção é
   imediata (`docs/compatibility-policy.md` §3).
 
-  Pinado por `tests/trust001-anchoring`, seis casos sobre socket real, com
+  **A cadeia `X-Forwarded-For` usava o mesmo matcher, e é lá que o defeito movia
+  um valor em vez de só borrar um conjunto.** A caminhada é da direita para a
+  esquerda e para no primeiro hop que *não* é proxy confiável; confiar demais num
+  hop fazia a caminhada **passar por cima dele**, um lugar mais à esquerda — e a
+  esquerda é a direção que o cliente controla. Medido: com a entrada
+  `"127.0.0.1"` e o cabeçalho `"9.9.9.9, 127.0.0.199"`, o matcher antigo devolvia
+  `9.9.9.9`; o novo para em `127.0.0.199`.
+
+  *Isso demonstra o mecanismo, não uma forjação completa: chegar a um valor
+  inteiramente forjado exige também um proxy que repasse o cabeçalho em vez de
+  acrescentar a ele.*
+
+  Pinado por `tests/trust001-anchoring`, sete casos sobre socket real, com
   mutante.
 
 ### Added
