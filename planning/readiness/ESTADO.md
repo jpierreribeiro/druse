@@ -178,6 +178,28 @@ como um run de 12 h sobrevive à queda do ssh, e as decisões congeladas — est
 
 - **Host de campanha:** `184.72.201.140`, usuário `ubuntu`, chave
   `~/Downloads/colossus.pem`. c5.2xlarge, 4 núcleos físicos com irmãos SMT.
+
+  > **INACESSÍVEL desde 2026-08-03, ~23h (BRT).** O WP04 foi autorizado a
+  > começar e não começou por isto. O sintoma é específico e vale registrar
+  > porque descarta as causas fáceis: **a porta 22 aceita a conexão TCP e o
+  > banner do SSH nunca chega** (`Connection timed out during banner exchange`),
+  > cinco tentativas. As portas 80 e 12345 recusam corretamente no mesmo
+  > instante, então "aberto" ali é significativo e a instância não está parada
+  > nem sem rota — alguma coisa escuta em 22 e não completa handshake.
+  >
+  > Isso é sshd travado ou host em thrashing/disco cheio, não rede. **Não há
+  > CLI nem credencial AWS nesta máquina** (`aws` não instalado, `~/.aws`
+  > inexistente), então diagnosticar pelo console ou reiniciar a instância é
+  > ação do dono. O caminho mais curto é o console da EC2: *system log* e
+  > *instance status checks* dizem qual dos dois é em um minuto.
+  >
+  > **A qualificação do host expira em 2026-08-10** (vale 7 dias, §10 do
+  > pré-registro). Se ele voltar depois disso, `preflight.sh` e `smoke.sh`
+  > rodam de novo antes do primeiro degrau — 15 min, não um problema.
+  >
+  > O bundle do candidato já está montado e verificado
+  > (`git bundle`, 7,2 MB, história completa até `c8096b5`). Quando o host
+  > voltar, a transferência é um `scp` e o resto é o runbook.
 - **Affinity de registro:** servidor `0,1,4,5`, gerador `2,3,6,7`,
   `DRUSE_SOAK_LANES=2`. **Nunca alterar isso por variável de ambiente** — é uma
   emenda ao pré-registro, commitada antes do run.
