@@ -197,9 +197,33 @@ como um run de 12 h sobrevive à queda do ssh, e as decisões congeladas — est
   > pré-registro). Se ele voltar depois disso, `preflight.sh` e `smoke.sh`
   > rodam de novo antes do primeiro degrau — 15 min, não um problema.
   >
+  > **Atualização 2026-08-04, 02:58 UTC — o reboot não resolveu, e o log de
+  > sistema trouxe um achado maior que a queda.** A instância reiniciou às
+  > 02:40:04 UTC, o `ssh.service` subiu verde no boot, e dezoito minutos depois
+  > o banner continuava não chegando. O `ssh.socket` do Ubuntu 26.04 é
+  > socket-activated, o que explica o sintoma exatamente: o systemd aceita o TCP
+  > e o `sshd` nunca é gerado.
+  >
+  > **O kernel mudou: `7.0.0-1006-aws` → `7.0.0-1009-aws`.** O §3.1 do
+  > pré-registro pina o 1006. Sob G1 isso é ambiente diferente, e vale mesmo que
+  > o SSH volte: **o host precisa de emenda commitada antes de qualquer run**,
+  > não só de re-qualificação. Um unattended-upgrade instalou kernel novo entre
+  > a qualificação e agora — e é também a explicação mais provável da queda.
+  >
+  > O buraco de controle que isso expôs está fechado (`3901514`): o
+  > `preflight.sh` agora **recusa** um host que se atualiza sozinho, nomeando os
+  > units, com override carimbado e mutante. O §3 já exigia "o host não roda mais
+  > nada na janela"; faltava enumerar o auto-atualizador.
+  >
+  > **O que está só naquele disco:** os artefatos de `~/ladder2/` e
+  > `~/rate-derivation/`. **Nenhum pacote de burn-in ou rehearsal foi commitado
+  > em `evidence/`** — as conclusões estão no pré-registro §4.2/§4.3, os dados
+  > brutos não. Antes de qualquer stop/start/terminate, **tire um snapshot do
+  > volume EBS**: é barato, não destrutivo, e é o que impede perder isso.
+  >
   > O bundle do candidato já está montado e verificado
-  > (`git bundle`, 7,2 MB, história completa até `c8096b5`). Quando o host
-  > voltar, a transferência é um `scp` e o resto é o runbook.
+  > (`git bundle`, 7,2 MB, história completa até `c8096b5`). Quando houver host,
+  > a transferência é um `scp` e o resto é o runbook.
 - **Affinity de registro:** servidor `0,1,4,5`, gerador `2,3,6,7`,
   `DRUSE_SOAK_LANES=2`. **Nunca alterar isso por variável de ambiente** — é uma
   emenda ao pré-registro, commitada antes do run.
