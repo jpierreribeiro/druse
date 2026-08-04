@@ -1101,7 +1101,43 @@ cites it and does not restate it.
 
 | Field | Value |
 |---|---|
-| verdict | — not run |
-| analyser output | `analysis/verdict.json` |
-| reasons | — |
-| decision | PROMOTE TO R2 / HOLD AT R1 / REVOKE |
+| verdict | **os finais NÃO rodaram** — a escada parou no rehearsal por regra C22 |
+| analyser output | todos os cinco degraus deram `PASS`; ver `evidence/2026-08-04-r2-wp04-ladder/steps/*/raw/verdict.json` |
+| reasons | o rehearsal a f = 0,06 contou **7 recusas atribuíveis à carga** (461 totais, 454 injetadas). O §4.7 já tinha gasto a única descida permitida |
+| decision | **HOLD AT R1** |
+
+### O encerramento, e por que ele não é uma reprovação do produto
+
+**Todo degrau passou em todos os critérios pré-registrados**, o rehearsal
+inclusive: `/health` com zero erros de transporte em 60 ciclos, p99 mediano
+1.196 µs, e inclinação de RSS de **49,0 KiB/h avaliada** contra 1 MiB/h — a
+primeira vez que o run foi longo o bastante para `rss_slope_evaluated=true`.
+
+O que encerrou foi o **C22**, que é uma regra sobre qual taxa pode ser
+certificada para um final. A conta:
+
+| | |
+|---|---|
+| recusas de carga a f = 0,06 | 8 em 80 ciclos = **0,100/ciclo** |
+| projetado num final de ~360 ciclos | ~36 |
+| `/health` como fração das conexões novas | 16 de 624 = 2,56% |
+| esperadas em `/health` num final | **~0,9** |
+| critério 1 permite | **0** |
+
+Um final de doze horas nesta taxa tem cerca de uma recusa esperada exatamente no
+workload que não pode ter nenhuma.
+
+**E descer a taxa não move o piso:** f = 0,10 deu 1 recusa de carga em 20 ciclos
+(0,050/ciclo), f = 0,06 deu 8 em 80 (0,100/ciclo). Os intervalos se sobrepõem
+largamente — não dá para dizer que piorou — mas **não há evidência nenhuma de que
+baixar 40% da carga tenha ajudado**, e é essa a alegação que a descida precisava
+sustentar.
+
+Todas as recusas medidas caem em **rajada de reconexão**, não em carga
+permanente. A hipótese entregue ao **R2-WP05**: com `max_handlers = lanes = 2` a
+variável é a rajada de ~624 conexões por ciclo, não a taxa de requisições — e se
+for, nenhuma taxa converge. A resposta seria mais lanes, ou uma admissão que não
+recuse a sonda de liveness.
+
+O veredito completo, com proveniência, está em
+`evidence/2026-08-04-r2-wp04-ladder/verdict.md`.

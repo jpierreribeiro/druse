@@ -48,8 +48,8 @@ O custo alto é deliberado. As seis regras globais estão no
 | WP01 | o instrumento consegue explicar uma falha | **fechado** |
 | WP02 | o host e o candidato estão congelados | **fechado** |
 | WP03 | o servidor é observável enquanto falha | **fechado** |
-| **WP04** | **o candidato aguenta 12 h sem degradar** | **em execução desde 2026-08-04** — escada rodando, ver §6.2 |
-| WP05 | qual é o teto de capacidade e como degrada | depende do WP04 |
+| **WP04** | **o candidato aguenta 12 h sem degradar** | **PAROU em 2026-08-04** por regra C22 — achado de capacidade, ver §6.2 |
+| WP05 | qual é o teto de capacidade e como degrada | **é o próximo** — herda o achado do WP04 |
 | WP06 | segurança e cadeia de suprimentos | executado; 2 itens são decisão do dono |
 | WP07 | composição sob tráfego real | degrau 1 entregue; degraus 2–6 = risco aceito |
 | WP08 | o freeze e a decisão PROMOVER / SEGURAR | depende de tudo acima |
@@ -130,17 +130,18 @@ somente ele*.
 
 ## 6. O que falta, em ordem
 
-1. **Final 1** — ≥12 h no host de campanha, a f = 0.10.
-2. **Final 2** — outro dia, mesmo candidato, host re-qualificado antes.
-   - ambos PASS → a alegação de estabilidade vale para o candidato;
-   - um PASS e um FAIL → **vermelho**, e o próximo passo é atribuir a causa, não
-     uma terceira corrida;
-   - ambos FAIL → vermelho, e o WP04 para.
-3. **WP05** — o envelope de capacidade, o knee e a curva de degradação.
-4. **WP08** — o pacote de decisão e o veredito.
+1. **WP05** — e ele mudou de natureza. Não é mais só "o envelope de capacidade":
+   herda a pergunta que parou o WP04 — **separar a variável taxa da variável
+   concorrência de reconexão**. Precisa de instrumento novo, porque o
+   `run-soak.sh` fixa as conexões por carga e reabre todas por ciclo.
+2. **Decidir o que fazer com `max_handlers = lanes`.** Se a rajada for a
+   variável, a saída é mais lanes ou tirar a `/health` das lanes de aplicação —
+   o mesmo argumento que a ADR-050 já fez para métrica. **É decisão de produto,
+   não de campanha.**
+3. **WP08** — o pacote de decisão e o veredito.
 
-**Dois dias de calendário para a evidência que decide o R2.** Nada disso precisa
-de você além de dizer para começar.
+**Os finais voltam à mesa quando existir uma configuração em que a recusa de
+carga chegue a zero.** Não é calendário; é uma pergunta aberta.
 
 ### 6.1 Uma consequência do G1 que vale saber antes
 
@@ -161,19 +162,38 @@ Continua não sendo um dia, e continua cabendo antes do Final 1 no mesmo dia.
 Carregar os degraus antigos para a frente significaria citar verdes tomados a uma
 taxa que a campanha não usa mais.
 
-### 6.2 A escada está rodando, e já desceu a taxa uma vez
+### 6.2 A escada rodou inteira e o WP04 PAROU — com um achado, não com uma falha
 
-**2026-08-04.** O host novo (§3.7) qualificou e a escada começou. Dois degraus
-fecharam e o segundo custou os outros dois:
+**2026-08-04.** O host novo (§3.7) qualificou e a escada rodou até o fim:
 
 | Degrau | Taxa | Analisador | Recusas: total / injetadas / **carga** |
 |---|---|---|---|
 | smoke, 5 ciclos | f = 0,10 | **PASS** | 56 / 56 / **0** |
-| burn-in, 15 ciclos | f = 0,10 | **PASS** | 105 / 104 / **1** |
+| burn-in, 15 ciclos | f = 0,10 | **PASS** | 105 / 104 / **1** ← desce a taxa |
+| smoke, 5 ciclos | f = 0,06 | **PASS** | 1 / 0 / **1** |
+| burn-in, 15 ciclos | f = 0,06 | **PASS** | 72 / 72 / **0** |
+| **rehearsal, 60 ciclos** | f = 0,06 | **PASS** | 461 / 454 / **7** ← **PARA** |
 
-**Aquele 1 disparou o C22 e a taxa desceu para f = 0,06** (agregado 960/s,
-§4.7). A escada reiniciou no smoke — G1, taxa nova é candidato novo — a ~2h40 de
-custo.
+**Os finais de 12 h não rodaram e não vão rodar neste candidato.**
+
+**Leia isto antes de concluir qualquer coisa: o produto passou em tudo.** Todo
+degrau passou em todos os critérios pré-registrados. O rehearsal deu `/health`
+com zero erros em 60 ciclos, p99 mediano 1.196 µs e inclinação de memória de
+49,0 KiB/h **avaliada** contra teto de 1 MiB/h — vinte vezes de margem.
+
+O que parou foi o **C22**, uma regra de campanha sobre qual taxa pode ser
+certificada para um final. Um final de 12 h nesta taxa espera ~0,9 recusa em
+`/health`, e o critério 1 permite zero.
+
+**O achado, que é o que o WP04 entrega:** descer a taxa **não move o piso de
+recusa** — f = 0,10 deu 1 em 20 ciclos, f = 0,06 deu 8 em 80. E todas as recusas
+caem em **rajada de reconexão**, não em carga permanente. A hipótese para o WP05
+é que a variável seja a rajada de ~624 conexões por ciclo contra
+`max_handlers = lanes = 2`, e não a taxa. Se for, **nenhuma taxa converge**, e a
+resposta é mais lanes ou uma admissão que não recuse a sonda de liveness.
+
+O veredito completo está em
+[`../../evidence/2026-08-04-r2-wp04-ladder/verdict.md`](../../evidence/2026-08-04-r2-wp04-ladder/verdict.md).
 
 **Duas coisas que essa linha esconde e valem saber.**
 
