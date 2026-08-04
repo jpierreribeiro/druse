@@ -55,12 +55,31 @@ recomendação de produto.
 Quatro braços, mesma duração e mesma taxa agregada. **Só duas coisas variam:** a
 frequência de reconexão e o número de lanes.
 
-| Braço | lanes | período de rajada | eventos de reconexão em 600 s | prevê (se H1) |
-|---|---:|---:|---:|---|
-| **A** | 2 | nenhum (um run contínuo) | **1** | ~0 recusas |
-| **B** | 2 | 120 s | **5** | recusas > 0 |
-| **C** | 2 | 60 s | **10** | ~2× as de B |
-| **D** | **4** | 120 s | 5 | < B, se H2 |
+> ### Primeira emenda — 2026-08-04, antes do run: o desenho estava subdimensionado
+>
+> **Congelei quatro braços sem fazer a conta de poder.** Um braço de validação de
+> 60 s deu zero recusas, o que me levou a fazê-la: a taxa medida no rehearsal do
+> WP04 é **7 recusas de carga em 60 rajadas = 0,117 por rajada**, e o desenho
+> original previa **0,12 / 0,58 / 1,17 / 0,58** recusas esperadas.
+>
+> Distinguir 0,58 de 1,17 com contagens de Poisson exige muito mais exposição do
+> que 600 s davam. **O experimento teria produzido quatro números pequenos e
+> nenhuma resposta** — e o pior desfecho seria eu ler o ruído como dose-resposta.
+>
+> A emenda dobra a duração e encurta os períodos. **Nada sobre as hipóteses, os
+> critérios ou a atribuição muda** — só a exposição. E ela vem antes do run,
+> porque depois seria outra coisa.
+
+| Braço | lanes | período de rajada | eventos de reconexão em **1200 s** | esperadas a 0,117/rajada |
+|---|---:|---:|---:|---:|
+| **A** | 2 | nenhum (um run contínuo) | **1** | **0,12** |
+| **B** | 2 | 60 s | **20** | **2,3** |
+| **C** | 2 | 20 s | **60** | **7,0** |
+| **D** | **4** | 60 s | 20 | 2,3 se lanes não importarem |
+
+**A vs C** é o discriminador: 0,12 contra 7,0. **B vs C** é a dose-resposta —
+razão de rajadas 3×, razão esperada 3×, e é ela que separa "a rajada importa" de
+"algo acontece no começo do run".
 
 - **A vs B** testa H1: mesma taxa, mesma duração, mesma carga total; só muda se
   as conexões são reabertas.
@@ -72,7 +91,8 @@ frequência de reconexão e o número de lanes.
 mesmas seis cargas. Manter a mistura importa: a carga bloqueante é a que ocupa
 lane, e trocá-la mudaria o mecanismo em estudo.
 
-**Duração:** 600 s por braço. Total ~40 min mais preparo.
+**Duração:** 1200 s por braço (ver a emenda acima). Total ~2h40 mais o build de
+cada braço.
 
 **Repetições:** cada braço roda **2 vezes**, alternando a ordem (A B C D / D C B A).
 Um braço só não distingue efeito de deriva do host.
@@ -83,6 +103,7 @@ Um braço só não distingue efeito de deriva do host.
 |---|---|---|
 | **W1** | H1 é sustentada se as recusas de carga crescerem monotonicamente de A para B para C, nas duas repetições | monotônico nas duas |
 | **W2** | H1 é **refutada** se A e C ficarem dentro de ±1 recusa uma da outra | qualquer repetição |
+| **W6** | um braço cujo servidor não foi o processo medido é **inválido**: a porta tem de estar livre antes do start e o snapshot da ADR-050 tem de aparecer antes da carga | qualquer ocorrência |
 | **W3** | H2 é sustentada se D < B nas duas repetições | as duas |
 | **W4** | o run é **inválido** se qualquer braço registrar falha de instrumento — gerador que não subiu, servidor que morreu, snapshot ausente ou obsoleto | qualquer ocorrência |
 | **W5** | a atribuição injetada/carga usa `ops/soak/attribute-refusals.py`; **este experimento não injeta falhas**, então toda recusa é de carga por construção, e o `injected.txt` vazio tem de estar no artefato para provar isso | presente e vazio |
