@@ -81,12 +81,34 @@ if [[ "$ready" != yes ]]; then
   exit 3
 fi
 
-read_refusals() {  # the ADR-050 snapshot, not an HTTP scrape on the lanes under test
+# The ADR-050 snapshot, not an HTTP scrape on the lanes under test. Guarded on
+# the file EXISTING because the first edition was not: `awk` on a missing file
+# exits 2, `pipefail` propagated it and `set -e` killed the harness before it
+# measured anything. Eight arms died in eleven seconds each.
+#
+# The guard returns empty, never zero. Zero is a measurement; empty is the
+# absence of one, and the callers below treat them differently.
+read_refusals() {
+  [[ -f "$SNAPSHOT" ]] || return 0
   awk '/^saturation_refusals /{print $2}' "$SNAPSHOT" 2>/dev/null | tail -1
 }
 
+# THE SNAPSHOT IS A PRECONDITION, NOT A CONVENIENCE. `/health` answers before
+# the exporter thread has written its first file, so waiting only on readiness
+# reads an absent channel as a working one. The soak analyser refuses a run whose
+# snapshot is missing or stale; this harness refuses to START one.
+snapshot_ready=no
+for _ in $(seq 1 100); do
+  if [[ -n "$(read_refusals)" ]]; then snapshot_ready=yes; break; fi
+  sleep 0.2
+done
+if [[ "$snapshot_ready" != yes ]]; then
+  echo "FATAL: the ADR-050 snapshot never appeared at $SNAPSHOT; the metric channel this run depends on is not working, and a run without it is not a measurement" >&2
+  kill "$SERVER_PID" 2>/dev/null || true
+  exit 5
+fi
+
 REFUSALS_BEFORE="$(read_refusals)"
-: "${REFUSALS_BEFORE:=0}"
 
 # One "burst" = every generator being (re)started at the same instant. That is
 # what run-soak.sh does at each cycle edge, and what this script makes optional.
