@@ -44,6 +44,18 @@ GENERATOR_CPUS="${DRUSE_SOAK_GENERATOR_CPUS:-2,3,6,7}"
 HEALTH_RATE=20 TINY_RATE=600 JSON_ENCODE_RATE=90
 JSON_DECODE_RATE=240 BYTES_64K_RATE=9 WAIT_40MS_RATE=1
 
+# THE PORT MUST BE FREE BEFORE WE START, and this is not defensive politeness.
+# The first edition skipped it and paid: arm 1 died on an unrelated bug leaving
+# its server alive, the next seven could not bind — and their readiness check
+# still got a 200 from the ORPHAN. A harness that reads one process's counters
+# while believing they belong to another does not produce a wrong number, it
+# produces a confident one. `preflight.sh` refuses an occupied port for the same
+# reason; so does this.
+if command -v ss >/dev/null 2>&1 && ss -lntH "sport = :$PORT" 2>/dev/null | grep -q .; then
+  echo "FATAL: port $PORT already has a listener. This run would measure someone else's server — refusing to start. Find it with 'ss -lntp \"sport = :$PORT\"' and kill it BY PID (never pkill -f)." >&2
+  exit 6
+fi
+
 rm -rf "$OUT"
 mkdir -p "$OUT"/{bin,control,raw}
 SERVER="$OUT/bin/server"
@@ -64,10 +76,23 @@ taskset -c "$SERVER_CPUS" "$SERVER" "$LANES" "$PORT" "$SNAPSHOT" \
 SERVER_PID=$!
 echo "$SERVER_PID" >"$OUT/control/server.pid"
 
+# KILL THE SERVER ON EVERY EXIT PATH, not only the ones we thought of. The first
+# edition killed it inside each FATAL branch and leaked it everywhere else — one
+# unhandled error left a server holding the port for the rest of the sweep. The
+# trap is the only construct that covers the paths nobody enumerated.
+trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
 # THE NEGATIVE CONTROL IS STRUCTURAL, not a separate case: if the server never
 # becomes ready the harness EXITS NON-ZERO instead of recording zero refusals.
 # INS-013 in this repository — one absent measurement rendered as a clean result
 # produced a green twelve-hour artefact with no telemetry in it.
+#
+# AND READINESS IS CHECKED ON OUR OWN PROCESS FIRST. A 200 from `/health` proves
+# that SOMETHING answers on this port, which is a weaker claim than it looks.
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+  echo "FATAL: the server exited immediately; see $OUT/server.log" >&2
+  exit 7
+fi
 ready=no
 for _ in $(seq 1 200); do
   if curl -fsS --max-time 1 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
