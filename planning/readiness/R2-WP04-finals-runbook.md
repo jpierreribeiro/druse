@@ -40,7 +40,8 @@ vez de uma quarta descida.
 |---|---|---|
 | 1 | o checkout no host contém o commit da §4.5 | `git -C ~/soak-runs/repo log --oneline -1` bate com o do laptop |
 | 2 | árvore limpa no host | `run-soak.sh` aborta com exit 4 se não for um checkout git limpo |
-| 3 | qualificação do host válida | **vale 7 dias** (§10). A de `184.72.201.140` é de **2026-08-03 → expira 2026-08-10**. Depois disso, `preflight.sh` + `smoke.sh` de novo antes do primeiro degrau |
+| 3 | qualificação do host válida | **vale 7 dias** (§10). A de `44.212.50.252` é de **2026-08-04 → expira 2026-08-11**. Depois disso, `preflight.sh` + `smoke.sh` de novo antes do primeiro degrau |
+| 6 | **os finais estão liberados?** | **só depois de um rehearsal verde a f = 0,06.** O C22 já usou a única descida permitida (§4.7); se o rehearsal contar recusa de carga, o WP04 **para** e vira achado de capacidade para o WP05. Não rode um final sem esse degrau |
 | 4 | disco | ~10,2 GiB por final medidos no rehearsal; o `preflight.sh` exige ≥ 100 GiB e é ele quem recusa |
 | 5 | artefatos antigos preservados | `~/ladder2/` e `~/rate-derivation/` não se apagam, nem os vermelhos |
 
@@ -65,21 +66,36 @@ export DRUSE_SOAK_SERVER_CPUS=0,1,4,5
 export DRUSE_SOAK_GENERATOR_CPUS=2,3,6,7
 export DRUSE_SOAK_LANES=2
 
-# as taxas da QUINTA emenda (§4.5), f = 0,10. C21 lê isto no manifesto.
+# as taxas da emenda VIGENTE. C21 lê isto no manifesto e compara com a tabela
+# em vigor -- não com uma cópia colada aqui.
 export DRUSE_SOAK_HEALTH_RATE=20
-export DRUSE_SOAK_TINY_RATE=1000
-export DRUSE_SOAK_JSON_ENCODE_RATE=150
-export DRUSE_SOAK_JSON_DECODE_RATE=400
-export DRUSE_SOAK_BYTES_64K_RATE=15
+export DRUSE_SOAK_TINY_RATE=600
+export DRUSE_SOAK_JSON_ENCODE_RATE=90
+export DRUSE_SOAK_JSON_DECODE_RATE=240
+export DRUSE_SOAK_BYTES_64K_RATE=9
 export DRUSE_SOAK_WAIT_40MS_RATE=1
 ```
 
-Confira o manifesto **antes** de deixar um run de 12 h correr sozinho:
+> **Os números acima são a SÉTIMA emenda (§4.7), f = 0,06, agregado 960/s.**
+> Eles substituíram os da quinta (f = 0,10) em 2026-08-04, quando o C22 disparou
+> no burn-in.
+>
+> **Não confie nesta cópia.** Ela já esteve errada uma vez — este runbook nasceu
+> em 2026-08-03 com as taxas da quinta emenda, e no dia seguinte elas eram
+> outras. **A fonte é a tabela de registro vigente no pré-registro**, hoje o
+> §4.7; o C21 compara o manifesto com *ela*, não com este arquivo. Se as duas
+> discordarem, este está velho.
+>
+> Isto é a mesma armadilha que o `commands.txt` do pacote antigo tem e que a §8.5
+> abaixo descreve — só que aqui ela é minha.
+
+Confira o manifesto **antes** de deixar um run de 12 h correr sozinho, contra o
+pré-registro e não contra o bloco acima:
 
 ```bash
 grep '_rate=' ~/soak-runs/soak/manifest.txt
-# health_rate=20 tiny_rate=1000 json_encode_rate=150
-# json_decode_rate=400 bytes_64k_rate=15 wait_40ms_rate=1
+# health_rate=20 tiny_rate=600 json_encode_rate=90
+# json_decode_rate=240 bytes_64k_rate=9 wait_40ms_rate=1
 ```
 
 ## 4. A sequência
@@ -139,7 +155,7 @@ assim que deve ser.
 
 ## 6. As decisões, congeladas antes de ver qualquer número
 
-**Degraus 1–3 (pré-finais), no f = 0,10:**
+**Degraus pré-finais, na taxa vigente:**
 
 | Observado | O que acontece |
 |---|---|
@@ -147,8 +163,10 @@ assim que deve ser.
 | **qualquer** recusa do servidor | C22: desce para f = 0,06 em commit próprio, e a escada recomeça. Se o rehearsal do f = 0,06 também recusar, **o WP04 para** e vira achado de capacidade para o WP05 |
 | vermelho por instrumento | conserta o instrumento; sob G1 isso é candidato novo e a escada recomeça no smoke |
 
-Onde ler as recusas: **`saturation_refusals` no `final-stats.json`** do servidor,
-não os erros do `/health`. Foi a lição do §4.1 — se o `/health` come a recusa é
+Onde ler as recusas: **a saída de `ops/soak/attribute-refusals.py`**, não o total
+cru do `final-stats.json` e muito menos os erros do `/health`. O C22 lê a linha
+`attributable to load`; o total inclui as falhas injetadas, que descer a taxa não
+remove. O C23 exige que essa divisão exista em todo degrau que relate recusa. Foi a lição do §4.1 — se o `/health` come a recusa é
 sorte, se o servidor recusa alguma coisa é mecanismo.
 
 **Finais (§9), sem exceção:**
