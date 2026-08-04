@@ -250,3 +250,64 @@ proíbe. Fica aberto.
 os degraus já rodados. O item 3 é o único seguro de fazer durante ela — toca só
 `tests/` — e mesmo assim esperei, porque `tests/` entra no hash da árvore que o
 `manifest.txt` grava.
+
+## 8. Segundo achado da mesma família: `ingest-leak` sob janela de 600 ms
+
+**Aberto em 2026-08-04, e é irmão do §7.**
+
+`build/check.sh` reprovou em
+`test_ingest_leak.upload_admission_survives_an_unopenable_spool` com
+`FAIL: server did not start`.
+
+### O que a medição diz
+
+| momento | contexto | resultado |
+|---|---|---|
+| ~06:45Z e ~08:00Z | gates completos verdes | **PASS**, 6,0 s |
+| ~14:56Z | gate completo | **FAIL** |
+| ~14:58–15:00Z | isolado, 4 execuções | **FAIL 4/4** |
+| a partir de ~15:01Z | isolado, 9 execuções | **PASS 9/9** |
+
+**Descartado, por medição e não por argumento:**
+
+- **não é a minha mudança** — reprova igual na `origin/main`, e passa igual nas
+  duas;
+- **não é colisão de portas** com a suíte `trust001-anchoring` que acrescentei
+  hoje: aquela usa `34811`–`34938`, esta usa `41985`/`41986`;
+- **não é a porta ocupada** — bind direto nas duas funciona, e não há socket em
+  estado nenhum sobre elas;
+- **não é o spool sujo** — os dois diretórios estão vazios e em `0700`, que é o
+  que o `defer chmod` do próprio teste garante;
+- **não é `RLIMIT_MEMLOCK`** (F-C03-2) — o limite local é ~3 GiB.
+
+### O que sobra, e é o que o achado nomeia
+
+A janela de prontidão do fixture é **600 ms** — `300` tentativas a `2 ms`
+(`ingest_leak_test.odin:93`). O servidor sobe rings de io_uring antes de aceitar,
+e numa máquina carregada 600 ms é apertado. A janela de falha coincidiu com um
+período em que esta máquina tinha acabado de rodar um gate completo, duas suítes
+e dois mutantes.
+
+### O que NÃO fiz, e por quê
+
+**Não alarguei a janela.** Seria o conserto de trinta segundos, e seria
+goalpost-moving: o mesmo movimento que recusei hoje no C22 e no piso de disco.
+Uma janela alargada porque falhou esconde a pergunta que interessa — **por que a
+inicialização às vezes passa de 600 ms** — e essa pergunta é sobre o produto, não
+sobre o teste.
+
+**Não declarei flake.** Pela mesma regra do §7: o `build/check_test.sh:132` diz
+que a falha estaria no estado por servidor, não no runner.
+
+### O que fica devido
+
+1. **Medir o tempo de inicialização sob carga** em vez de supor. Se o p99 real
+   for 400 ms, 600 ms é fixture apertado e a janela pode subir com justificativa
+   medida. Se for 2 s, é achado de produto.
+2. **A relação com o §7 vale investigar junto:** os dois são fixtures que
+   quebram sob contenção local, os dois envolvem `ingest`, e o `wp123` falhou
+   com **507**, que é exatamente `ingest.begin` não conseguindo abrir o spool.
+   Podem ser o mesmo defeito visto de dois ângulos.
+3. **E uma lição de processo que é minha:** rodei trabalho pesado em paralelo com
+   o gate **duas vezes hoje**, depois de as notas de 2026-08-03 já dizerem para
+   não fazer isso. As duas vezes produziram um vermelho que não reproduziu.
