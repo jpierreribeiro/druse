@@ -148,12 +148,56 @@ Antes de qualquer braço valer:
 **Nenhum desses caminhos reabre os finais sozinho.** Reabrir exige um candidato
 novo e a escada inteira, e isso é decisão do dono.
 
+## 6.1 Segunda emenda — host novo, e o piso de disco que não é deste experimento
+
+**2026-08-04, antes de qualquer braço do reinício.**
+
+**O host mudou, então o experimento reinicia pelos oito braços.** O de
+`44.212.50.252` ficou inacessível durante a segunda repetição e não voltou; os
+cinco braços medidos lá pertencem àquele ambiente e **não se juntam** aos novos
+(G1). O `ops/wp05/resume-sweep.sh` recusa retomar pelos três justamente por isso.
+
+**Host de registro: `98.92.141.100` / `i-0dc43a340e9ab0388`.** Ele é
+comparável ao anterior nas coisas que decidem — mesmo `c5.2xlarge`, mesmo **Xeon
+Platinum 8275CL**, mesmo kernel **`6.17.0-1017-aws`**, mesma topologia de irmãos
+`(0,4) (1,5) (2,6) (3,7)`, mesma RAM. Isso não faz os braços antigos valerem
+aqui; faz o resultado novo ser lido no mesmo contexto do R2-WP04.
+
+### O piso de disco, e por que ele não se aplica a este experimento
+
+O host tem **20 GiB livres** e o `preflight.sh` exigiria **25**, então ele
+recusaria.
+
+**O piso de 25 GiB foi derivado para a escada do soak**, e a justificativa está
+escrita lá: *"o disco guarda a escada inteira e não um run: smoke, burn-in,
+rehearsal e os dois finais ficam lado a lado… nas taxas do §4.5 isso é ~17 GiB de
+artefato"*. Aqueles 17 GiB são **CSV por requisição**, que o `run-soak.sh`
+escreve e este experimento **não escreve**.
+
+O `burst-sweep.sh` grava por braço: um manifesto de ~1 KB, um `server.log`, um
+snapshot, e os dois binários (~8 MB). **Oito braços somam menos de 100 MB.** Com
+o repositório e o toolchain, o total fica abaixo de 1 GiB — contra 20 GiB
+livres, **vinte vezes de margem**.
+
+**Então o piso é aplicado com o valor deste experimento, não o da escada:**
+`DRUSE_SOAK_LADDER_FLOOR_GIB=2`, que é duas vezes o pior caso estimado.
+
+**Por que isto não é afrouxar um controle para admitir um host.** O piso é um
+parâmetro que eu criei hoje justamente para separar "o que este run escreve" de
+"o que a escada guarda", e a derivação por taxa continua intacta — ela prevê
+11 GiB para o soak a f = 0,06 e continua prevendo. O que muda é o piso, e ele
+está sendo aplicado ao workload para o qual foi medido.
+
+**E o critério que isto cria, congelado agora:** o uso real de disco dos oito
+braços é **medido e registrado no pacote de evidência**. Se passar de 2 GiB, a
+justificativa acima está errada e o run é inválido — não "quase certo".
+
 ## 7. Owner e janela
 
 | Campo | Valor |
 |---|---|
 | owner | o dono do repositório; **execução autorizada em 2026-08-04** |
-| host | `44.212.50.252`, o mesmo host qualificado do WP04 (§3.7), qualificação válida até 2026-08-11 |
+| host | ⟶ **`98.92.141.100`** / `i-0dc43a340e9ab0388` (§6.1). O anterior foi perdido |
 | affinity | servidor `0,1,4,5`, gerador `2,3,6,7` — inalterada |
 | artefatos | `evidence/2026-08-04-r2-wp05-burst/` |
 
