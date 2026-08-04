@@ -1,6 +1,7 @@
 # R2-WP04 — os finais, do jeito que se executa
 
-**Status: PLANO CONGELADO, não iniciado. 2026-08-03.**
+**Status: ESCADA EM EXECUÇÃO desde 2026-08-04.** Os finais continuam **não
+iniciados** e dependem de um rehearsal verde a f = 0,06 (§2, linha 6).
 
 Este arquivo existe para que retomar os finais seja apertar botões, e não
 re-derivar decisões. Ele **não autoriza** nada: os runs começam quando o dono
@@ -13,37 +14,33 @@ velho**.
 
 ---
 
-## 1. O que mudou hoje, e por que importa antes de qualquer comando
+## 1. Onde a escada está, antes de qualquer comando
 
-Duas coisas foram decididas e commitadas nesta sessão, ambas exigidas por regras
-escritas antes:
+**Host de registro:** `44.212.50.252` (§3.7 do pré-registro). O anterior foi
+perdido; não o use.
 
-1. **A quinta emenda (§4.5) existe.** O §4.1 obrigava a taxa a descer "em seu
-   próprio commit, antes do final" quando um degrau contasse recusas. O rehearsal
-   contou 345. A tabela de f = 0,10 agora está registrada, com margem de 33%
-   abaixo do teto livre de recusa. **Sem esse commit, um final produziria um
-   `manifest.txt` que viola o C21** — as taxas do artefato discordariam da única
-   tabela registrada.
+**Taxa vigente:** f = 0,06, agregado 960/s — a **sétima** emenda (§4.7).
 
-2. **O reinício da escada custa 2 h 40, não 40 min.** O `ESTADO.md` dizia smoke +
-   burn-in. Faltava o rehearsal, e ele é o degrau que decide: no f = 0,15, 15
-   ciclos contaram 3 recusas e 60 ciclos contaram 345. Um burn-in verde não
-   limita 360 ciclos — é o erro que o §4.2 já nomeou uma vez.
+Os degraus já rodados nesta escada estão em
+[`../../evidence/2026-08-04-r2-wp04-ladder/`](../../evidence/2026-08-04-r2-wp04-ladder/),
+com o veredito e a atribuição de recusas de cada um. Leia o README de lá antes de
+rodar qualquer coisa: ele diz por que a taxa desceu e o que o rehearsal decide.
 
-Também foi congelado o **C22**: a descida tem piso em f = 0,06, e uma recusa no
-rehearsal do f = 0,06 **para o WP04** e vira achado de capacidade para o WP05, em
-vez de uma quarta descida.
+**A regra que governa tudo abaixo:** o C22 já usou a **única** descida permitida.
+Não há f = 0,04. Se o rehearsal a f = 0,06 contar recusa **atribuível à carga**,
+o R2-WP04 **para** e o resultado é um achado de capacidade sobre
+`max_handlers = lanes` para o R2-WP05.
 
 ## 2. Pré-condições, verificáveis antes de gastar 12 h
 
 | | O quê | Como confere |
 |---|---|---|
-| 1 | o checkout no host contém o commit da §4.5 | `git -C ~/soak-runs/repo log --oneline -1` bate com o do laptop |
+| 1 | o checkout no host contém a emenda vigente | `git -C ~/soak-runs/repo log --oneline -1` bate com o do laptop |
 | 2 | árvore limpa no host | `run-soak.sh` aborta com exit 4 se não for um checkout git limpo |
 | 3 | qualificação do host válida | **vale 7 dias** (§10). A de `44.212.50.252` é de **2026-08-04 → expira 2026-08-11**. Depois disso, `preflight.sh` + `smoke.sh` de novo antes do primeiro degrau |
-| 6 | **os finais estão liberados?** | **só depois de um rehearsal verde a f = 0,06.** O C22 já usou a única descida permitida (§4.7); se o rehearsal contar recusa de carga, o WP04 **para** e vira achado de capacidade para o WP05. Não rode um final sem esse degrau |
-| 4 | disco | ~10,2 GiB por final medidos no rehearsal; o `preflight.sh` exige ≥ 100 GiB e é ele quem recusa |
-| 5 | artefatos antigos preservados | `~/ladder2/` e `~/rate-derivation/` não se apagam, nem os vermelhos |
+| 4 | disco | ~10,2 GiB por final, medidos. O `preflight.sh` **deriva** a exigência da taxa oferecida com piso de 25 GiB, e é ele quem recusa |
+| 5 | artefatos preservados | `~/ladder3/` no host, e o pacote versionado em `evidence/2026-08-04-r2-wp04-ladder/`. Runs vermelhos não se apagam |
+| 6 | **os finais estão liberados?** | **só depois de um rehearsal verde a f = 0,06.** O C22 já usou a única descida permitida (§4.7). Não rode um final sem esse degrau |
 
 O host **não alcança o GitHub**. A transferência é `git bundle` ou
 `git clone --depth 1` + `rsync` (o clone raso preserva o SHA real, ~20 MB).
@@ -134,7 +131,7 @@ de "teve uma boa noite".
 `setsid`, grave o PID, e **nunca** `pkill -f`:
 
 ```bash
-ssh -i ~/Downloads/colossus.pem ubuntu@184.72.201.140 \
+ssh -i ~/Downloads/colossus.pem ubuntu@44.212.50.252 \
   'cd ~/soak-runs/repo && setsid nohup bash ops/soak/run-soak.sh ~/soak-runs 12 \
      >~/soak-runs/final1.log 2>&1 < /dev/null & echo $! > ~/soak-runs/final1.pid'
 
@@ -159,8 +156,10 @@ assim que deve ser.
 
 | Observado | O que acontece |
 |---|---|
-| recusas do servidor = 0 e todos os critérios verdes | segue para o Final 1 |
-| **qualquer** recusa do servidor | C22: desce para f = 0,06 em commit próprio, e a escada recomeça. Se o rehearsal do f = 0,06 também recusar, **o WP04 para** e vira achado de capacidade para o WP05 |
+| analisador PASS e **zero** recusas de carga no rehearsal | segue para o Final 1 |
+| recusa de carga em smoke ou burn-in | **não para a escada** — o C22 julga no rehearsal, porque 5 ou 15 ciclos não limitam uma probabilidade por ciclo (§4.2). Relate e siga |
+| **recusa de carga no rehearsal** | **o R2-WP04 PARA.** A única descida permitida já foi usada em 2026-08-04 (§4.7); não existe f = 0,04. Vira achado de capacidade sobre `max_handlers = lanes` para o R2-WP05 |
+| recusa dentro de janela de injeção declarada | contada e **relatada**, nunca abatida, e **não move a taxa** (§4.6): baixar a carga de fundo não remove 24 leitores lentos estacionados em duas lanes |
 | vermelho por instrumento | conserta o instrumento; sob G1 isso é candidato novo e a escada recomeça no smoke |
 
 Onde ler as recusas: **a saída de `ops/soak/attribute-refusals.py`**, não o total
