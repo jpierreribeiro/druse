@@ -765,6 +765,91 @@ uma alegação de estresse mais fraca.
 O dono pode sobrepor este piso; sobrepor uma regra escrita antes exige
 justificativa registrada, seguir uma não exige nada (§4.3).
 
+### 4.6 Sexta emenda — o C22 conta a recusa errada, e a medição que mostrou isso
+
+**Escrita depois do smoke do f = 0,10 no host novo e antes do burn-in.** Ela
+resolve uma ambiguidade minha, e resolve no sentido que **permite a escada
+continuar** — que é exatamente a razão de estar escrita aqui em vez de aplicada
+em silêncio.
+
+#### O que o smoke mediu
+
+`result=PASS`, 5 ciclos, 951.600 requisições, `/health` com **zero** erros de
+transporte. E o servidor contou **56 recusas de saturação**, que pelo texto do
+C22 ("recusa do servidor > 0") derrubariam a taxa para f = 0,06.
+
+A telemetria por segundo diz onde elas aconteceram:
+
+| | |
+|---|---|
+| amostras com `saturation_refusals = 0` | **522** |
+| amostras com `= 56` | 153 |
+| saltos distintos na série | **um só** |
+| instante do salto | `2026-08-04T04:01:58.81Z` |
+| `control/injected.txt` declara | `cycle=5 kind=rst attempted=128 utc=2026-08-04T04:01:58Z`<br>`cycle=5 kind=slow_readers attempted=24 utc=2026-08-04T04:01:58Z` |
+
+**O mesmo segundo.** As 56 recusas não estão distribuídas pelas rajadas de
+reconexão dos cinco ciclos — são um degrau único no instante em que 24 leitores
+lentos foram injetados contra duas lanes. **A carga oferecida a f = 0,10 produziu
+zero recusas neste host**, em 522 segundos de regime.
+
+#### Por que isto não é interpretar o resultado a meu favor
+
+Porque a regra que decide já existia e é mais velha que este run.
+`CRITERIA.md` 14 e o §4 deste arquivo: **falhas injetadas são contadas à parte
+das espontâneas e nunca abatidas umas das outras.** O C22 apenas não citou essa
+regra, e por isso pôde ser lido como somando as duas.
+
+E há uma razão estrutural, que é a mais forte: **a escada de derivação do §4.1
+tem três ciclos por ponto.** Com três ciclos não existe quinto ciclo, e as
+injeções rodam no quinto. Então **nenhum dos dez pontos daquela tabela mediu uma
+recusa injetada** — cada número ali é carga pura. Comparar um run que inclui um
+ciclo de injeção contra aqueles limiares é comparar coisas diferentes, e era isso
+que o C22 mandava fazer.
+
+#### O texto do C22, corrigido
+
+> se qualquer degrau pré-final no f = 0,10 contar recusa do servidor
+> **atribuível à carga oferecida** — isto é, fora das janelas em que
+> `control/injected.txt` declara uma injeção ativa — a taxa desce uma vez mais,
+> para f = 0,06. Recusas concorrentes com uma injeção declarada são contadas e
+> **relatadas**, nunca abatidas, e não movem a taxa: baixar a carga de fundo não
+> remove 24 leitores lentos estacionados em duas lanes, então descer por causa
+> delas seria seguir a letra da regra errando o mecanismo, e descer para sempre
+> sem nunca remover a causa.
+
+O piso de f = 0,06 e a condição de parada do C22 seguem valendo, inalterados,
+para recusas de carga.
+
+#### A dúvida retrospectiva, registrada porque é séria
+
+**O §4.2 e o §4.3 podem ter disparado sobre falhas injetadas.** O burn-in tinha
+15 ciclos (3 de injeção) e contou 3 recusas; o rehearsal tinha 60 (12 de injeção)
+e contou 345 — cerca de 29 por ciclo de injeção, a mesma ordem das 56 medidas
+aqui num ciclo. Se aquelas recusas eram majoritariamente injetadas, a descida de
+f = 0,15 para f = 0,10 respondeu a um sinal que não era sobre a taxa.
+
+**Não dá para verificar:** os artefatos daqueles runs viviam em `~/ladder2/`, no
+host perdido (§3.7). É a segunda vez neste episódio que evidência não commitada
+custa uma resposta.
+
+**O que faço com a dúvida: nada, deliberadamente.** A taxa registrada continua
+f = 0,10. Reverter para f = 0,15 seria desfazer uma decisão congelada com base na
+re-análise de dados que não existem mais, e sob G1 este host precisa da própria
+derivação de qualquer forma. Rodar mais devagar que o necessário **enfraquece** a
+alegação de estresse, não a fortalece — é o erro seguro. A re-derivação neste
+host é entrada do R2-WP05, registrada aqui e não feita agora.
+
+#### C23 — a atribuição é obrigatória, não opcional
+
+> um degrau que relate `saturation_refusals > 0` tem de dizer **quantas** caem
+> dentro de janela de injeção declarada e quantas não. Um total sem essa divisão
+> não satisfaz o C22 em direção nenhuma — nem para descer nem para continuar.
+
+Existe porque a divisão é o que distingue as duas leituras, e um run que não a
+produza deixaria a próxima pessoa exatamente onde eu estava: com um número e duas
+histórias.
+
 ## 6. Criteria and SLO
 
 The eighteen criteria in `ops/soak/CRITERIA.md` apply as written and are pinned
@@ -777,7 +862,8 @@ before the run.
 | C19 | the host was qualified by core, not by number | the attached preflight report carries `physical_core_disjoint=yes` | the property §3.2 exists to guarantee, asserted in the artefact rather than assumed |
 | C20 | the smoke was green on this host, unqualified-override absent | `smoke=pass` and no `smoke_on_unqualified_host` line | a green smoke taken with the override is a fact about the script |
 | C21 | the run's rates equal the current amendment | the six `*_rate` fields in `manifest.txt` match the registered table in force when the run started (§4.5 today, §4.1 before it) | defined in full in §4.1; a run that adjusted its rate at the prompt disagrees with its own plan and nothing notices |
-| C22 | the descent has a floor | any pre-final step counting server refusals at f = 0.10 drops the rate to f = 0.06 once; a refusal in the f = 0.06 rehearsal stops R2-WP04 for attribution | defined in full in §4.5; without a floor the rule of §4.1 is a search for a rate at which nothing happens, and one always exists |
+| C22 | the descent has a floor | any pre-final step counting server refusals **attributable to offered load** at f = 0.10 drops the rate to f = 0.06 once; a load refusal in the f = 0.06 rehearsal stops R2-WP04 for attribution | defined in §4.5, amended in §4.6 — the rate-derivation ladder never measured an injected-fault cycle, so counting injected refusals against its thresholds compares different things |
+| C23 | a refusal total is attributed, not just counted | a step reporting `saturation_refusals > 0` states how many fall inside a declared injection window and how many do not | defined in full in §4.6; the split is what separates the two readings of C22, and a total without it leaves the next person with one number and two stories |
 
 ### 6.1 What an SLO is here
 
