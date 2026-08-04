@@ -1,0 +1,134 @@
+# R2-WP04, escada de 2026-08-04 — o que executar ensinou
+
+**Status: REGISTRO OPERACIONAL.** Não é plano e não é evidência. É o que o
+`git log` não conta: o que deu errado executando a escada, o que era instrumento,
+o que era produto, e o que era eu.
+
+O veredito dos degraus está em
+[`../evidence/2026-08-04-r2-wp04-ladder/`](../evidence/2026-08-04-r2-wp04-ladder/).
+O contrato é o pré-registro. Este arquivo é a terceira coisa.
+
+---
+
+## 1. Um critério que eu escrevi de manhã reprovou meu run à noite
+
+O C22 foi congelado em 2026-08-04 de manhã (§4.5), emendado à tarde (§4.6) e
+disparou contra a escada à noite (§4.7). Vale separar as três, porque só a do
+meio é discutível.
+
+**Congelar (§4.5).** A regra do §4.1 exigia que a taxa descesse em commit próprio
+antes do final. Ela nunca tinha um piso, e sem piso *"a regra é uma busca por uma
+taxa em que nada acontece, e uma taxa suficientemente baixa sempre existe"*. O
+C22 pôs o piso em f = 0,06 e uma condição de parada.
+
+**Emendar (§4.6).** O smoke contou 56 recusas e o C22, como escrito, derrubaria a
+taxa. A telemetria mostrou as 56 num único salto, no mesmo segundo da injeção
+declarada. Emendei o critério para ler recusa **atribuível à carga**.
+
+**Esta é a que precisa de escrutínio, porque me beneficiou.** Duas defesas, as
+duas mais velhas que o run: `CRITERIA.md` 14 já mandava contar injetada à parte;
+e a escada de derivação do §4.1 tem três ciclos por ponto, logo nenhum dos seus
+dez pontos mediu um ciclo de injeção — as injeções rodam no quinto. Comparar um
+run com injeção contra aqueles limiares compara coisas diferentes.
+
+**Disparar (§4.7).** No burn-in seguinte o mesmo critério achou 1 recusa de carga
+e a taxa desceu para f = 0,06, a 2h40 de custo. Verifiquei antes de aceitar:
+ciclo 4, com a injeção mais próxima 128 segundos depois. Não era borda de janela.
+
+**A assimetria que decide isto está no §4.3 e não é minha:** seguir uma regra
+escrita antes não exige justificativa, sobrepor exige. Uma regra não vale menos
+por ter sido escrita por mim doze horas antes.
+
+## 2. O que a descida mediu, e é o achado técnico da escada
+
+| taxa | agregado | ciclos | recusas de carga | por ciclo |
+|---|---:|---:|---:|---:|
+| f = 0,10 | 1.586/s | 15 | 1 | 0,067 |
+| f = 0,06 | 960/s | 5 | 1 | 0,200 |
+
+**Baixar a carga em 40% não moveu o piso.** Com n = 1 em cada, Poisson não
+distingue as duas taxas — não dá para afirmar que piorou. Dá para afirmar o que
+se queria negar: **não há evidência de que a descida ajudou.**
+
+E as duas recusas têm a mesma forma: 34 s dentro do ciclo 4, 15,7 s dentro do
+ciclo 2. Ambas em **rajada de reconexão**, que é onde o §4.1 já dissera que elas
+se concentram.
+
+**Hipótese, nomeada e não testada:** o que produz essas recusas não é a taxa de
+requisições — é a rajada de ~624 conexões novas na borda do ciclo. Com
+`max_handlers = lanes = 2`, descer a taxa reduz o tempo *dentro* do handler, não
+o tamanho da rajada.
+
+**Por que não a testei agora:** o instrumento não existe. O `run-soak.sh` fixa as
+conexões por carga e reabre todas por ciclo, então taxa e concorrência de
+reconexão não são variáveis separáveis nele. Construir essa separação mudaria o
+hash do instrumento no meio da escada e criaria candidato novo (G1). Entrada do
+R2-WP05, e a mais valiosa que esta escada produziu.
+
+## 3. Três hosts, três taxas — o que isso diz e o que não diz
+
+| host | kernel | taxa de registro |
+|---|---|---|
+| `184.72.201.140` | `7.0.0-1006-aws` | f = 0,15 → 0,10 |
+| `44.212.50.252` | `6.17.0-1017-aws` | f = 0,10 → 0,06 |
+
+**Diz:** o limiar de recusa é propriedade do framework **num ambiente**, não do
+framework sozinho. Uma taxa derivada num host não se transfere para outro, e o G1
+já dizia isso em geral — aqui está medido.
+
+**Não diz** que o Druse piorou. Nenhuma dessas taxas é capacidade; são cargas
+oferecidas escolhidas para um teste de estabilidade. O envelope é o R2-WP05, e o
+§1 do pré-registro proíbe explicitamente citar esta campanha para ele.
+
+## 4. Erros meus nesta sessão, porque são mais instrutivos que os do código
+
+1. **`git checkout` num arquivo com trabalho não commitado.** Rodei o mutante do
+   C23 apagando a linha com `sed`, depois `git checkout` para restaurar — e
+   levei junto a emenda §4.6 inteira, que ainda não estava commitada. Refiz.
+   **A correção do processo:** commitar antes de rodar mutante, e restaurar por
+   cópia de backup, nunca por `git checkout`.
+
+2. **Deixei um servidor escutando na 8080.** O primeiro teste de build terminou
+   com `server --help`; o soak-server não tem `--help` — ele sobe e escuta. O SSH
+   expirou e o processo ficou. **O preflight pegou**, e essa é a parte boa: um
+   listener órfão teria envenenado a campanha inteira, e o instrumento o achou
+   antes do primeiro degrau em vez de depois de doze horas.
+
+3. **Escrevi um runbook com as taxas coladas dentro.** Em 2026-08-03 ele nasceu
+   com f = 0,10; em 2026-08-04 elas eram f = 0,06. Eu tinha escrito, no próprio
+   arquivo, o aviso sobre o `commands.txt` do pacote antigo estar desatualizado
+   pela mesma razão. **Corrigido para apontar para a emenda vigente em vez de
+   copiá-la.**
+
+4. **A cadeia de degraus parava mais cedo do que a regra manda.** Escrevi o
+   `chain.sh` para parar em qualquer recusa de carga; o C22 julga **no
+   rehearsal**, porque 5 ou 15 ciclos não limitam uma probabilidade por ciclo.
+   Parar no burn-in seria sobrepor a regra com evidência mais fraca do que ela
+   exige. Corrigido antes de rodar.
+
+## 5. Dois defeitos de instrumento que a escada expôs
+
+**O preflight não tinha opinião sobre o host se atualizar sozinho.** Todas as
+suas checagens leem o host em repouso; nenhuma era sobre o que ele faria consigo
+mesmo durante doze horas. Um unattended-upgrade trocou o kernel do host anterior
+entre a qualificação e o run. Agora recusa, nomeando os units, com override
+carimbado e mutante.
+
+**O piso de disco era constante fingindo ser estimativa.** Os 100 GiB vinham de
+uma aritmética escrita no próprio script cujo *resultado* foi pinado; a campanha
+cortou a taxa por dez e o número não se moveu. Agora é derivado da carga
+oferecida — e nas taxas históricas pede **113 GiB**, mais que a constante que
+substituiu, o que é o controle que prova que não foi afrouxamento.
+
+**O padrão comum:** os dois números eram verdadeiros quando escritos. Nenhum
+tinha instrumento que os obrigasse a continuar verdadeiros.
+
+## 6. A lição operacional, que custou duas respostas
+
+**Nenhum pacote de burn-in ou rehearsal tinha sido commitado antes de hoje.** As
+conclusões do §4.2 e do §4.3 sobreviveram ao host que morreu; os dados que as
+sustentavam, não. Por isso a dúvida do §4.6 — se aquelas recusas eram injetadas —
+**não é verificável**, e provavelmente nunca será.
+
+Um degrau cujo artefato vive só no host é um degrau que um host leva embora. O
+pacote desta escada existe desde o primeiro degrau por essa razão.
