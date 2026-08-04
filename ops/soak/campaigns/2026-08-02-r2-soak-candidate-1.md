@@ -96,7 +96,8 @@ change** before running. Do not narrow the affinity at the prompt.
 
 ### 3.1 The requirement
 
-**Amended twice on 2026-08-02, both times before any run.**
+**Amended three times, every time before the run it governs** — twice on
+2026-08-02 and once on 2026-08-04 (§3.7).
 
 The first amendment took the fallback branch of §3.2: the owner designated an
 existing `c5.2xlarge` at `44.200.160.96`, so the affinity changed to a
@@ -114,10 +115,13 @@ of the candidate's identity: a Xeon **8275CL** instead of an 8124M, Ubuntu
 6.17.0-1017-aws. No measurement taken on the previous host carries over, and none
 was — nothing beyond a smoke ever ran there.
 
+**Superseded by §3.7 on 2026-08-04** — the two rows below marked ⟶ carry the
+third amendment's values. The rest of the table is unchanged and still binding.
+
 | Field | Required value |
 |---|---|
-| hostname / provider | AWS `c5.2xlarge`, `i-05c3c8168b18776a5`, `us-east-1b`, Xeon Platinum 8275CL @ 3.00 GHz |
-| OS / kernel | Ubuntu 26.04, `7.0.0-1006-aws` |
+| hostname / provider | ⟶ AWS `c5.2xlarge`, `i-08c31e483e890fd16`, `us-east-1a`, Xeon Platinum 8275CL @ 3.00 GHz |
+| OS / kernel | ⟶ Ubuntu 24.04.4 LTS, `6.17.0-1017-aws` |
 | logical CPUs online | ≥ 8 — **measured: 8** |
 | physical cores | 4 (2 threads each), siblings `(0,4) (1,5) (2,6) (3,7)` — **measured, not assumed** |
 | **isolation** | **`preflight.sh` must report `physical_core_disjoint=yes`** |
@@ -132,7 +136,7 @@ was — nothing beyond a smoke ever ran there.
 | nofile hard limit | ≥ 8192 |
 | cgroup | recorded |
 | `nstat` present | must be `yes`; absent fails the run |
-| free disk | ≥ 100 GiB at `DRUSE_SOAK_BASE` |
+| free disk | ⟶ ≥ the estimate `preflight.sh` **derives** from the offered rate, floor 25 GiB (§3.7). At the §4.5 rates that is 25 GiB; **measured on the host of record: 91 GiB free** |
 | clock synchronised | `NTPSynchronized=yes` |
 | known neighbours | none; the host runs nothing else for the window |
 | upload/stream/proxy smoke | `ops/soak/smoke.sh` reports `smoke=pass` **without** `smoke_on_unqualified_host` |
@@ -314,6 +318,91 @@ Two consequences, and neither is this work package's to resolve:
   It is recorded here and not acted on: amending published reports is outside
   R2-WP02, and doing it quietly inside a host-qualification commit is exactly the
   kind of edit this programme exists to prevent.
+
+### 3.7 Terceira emenda ao host — 2026-08-04, antes de qualquer degrau
+
+**O host de registro anterior foi perdido, não trocado por conveniência.**
+`184.72.201.140` parou de responder a SSH. O sintoma foi medido em vez de
+suposto: a porta 22 completava o handshake TCP e **zero bytes** chegavam — sem
+banner, cinco tentativas, e o mesmo depois de um reboot que o log de sistema
+mostra ter subido o `ssh.service` verde. O `ssh.socket` do Ubuntu 26.04 é
+socket-activated, o que casa exatamente: o systemd aceita a conexão e o `sshd`
+nunca é gerado.
+
+**E o log entregou algo maior que a queda.** Aquele host voltou rodando kernel
+`7.0.0-1009-aws` contra os `7.0.0-1006-aws` que esta seção pinava — um
+unattended-upgrade instalou kernel novo entre a qualificação e o run. Sob G1 isso
+já era ambiente diferente, e teria invalidado um final que começasse num kernel
+e terminasse noutro sem que nenhum artefato registrasse a troca. O buraco de
+instrumento está fechado: `preflight.sh` agora **recusa** um host que se atualiza
+sozinho, nomeando os units, com override carimbado e mutante.
+
+**O host de registro passa a ser `44.212.50.252`.**
+
+| Campo | Anterior (pinado) | Agora | Sob G1 |
+|---|---|---|---|
+| instância | `i-05c3c8168b18776a5`, us-east-1b | `i-08c31e483e890fd16`, **us-east-1a** | diferente |
+| tipo | `c5.2xlarge` | `c5.2xlarge` | igual |
+| CPU | Xeon Platinum 8275CL @ 3,00 GHz | **8275CL — o mesmo modelo** | igual |
+| topologia | 4 núcleos, irmãos `(0,4) (1,5) (2,6) (3,7)` | **idêntica, medida** | igual |
+| OS | Ubuntu 26.04 | **Ubuntu 24.04.4 LTS** | diferente |
+| kernel | `7.0.0-1006-aws` | **`6.17.0-1017-aws`** | diferente |
+| RAM | ≥ 8 GiB | 15,25 GiB | ok |
+| memlock | unlimited | unlimited (`limits.d` + `user@.service.d`) | ok |
+| disco livre | ≥ 100 GiB | 91 GiB contra 25 derivados | ok, ver abaixo |
+| auto-upgrade | não verificado | **`auto_upgrade_units=none`** | novo requisito |
+
+**A affinity de registro não muda.** A topologia é a mesma medida — não assumida
+do tipo de instância — então servidor `0,1,4,5`, gerador `2,3,6,7` e
+`DRUSE_SOAK_LANES=2` seguem valendo, e o `preflight.sh` confirmou
+`physical_core_disjoint=yes` neste host.
+
+**Uma ironia que vale registrar em vez de esconder:** o kernel novo é
+`6.17.0-1017-aws`, exatamente o do **primeiro** host, aquele que o §3.1 recusou
+por disco. A campanha volta à geração de kernel de onde saiu. Isso não é um
+problema — é um fato de identidade, e é por isso que ele está numa tabela em vez
+de numa nota de rodapé.
+
+#### O que esta emenda custa, dito antes do run
+
+**Nada de medição carrega**, e desta vez isso não custa um degrau: a escada já ia
+reiniciar no smoke por causa da mudança de taxa do §4.5. O smoke, o burn-in e o
+rehearsal de 2026-08-03 pertencem ao candidato antigo por **duas** razões
+independentes agora — taxa e ambiente — e nenhuma delas é nova despesa.
+
+**O que se perdeu de verdade** são os artefatos brutos que só existiam naquele
+disco: `~/ladder2/` e `~/rate-derivation/`. As conclusões estão preservadas neste
+arquivo (§4.1, §4.2, §4.3, §4.4) com os números que as sustentam; os diretórios
+de ciclo e a telemetria por segundo, não. **Nenhum pacote de burn-in ou rehearsal
+tinha sido commitado em `evidence/`**, e essa é a lição operacional do episódio:
+um degrau cujo artefato vive só no host é um degrau que um host leva embora.
+
+#### O piso de disco deixou de ser constante
+
+Os 100 GiB do `preflight.sh` vinham de uma aritmética escrita no próprio script —
+*"~15,6k req/s ... ~120 bytes a row, is ~80 GiB"* — cujo **resultado** foi pinado.
+As emendas §4.1 e §4.5 cortaram a taxa agregada por dez e o número não se moveu,
+então ele recusou este host por um run que o §4.4 mediu em ~10,2 GiB.
+
+Passou a ser derivado da taxa oferecida, com margem de 1,5× e piso de 25 GiB
+porque o disco guarda a escada inteira e não um run. **Nas taxas históricas a
+derivação pede 113 GiB, mais que a constante que substituiu** — não é limiar
+afrouxado para admitir um host, e o controle no gate assere exatamente isso.
+
+#### Qualificação deste host
+
+| | |
+|---|---|
+| `preflight.sh` | **pass** — `physical_core_disjoint=yes`, `odin_can_build=yes`, `memlock=unlimited`, `auto_upgrade_units=none`, `nofile_hard=1048576`, `ntp_synchronized=yes` |
+| `smoke.sh` | **pass** — upload spooled com checksum, upload buffered, stream incremental (10 frames, spread 0,451 s) através do Caddy fixado sobre TLS |
+| override | **ausente** — sem `smoke_on_unqualified_host` |
+| validade | 7 dias a partir de 2026-08-04 (§10) |
+
+**Uma recusa intermediária, registrada porque o instrumento acertou.** A primeira
+tentativa reprovou com `port 8080 already has a listener`: um teste de build que
+o operador deixou pendurado depois que o SSH expirou. Não era o host e não era o
+produto — era operador, e o preflight pegou antes de a campanha começar em vez de
+depois de doze horas.
 
 ## 4. Workloads, rates and connections
 
