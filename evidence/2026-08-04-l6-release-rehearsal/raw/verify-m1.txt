@@ -1,0 +1,10 @@
+verify_utc=2026-08-04T15:31:52Z
+approval_record=/home/jp/.claude/jobs/92ffe4bc/tmp/rehearsal/approval.txt
+approved_sha256=548001674bf505cc14be18ae1278ed08ee8dcaee6345d47cdb28c9d1f2f284c3
+approved_commit=3ed117d168884af8839f3f6163c84005d7ac5ba6
+deployed_path=/home/jp/.claude/jobs/92ffe4bc/tmp/rehearsal/target/mutant
+deployed_sha256=718821b243dda7d04da5ab37a8c5684395ef2ff8623fd4c8cb7a6890cb052e23
+deployed_bytes=918672
+deployed_identity=mismatch
+verify=fail
+problem=the deployed file is 918672 bytes, exactly as approved, and hashes differently: identical size is not identity, and this is the case the rebuild measurement produced

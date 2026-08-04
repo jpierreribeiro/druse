@@ -1,0 +1,7 @@
+verify_utc=2026-08-04T15:31:25Z
+approval_record=/home/jp/.claude/jobs/92ffe4bc/tmp/rehearsal/approval.txt
+approved_sha256=548001674bf505cc14be18ae1278ed08ee8dcaee6345d47cdb28c9d1f2f284c3
+approved_commit=3ed117d168884af8839f3f6163c84005d7ac5ba6
+deployed_identity=mismatch
+verify=fail
+problem=deployed_missing: no such file on the target: /home/jp/.claude/jobs/92ffe4bc/tmp/rehearsal/target/nao-existe

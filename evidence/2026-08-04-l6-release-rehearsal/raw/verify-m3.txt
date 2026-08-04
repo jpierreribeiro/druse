@@ -1,0 +1,4 @@
+verify_utc=2026-08-04T15:31:25Z
+deployed_identity=mismatch
+verify=fail
+problem=approval_unreadable: /home/jp/.claude/jobs/92ffe4bc/tmp/rehearsal/target/druse-server carries no well-formed artefact_sha256; a comparison against an empty expectation passes for every file
