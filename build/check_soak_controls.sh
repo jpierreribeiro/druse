@@ -987,6 +987,74 @@ fi
 echo "PASS (soak preflight, control-of-the-control): removing the auto-upgrade refusal makes the positive case red"
 
 # ---------------------------------------------------------------------------
+# THE DISK ESTIMATE MOVES WITH THE RATE IT ESTIMATES — 2026-08-04.
+#
+# It used to be the constant 100, carrying a comment that derived 80 GiB from
+# "~15.6k req/s ... ~120 bytes a row". The campaign then cut the aggregate rate
+# by ten (§4.1, §4.5) and the constant did not move, so it refused a host with
+# 91 GiB free for a run the rehearsal MEASURED at ~10.2 GiB.
+#
+# The property under test is not a number — it is that the estimate is a
+# FUNCTION of the offered load. Asserting a number here would rebuild the defect
+# in the control that guards it.
+# ---------------------------------------------------------------------------
+disk_estimate_at() {  # $1 = report, $2.. = rate env assignments
+  local report="$1"; shift
+  env "$@" DRUSE_SOAK_BASE=/ DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-distinct" \
+      DRUSE_SOAK_SERVER_CPUS="0-3" DRUSE_SOAK_GENERATOR_CPUS="4-7" \
+      bash "$SOAK/preflight.sh" "$report" >/dev/null 2>&1 || true
+  sed -n 's/^estimated_need_gib=\([0-9]*\) .*/\1/p' "$report"
+}
+
+DRUSE_EST_HIGH="$(disk_estimate_at "$TMP/pf-est-high.txt" DRUSE_SOAK_LADDER_FLOOR_GIB=0)"
+DRUSE_EST_LOW="$(disk_estimate_at "$TMP/pf-est-low.txt" DRUSE_SOAK_LADDER_FLOOR_GIB=0 \
+  DRUSE_SOAK_HEALTH_RATE=20 DRUSE_SOAK_TINY_RATE=1000 DRUSE_SOAK_JSON_ENCODE_RATE=150 \
+  DRUSE_SOAK_JSON_DECODE_RATE=400 DRUSE_SOAK_BYTES_64K_RATE=15 DRUSE_SOAK_WAIT_40MS_RATE=1)"
+
+test -n "$DRUSE_EST_HIGH" && test -n "$DRUSE_EST_LOW" ||
+  fail "the preflight stopped reporting estimated_need_gib; the disk estimate cannot be checked"
+
+# It must SHRINK when the offered load shrinks. This is the whole point.
+(( DRUSE_EST_LOW < DRUSE_EST_HIGH )) ||
+  fail "the disk estimate did not fall when the offered rate fell tenfold ($DRUSE_EST_HIGH -> $DRUSE_EST_LOW GiB). It is pinned again, and a pinned estimate refuses hosts for load nobody offers."
+
+# And it must NOT have been softened at the historic rates — the change that
+# introduced this derivation must not read as a threshold lowered to admit a
+# host that had just failed. At 15,685 req/s it demands MORE than the old 100.
+(( DRUSE_EST_HIGH >= 100 )) ||
+  fail "at the historic rates the derived estimate ($DRUSE_EST_HIGH GiB) is below the constant 100 it replaced. The derivation was supposed to be a correction, not a relaxation."
+echo "PASS (soak preflight): the disk estimate is a function of the offered rate ($DRUSE_EST_HIGH GiB at 15,685/s, $DRUSE_EST_LOW GiB at 1,586/s)"
+
+# The floor binds underneath it, because the disk holds the whole ladder.
+DRUSE_EST_FLOOR="$(disk_estimate_at "$TMP/pf-est-floor.txt" \
+  DRUSE_SOAK_HEALTH_RATE=1 DRUSE_SOAK_TINY_RATE=1 DRUSE_SOAK_JSON_ENCODE_RATE=1 \
+  DRUSE_SOAK_JSON_DECODE_RATE=1 DRUSE_SOAK_BYTES_64K_RATE=1 DRUSE_SOAK_WAIT_40MS_RATE=1)"
+(( DRUSE_EST_FLOOR >= 25 )) ||
+  fail "a near-zero offered rate produced a $DRUSE_EST_FLOOR GiB requirement. The ladder's own artefacts, the toolchain and the proxy images live on that disk whatever the rate."
+grep -q '^estimate_rate_total=' "$TMP/pf-est-floor.txt" ||
+  fail "the report does not carry the estimate's inputs; a reader cannot recompute it and the number is a constant wearing an estimate's label"
+echo "PASS (soak preflight): the ladder floor binds below the derived estimate, and the inputs are in the report"
+
+# CONTROL-OF-THE-CONTROL — pin it back to a constant and the scaling test dies.
+sed 's/^DRUSE_EST_GIB=\$((.*/DRUSE_EST_GIB=100/' "$SOAK/preflight.sh" >"$TMP/preflight-pinned.sh"
+cmp -s "$SOAK/preflight.sh" "$TMP/preflight-pinned.sh" &&
+  fail "the disk derivation could not be located in preflight.sh to mutate it; this control has gone stale against the script it guards"
+DRUSE_PIN_HIGH="$(env DRUSE_SOAK_BASE=/ DRUSE_SOAK_LADDER_FLOOR_GIB=0 \
+  DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-distinct" DRUSE_SOAK_SERVER_CPUS="0-3" \
+  DRUSE_SOAK_GENERATOR_CPUS="4-7" bash "$TMP/preflight-pinned.sh" "$TMP/pf-pin-high.txt" \
+  >/dev/null 2>&1; sed -n 's/^estimated_need_gib=\([0-9]*\) .*/\1/p' "$TMP/pf-pin-high.txt")"
+DRUSE_PIN_LOW="$(env DRUSE_SOAK_BASE=/ DRUSE_SOAK_LADDER_FLOOR_GIB=0 \
+  DRUSE_SOAK_TINY_RATE=1000 DRUSE_SOAK_JSON_ENCODE_RATE=150 DRUSE_SOAK_JSON_DECODE_RATE=400 \
+  DRUSE_SOAK_BYTES_64K_RATE=15 DRUSE_SOAK_WAIT_40MS_RATE=1 \
+  DRUSE_SOAK_TOPOLOGY_DIR="$TMP/topo-distinct" DRUSE_SOAK_SERVER_CPUS="0-3" \
+  DRUSE_SOAK_GENERATOR_CPUS="4-7" bash "$TMP/preflight-pinned.sh" "$TMP/pf-pin-low.txt" \
+  >/dev/null 2>&1; sed -n 's/^estimated_need_gib=\([0-9]*\) .*/\1/p' "$TMP/pf-pin-low.txt")"
+if (( DRUSE_PIN_LOW < DRUSE_PIN_HIGH )); then
+  fail "a preflight with the estimate pinned back to a constant still shrank with the rate. The scaling assertion above is not reading what it claims to read."
+fi
+echo "PASS (soak preflight, control-of-the-control): pinning the estimate back to a constant makes the scaling case red"
+
+# ---------------------------------------------------------------------------
 # The compiler BUILDS, it does not merely exist.
 #
 # Found on a real campaign host, and found by the smoke rather than by the

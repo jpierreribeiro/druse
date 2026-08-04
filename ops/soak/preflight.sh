@@ -55,11 +55,42 @@ GENERATOR_CPUS="${DRUSE_SOAK_GENERATOR_CPUS:-4-7}"
 PORT="${DRUSE_SOAK_PORT:-8080}"
 HOURS="${DRUSE_SOAK_PREFLIGHT_HOURS:-12}"
 SAMPLE_SECONDS="${DRUSE_SOAK_SAMPLE_SECONDS:-1}"
-# 12 h of per-request CSV at the pre-registered rates is the dominant artefact.
-# ~15.6k req/s across the profiles, ~120 bytes a row, is ~80 GiB — the number is
-# an estimate and it is recorded as one, but a host with 20 GiB free is not
-# going to survive the night and should learn that now rather than at hour nine.
-MIN_FREE_GIB="${DRUSE_SOAK_MIN_FREE_GIB:-100}"
+# 12 h of per-request CSV at the pre-registered rates is the dominant artefact,
+# and its size is a FUNCTION OF THE OFFERED RATE. The first edition of this
+# script wrote that function out in a comment — "~15.6k req/s across the
+# profiles, ~120 bytes a row, is ~80 GiB" — and then pinned the RESULT as the
+# constant 100.
+#
+# That constant went stale the moment the campaign changed rates. §4.1 and §4.5
+# of the pre-registration took the aggregate from 15,685/s to 1,586/s, a factor
+# of ten, and this number kept demanding disk for a load nobody offers any more.
+# It refused a host with 91 GiB free for a run whose artefact the rehearsal
+# MEASURED at ~10.2 GiB (§4.4).
+#
+# So it is derived, not pinned. The arithmetic is the comment's own, and it
+# agrees with the measurement: at the rehearsal's 2,352/s it predicts 11.4 GiB
+# against ~10.2 GiB observed, which is 12% — close enough to trust the shape and
+# not close enough to pretend it is exact, which is why the margin below exists.
+#
+# The margin is 1.5x (the original was 80 GiB estimated against a 100 GiB floor,
+# i.e. 1.25x). At the historic rates this derivation yields 113 GiB, MORE than
+# the constant it replaces: it is not a threshold lowered to admit a host, it is
+# a threshold that now moves with the thing it estimates.
+DRUSE_RATE_TOTAL=$(( ${DRUSE_SOAK_HEALTH_RATE:-20} + ${DRUSE_SOAK_TINY_RATE:-10000} \
+  + ${DRUSE_SOAK_JSON_ENCODE_RATE:-1500} + ${DRUSE_SOAK_JSON_DECODE_RATE:-4000} \
+  + ${DRUSE_SOAK_BYTES_64K_RATE:-150} + ${DRUSE_SOAK_WAIT_40MS_RATE:-15} ))
+DRUSE_CSV_ROW_BYTES="${DRUSE_SOAK_CSV_ROW_BYTES:-120}"
+DRUSE_EST_GIB=$(( DRUSE_RATE_TOTAL * 3600 * HOURS * DRUSE_CSV_ROW_BYTES * 3 / 2 / 1073741824 ))
+# An absolute floor, because the disk holds THE WHOLE LADDER and not one run:
+# smoke, burn-in, rehearsal and both finals are preserved side by side (red runs
+# are never deleted — they are evidence about the instrument), plus the pinned
+# toolchain and the proxy smoke's container images. At the f = 0.10 rates that
+# is ~17 GiB of artefact before anything else.
+DRUSE_LADDER_FLOOR_GIB="${DRUSE_SOAK_LADDER_FLOOR_GIB:-25}"
+if (( DRUSE_EST_GIB < DRUSE_LADDER_FLOOR_GIB )); then
+  DRUSE_EST_GIB="$DRUSE_LADDER_FLOOR_GIB"
+fi
+MIN_FREE_GIB="${DRUSE_SOAK_MIN_FREE_GIB:-$DRUSE_EST_GIB}"
 # Where the CPU topology is read from. Overridable for ONE reason: the physical
 # core check is itself a control, and a control that can only be exercised on the
 # machine it happens to run on cannot have a positive case. build/check_soak_
@@ -434,6 +465,13 @@ free_kib="$(df -Pk "$target_dir" 2>/dev/null | awk 'NR==2 {print $4}')"
 free_gib=$(( ${free_kib:-0} / 1024 / 1024 ))
 note "free_gib_at=$target_dir:$free_gib"
 note "estimated_need_gib=$MIN_FREE_GIB (for ${HOURS}h at sample_seconds=$SAMPLE_SECONDS)"
+# The inputs to the estimate, so a reader of the artefact can recompute it
+# instead of taking the number on faith. An estimate whose derivation is not in
+# the report is a constant wearing an estimate's label — which is the defect
+# this derivation replaced.
+note "estimate_rate_total=$DRUSE_RATE_TOTAL"
+note "estimate_row_bytes=$DRUSE_CSV_ROW_BYTES"
+note "estimate_ladder_floor_gib=$DRUSE_LADDER_FLOOR_GIB"
 if (( free_gib < MIN_FREE_GIB )); then
   problem "$free_gib GiB free at $target_dir; a ${HOURS}h run is estimated to need $MIN_FREE_GIB GiB of raw CSV"
 fi
