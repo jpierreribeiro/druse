@@ -1,0 +1,41 @@
+{
+  "run_directory": "/home/ubuntu/ladder3/burnin-20260804T045113Z",
+  "telemetry_samples": 1963,
+  "unreadable_samples": 0,
+  "declared_injections": 6,
+  "unknown_injection_kinds": [],
+  "saturation_refusals_total": 105,
+  "refusals_inside_injection_window": 104,
+  "refusals_attributable_to_load": 1,
+  "c22_descent_required": true,
+  "steps": [
+    {
+      "unix_s": 1785817496.449,
+      "delta": 1,
+      "running_total": 1,
+      "attributed_to": "load",
+      "window": null
+    },
+    {
+      "unix_s": 1785817625.478,
+      "delta": 12,
+      "running_total": 13,
+      "attributed_to": "injection",
+      "window": "cycle=5 kind=rst; cycle=5 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785818271.655,
+      "delta": 50,
+      "running_total": 63,
+      "attributed_to": "injection",
+      "window": "cycle=10 kind=rst; cycle=10 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785818918.837,
+      "delta": 42,
+      "running_total": 105,
+      "attributed_to": "injection",
+      "window": "cycle=15 kind=rst; cycle=15 kind=slow_readers"
+    }
+  ]
+}

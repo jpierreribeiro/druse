@@ -1,0 +1,15 @@
+run:                    /home/ubuntu/ladder3/burnin-20260804T045113Z
+telemetry samples:      1963 (0 unreadable)
+declared injections:    6
+
+saturation_refusals:    105
+  inside an injection:  104
+  attributable to load: 1   <-- C22 reads THIS
+
+C22: DESCENT REQUIRED — offered load produced refusals at this rate.
+
+steps:
+  +1     -> 1      load       (no declared injection active)
+  +12    -> 13     injection  (cycle=5 kind=rst; cycle=5 kind=slow_readers)
+  +50    -> 63     injection  (cycle=10 kind=rst; cycle=10 kind=slow_readers)
+  +42    -> 105    injection  (cycle=15 kind=rst; cycle=15 kind=slow_readers)

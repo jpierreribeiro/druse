@@ -850,6 +850,98 @@ Existe porque a divisão é o que distingue as duas leituras, e um run que não 
 produza deixaria a próxima pessoa exatamente onde eu estava: com um número e duas
 histórias.
 
+### 4.7 Sétima emenda — o C22 disparou contra mim, e a taxa desce para f = 0,06
+
+**Escrita depois do burn-in do f = 0,10 e antes do próximo degrau**, que é onde a
+regra manda. O C22 foi congelado nesta manhã e emendado no §4.6 poucas horas
+antes deste run; agora ele reprova o run e o custo é meu.
+
+#### A medição
+
+O burn-in deu `result=PASS` pelo analisador — 15 ciclos, `/health` com **zero**
+erros de transporte, p99 mediano 1.546 µs, todas as seis falhas classificadas. E
+a atribuição do C23 encontrou o seguinte:
+
+| | |
+|---|---|
+| `saturation_refusals` total | **105** |
+| dentro de janela de injeção declarada | 104 |
+| **atribuíveis à carga oferecida** | **1** |
+
+**A recusa de carga não é artefato de borda de janela, e isso foi verificado
+antes de aceitar o custo.** Ela caiu às `04:24:56.449`, com o run começando às
+`04:18:22` — 394 s de decorrido, portanto **ciclo 4**. A injeção mais próxima é a
+do ciclo 5, às `04:27:04`, **128 segundos depois**. Nenhum alargamento defensável
+da janela a alcança.
+
+As outras três subidas (12, 50 e 42) caem nos ciclos 5, 10 e 15 — os de injeção —
+dentro de um segundo das declarações. O padrão é limpo.
+
+#### Por que uma recusa não é pedantismo
+
+É a aritmética do §4.2, refeita com o número deste host:
+
+| | |
+|---|---|
+| recusas de carga medidas em 15 ciclos | 1 |
+| por ciclo | 0,067 |
+| projetado num final de ~360 ciclos | **~24** |
+| fração de conexões novas que é `/health` | 16 de 624 ≈ 2,6% |
+| recusas esperadas em `/health` num final | **~0,6** |
+
+O critério 1 permite **zero**. Meio evento esperado não é um final que se aposta,
+e a projeção vem de um ponto só — que é exatamente contra o que o §4.1 avisou.
+Mas a regra não pede projeção: ela pede zero recusa de carga nos degraus
+pré-finais, e houve uma.
+
+#### A descida, e um problema aritmético que ela expõe
+
+f = 0,06 sobre os defaults, `/health` inalterado pela razão de sempre:
+
+| Profile | Path | Taxa | Conexões | Status esperado |
+|---|---|---:|---:|---|
+| health | `/health` | **20/s — inalterada** | 16 | 200 |
+| tiny | `/tiny` | **600/s** | 128 | 200 |
+| json encode | `/json/medium` | **90/s** | 128 | 200 |
+| json decode | `/json/medium/decode` | **240/s** | 256 | 204 |
+| 64 KiB | `/bytes/64k` | **9/s** | 64 | 200 |
+| blocking | `/wait/40ms` | **1/s** | 32 | 200 |
+
+Agregado: **960/s**.
+
+**A regra de truncamento do §4.5 quebra aqui, e a correção precisa ser dita.**
+`/wait/40ms` a 0,06 dá 0,9, que truncado é **zero** — e o `run-soak.sh` **pula**
+uma carga com taxa ≤ 0, gravando `skipped=... reason=rate_zero`. Truncar
+obedientemente removeria a carga bloqueante da campanha, que é justamente a que
+exercita o dwell de handler, e o §4 deste arquivo existe para dizer *"toda
+carga que vai rodar, e toda que não vai"* — não para deixar uma sumir por
+arredondamento.
+
+Então: **piso de 1/s para qualquer carga que o fator zeraria.** O bloqueante
+roda a 0,067× do default em vez de 0,06× — a mesma forma de desvio que o §4.5 já
+declarou, por 0,1% do agregado. Declarado aqui em vez de descoberto no manifesto.
+
+#### O que isto NÃO significa
+
+- **Não é uma alegação de capacidade.** É a taxa abaixo da qual o acceptor deste
+  host não recusa sob carga, que é pergunta diferente de teto. O envelope é o
+  R2-WP05.
+- **Não é o Druse piorando.** É a terceira taxa de registro em três hosts, e o
+  §4.6 já registrou a suspeita de que a primeira descida respondeu a um sinal
+  errado. O que este número diz é que **o limiar de recusa é propriedade do
+  framework NUM AMBIENTE**, não do framework sozinho — e essa é a entrada mais
+  útil que esta escada produziu para o WP05.
+- **Não é o piso.** O C22 permite esta descida e mais nenhuma.
+
+#### A escada reinicia, e o C22 agora tem a última palavra
+
+G1: taxa nova é candidato novo, então smoke → burn-in → rehearsal outra vez,
+~2h40. E a condição de parada do C22 vale como escrita, lida com o §4.6:
+
+> **se o rehearsal do f = 0,06 contar recusa atribuível à carga, o R2-WP04
+> para**, e o resultado é um achado de capacidade sobre `max_handlers = lanes`
+> entregue ao R2-WP05 — não uma quarta descida.
+
 ## 6. Criteria and SLO
 
 The eighteen criteria in `ops/soak/CRITERIA.md` apply as written and are pinned
