@@ -1,0 +1,1 @@
+{"refused_connections":0,"saturation_refusals":1,"responses_sent":576132,"response_bytes":763272290,"send_errors":32,"write_deadline_aborts":0,"handler_dwell_ns":48766315924,"stream_refused_full":0,"stream_refused_budget":0,"stream_aborted_slow":0,"active_connections":1,"handlers_active":1,"handler_capacity":2,"connection_capacity":4032}

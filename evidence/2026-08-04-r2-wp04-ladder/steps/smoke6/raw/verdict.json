@@ -1,0 +1,255 @@
+{
+  "complete_marker": true,
+  "cycles": 5,
+  "expected_samples": 677,
+  "failure_classes": {
+    "request_write_failed": 1
+  },
+  "failure_examples": {
+    "request_write_failed": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:57146->127.0.0.1:8080: use of closed network connection"
+  },
+  "failures_classified": 1,
+  "failures_counted": 1,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 10,
+    "last": 10,
+    "max": 60
+  },
+  "final_state": {
+    "forced_kill": "0",
+    "sampler_exit": "143",
+    "server_exit": "0"
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 1556,
+    "median_p99_us": 1200,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 27836
+  },
+  "injected_faults": {
+    "attempted": 128,
+    "by_phase": {},
+    "campaigns": 1,
+    "declared": {
+      "rst": 1,
+      "slow_readers": 1
+    },
+    "errors": 0,
+    "unreadable": []
+  },
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 120,
+    "tcp_retrans": 412
+  },
+  "manifest": {
+    "allow_dirty": "0",
+    "analyzer_sha256": "18da528451bb46ce7d31f27033dbff7c903c6baad234899d6776c43a10feb62d",
+    "bytes_64k_rate": "9",
+    "compiler": "/home/ubuntu/odin-pinned/odin version dev-2026-07-nightly:819fdc7",
+    "completed_utc": "2026-08-04T05:07:57Z",
+    "criteria_sha256": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8",
+    "cycles": "5",
+    "expected_samples": "677",
+    "final_settle_seconds": "35",
+    "generator_cpus": "2,3,6,7",
+    "git_dirty": "0",
+    "git_head": "34ec788231cd89660d888b8298ba289d1e8fe5ef",
+    "git_tree": "b02793d4c1f3ce2f9d2cf8d031121a2bca0048cf",
+    "harness_head": "34ec788231cd89660d888b8298ba289d1e8fe5ef",
+    "health_rate": "20",
+    "hours": "1",
+    "json_decode_rate": "240",
+    "json_encode_rate": "90",
+    "kernel": "Linux 6.17.0-1017-aws x86_64 GNU/Linux",
+    "lanes": "2",
+    "launch_stagger_seconds": "1",
+    "max_cycles": "5",
+    "max_rss_kib": "4194304",
+    "nofile": "8192",
+    "nstat": "present",
+    "openload_sha256": "bc61a8e6df38e852eb2b8d8f4cb81d5e5bc668af87ab17c03a687a01ad0977ee",
+    "phase_seconds": "120",
+    "preflight": "pass",
+    "runner_sha256": "0ef0dd841f64715aa7a13eab68c3a8e8de483fba430fa604c9469852d47be2e8",
+    "sample_seconds": "1",
+    "schema_sha256": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+    "schema_version": "soak/1",
+    "server_cpus": "0,1,4,5",
+    "server_sha256": "978052a8a7abc710c71b1ddfd763a12c3c7b37d39c60cac209aa70b48094c3bd",
+    "started_utc": "2026-08-04T04:56:40Z",
+    "tiny_rate": "600",
+    "wait_40ms_rate": "1"
+  },
+  "nstat": "present",
+  "pins": {
+    "criteria": {
+      "run": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8",
+      "tree": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8"
+    },
+    "schema": {
+      "run": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+      "tree": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640"
+    }
+  },
+  "reasons": [],
+  "result": "PASS",
+  "rss_kib": {
+    "first": 3760,
+    "last": 6296,
+    "max": 6876,
+    "min": 3760,
+    "tail_slope_kib_per_hour": 30141.27830089781
+  },
+  "rss_slope_evaluated": false,
+  "rss_slope_run_seconds": 677,
+  "run_directory": "/home/ubuntu/ladder3/smoke6-20260804T050758Z",
+  "sample_shortfall": 2,
+  "saturation": {
+    "refusals_counted_by_server": 1,
+    "refused_seen_by_generators": 0
+  },
+  "schema_version": "soak/1",
+  "schema_version_expected": "soak/1",
+  "short_workloads": {},
+  "skipped_workloads": {},
+  "stats_empty_bodies": 0,
+  "stats_failure_causes": {},
+  "stats_failures_uncaptured": 0,
+  "stats_missing_samples": 0,
+  "telemetry_samples": 675,
+  "threads": {
+    "max": 4,
+    "min": 4
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 5400,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1391,
+      "median_p99_us": 1381,
+      "planned": 5400,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 5400
+      },
+      "status_total": 5400,
+      "succeeded": 5400,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 12000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1556,
+      "median_p99_us": 1200,
+      "planned": 12000,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 12000
+      },
+      "status_total": 12000,
+      "succeeded": 12000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 144000,
+      "failure_classes": {
+        "request_write_failed": 1
+      },
+      "failures": [
+        {
+          "class": "request_write_failed",
+          "count": 1,
+          "example_error": "Post \"http://127.0.0.1:8080/json/medium/decode\": write tcp 127.0.0.1:57146->127.0.0.1:8080: use of closed network connection"
+        }
+      ],
+      "max_p99_us": 1320,
+      "median_p99_us": 1315,
+      "planned": 144000,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 1,
+      "status": {
+        "0": 1,
+        "204": 143999
+      },
+      "status_total": 144000,
+      "succeeded": 143999,
+      "transport_error_ratio": 6.944444444444445e-06,
+      "transport_errors": 1,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 54000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1276,
+      "median_p99_us": 1272,
+      "planned": 54000,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 54000
+      },
+      "status_total": 54000,
+      "succeeded": 54000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 360000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1164,
+      "median_p99_us": 1162,
+      "planned": 360000,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 360000
+      },
+      "status_total": 360000,
+      "succeeded": 360000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 600,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 41286,
+      "median_p99_us": 41230,
+      "planned": 600,
+      "runs": 5,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 600
+      },
+      "status_total": 600,
+      "succeeded": 600,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}

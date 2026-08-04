@@ -40,9 +40,12 @@ host, anexados na raiz deste pacote.
 |---|---|---:|---|---|
 | 1 | smoke | 5 | **PASS** | 56 / 56 / **0** |
 | 2 | burn-in | 15 | **PASS** pelo analisador, **C22 DISPAROU** | 105 / 104 / **1** |
-| 3 | rehearsal | 60 | — (cancelado a f=0,10; a escada reinicia a f=0,06 — §4.7) | — |
-| 4 | Final 1 | ~360 | — | — |
-| 5 | Final 2 | ~360 | — | — |
+| — | *(escada reinicia a f = 0,06 — §4.7)* | | | |
+| 3 | smoke | 5 | **PASS** | 1 / 0 / **1** |
+| 4 | burn-in | 15 | em execução | — |
+| 5 | rehearsal | 60 | em execução | — |
+| 6 | Final 1 | ~360 | — | — |
+| 7 | Final 2 | ~360 | — | — |
 
 A coluna que decide é a última. O C22 desce a taxa por recusa **de carga**; o
 C23 exige que a divisão exista em vez de um total ambíguo. Ela é produzida por
@@ -120,3 +123,46 @@ esperado não é um final que se aposta.
 **O que este número diz, e é a entrada mais útil da escada para o WP05:** o
 limiar de recusa é propriedade do framework **num ambiente**, não do framework
 sozinho. Três hosts, três taxas de registro.
+
+
+## O achado do degrau 3, e é o mais importante da escada
+
+O smoke a f = 0,06 passou pelo analisador e contou **1 recusa de carga** —
+nenhuma injetada. Sozinho isso não para nada: o C22 julga a parada **no
+rehearsal**, e a razão está no §4.2 — cinco ciclos não limitam uma probabilidade
+por ciclo, *"seis minutos não previram trinta"*. Parar aqui seria sobrepor a
+regra com evidência mais fraca do que ela exige.
+
+**O que importa é a comparação entre as duas taxas:**
+
+| taxa | agregado | ciclos | recusas de carga | por ciclo |
+|---|---:|---:|---:|---:|
+| f = 0,10 | 1.586/s | 15 | 1 | 0,067 |
+| f = 0,06 | 960/s | 5 | 1 | 0,200 |
+
+**Baixar a carga em 40% não moveu o piso.** Com um evento em cada, não dá para
+afirmar que subiu — Poisson não distingue essas duas taxas com n = 1. O que dá
+para afirmar é o contrário do que se queria: **não há evidência de que a descida
+ajudou.**
+
+E as duas recusas têm a mesma forma. A do f = 0,10 caiu 34 s dentro do ciclo 4; a
+do f = 0,06, 15,7 s dentro do ciclo 2. Ambas em **rajada de reconexão**, não em
+carga permanente — que é exatamente onde o §4.1 disse que elas se concentram:
+*"os picos nos instantes em que os seis geradores reabrem suas ~624 conexões"*.
+
+**A hipótese que isto levanta, e que esta escada não pode testar:** o que produz
+essas recusas não é a taxa de requisições, é a **rajada de conexões novas na
+borda do ciclo**. Com `max_handlers = lanes = 2`, uma conexão que chega enquanto
+as duas lanes estão dentro de handlers é recusada, e ~624 reconexões simultâneas
+tornam isso provável qualquer que seja a carga de fundo. Descer a taxa reduz o
+tempo dentro de handler, não o tamanho da rajada.
+
+**Se a hipótese estiver certa, descer a taxa nunca converge** — que é literalmente
+o cenário para o qual o C22 foi escrito: *"uma taxa suficientemente baixa sempre
+existe... o que ela produziria não é uma alegação de estabilidade sob um envelope
+de produção; é a descoberta de que o envelope é pequeno."*
+
+**Entrada para o R2-WP05, nomeada e não decidida aqui:** separar a variável
+*taxa* da variável *concorrência de reconexão*. O instrumento para isso não
+existe — o `run-soak.sh` fixa as conexões por carga e reabre todas por ciclo — e
+inventá-lo agora mudaria o hash do instrumento no meio da escada.

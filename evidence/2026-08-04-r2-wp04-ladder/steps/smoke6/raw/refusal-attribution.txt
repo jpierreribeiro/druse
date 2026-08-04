@@ -1,0 +1,12 @@
+run:                    /home/ubuntu/ladder3/smoke6-20260804T050758Z
+telemetry samples:      675 (0 unreadable)
+declared injections:    2
+
+saturation_refusals:    1
+  inside an injection:  0
+  attributable to load: 1   <-- C22 reads THIS
+
+C22: DESCENT REQUIRED — offered load produced refusals at this rate.
+
+steps:
+  +1     -> 1      load       (no declared injection active)
