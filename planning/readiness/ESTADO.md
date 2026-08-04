@@ -50,7 +50,7 @@ O custo alto é deliberado. As seis regras globais estão no
 | WP03 | o servidor é observável enquanto falha | **fechado** |
 | **WP04** | **o candidato aguenta 12 h sem degradar** | **PAROU em 2026-08-04** por regra C22 — achado de capacidade, ver §6.2 |
 | WP05 | qual é o teto de capacidade e como degrada | **é o próximo** — herda o achado do WP04 |
-| WP06 | segurança e cadeia de suprimentos | executado; 2 itens são decisão do dono |
+| WP06 | segurança e cadeia de suprimentos | **fechado em 2026-08-04** — os 2 itens decididos, ver §5 |
 | WP07 | composição sob tráfego real | degrau 1 entregue; degraus 2–6 = risco aceito |
 | WP08 | o freeze e a decisão PROMOVER / SEGURAR | depende de tudo acima |
 
@@ -95,8 +95,10 @@ rodaram". Ver §6.2.
 
 ## 5. O que está esperando por você
 
-Três coisas de naturezas diferentes, **mais uma que passou a bloquear**. As três
-antigas não são urgentes; a nova é o que destrava o R2 (§6, item 2).
+**Duas das três foram decididas por mim em 2026-08-04**, sob autorização
+explícita — ver [`DECISOES-2026-08-04.md`](DECISOES-2026-08-04.md). Resta o risco
+aceito do canário (já assinado) e a decisão de produto do §6 item 2, que é a que
+destrava o R2.
 
 ### 5.1 Canário, degraus 2–6 — risco aceito (ASSINADO em 2026-08-03)
 
@@ -114,25 +116,40 @@ serviço real **é** o degrau 2 e será tratado como canário, com abort automá
 
 O texto formal está em `R2-restricted-production.md` §8.1.
 
-### 5.2 Assinatura de release — falta uma política, não uma assinatura
+### 5.2 Assinatura de release — DECIDIDA em 2026-08-04
 
-O R2-WP06 pede "assinar checksums/release conforme política do projeto". **Não
-existe política**: nenhum arquivo define chave, formato, custódia ou verificação.
+A política existe: [`../../docs/release-integrity-policy.md`](../../docs/release-integrity-policy.md).
 
-Assinar com uma chave inventada durante um work package seria pior que não
-assinar — uma assinatura cuja custódia ninguém decidiu não prova nada e convida a
-ser confiada.
+**Releases são verificados por hash e não assinados, e a nota de release diz
+literalmente isso** — a palavra "assinado" fica proibida enquanto a política
+valer.
 
-O WP08 já entrega a metade verificável: o hash do artefato implantado confere com
-o aprovado. A assinatura acrescentaria *quem* aprovou. **Enquanto não houver
-política, a nota de release diz "verificado por hash", não "assinado".**
+A razão: assinatura prova **custódia**, não integridade, e a integridade já está
+provada por hash num registro versionado. Hoje não há um "quem" separado — a
+chave estaria na mesma máquina do build, usada por quem commita o hash. Isso
+adicionaria uma alegação de garantia que a custódia não sustenta.
 
-### 5.3 TRUST-001 — é uma decisão de API pública
+**Três gatilhos nomeados** tornam a assinatura obrigatória: um segundo
+mantenedor, distribuição fora do repositório, ou um adotante pedindo. A decisão
+não é permanente por inércia.
 
-Consertar o casamento de prefixos muda o significado de uma API pública. A regra
-G5 diz que um plano pode **nomear** a necessidade e não pode **inventar** a
-assinatura. A necessidade nomeada: *uma entrada que signifique um endereço e
-somente ele*.
+### 5.3 TRUST-001 — CORRIGIDO em 2026-08-04
+
+Uma entrada terminada em `.` ou `:` é prefixo; qualquer outra casa o endereço
+inteiro. `tests/trust001-anchoring`, seis casos sobre socket real, com mutante.
+
+**O defeito era pior do que o catálogo dizia.** A documentação justificava
+casamento textual em vez de CIDR com a frase *"a wrong prefix can only fail to
+trust one you did"* — e essa afirmação era **falsa**: `"127.0.0.1"` confiava em
+~110 endereços vizinhos. Uma justificativa de desenho que a implementação não
+satisfaz é pior que nenhuma, porque quem lê orça risco contra ela.
+
+Mantive textual **contra** CIDR de propósito: parsing de IPv4/IPv6 e aritmética
+de máscara são três lugares para estar sutilmente errado numa fronteira de
+segurança, e aqui não há revisão humana para pegar. O custo está dito — `/25` não
+tem grafia, o que já era verdade antes.
+
+É quebra de compatibilidade, registrada no `CHANGELOG.md` com a ação necessária.
 
 ## 6. O que falta, em ordem
 
