@@ -1,11 +1,13 @@
 # Programa de prontidão para produção — R1, R2 e R3
 
-**Status:** R1 PROMOTED em 2026-08-02 para piloto interno não crítico. R2 em
-execução — WP01, WP02 e WP03 fechados; WP04 na escada (smoke e burn-in PASS nas
-taxas re-derivadas, rehearsal em curso, finais bloqueados pelo pré-registro
-§4.2); WP06 executado com duas cláusulas abertas; WP07 degrau 1 entregue e
-degraus 2–6 como risco aceito a assinar; WP05 e WP08 abertos. R3 continua como
-plano bloqueado por seu próprio gate.
+**Status:** o portão está em **R1** (promovido em 2026-08-02, piloto interno não
+crítico) e o R2 está em execução.
+
+**O estado detalhado vive em um lugar só: [`ESTADO.md`](ESTADO.md).** Este
+parágrafo já foi uma cópia dele e envelheceu em dois dias — descrevia um
+rehearsal "em curso" que terminou PASS e um risco "a assinar" que foi assinado.
+Duas fontes de status divergentes confundem mais do que nenhuma, então esta
+deixou de existir: aqui fica o portão, lá fica o resto.
 
 **O gate permanece em R1, e nada nesta linha o move.** WP01 tornou o instrumento
 capaz de explicar uma falha; WP03 tornou o servidor observável enquanto ele
