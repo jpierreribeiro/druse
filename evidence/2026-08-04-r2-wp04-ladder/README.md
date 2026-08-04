@@ -42,8 +42,8 @@ host, anexados na raiz deste pacote.
 | 2 | burn-in | 15 | **PASS** pelo analisador, **C22 DISPAROU** | 105 / 104 / **1** |
 | — | *(escada reinicia a f = 0,06 — §4.7)* | | | |
 | 3 | smoke | 5 | **PASS** | 1 / 0 / **1** |
-| 4 | burn-in | 15 | em execução | — |
-| 5 | rehearsal | 60 | em execução | — |
+| 4 | burn-in | 15 | **PASS** | 72 / 72 / **0** |
+| 5 | rehearsal | 60 | em execução — **é ele que decide** | — |
 | 6 | Final 1 | ~360 | — | — |
 | 7 | Final 2 | ~360 | — | — |
 
@@ -133,17 +133,23 @@ rehearsal**, e a razão está no §4.2 — cinco ciclos não limitam uma probabi
 por ciclo, *"seis minutos não previram trinta"*. Parar aqui seria sobrepor a
 regra com evidência mais fraca do que ela exige.
 
-**O que importa é a comparação entre as duas taxas:**
+**O que importa é a comparação entre as duas taxas.** Com o burn-in a f = 0,06
+fechado, ela ficou limpa — mesma quantidade de ciclos dos dois lados:
 
-| taxa | agregado | ciclos | recusas de carga | por ciclo |
-|---|---:|---:|---:|---:|
-| f = 0,10 | 1.586/s | 15 | 1 | 0,067 |
-| f = 0,06 | 960/s | 5 | 1 | 0,200 |
+| taxa | agregado | smoke (5 ciclos) | burn-in (15) | **total em 20 ciclos** | por ciclo |
+|---|---:|---:|---:|---:|---:|
+| f = 0,10 | 1.586/s | 0 | 1 | **1** | 0,050 |
+| f = 0,06 | 960/s | 1 | 0 | **1** | 0,050 |
 
-**Baixar a carga em 40% não moveu o piso.** Com um evento em cada, não dá para
-afirmar que subiu — Poisson não distingue essas duas taxas com n = 1. O que dá
-para afirmar é o contrário do que se queria: **não há evidência de que a descida
-ajudou.**
+**Baixar a carga em 40% não moveu o piso: uma recusa de carga em vinte ciclos,
+dos dois lados.** E o evento caiu em degraus diferentes de cada vez, que é
+exatamente o que um processo de Poisson raro faz — reforça que é o mesmo
+fenômeno, não dois.
+
+*(Uma versão anterior desta seção comparava 1 em 15 contra 1 em 5 e dizia que a
+taxa "por ciclo" tinha triplicado. Era o mesmo achado com menos dados e uma
+aritmética pior: os dois pontos não tinham a mesma exposição. Com 20 ciclos de
+cada lado, os números coincidem.)*
 
 E as duas recusas têm a mesma forma. A do f = 0,10 caiu 34 s dentro do ciclo 4; a
 do f = 0,06, 15,7 s dentro do ciclo 2. Ambas em **rajada de reconexão**, não em
@@ -156,6 +162,10 @@ borda do ciclo**. Com `max_handlers = lanes = 2`, uma conexão que chega enquant
 as duas lanes estão dentro de handlers é recusada, e ~624 reconexões simultâneas
 tornam isso provável qualquer que seja a carga de fundo. Descer a taxa reduz o
 tempo dentro de handler, não o tamanho da rajada.
+
+**A projeção que o rehearsal vai testar:** a 0,05 por ciclo, sessenta ciclos
+esperam **~3** recusas de carga. O C22 permite zero. Se a projeção valer, o
+R2-WP04 para — e para pelo mecanismo que esta escada entende, não por algo novo.
 
 **Se a hipótese estiver certa, descer a taxa nunca converge** — que é literalmente
 o cenário para o qual o C22 foi escrito: *"uma taxa suficientemente baixa sempre

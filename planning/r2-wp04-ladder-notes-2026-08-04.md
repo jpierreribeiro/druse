@@ -41,14 +41,21 @@ por ter sido escrita por mim doze horas antes.
 
 ## 2. O que a descida mediu, e é o achado técnico da escada
 
-| taxa | agregado | ciclos | recusas de carga | por ciclo |
-|---|---:|---:|---:|---:|
-| f = 0,10 | 1.586/s | 15 | 1 | 0,067 |
-| f = 0,06 | 960/s | 5 | 1 | 0,200 |
+| taxa | agregado | smoke (5) | burn-in (15) | **total em 20 ciclos** | por ciclo |
+|---|---:|---:|---:|---:|---:|
+| f = 0,10 | 1.586/s | 0 | 1 | **1** | 0,050 |
+| f = 0,06 | 960/s | 1 | 0 | **1** | 0,050 |
 
-**Baixar a carga em 40% não moveu o piso.** Com n = 1 em cada, Poisson não
-distingue as duas taxas — não dá para afirmar que piorou. Dá para afirmar o que
-se queria negar: **não há evidência de que a descida ajudou.**
+**Baixar a carga em 40% não moveu o piso: uma recusa de carga em vinte ciclos,
+dos dois lados.** O evento caiu em degraus diferentes de cada vez, que é o que um
+processo de Poisson raro faz.
+
+**Escrevi isto errado antes e a correção é instrutiva.** Com só o smoke a
+f = 0,06 na mão, comparei "1 em 15" contra "1 em 5" e falei em triplicar. Os dois
+pontos não tinham a mesma exposição, e a conclusão certa saiu de uma aritmética
+que não sustentava. Esperar o burn-in fechar deu 20 ciclos de cada lado e o
+mesmo achado com números que se defendem. **Comparar taxas de eventos raros com
+exposições diferentes é como se inventa uma tendência.**
 
 E as duas recusas têm a mesma forma: 34 s dentro do ciclo 4, 15,7 s dentro do
 ciclo 2. Ambas em **rajada de reconexão**, que é onde o §4.1 já dissera que elas
