@@ -430,7 +430,14 @@ Critério novo, congelado antes do próximo run, no mesmo espírito do C18:
 
 > as taxas em `manifest.txt` (`health_rate`, `tiny_rate`, `json_encode_rate`,
 > `json_decode_rate`, `bytes_64k_rate`, `wait_40ms_rate`) têm de ser exatamente
-> as da tabela acima.
+> as da **tabela de registro vigente**.
+
+**A tabela vigente é a da emenda mais recente.** Quando o C21 foi escrito havia
+só uma, e "a tabela acima" era exata; a quinta emenda (§4.5) tornou a frase
+ambígua, e um critério ambíguo é um critério que não recusa nada. Hoje: **§4.5 é
+a vigente** (f = 0,10) e a tabela desta seção fica registrada como o que o smoke,
+o burn-in e o rehearsal de 2026-08-03 realmente ofereceram. Um run é lido contra
+a emenda vigente na data em que começou.
 
 Razão de existir: a affinity tem um preflight que **recusa** e o critério C18; as
 taxas não tinham nem um nem outro, e um run que ajustasse a taxa no prompt
@@ -471,7 +478,7 @@ reach twelve hours.
 | smoke | 10 min | wiring, schema, clocks, hashes | no | **PASS** 2026-08-03 at the fourth attempt (`9905509`); three red runs, all instrument. `evidence/2026-08-03-r2-soak-smoke/`. **Re-run PASS** at the §4.1 rates (`6b4f3d4`) |
 | burn-in | 30 min | every workload and fault class appears | no | **FAIL** at the original rates (`6bff82f`) — `health transport errors`, which produced §4.1. **PASS** at the §4.1 rates (`6b4f3d4`), health 0 errors in 36,000 — but see §4.2 |
 | rehearsal | 2 h | fast drift, evidence volume, first latency distributions | no | **PASS** 2026-08-03 — health 0 errors in 144,000, RSS slope 30.7 KiB/h, and 345 refusals which fire §4.2's rule (see §4.3) |
-| final | ≥12 h | R2 stability criterion + §6 SLO | yes, if PASS | **settled: run at f = 0.10** (§4.3). Two runs, different days (§9) |
+| final | ≥12 h | R2 stability criterion + §6 SLO | yes, if PASS | **settled: run at f = 0.10**, registered in §4.5. The rate change is a new candidate, so smoke, burn-in **and rehearsal** re-run at f = 0.10 first (§4.5) — ~2 h 40, not 40 min. Two finals, different days (§9) |
 
 ### 4.2 The burn-in passed and the rule of §4.1 fired anyway
 
@@ -582,6 +589,93 @@ The rehearsal is also where the two open estimates from R2-WP01's accepted risks
 are corrected: the 100 GiB disk figure in `preflight.sh` and the 2%
 `expected_samples` tolerance in `analyze-soak.py`.
 
+### 4.5 Quinta emenda — as taxas dos finais (f = 0,10)
+
+**Commitada antes de qualquer final, que é o que a regra do §4.1 exige** ("a taxa
+desce de novo — nesta seção, em seu próprio commit, antes do final"). O gatilho
+já disparou e está registrado no §4.3: o rehearsal contou **345 recusas do
+servidor**, e a regra não distingue 345 de 3. Nenhum resultado novo foi visto
+entre aquela linha e esta.
+
+#### As taxas de registro dos finais
+
+Escala f = 0,10 sobre os defaults do `run-soak.sh`, com `/health` **não
+escalado** pela mesma razão do §4.1 — é sonda, não carga, e reduzi-la tira
+amostras do critério 1, que é o critério que a descida existe para proteger.
+
+| Profile | Path | Taxa | Conexões | Status esperado |
+|---|---|---:|---:|---|
+| health | `/health` | **20/s — inalterada** | 16 | 200 |
+| tiny | `/tiny` | **1.000/s** | 128 | 200 |
+| json encode | `/json/medium` | **150/s** | 128 | 200 |
+| json decode | `/json/medium/decode` | **400/s** | 256 | 204 |
+| 64 KiB | `/bytes/64k` | **15/s** | 64 | 200 |
+| blocking | `/wait/40ms` | **1/s** | 32 | 200 |
+
+Agregado: **1.586/s**.
+
+**A regra de arredondamento, dita porque uma linha depende dela.** Truncamento
+para zero, que é o que a quarta emenda já fez (22,5 → 22 e 2,25 → 2). Quatro das
+cinco cargas escalam exato; `/wait/40ms` cai em 1,5 e vira **1**. Isso oferece o
+bloqueante a 0,067× do default em vez de 0,10× — uma diferença de 0,5 req/s, ou
+**0,03% do agregado**. Preferi a regra consistente a uma exceção que faria a
+tabela discordar do fator que a nomeia; o desvio está aqui para ser contestado.
+
+**Por que 1.586/s e não os 1.569/s da escada de derivação:** aquele ponto escalou
+`/health` junto (20 → 2). Manter a sonda em 20/s soma 17/s, +1,1%. É a mesma
+aritmética que o §4.1 declarou para o f = 0,15 (lá, +0,7%).
+
+**A margem, declarada antes do run:** 1.586/s contra 2.352/s onde as recusas
+ainda eram zero e 2.824/s onde a primeira reaparece — **33% abaixo do teto livre
+de recusa e 44% abaixo da primeira recusa**. No f = 0,15 essa margem era 16%, e
+16% não sobreviveu a 60 ciclos. A derivação mediu zero em f = 0,10 e em dois
+pontos abaixo dele.
+
+#### A escada reinicia — e isso inclui o rehearsal
+
+G1 conta configuração load-bearing como identidade do candidato, então esta
+tabela cria um **candidato novo** e a escada recomeça no smoke, exatamente como o
+§4.4 registrou para a emenda anterior.
+
+**O rehearsal de 2 h faz parte do reinício, e vale dizer por quê**, porque a
+tentação de pular é real e custa 2 h:
+
+| degrau | ciclos | recusas medidas no f = 0,15 |
+|---|---:|---:|
+| burn-in | 15 | 3 |
+| rehearsal | 60 | 345 |
+
+Quinze ciclos disseram "3" e sessenta disseram "345". **Um burn-in verde no
+f = 0,10 não é evidência de que 360 ciclos ficam limpos** — é o mesmo erro que o
+§4.2 nomeou quando seis minutos não previram trinta. O rehearsal é o único
+degrau com ciclos suficientes para limitar a probabilidade por ciclo antes de
+gastar doze horas.
+
+Custo do reinício: smoke 10 min + burn-in 30 min + rehearsal 2 h ≈ **2 h 40**,
+não os ~40 min que o mapa de estado dizia. A correção está feita lá também.
+
+#### C22 — a descida tem um piso, e o piso é uma decisão
+
+Critério novo, congelado agora porque congelá-lo depois de ver um degrau
+vermelho seria a violação exata que o G3 proíbe:
+
+> se qualquer degrau pré-final no f = 0,10 contar **recusa do servidor > 0**, a
+> taxa desce uma vez mais, para **f = 0,06** (941/s de carga escalada, `/health`
+> ainda em 20/s), nesta seção e em commit próprio. **Se o rehearsal do f = 0,06
+> também contar recusa, o R2-WP04 para** e o resultado é um achado de capacidade
+> sobre `max_handlers = lanes`, entregue ao R2-WP05 para atribuição — não uma
+> quarta descida.
+
+Razão de existir: sem piso, a regra do §4.1 é uma busca por uma taxa em que nada
+acontece, e uma taxa suficientemente baixa sempre existe. O que ela produziria
+não é uma alegação de estabilidade sob um envelope de produção; é a descoberta de
+que o envelope é pequeno — que é informação, e pertence ao WP05, dita como
+achado em vez de escondida atrás de um verde. Cada descida custa 2 h 40 e compra
+uma alegação de estresse mais fraca.
+
+O dono pode sobrepor este piso; sobrepor uma regra escrita antes exige
+justificativa registrada, seguir uma não exige nada (§4.3).
+
 ## 6. Criteria and SLO
 
 The eighteen criteria in `ops/soak/CRITERIA.md` apply as written and are pinned
@@ -593,6 +687,8 @@ before the run.
 | C18 | the run's affinity equals §3 | `manifest.txt` `server_cpus`/`generator_cpus` match this file exactly | a run that adapted its affinity is a run whose plan and artefact disagree |
 | C19 | the host was qualified by core, not by number | the attached preflight report carries `physical_core_disjoint=yes` | the property §3.2 exists to guarantee, asserted in the artefact rather than assumed |
 | C20 | the smoke was green on this host, unqualified-override absent | `smoke=pass` and no `smoke_on_unqualified_host` line | a green smoke taken with the override is a fact about the script |
+| C21 | the run's rates equal the current amendment | the six `*_rate` fields in `manifest.txt` match the registered table in force when the run started (§4.5 today, §4.1 before it) | defined in full in §4.1; a run that adjusted its rate at the prompt disagrees with its own plan and nothing notices |
+| C22 | the descent has a floor | any pre-final step counting server refusals at f = 0.10 drops the rate to f = 0.06 once; a refusal in the f = 0.06 rehearsal stops R2-WP04 for attribution | defined in full in §4.5; without a floor the rule of §4.1 is a search for a rate at which nothing happens, and one always exists |
 
 ### 6.1 What an SLO is here
 
