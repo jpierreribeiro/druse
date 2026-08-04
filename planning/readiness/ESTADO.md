@@ -1,6 +1,6 @@
 # Onde estamos — mapa do programa de prontidão
 
-**Última atualização: 2026-08-03.**
+**Última atualização: 2026-08-04** — o R2-WP04 fechou (parado, §6.2).
 
 Este arquivo existe para uma pessoa que volta ao projeto depois de um tempo e
 precisa saber onde está antes de saber os detalhes. Os outros documentos deste
@@ -54,13 +54,17 @@ O custo alto é deliberado. As seis regras globais estão no
 | WP07 | composição sob tráfego real | degrau 1 entregue; degraus 2–6 = risco aceito |
 | WP08 | o freeze e a decisão PROMOVER / SEGURAR | depende de tudo acima |
 
-**O WP04 é o gargalo, e é gargalo de calendário, não de trabalho.** O
-pré-registro exige **duas corridas de ≥12 h em dias diferentes**. Não é
-burocracia: uma corrida boa sozinha não distingue "estável" de "teve uma boa
-noite". Rodar as duas no mesmo dia produz um artefato que o próprio plano recusa
-para promoção.
+**O WP04 era o gargalo e deixou de ser — não porque foi resolvido, mas porque
+foi respondido.** Ele parou em 2026-08-04 com um achado (§6.2): descer a taxa
+não faz a recusa chegar a zero, então não existe corrida de 12 h a rodar neste
+candidato. **O gargalo passou a ser uma decisão de produto sobre
+`max_handlers = lanes`**, e essa é sua (§6).
 
 ## 4. O que 2026-08-03 produziu — e o que não produziu
+
+**Esta seção é sobre o dia anterior**, e vale mantê-la porque os instrumentos que
+ela descreve são o que tornou 2026-08-04 possível. O que aconteceu em 08-04 está
+no §6.2.
 
 **Produziu duas coisas, e vale separá-las.**
 
@@ -77,7 +81,9 @@ implantado é o aprovado. Nada disso é evidência sobre o produto; é o que tor
 evidência possível.
 
 **O que NÃO produziu: nenhuma prova de que o Druse é estável em produção.** Isso
-vem das duas corridas de 12 h, que não aconteceram.
+viria das duas corridas de 12 h — e em 2026-08-04 ficou medido que elas **não são
+rodáveis** neste candidato, o que é uma resposta diferente de "ainda não
+rodaram". Ver §6.2.
 
 ### 4.1 Achados abertos, que não bloqueiam nada mas não somem
 
@@ -89,8 +95,8 @@ vem das duas corridas de 12 h, que não aconteceram.
 
 ## 5. O que está esperando por você
 
-Três coisas, de naturezas diferentes. **Nenhuma é urgente e nenhuma bloqueia o
-WP04.**
+Três coisas de naturezas diferentes, **mais uma que passou a bloquear**. As três
+antigas não são urgentes; a nova é o que destrava o R2 (§6, item 2).
 
 ### 5.1 Canário, degraus 2–6 — risco aceito (ASSINADO em 2026-08-03)
 
@@ -143,24 +149,19 @@ somente ele*.
 **Os finais voltam à mesa quando existir uma configuração em que a recusa de
 carga chegue a zero.** Não é calendário; é uma pergunta aberta.
 
-### 6.1 Uma consequência do G1 que vale saber antes
+### 6.1 Uma consequência do G1 que custou duas escadas, e vale saber antes
 
-A taxa dos finais (f = 0.10) é diferente da que o rehearsal rodou (f = 0.15).
-**G1 conta configuração load-bearing como parte da identidade do candidato**, e
-carga oferecida é load-bearing por construção. Então a escada reinicia no smoke
-antes dos finais.
+**Toda mudança de taxa reinicia a escada no smoke.** G1 conta configuração
+load-bearing como identidade do candidato, e carga oferecida é load-bearing por
+construção. O reinício é **smoke (10 min) + burn-in (30 min) + rehearsal (2 h)
+≈ 2 h 40** — e o rehearsal não é opcional: é o único degrau com ciclos
+suficientes para limitar uma probabilidade por ciclo.
 
-**Correção de 2026-08-03 (tarde):** uma versão anterior deste parágrafo dizia
-"smoke (10 min) e burn-in (30 min), ~40 min a mais". **Faltava o rehearsal**, e
-ele não é opcional: no f = 0.15, quinze ciclos contaram 3 recusas e sessenta
-contaram 345. Um burn-in verde não limita 360 ciclos — é exatamente o erro que a
-§4.2 do pré-registro já nomeou quando seis minutos não previram trinta.
-
-O reinício é **smoke (10 min) + burn-in (30 min) + rehearsal (2 h) ≈ 2 h 40**.
-Continua não sendo um dia, e continua cabendo antes do Final 1 no mesmo dia.
-
-Carregar os degraus antigos para a frente significaria citar verdes tomados a uma
-taxa que a campanha não usa mais.
+Em 2026-08-04 isso foi pago **duas vezes**: uma pela troca de host (§3.7) e outra
+pela descida de taxa do C22 (§4.7). **Foi dinheiro bem gasto:** o rehearsal
+completo é justamente o degrau que produziu as 7 recusas de carga que
+responderam a pergunta. Um atalho teria levado a doze horas desperdiçadas em vez
+de duas.
 
 ### 6.2 A escada rodou inteira e o WP04 PAROU — com um achado, não com uma falha
 
@@ -214,18 +215,29 @@ O pacote vive em
 e cresce a cada degrau — desta vez desde o primeiro, porque quando o host
 anterior morreu as conclusões sobreviveram e os dados brutos não.
 
-### 6.3 A quinta emenda está commitada; os finais não dependem de mais nenhum papel
+### 6.3 As sete emendas, para quem quiser auditar a cadeia de decisões
 
-A regra da §4.1 obrigava a taxa a descer "em seu próprio commit, antes do final".
-Foi feito: **§4.5 do pré-registro** registra a tabela de f = 0.10 (agregado
-1.586/s, 33% abaixo do teto livre de recusa), o C21 passou a nomear a emenda
-vigente em vez de "a tabela acima", e o **C22** congelou o piso da descida —
-f = 0.06 uma vez, e uma recusa lá **para o WP04** para atribuição em vez de uma
-quarta descida.
+O pré-registro foi emendado sete vezes, **sempre antes do run que a emenda
+governa**, e a cadeia inteira é auditável:
 
-O passo a passo executável — bloco de ambiente com as seis taxas, sequência,
-como um run de 12 h sobrevive à queda do ssh, e as decisões congeladas — está em
-[`R2-WP04-finals-runbook.md`](R2-WP04-finals-runbook.md).
+| | O quê |
+|---|---|
+| §3.1 (1ª, 2ª) | host, duas vezes em 2026-08-02 |
+| §3.6, §3.4, §3.3 | canal de métrica, custo declarado, limitação das medições antigas |
+| §4.1 (4ª) | as taxas re-derivadas por medição — a escada de 10 pontos |
+| §4.5 (5ª) | f = 0,10 + **C21** (a taxa do run é a da emenda vigente) + **C22** (piso da descida) |
+| §3.7 (3ª de host) | o host novo, depois que o anterior morreu |
+| §4.6 (6ª) | **C22 corrigido**: recusa *atribuível à carga* + **C23** (a atribuição é obrigatória) |
+| §4.7 (7ª) | a descida para f = 0,06, disparada pelo próprio C22 |
+
+**A §4.6 é a que merece escrutínio, porque me beneficiou** — ela impediu uma
+descida que teria custado 2h40. As duas defesas estão lá e ambas são mais velhas
+que o run. E no degrau seguinte o mesmo critério corrigido reprovou o run e
+cobrou as 2h40 mesmo assim.
+
+O passo a passo executável está em
+[`R2-WP04-finals-runbook.md`](R2-WP04-finals-runbook.md) — **e os finais que ele
+descreve não estão liberados** (§6.2).
 
 ## 7. Como retomar
 
