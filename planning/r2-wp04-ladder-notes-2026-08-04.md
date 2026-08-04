@@ -41,21 +41,31 @@ por ter sido escrita por mim doze horas antes.
 
 ## 2. O que a descida mediu, e é o achado técnico da escada
 
-| taxa | agregado | smoke (5) | burn-in (15) | **total em 20 ciclos** | por ciclo |
-|---|---:|---:|---:|---:|---:|
-| f = 0,10 | 1.586/s | 0 | 1 | **1** | 0,050 |
-| f = 0,06 | 960/s | 1 | 0 | **1** | 0,050 |
+**Com o rehearsal fechado, a tabela final:**
 
-**Baixar a carga em 40% não moveu o piso: uma recusa de carga em vinte ciclos,
-dos dois lados.** O evento caiu em degraus diferentes de cada vez, que é o que um
-processo de Poisson raro faz.
+| taxa | agregado | smoke (5) | burn-in (15) | rehearsal (60) | **total** | por ciclo |
+|---|---:|---:|---:|---:|---:|---:|
+| f = 0,10 | 1.586/s | 0 | 1 | — | **1 / 20** | 0,050 |
+| f = 0,06 | 960/s | 1 | 0 | 7 | **8 / 80** | 0,100 |
 
-**Escrevi isto errado antes e a correção é instrutiva.** Com só o smoke a
-f = 0,06 na mão, comparei "1 em 15" contra "1 em 5" e falei em triplicar. Os dois
-pontos não tinham a mesma exposição, e a conclusão certa saiu de uma aritmética
-que não sustentava. Esperar o burn-in fechar deu 20 ciclos de cada lado e o
-mesmo achado com números que se defendem. **Comparar taxas de eventos raros com
-exposições diferentes é como se inventa uma tendência.**
+**Baixar a carga em 40% não moveu o piso.** Com 1 evento em 20 ciclos de um lado,
+os intervalos de confiança se sobrepõem largamente e **não dá para afirmar que
+piorou** — mas também não sobra nada da alegação que a descida precisava
+sustentar. Essa é a assimetria honesta: a descida tinha o ônus da prova e não o
+cumpriu.
+
+**As sete do rehearsal estão espalhadas pelas duas horas**, uma de cada vez:
+05:45, 06:11, 06:30, 06:36, 07:13, 07:15, 07:45. Não é um evento raro com azar —
+é um piso.
+
+**Escrevi isto errado duas vezes, e as correções são o método funcionando.**
+Primeiro comparei "1 em 15" contra "1 em 5" e falei em triplicar — exposições
+diferentes, aritmética que não sustentava a conclusão. Depois, com 20 ciclos de
+cada lado, escrevi "mesmo número dos dois lados" e projetei ~3 para o rehearsal;
+vieram 7. **Comparar taxas de eventos raros com exposições diferentes é como se
+inventa uma tendência, e projetar de n = 1 é como se inventa precisão.** A
+conclusão sobreviveu às duas correções porque nunca dependia da magnitude — só de
+o piso não chegar a zero.
 
 E as duas recusas têm a mesma forma: 34 s dentro do ciclo 4, 15,7 s dentro do
 ciclo 2. Ambas em **rajada de reconexão**, que é onde o §4.1 já dissera que elas
@@ -71,6 +81,10 @@ conexões por carga e reabre todas por ciclo, então taxa e concorrência de
 reconexão não são variáveis separáveis nele. Construir essa separação mudaria o
 hash do instrumento no meio da escada e criaria candidato novo (G1). Entrada do
 R2-WP05, e a mais valiosa que esta escada produziu.
+
+**O resultado:** o C22 parou o R2-WP04 em 2026-08-04. Veredito completo em
+`evidence/2026-08-04-r2-wp04-ladder/verdict.md`; decisão registrada como
+`HOLD AT R1` na seção `Result` do pré-registro.
 
 ## 3. Três hosts, três taxas — o que isso diz e o que não diz
 
