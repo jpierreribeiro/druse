@@ -1,0 +1,12 @@
+run:                    /home/ubuntu/ladder3/smoke-20260804T040433Z
+telemetry samples:      675 (0 unreadable)
+declared injections:    2
+
+saturation_refusals:    56
+  inside an injection:  56
+  attributable to load: 0   <-- C22 reads THIS
+
+C22: no descent — offered load produced no refusals at this rate.
+
+steps:
+  +56    -> 56     injection  (cycle=5 kind=rst; cycle=5 kind=slow_readers)

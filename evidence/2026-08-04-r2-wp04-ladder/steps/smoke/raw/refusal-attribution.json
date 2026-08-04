@@ -1,0 +1,20 @@
+{
+  "run_directory": "/home/ubuntu/ladder3/smoke-20260804T040433Z",
+  "telemetry_samples": 675,
+  "unreadable_samples": 0,
+  "declared_injections": 2,
+  "unknown_injection_kinds": [],
+  "saturation_refusals_total": 56,
+  "refusals_inside_injection_window": 56,
+  "refusals_attributable_to_load": 0,
+  "c22_descent_required": false,
+  "steps": [
+    {
+      "unix_s": 1785816118.815,
+      "delta": 56,
+      "running_total": 56,
+      "attributed_to": "injection",
+      "window": "cycle=5 kind=rst; cycle=5 kind=slow_readers"
+    }
+  ]
+}
