@@ -43,28 +43,45 @@ TRUSTED_PROXY_MAX :: 8
 // Trusted_Proxies is the registered set, stored on the App.
 @(private)
 Trusted_Proxies :: struct {
-	// PREFIXES, matched textually, not CIDR arithmetic. See `trust_proxies`.
+	// Entries matched textually, not by CIDR arithmetic. An entry ending in
+	// `.` or `:` is a prefix; anything else matches the whole address. See
+	// `trust_proxies` and `trusted_prefix_match`.
 	prefix: [TRUSTED_PROXY_MAX]string,
 	count:  int,
 }
 
 // trust_proxies declares which peers are allowed to speak for their clients.
 //
-// Each entry is an address PREFIX matched textually against the connected
-// peer's rendered address: `"10."`, `"192.168."`, `"127.0.0.1"`, `"::1"`.
+// Each entry is matched textually against the connected peer's rendered
+// address, and the trailing character decides how:
 //
-// **WHY PREFIXES RATHER THAN CIDR, stated plainly because CIDR is what a
+//	"10."        a PREFIX -> every address under 10.
+//	"192.168."   a PREFIX -> every address under 192.168.
+//	"fd00:"      a PREFIX -> every address under fd00:
+//	"127.0.0.1"  EXACT    -> that address and nothing else
+//	"::1"        EXACT    -> that address and nothing else
+//
+// **An entry ending in `.` or `:` is a prefix; anything else must match the
+// whole address.** The separator is how the author says "everything under
+// this", and it cannot land mid-octet.
+//
+// **This rule replaced an unanchored prefix match (TRUST-001).** Before it,
+// `"127.0.0.1"` also trusted `127.0.0.10` through `127.0.0.199`, and there was
+// no way to name one address and only it.
+//
+// **WHY TEXTUAL RATHER THAN CIDR, stated plainly because CIDR is what a
 // reviewer expects.** A correct CIDR implementation needs IPv4 and IPv6 parsing,
 // mask arithmetic, and the IPv4-mapped-IPv6 edge — and each of those is a place
-// to be subtly wrong in a security boundary. Textual prefixes are less
-// expressive and their failure mode is the safe one: a prefix that does not
-// match means the header is ignored and the peer is used, which is exactly the
-// default. **A wrong CIDR mask can trust a network you did not mean to trust; a
-// wrong prefix can only fail to trust one you did.**
+// to be subtly wrong in a security boundary. This rule needs a comparison and a
+// last-byte test.
 //
-// The asymmetry is the argument. If a deployment genuinely needs CIDR, that is
-// evidence for a later work package, and adding it then is a strengthening —
-// while shipping arithmetic now and finding it wrong would be a breach.
+// **What it costs, stated rather than hidden:** boundaries that are not
+// byte-aligned cannot be expressed. `10.0.0.0/24` is `"10.0.0."`; `10.0.0.0/25`
+// has no spelling. That was equally true of the unanchored version — this
+// change removes a widening bug without removing expressiveness — and a
+// deployment that genuinely needs a non-aligned mask is evidence for a later
+// work package. Adding CIDR then is a strengthening; shipping arithmetic now
+// and finding it wrong would be a breach.
 //
 // **Ordering does not matter and duplicates are harmless**: this is a set
 // membership test, not a chain walk.
@@ -198,18 +215,52 @@ trusted_peer :: proc(ctx: ^Context, peer: string) -> bool {
 }
 
 // trusted_prefix_match asks whether an address — the peer, or a hop rendered
-// into an `X-Forwarded-For` entry — matches any registered trusted-proxy
-// prefix. It is the shared membership test behind both the peer check and the
-// right-to-left chain walk (ADR-037): the SAME textual-prefix rule decides
-// trust everywhere, so a proxy trusted as the peer is also trusted as a hop.
-// Textual, bounded, and allocation-free.
+// into an `X-Forwarded-For` entry — matches any registered trusted-proxy entry.
+// It is the shared membership test behind both the peer check and the
+// right-to-left chain walk (ADR-037): the SAME rule decides trust everywhere,
+// so a proxy trusted as the peer is also trusted as a hop. Textual, bounded,
+// and allocation-free.
+//
+// **THE ANCHORING RULE, and the defect it closes (TRUST-001).** The first
+// edition matched an unanchored textual prefix, so `"127.0.0.1"` also trusted
+// `127.0.0.10` through `127.0.0.199` — about a hundred and ten addresses nobody
+// named. There was no way to write "this address and only this address", which
+// is the most natural thing a reader wants from this API.
+//
+// It also falsified the argument the doc on `trust_proxies` used to justify
+// textual matching over CIDR: *"a wrong prefix can only fail to trust one you
+// did"*. A prefix that silently widens is exactly the failure that argument
+// claimed could not happen.
+//
+// The rule now: an entry is a PREFIX only if it ends in an address separator —
+// `.` for IPv4, `:` for IPv6. Anything else must match the WHOLE address.
+//
+//	"10."        prefix  -> 10.x.x.x
+//	"192.168."   prefix  -> 192.168.x.x
+//	"fd00:"      prefix  -> fd00:...
+//	"127.0.0.1"  exact   -> 127.0.0.1 and nothing else
+//	"::1"        exact   -> ::1 and nothing else
+//
+// Every example the public doc already carried keeps the meaning a reader would
+// assume; only the unanchored widening is gone.
 @(private)
 trusted_prefix_match :: proc(ctx: ^Context, address: string) -> bool {
 	if ctx.private.trusted.count == 0 || len(address) == 0 {
 		return false
 	}
 	for i in 0 ..< ctx.private.trusted.count {
-		if strings.has_prefix(address, ctx.private.trusted.prefix[i]) {
+		entry := ctx.private.trusted.prefix[i]
+		if len(entry) == 0 {
+			continue
+		}
+		last := entry[len(entry) - 1]
+		if last == '.' || last == ':' {
+			// An explicit prefix: the trailing separator is the author saying
+			// "everything under this", and it cannot land mid-octet.
+			if strings.has_prefix(address, entry) {
+				return true
+			}
+		} else if address == entry {
 			return true
 		}
 	}

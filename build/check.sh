@@ -1435,6 +1435,19 @@ env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
 
 bash "$DRUSE_ROOT/build/check_wp123_controls.sh"
 
+# TRUST-001 — a trusted-proxy entry must not silently widen. `trust_proxies`
+# matched an unanchored textual prefix, so `"127.0.0.1"` also trusted
+# 127.0.0.10..199 and there was no way to name one address and only it. The
+# suite drives a real socket and reads what `web.client_ip` reports, because
+# that is the value an application authorizes on.
+echo "--- TRUST-001 trusted-proxy anchoring (odin test) ---"
+env ODIN_ROOT="$DRUSE_COMPILER_DIR" PATH="$DRUSE_COMPILER_DIR:/usr/bin:/bin" \
+  timeout 120 \
+  "$DRUSE_COMPILER" test "$DRUSE_ROOT/tests/trust001-anchoring" \
+  "-collection:druse=$DRUSE_ROOT" \
+  -out:"$DRUSE_BIN_TMP/trust001-anchoring" \
+  || fail "a trusted-proxy entry widened beyond the address it names, or an anchored entry stopped trusting; TRUST-001"
+
 # ---------------------------------------------------------------------------
 # Suites that were in the tree but in no gate script.
 #
