@@ -256,6 +256,39 @@ Four synchronous lanes on four cores maximize CPU efficiency but can return a
 bounded 503 when a connection is assigned to an already-busy lane. With the
 medium workload:
 
+> **Superseded on 2026-08-03 — the sentence above is wrong in two ways, and the
+> second one was wrong when it was written.**
+>
+> **The status.** Vendor Patch 42 removed the acceptor's HTTP write. When it
+> refuses, it has accepted a TCP socket and has **not parsed a request**, so it
+> now closes without writing anything and increments `saturation_refusals`
+> (`vendor/odin-http/server.odin`, `accept_refuse_handler_saturation`).
+> Request-aware overload paths — where a request *has* been read — still answer
+> 503 with `Retry-After`; the two contracts were never about the same code path.
+>
+> **The trigger, which no patch changed.** "Assigned to an already-busy lane" is
+> not when a refusal happens. A request arriving at a busy lane **queues
+> silently on that lane's socket — no status, no counter, only latency**
+> (`docs/operations.md`, `handler_dwell_ns`). The acceptor refuses only when
+> **every** lane is inside a handler at once. The sentence describes queueing and
+> attaches the refusal's consequence to it — which is the exact conflation that
+> got `lane_collisions` retired, named three paragraphs below in this same
+> section. The correction landed there and never reached the opening line.
+>
+> **The measurements below stand; what they measured is renamed.** The non-2xx
+> column and the "358 load-shed 503s" are facts about the 2026-07-25 build,
+> where the acceptor did write 503s. On a current build the same events carry no
+> HTTP status at all and appear to a client as a connection closed before a
+> reply. Counting them requires `web.stats().saturation_refusals` — a generator
+> that only tallies statuses now records zero and sees a clean run.
+>
+> `docs/supported-profile.md` §"Execution, saturation and failure domain" carries
+> the current contract and is the one to read. The behaviour is pinned by
+> `build/check_c05_controls.sh` in both directions, and confirmed against a
+> running binary in `docs/reports/2026-07-25-dedicated-accept-throughput.md`:
+> 1,913 refusals counted by the server against **zero** 503s seen by the load
+> generators, over 28.2 M requests.
+
 | lanes on four CPUs | median req/s | median p99 | non-2xx |
 |---|---:|---:|---:|
 | 4 | 7,468 | 26.69 ms | 0.11352% |
