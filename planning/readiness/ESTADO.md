@@ -147,11 +147,32 @@ de você além de dizer para começar.
 A taxa dos finais (f = 0.10) é diferente da que o rehearsal rodou (f = 0.15).
 **G1 conta configuração load-bearing como parte da identidade do candidato**, e
 carga oferecida é load-bearing por construção. Então a escada reinicia no smoke
-antes dos finais — smoke (10 min) e burn-in (30 min) — e isso é ~40 min a mais,
-não um dia.
+antes dos finais.
 
-Carregar o smoke e o burn-in antigos para a frente significaria citar degraus
-verdes tomados a uma taxa que a campanha não usa mais.
+**Correção de 2026-08-03 (tarde):** uma versão anterior deste parágrafo dizia
+"smoke (10 min) e burn-in (30 min), ~40 min a mais". **Faltava o rehearsal**, e
+ele não é opcional: no f = 0.15, quinze ciclos contaram 3 recusas e sessenta
+contaram 345. Um burn-in verde não limita 360 ciclos — é exatamente o erro que a
+§4.2 do pré-registro já nomeou quando seis minutos não previram trinta.
+
+O reinício é **smoke (10 min) + burn-in (30 min) + rehearsal (2 h) ≈ 2 h 40**.
+Continua não sendo um dia, e continua cabendo antes do Final 1 no mesmo dia.
+
+Carregar os degraus antigos para a frente significaria citar verdes tomados a uma
+taxa que a campanha não usa mais.
+
+### 6.2 A quinta emenda está commitada; os finais não dependem de mais nenhum papel
+
+A regra da §4.1 obrigava a taxa a descer "em seu próprio commit, antes do final".
+Foi feito: **§4.5 do pré-registro** registra a tabela de f = 0.10 (agregado
+1.586/s, 33% abaixo do teto livre de recusa), o C21 passou a nomear a emenda
+vigente em vez de "a tabela acima", e o **C22** congelou o piso da descida —
+f = 0.06 uma vez, e uma recusa lá **para o WP04** para atribuição em vez de uma
+quarta descida.
+
+O passo a passo executável — bloco de ambiente com as seis taxas, sequência,
+como um run de 12 h sobrevive à queda do ssh, e as decisões congeladas — está em
+[`R2-WP04-finals-runbook.md`](R2-WP04-finals-runbook.md).
 
 ## 7. Como retomar
 
