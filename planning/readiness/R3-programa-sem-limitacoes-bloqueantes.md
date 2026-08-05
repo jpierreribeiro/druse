@@ -1,9 +1,10 @@
 # Programa: produção sem limitações bloqueantes
 
-**Status: PROPOSED, 2026-08-03. O dono ratifica a decisão de ambição (§2) por
-ADR antes de qualquer implementação — é a exigência de
-`R3-general-maturity.md` §1, e este documento existe para instanciá-la, não
-para contorná-la.**
+**Status: RATIFICADO, 2026-08-05 — ADR-052.** A decisão de ambição (§2) foi
+ratificada pelo dono por ADR, como `R3-general-maturity.md` §1 exige: *"quero
+um framework para outras pessoas usarem"*. O primeiro item do §7 está
+cumprido; os demais seguem as recomendações fechadas dali, exercidas em
+`readiness/DECISOES-2026-08-05.md`. (Status anterior: PROPOSED, 2026-08-03.)
 
 **O pedido do dono, verbatim como diretriz:** *"quero um framework pronto para
 ser usado em produção, sem limitações bloqueantes"* — sabendo que o custo é

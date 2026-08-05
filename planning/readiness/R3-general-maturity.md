@@ -18,8 +18,10 @@ restrita saudável é um estado final válido.
 > [`R3-programa-sem-limitacoes-bloqueantes.md`](R3-programa-sem-limitacoes-bloqueantes.md)
 > é o documento que a registra, classifica quais limitações declaradas são de
 > fato bloqueantes, e sequencia as trilhas abaixo que o gatilho autoriza. Ele
-> **não substitui** esta seção: a ratificação por ADR que ela exige continua
-> pendente e é o primeiro item do §7 daquele programa.
+> **não substitui** esta seção: a ratificação por ADR que ela exige foi feita
+> em **2026-08-05 — ADR-052** (`planning/adrs.md`): o dono ratificou a ambição
+> como *"um framework para outras pessoas usarem"*, campo a campo como esta
+> seção exige, inclusive o que a decisão não compra.
 >
 > O resultado da classificação, resumido: o conjunto bloqueante é {L1 fault de
 > handler, L6 release/LTS, L2 handlers síncronos — condicional}, e **nenhum dos

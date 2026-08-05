@@ -7,6 +7,13 @@ o que cada caminho custa não é decidir.
 recomendação, ela está marcada como minha e vem com o motivo — e com o que me
 faria mudar de ideia.
 
+> **RESOLVIDO em 2026-08-05.** O dono respondeu a decisão A: **A2 — "quero um
+> framework para outras pessoas usarem."** A ratificação está no **ADR-052**
+> (`planning/adrs.md`) e o caminho decorrente — C vira GO, B vira B3 com o knee
+> medido antes — está em [`DECISOES-2026-08-05.md`](DECISOES-2026-08-05.md).
+> Este arquivo permanece como o mapa que informou a decisão; ele não é mais uma
+> lista de pendências.
+
 ---
 
 ## 0. O mapa: o que depende do quê

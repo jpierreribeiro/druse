@@ -2911,3 +2911,98 @@ pertence a quem não morreu — passa a ser o candidato melhor pelo mesmo preço
   (F1 e o controle negativo F1n em N=1) **não rodou** e não podia rodar — ela
   exige um braço implementado. Os números de recursos são de um container de
   4 CPUs, e são contabilidade determinística, não capacidade (G4).
+
+## ADR-052 — a ratificação da ambição: o Druse é para outras pessoas usarem
+
+- **Status.** **ACCEPTED — decisão do dono, 2026-08-05.** Esta é a ratificação
+  de ambição que `planning/readiness/R3-general-maturity.md` §1 exige antes de
+  qualquer implementação do R3, e que
+  `planning/readiness/R3-programa-sem-limitacoes-bloqueantes.md` §2 minutou. A
+  declaração do dono, verbatim: *"decisão de PRODUTO. Não sei as respostas,
+  preciso encontrar o melhor caminho, quero um framework para outras pessoas
+  usarem."*
+
+- **Contexto.** O mapa de decisões de 2026-08-05
+  (`planning/readiness/DECISOES-QUE-ESPERAM-POR-VOCE.md`) colocou três estados
+  de encerramento possíveis para o projeto, e mostrou que as outras duas
+  decisões pendentes — `max_handlers` (B) e publicar a v0.11.0 (C) — mudam de
+  valor conforme a resposta. A pergunta não é burocracia: é a que determina
+  quanto rigor o projeto precisa comprar daqui em diante.
+
+- **Opções.**
+  - **A1 — é do dono, para o dono usar.** Precisa do R2 e de nada mais; boa
+    parte do R3 fica sem sentido. Estado de encerramento válido.
+  - **A2 — é para outras pessoas usarem.** Precisa de tudo do A1 **mais** a L6
+    publicada, a L1 removida (falha de handler não pode matar o processo),
+    documentação de consumidor validada por quem não a escreveu, e um caminho
+    de upgrade testado. Cada quebra de compatibilidade passa a ter custo para
+    terceiros. É o único caminho caro e o único que traz risco novo.
+  - **A3 — é um artefato de pesquisa/demonstração.** O método é o produto; já
+    está pronto. Estado de encerramento válido — o próprio R3 diz que
+    *"produção restrita saudável é um estado final válido"*.
+
+- **Decisão. A2.** O dono declarou o destino, não as respostas de engenharia —
+  *"não sei as respostas, preciso encontrar o melhor caminho"* delega o caminho
+  às recomendações registradas, e a delegação está exercida em
+  `planning/readiness/DECISOES-2026-08-05.md`, com alternativas e critérios de
+  reversão, como manda o costume da casa.
+
+- **Campo a campo, como o §1 do R3 exige.**
+  - **Problema observado:** o dono quer o Druse utilizável em produção real por
+    terceiros, e o perfil declarado contém limitações bloqueantes para adoção
+    (L6) e para operação (L1), mais uma condicional (L2).
+  - **Usuários/workloads:** APIs HTTP/1.1 em Linux atrás de proxy revisado — o
+    shape da maioria das APIs em produção — incluindo apps com I/O bloqueante
+    moderado e operadores que exigem contenção de falha e política de release.
+  - **Baseline:** R2 completo. Continua pré-condição dura (Fase 0 do programa);
+    esta ratificação não a dispensa nem antecipa.
+  - **Alvos comprados:** R3-A (releases) integral; R3-B (backend/fork)
+    integral; R3-D **apenas o braço worker-pool**; R3-WP10 integral. R3-C só
+    nível dev-smoke por gatilho; R3-E DEFERRED por gatilho; R3-F conforme
+    demanda. Exatamente a lista do programa §2 — este ADR não a amplia.
+  - **Custo máximo aceitável:** as classes do programa §4 para as Fases 0–3
+    (baixo, baixo-médio, médio, médio). O teto da Fase 4 fica **adiado** até as
+    Fases 0–3 fecharem, conforme a recomendação fechada do programa §7 item 4 —
+    decidir o teto da fase cara antes de saber o que as anteriores entregaram é
+    comprar no escuro.
+  - **Compatibilidade:** nenhuma fase quebra o ledger público sem major; o
+    envelope N=1 permanece válido durante todo o programa; workers entram
+    opt-in.
+  - **Rollback:** por fase, como listado no programa §3; nenhum é rebuild.
+  - **Condição de abandono:** por fase, no programa §3. A do programa inteiro
+    ganha uma cláusula própria de A2: se até o freeze do R3-WP09 **nenhum
+    adotante externo existir nem tiver pedido para existir**, a ambição é
+    re-ratificada — A1 e A3 continuam estados de encerramento válidos e mais
+    baratos, e insistir em A2 sem demanda é pagar rigor sem beneficiário.
+
+- **O que esta decisão explicitamente NÃO compra.** Um runtime próprio
+  (programa §5, decisão permanente com critérios de reabertura); TLS nativo sem
+  gatilho; HTTP/2/WebSocket nativos sem gatilho; plataforma "supported"
+  não-Linux. E não compra calendário: nenhum run começa por causa deste ADR.
+
+- **O risco que esta decisão aceita, por escrito.** Um adotante externo passa a
+  confiar numa base **sem revisão humana de código**. Está declarado na
+  política de integridade; declarar não elimina — transfere. A mitigação é o
+  método (evidência medida, hashes, mutantes, critérios congelados antes do
+  run) e a nota de release que diz literalmente "gerado por IA sem revisão
+  humana" e "verificado por hash, não assinado".
+
+- **Consequências imediatas, pelo mapa da decisão.**
+  - **C (v0.11.0): publicar — GO.** Fecha a L6, entrega a correção de segurança
+    do TRUST-001 e inicia o relógio de suporte da linha corrente. A execução e
+    seu estado estão em `DECISOES-2026-08-05.md` §2.
+  - **B (`max_handlers`): direção B3** — a sonda de liveness sai das lanes de
+    aplicação, o mesmo movimento que ADR-050 fez para a métrica — **com o knee
+    medido antes de congelar a escolha**; B2 (mais lanes) fica como paliativo
+    nomeado; B4 (afrouxar o critério) recusado por G3. Alternativas e critérios
+    de reversão em `DECISOES-2026-08-05.md` §3.
+
+- **Impacto em documentação.** `R3-general-maturity.md` §1 (ratificação feita);
+  `R3-programa-sem-limitacoes-bloqueantes.md` (status); `ESTADO.md` §5–§6;
+  `DECISOES-QUE-ESPERAM-POR-VOCE.md` (nota de resolução).
+
+- **Reversibilidade. ALTA até o primeiro adotante externo; MÉDIA-BAIXA
+  depois.** Antes do primeiro adotante, rebaixar para A1/A3 custa apenas as
+  horas já gastas nas obrigações de A2. Depois, cada recuo tem custo para
+  terceiros — e esse custo passar a existir é exatamente o que a decisão
+  compra.

@@ -1,6 +1,8 @@
 # Onde estamos — mapa do programa de prontidão
 
-**Última atualização: 2026-08-04** — o R2-WP04 fechou (parado, §6.2).
+**Última atualização: 2026-08-05** — a ambição foi ratificada (**ADR-052**):
+o Druse é **para outras pessoas usarem** (A2). O caminho decorrente está em
+[`DECISOES-2026-08-05.md`](DECISOES-2026-08-05.md).
 
 Este arquivo existe para uma pessoa que volta ao projeto depois de um tempo e
 precisa saber onde está antes de saber os detalhes. Os outros documentos deste
@@ -96,9 +98,12 @@ rodaram". Ver §6.2.
 ## 5. O que está esperando por você
 
 **Duas das três foram decididas por mim em 2026-08-04**, sob autorização
-explícita — ver [`DECISOES-2026-08-04.md`](DECISOES-2026-08-04.md). Resta o risco
-aceito do canário (já assinado) e a decisão de produto do §6 item 2, que é a que
-destrava o R2.
+explícita — ver [`DECISOES-2026-08-04.md`](DECISOES-2026-08-04.md). Em
+**2026-08-05 o dono decidiu a que faltava**: a ambição é A2 — framework para
+outras pessoas usarem (**ADR-052**) — e disso decorrem o GO da v0.11.0 e a
+direção B3 para o §6 item 2, com o knee medido antes do congelamento
+([`DECISOES-2026-08-05.md`](DECISOES-2026-08-05.md)). O que resta pendente é
+**execução**, não decisão.
 
 ### 5.1 Canário, degraus 2–6 — risco aceito (ASSINADO em 2026-08-03)
 
@@ -157,10 +162,13 @@ tem grafia, o que já era verdade antes.
    herda a pergunta que parou o WP04 — **separar a variável taxa da variável
    concorrência de reconexão**. Precisa de instrumento novo, porque o
    `run-soak.sh` fixa as conexões por carga e reabre todas por ciclo.
-2. **Decidir o que fazer com `max_handlers = lanes`.** Se a rajada for a
-   variável, a saída é mais lanes ou tirar a `/health` das lanes de aplicação —
-   o mesmo argumento que a ADR-050 já fez para métrica. **É decisão de produto,
-   não de campanha.**
+2. **`max_handlers = lanes` — direção decidida em 2026-08-05:** a saída é
+   **B3, tirar a sonda de liveness das lanes de aplicação** (o argumento da
+   ADR-050, agora para a `/health`), com **o knee medido antes** de congelar a
+   escolha — pré-registro novo, ~3 h de host. B2 (mais lanes) fica como
+   paliativo nomeado; B4 (afrouxar o critério) recusado por G3. Alternativas e
+   critérios de reversão em
+   [`DECISOES-2026-08-05.md`](DECISOES-2026-08-05.md) §3.
 3. **WP08** — o pacote de decisão e o veredito.
 
 **Os finais voltam à mesa quando existir uma configuração em que a recusa de
