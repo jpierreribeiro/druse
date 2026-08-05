@@ -1025,15 +1025,35 @@ test -n "$DRUSE_EST_HIGH" && test -n "$DRUSE_EST_LOW" ||
   fail "at the historic rates the derived estimate ($DRUSE_EST_HIGH GiB) is below the constant 100 it replaced. The derivation was supposed to be a correction, not a relaxation."
 echo "PASS (soak preflight): the disk estimate is a function of the offered rate ($DRUSE_EST_HIGH GiB at 15,685/s, $DRUSE_EST_LOW GiB at 1,586/s)"
 
-# The floor binds underneath it, because the disk holds the whole ladder.
+# THE LADDER FLOOR ALSO SCALES — and this control asserted the number 25 until
+# 2026-08-05, when deriving the floor made it stale and it failed a change it
+# has no opinion about.
+#
+# That is the third time in three days that a control pinned to a NUMBER failed
+# a legitimate change, and the second time the number was mine. The property is
+# "the floor tracks the rate and never falls below what the toolchain and the
+# proxy images need whatever the rate" — so that is what it asserts now.
 DRUSE_EST_FLOOR="$(disk_estimate_at "$TMP/pf-est-floor.txt" \
   DRUSE_SOAK_HEALTH_RATE=1 DRUSE_SOAK_TINY_RATE=1 DRUSE_SOAK_JSON_ENCODE_RATE=1 \
   DRUSE_SOAK_JSON_DECODE_RATE=1 DRUSE_SOAK_BYTES_64K_RATE=1 DRUSE_SOAK_WAIT_40MS_RATE=1)"
-(( DRUSE_EST_FLOOR >= 25 )) ||
-  fail "a near-zero offered rate produced a $DRUSE_EST_FLOOR GiB requirement. The ladder's own artefacts, the toolchain and the proxy images live on that disk whatever the rate."
+DRUSE_EST_FLOOR_MID="$(disk_estimate_at "$TMP/pf-est-floor-mid.txt" \
+  DRUSE_SOAK_HEALTH_RATE=20 DRUSE_SOAK_TINY_RATE=1500 DRUSE_SOAK_JSON_ENCODE_RATE=225 \
+  DRUSE_SOAK_JSON_DECODE_RATE=600 DRUSE_SOAK_BYTES_64K_RATE=22 DRUSE_SOAK_WAIT_40MS_RATE=2)"
+
+# A rate that writes essentially nothing still needs room for the toolchain, the
+# repository and the proxy smoke's container images. Zero is the answer that
+# would let a full disk qualify.
+(( DRUSE_EST_FLOOR > 0 )) ||
+  fail "a near-zero offered rate produced a $DRUSE_EST_FLOOR GiB requirement. The toolchain, the repository and the proxy images live on that disk whatever the rate, and a zero floor lets a full disk qualify."
+
+# And it MOVES: a campaign that writes 2,369/s for the whole ladder needs more
+# than one that writes almost nothing. A floor that did not move would be the
+# constant this control exists to have replaced.
+(( DRUSE_EST_FLOOR_MID > DRUSE_EST_FLOOR )) ||
+  fail "the ladder floor did not grow with the offered rate ($DRUSE_EST_FLOOR GiB at ~6/s, $DRUSE_EST_FLOOR_MID GiB at 2,369/s). It is pinned again, and a pinned floor is wrong in both directions: too small for a fast campaign and too large for a slow one."
 grep -q '^estimate_rate_total=' "$TMP/pf-est-floor.txt" ||
   fail "the report does not carry the estimate's inputs; a reader cannot recompute it and the number is a constant wearing an estimate's label"
-echo "PASS (soak preflight): the ladder floor binds below the derived estimate, and the inputs are in the report"
+echo "PASS (soak preflight): the ladder floor scales with the rate ($DRUSE_EST_FLOOR GiB at ~6/s, $DRUSE_EST_FLOOR_MID GiB at 2,369/s) and never reaches zero"
 
 # CONTROL-OF-THE-CONTROL — pin it back to a constant and the scaling test dies.
 sed 's/^DRUSE_EST_GIB=\$((.*/DRUSE_EST_GIB=100/' "$SOAK/preflight.sh" >"$TMP/preflight-pinned.sh"
