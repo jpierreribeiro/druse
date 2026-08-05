@@ -62,8 +62,35 @@ e o `serve` retorna sem aceitar — o que se parece exatamente com
 diferentes, o mesmo subsistema — e agora uma hipótese comum que não é sobre
 tempo.
 
-**O próximo passo é medir a mesma janela com `enable_upload` habilitado.**
-Precisa de um binário de teste que ainda não existe; está nomeado e não feito.
+**O próximo passo era medir a mesma janela com `enable_upload` habilitado.**
+Feito em 2026-08-05 — ver §5.1.
+
+### 5.1 A lacuna fechada: com upload habilitado, é ainda mais rápido
+
+Binário mínimo em `upload-server/main.odin`: `enable_upload` com um diretório de
+spool, uma rota, `serve`. Doze medições em cada condição.
+
+| condição | n | mín | mediana | máx |
+|---|---:|---:|---:|---:|
+| sem upload, ocioso | 12 | 20 ms | 42 ms | 127 ms |
+| sem upload, sob carga | 12 | 45 ms | 78 ms | **174 ms** |
+| **com upload, ocioso** | 12 | 21 ms | **26 ms** | 32 ms |
+| **com upload, sob carga** | 12 | 35 ms | **41 ms** | 47 ms |
+
+**Habilitar upload não torna a inicialização lenta — torna mais rápida**, e isso
+faz sentido: o `soak-server` das primeiras linhas sobe o exportador de métrica da
+ADR-050 e registra mais rotas. O que a primeira medição capturou como "sem
+upload" era, na verdade, "com mais coisas".
+
+**Quarenta e oito medições, pior caso 174 ms, margem de 3,4× contra os 600 ms do
+fixture.** A hipótese de que o `ingest-leak` falhava por lentidão de
+inicialização está **eliminada nas duas variantes** — a que eu media e a que eu
+tinha declarado não medir.
+
+**O que sobra:** a falha do `ingest-leak` não é sobre tempo. O servidor não
+demorou e não é o upload; ele **não subiu**, e a causa continua sem nome. O
+`wp123` (507 de `ingest.begin`) segue como o parente mais próximo, e a
+investigação dos dois é a mesma.
 
 ## 6. Conteúdo
 
