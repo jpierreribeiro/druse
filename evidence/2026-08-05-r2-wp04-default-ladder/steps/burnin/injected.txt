@@ -1,0 +1,6 @@
+cycle=5 kind=rst attempted=128 utc=2026-08-05T07:51:46Z
+cycle=5 kind=slow_readers attempted=24 utc=2026-08-05T07:51:46Z
+cycle=10 kind=rst attempted=128 utc=2026-08-05T08:02:33Z
+cycle=10 kind=slow_readers attempted=24 utc=2026-08-05T08:02:33Z
+cycle=15 kind=rst attempted=128 utc=2026-08-05T08:13:19Z
+cycle=15 kind=slow_readers attempted=24 utc=2026-08-05T08:13:19Z

@@ -1,0 +1,242 @@
+{
+  "complete_marker": true,
+  "cycles": 60,
+  "expected_samples": 7789,
+  "failure_classes": {},
+  "failure_examples": {},
+  "failures_classified": 0,
+  "failures_counted": 0,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 14,
+    "last": 14,
+    "max": 115
+  },
+  "final_state": {
+    "forced_kill": "0",
+    "sampler_exit": "143",
+    "server_exit": "0"
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 1182,
+    "median_p99_us": 1165.0,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 44888
+  },
+  "injected_faults": {
+    "attempted": 1536,
+    "by_phase": {},
+    "campaigns": 12,
+    "declared": {
+      "rst": 12,
+      "slow_readers": 12
+    },
+    "errors": 0,
+    "unreadable": []
+  },
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 1624,
+    "tcp_retrans": 1704
+  },
+  "manifest": {
+    "allow_dirty": "0",
+    "analyzer_sha256": "18da528451bb46ce7d31f27033dbff7c903c6baad234899d6776c43a10feb62d",
+    "bytes_64k_rate": "10",
+    "compiler": "/home/ubuntu/odin-pinned/odin version dev-2026-07-nightly:819fdc7",
+    "completed_utc": "2026-08-05T10:26:26Z",
+    "criteria_sha256": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8",
+    "cycles": "60",
+    "expected_samples": "7789",
+    "final_settle_seconds": "35",
+    "generator_cpus": "2,3,6,7",
+    "git_dirty": "0",
+    "git_head": "5a17b789787aea5c331591513ce8ce429139b175",
+    "git_tree": "8bcfe75dabb8f867c6d9bf89b6b32600b425ab62",
+    "harness_head": "5a17b789787aea5c331591513ce8ce429139b175",
+    "health_rate": "20",
+    "hours": "3",
+    "json_decode_rate": "280",
+    "json_encode_rate": "105",
+    "kernel": "Linux 6.17.0-1017-aws x86_64 GNU/Linux",
+    "lanes": "0",
+    "launch_stagger_seconds": "1",
+    "max_cycles": "60",
+    "max_rss_kib": "4194304",
+    "nofile": "8192",
+    "nstat": "present",
+    "openload_sha256": "bc61a8e6df38e852eb2b8d8f4cb81d5e5bc668af87ab17c03a687a01ad0977ee",
+    "phase_seconds": "120",
+    "preflight": "pass",
+    "runner_sha256": "0ef0dd841f64715aa7a13eab68c3a8e8de483fba430fa604c9469852d47be2e8",
+    "sample_seconds": "1",
+    "schema_sha256": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+    "schema_version": "soak/1",
+    "server_cpus": "0,1,4,5",
+    "server_sha256": "2d138c9959274979b6aa59db9ec2d64272ad94d23711f01a968656123ae8cd72",
+    "started_utc": "2026-08-05T08:16:37Z",
+    "tiny_rate": "702",
+    "wait_40ms_rate": "1"
+  },
+  "nstat": "present",
+  "pins": {
+    "criteria": {
+      "run": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8",
+      "tree": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8"
+    },
+    "schema": {
+      "run": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+      "tree": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640"
+    }
+  },
+  "reasons": [],
+  "result": "PASS",
+  "rss_kib": {
+    "first": 4252,
+    "last": 9080,
+    "max": 34052,
+    "min": 4252,
+    "tail_slope_kib_per_hour": 10.235153687908825
+  },
+  "rss_slope_evaluated": true,
+  "rss_slope_run_seconds": 7789,
+  "run_directory": "/home/ubuntu/ladder4/rehearsal-20260805T102629Z",
+  "sample_shortfall": 26,
+  "saturation": {
+    "refusals_counted_by_server": 5,
+    "refused_seen_by_generators": 0
+  },
+  "schema_version": "soak/1",
+  "schema_version_expected": "soak/1",
+  "short_workloads": {},
+  "skipped_workloads": {},
+  "stats_empty_bodies": 0,
+  "stats_failure_causes": {},
+  "stats_failures_uncaptured": 0,
+  "stats_missing_samples": 0,
+  "telemetry_samples": 7763,
+  "threads": {
+    "max": 6,
+    "min": 6
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 72000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1334,
+      "median_p99_us": 1311.0,
+      "planned": 72000,
+      "runs": 60,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 72000
+      },
+      "status_total": 72000,
+      "succeeded": 72000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 144000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1182,
+      "median_p99_us": 1165.0,
+      "planned": 144000,
+      "runs": 60,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 144000
+      },
+      "status_total": 144000,
+      "succeeded": 144000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 2016000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1287,
+      "median_p99_us": 1281.0,
+      "planned": 2016000,
+      "runs": 60,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "204": 2016000
+      },
+      "status_total": 2016000,
+      "succeeded": 2016000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 756000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 27011,
+      "median_p99_us": 1243.0,
+      "planned": 756000,
+      "runs": 60,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 756000
+      },
+      "status_total": 756000,
+      "succeeded": 756000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 5054400,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1147,
+      "median_p99_us": 1144.0,
+      "planned": 5054400,
+      "runs": 60,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 5054400
+      },
+      "status_total": 5054400,
+      "succeeded": 5054400,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 7200,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 41286,
+      "median_p99_us": 41218.0,
+      "planned": 7200,
+      "runs": 60,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 7200
+      },
+      "status_total": 7200,
+      "succeeded": 7200,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}

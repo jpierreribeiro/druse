@@ -1,0 +1,243 @@
+{
+  "complete_marker": true,
+  "cycles": 15,
+  "expected_samples": 1970,
+  "failure_classes": {},
+  "failure_examples": {},
+  "failures_classified": 0,
+  "failures_counted": 0,
+  "failures_unclassified": 0,
+  "fds": {
+    "first": 14,
+    "last": 14,
+    "max": 103
+  },
+  "final_state": {
+    "forced_kill": "0",
+    "sampler_exit": "143",
+    "server_exit": "0"
+  },
+  "health": {
+    "cycles_over_250ms": 0,
+    "max_p99_us": 1176,
+    "median_p99_us": 1165,
+    "transport_errors": 0
+  },
+  "hwm_kib": {
+    "max": 43508
+  },
+  "injected_faults": {
+    "attempted": 384,
+    "by_phase": {},
+    "campaigns": 3,
+    "declared": {
+      "rst": 3,
+      "slow_readers": 3
+    },
+    "errors": 0,
+    "unreadable": []
+  },
+  "kernel_deltas": {
+    "listen_drops": 0,
+    "listen_overflows": 0,
+    "tcp_abort_on_close": 413,
+    "tcp_retrans": 434
+  },
+  "manifest": {
+    "allow_dirty": "0",
+    "analyzer_sha256": "18da528451bb46ce7d31f27033dbff7c903c6baad234899d6776c43a10feb62d",
+    "bytes_64k_rate": "10",
+    "compiler": "/home/ubuntu/odin-pinned/odin version dev-2026-07-nightly:819fdc7",
+    "completed_utc": "2026-08-05T08:15:54Z",
+    "criteria_sha256": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8",
+    "cycles": "15",
+    "expected_samples": "1970",
+    "final_settle_seconds": "35",
+    "generator_cpus": "2,3,6,7",
+    "git_dirty": "0",
+    "git_head": "5a17b789787aea5c331591513ce8ce429139b175",
+    "git_tree": "8bcfe75dabb8f867c6d9bf89b6b32600b425ab62",
+    "harness_head": "5a17b789787aea5c331591513ce8ce429139b175",
+    "health_rate": "20",
+    "hours": "2",
+    "json_decode_rate": "280",
+    "json_encode_rate": "105",
+    "kernel": "Linux 6.17.0-1017-aws x86_64 GNU/Linux",
+    "lanes": "0",
+    "launch_stagger_seconds": "1",
+    "max_cycles": "15",
+    "max_rss_kib": "4194304",
+    "nofile": "8192",
+    "nstat": "present",
+    "openload_sha256": "bc61a8e6df38e852eb2b8d8f4cb81d5e5bc668af87ab17c03a687a01ad0977ee",
+    "phase_seconds": "120",
+    "preflight": "pass",
+    "runner_sha256": "0ef0dd841f64715aa7a13eab68c3a8e8de483fba430fa604c9469852d47be2e8",
+    "sample_seconds": "1",
+    "schema_sha256": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+    "schema_version": "soak/1",
+    "server_cpus": "0,1,4,5",
+    "server_sha256": "ad0366622d7f07bbe6c0b014f3466e8b7693af57b603cd78039378057167fc9e",
+    "started_utc": "2026-08-05T07:43:04Z",
+    "tiny_rate": "702",
+    "wait_40ms_rate": "1"
+  },
+  "nstat": "present",
+  "pins": {
+    "criteria": {
+      "run": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8",
+      "tree": "e324025c201e307e9ea1cca6aef5c1dfa21fc80ad696ae46b764f595c08ca9e8"
+    },
+    "schema": {
+      "run": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640",
+      "tree": "e611a96f1360f01e2e3d2a9f595c4ebbd62eb5e5484a08aa61137d3764bf5640"
+    }
+  },
+  "reasons": [],
+  "result": "PASS",
+  "rss_kib": {
+    "first": 4252,
+    "last": 8976,
+    "max": 18020,
+    "min": 4252,
+    "tail_slope_kib_per_hour": 96.55599624008983
+  },
+  "rss_slope_evaluated": false,
+  "rss_slope_note": "tail slope 96.6 KiB/h recorded but NOT judged: the run is 33 min and the criterion needs 2 h for its window to start after allocator warm-up",
+  "rss_slope_run_seconds": 1969,
+  "run_directory": "/home/ubuntu/ladder4/burnin-20260805T081555Z",
+  "sample_shortfall": 7,
+  "saturation": {
+    "refusals_counted_by_server": 0,
+    "refused_seen_by_generators": 0
+  },
+  "schema_version": "soak/1",
+  "schema_version_expected": "soak/1",
+  "short_workloads": {},
+  "skipped_workloads": {},
+  "stats_empty_bodies": 0,
+  "stats_failure_causes": {},
+  "stats_failures_uncaptured": 0,
+  "stats_missing_samples": 0,
+  "telemetry_samples": 1963,
+  "threads": {
+    "max": 6,
+    "min": 6
+  },
+  "workloads": {
+    "bytes-64k": {
+      "completed": 18000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1324,
+      "median_p99_us": 1309,
+      "planned": 18000,
+      "runs": 15,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 18000
+      },
+      "status_total": 18000,
+      "succeeded": 18000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "health": {
+      "completed": 36000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1176,
+      "median_p99_us": 1165,
+      "planned": 36000,
+      "runs": 15,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 36000
+      },
+      "status_total": 36000,
+      "succeeded": 36000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-decode": {
+      "completed": 504000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1286,
+      "median_p99_us": 1281,
+      "planned": 504000,
+      "runs": 15,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "204": 504000
+      },
+      "status_total": 504000,
+      "succeeded": 504000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "json-encode": {
+      "completed": 189000,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1369,
+      "median_p99_us": 1244,
+      "planned": 189000,
+      "runs": 15,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 189000
+      },
+      "status_total": 189000,
+      "succeeded": 189000,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "tiny": {
+      "completed": 1263600,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 1146,
+      "median_p99_us": 1145,
+      "planned": 1263600,
+      "runs": 15,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 1263600
+      },
+      "status_total": 1263600,
+      "succeeded": 1263600,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    },
+    "wait-40ms": {
+      "completed": 1800,
+      "failure_classes": {},
+      "failures": [],
+      "max_p99_us": 41267,
+      "median_p99_us": 41232,
+      "planned": 1800,
+      "runs": 15,
+      "saturation_refused": 0,
+      "spontaneous_errors": 0,
+      "status": {
+        "200": 1800
+      },
+      "status_total": 1800,
+      "succeeded": 1800,
+      "transport_error_ratio": 0.0,
+      "transport_errors": 0,
+      "unexpected_http_status": {}
+    }
+  }
+}

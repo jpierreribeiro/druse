@@ -1,0 +1,19 @@
+druse_snapshot 1
+pid 70497
+unix_ns 1785917753629465922
+draining 0
+refused_connections 0
+saturation_refusals 0
+responses_sent 2012825
+response_bytes 2599620730
+send_errors 43
+write_deadline_aborts 0
+handler_dwell_ns 156688963717
+stream_refused_full 0
+stream_refused_budget 0
+stream_aborted_slow 0
+active_connections 0
+handlers_active 0
+handler_capacity 4
+connection_capacity 4032
+end

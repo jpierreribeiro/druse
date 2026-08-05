@@ -1,0 +1,27 @@
+{
+  "run_directory": "/home/ubuntu/ladder4/rehearsal-20260805T102629Z",
+  "telemetry_samples": 7763,
+  "unreadable_samples": 0,
+  "declared_injections": 24,
+  "unknown_injection_kinds": [],
+  "saturation_refusals_total": 5,
+  "refusals_inside_injection_window": 5,
+  "refusals_attributable_to_load": 0,
+  "c22_descent_required": false,
+  "steps": [
+    {
+      "unix_s": 1785923493.183,
+      "delta": 3,
+      "running_total": 3,
+      "attributed_to": "injection",
+      "window": "cycle=45 kind=rst; cycle=45 kind=slow_readers"
+    },
+    {
+      "unix_s": 1785925432.607,
+      "delta": 2,
+      "running_total": 5,
+      "attributed_to": "injection",
+      "window": "cycle=60 kind=rst; cycle=60 kind=slow_readers"
+    }
+  ]
+}
