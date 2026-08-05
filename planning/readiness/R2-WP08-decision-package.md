@@ -84,11 +84,22 @@ depois de ver os finais, a decisão vira racionalização.
 
 **Ambos PASS, zero recusa de carga:**
 > A alegação de estabilidade vale **para este candidato, neste envelope**. Mas o
-> item 5 continua parcial — sem recovery, sem matriz fatorial e sem região segura
-> publicada, e a região segura é **critério de saída**. A leitura honesta é
-> **PROMOVER com o envelope declarado incompleto**, ou **SEGURAR** até
-> completá-lo. Eu recomendo a segunda: promover com um critério de saída em
-> aberto é o que o programa recusa em toda outra parte.
+> item 5 continua parcial: **sem recovery depois de sobrecarga**, sem matriz
+> fatorial, e com **15 das 18 células de latência do SLO ainda `open`**.
+>
+> *(Corrigido em 2026-08-05: esta leitura dizia "sem região segura publicada", e
+> ela foi publicada horas depois — `docs/safe-operating-region.md`. O resto da
+> objeção sobrevive intacto, e é por isso que a correção não muda a recomendação.
+> Deixo a nota porque um critério de leitura editado em silêncio depois de o
+> mundo mudar é o que o G3 existe para impedir.)*
+>
+> A leitura honesta é **PROMOVER com o envelope declarado incompleto**, ou
+> **SEGURAR** até completá-lo. Eu recomendo a segunda: promover com um critério
+> de saída parcialmente aberto é o que o programa recusa em toda outra parte.
+>
+> **E o item que mais pesa nessa recomendação é o recovery.** Uma região segura
+> que não sabe o que acontece quando a carga passa do topo e volta é uma região
+> segura sobre o caminho de ida.
 
 **Um PASS e um FAIL:**
 > **Vermelho.** §9 do pré-registro: não é melhor-de-dois. O próximo passo é
