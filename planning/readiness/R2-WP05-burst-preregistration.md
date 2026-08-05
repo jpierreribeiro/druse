@@ -207,6 +207,18 @@ Preenchido **depois** do run.
 
 | Campo | Valor |
 |---|---|
-| H1 | — não medida |
-| H2 | — não medida |
-| decisão | — |
+| H1 | **SUSTENTADA** — W1 satisfeito nas duas repetições (`0<3<15`, `1<3<9`); W2 não disparou |
+| H2 | **SUSTENTADA** — W3 satisfeito nas duas (`D=0 < B=3`) |
+| validade | W4, W5, W6 e o critério de disco da §6.1 todos satisfeitos |
+| decisão | pelo §6: **a alavanca é `max_handlers`** → proposta de configuração e candidato novo de R2-WP04 |
+| evidência | `evidence/2026-08-04-r2-wp05-burst/` |
+
+**A recusa é função da rajada de reconexão, não da taxa.** Com carga idêntica, um
+evento de conexão deu 0 e 1 recusa; sessenta deram 15 e 9. E dobrar as lanes
+zerou: 0 em 40 rajadas contra 7,7 previstas pelo comportamento de 2 lanes
+(P = 0,00047 se a taxa fosse a mesma).
+
+**Isto explica por que o R2-WP04 parou.** Ele desceu a taxa duas vezes e o piso
+não se moveu, porque a taxa nunca foi a variável — o `run-soak.sh` reabre ~624
+conexões por ciclo qualquer que seja a carga. Nenhuma taxa teria convergido, e o
+C22 parou a busca antes de gastar dois finais de 12 h nela.

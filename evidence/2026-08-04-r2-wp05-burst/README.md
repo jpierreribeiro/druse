@@ -1,96 +1,139 @@
-# R2-WP05, experimento 1 — **INTERROMPIDO**, cinco de oito braços
+# R2-WP05, experimento 1 — **COMPLETO**: a rajada é a variável, e lanes é a alavanca
 
-**2026-08-04.** Este pacote **não conclui o experimento** e **não sustenta
-nenhuma conclusão sobre H1 ou H2**. Ele existe para que o trabalho seja
-retomável e para que os números observados não virem lenda.
+**2026-08-04/05.** Oito braços, dois critérios de hipótese satisfeitos, e um
+critério de refutação que não disparou.
 
 O contrato é
-[`../../planning/readiness/R2-WP05-burst-preregistration.md`](../../planning/readiness/R2-WP05-burst-preregistration.md).
+[`../../planning/readiness/R2-WP05-burst-preregistration.md`](../../planning/readiness/R2-WP05-burst-preregistration.md),
+congelado **antes** da primeira medição e emendado duas vezes, sempre antes do
+run que a emenda governa.
+
+**Este pacote não promove nada.** O portão fica em R1.
 
 ---
 
-## 1. Por que está interrompido
+## 1. O resultado
 
-O host de campanha `44.212.50.252` ficou inacessível durante a segunda
-repetição — sem ICMP e sem TCP em porta nenhuma, com a instância marcada
-*Running* no console. Um reboot não restaurou; um stop/start moveu o IP para
-`3.208.73.168` e, até o fim desta sessão, também não respondeu.
+Oito braços, **mesma taxa agregada (960/s) e mesma duração (1200 s) em todos**.
+Só duas coisas variaram: a frequência de reconexão e o número de lanes.
 
-**É o segundo host perdido no mesmo dia, ambos sob carga desta campanha.** O
-primeiro (`184.72.201.140`) travou o `sshd` de outro jeito — aceitava TCP e nunca
-mandava banner. Sintomas diferentes enfraquecem uma causa única, mas o padrão
-está registrado como achado aberto em vez de acidente (§4).
+| braço | lanes | rajadas | rep 1 | rep 2 |
+|---|---:|---:|---:|---:|
+| **A** | 2 | 1 | 0 | 1 |
+| **B** | 2 | 20 | 3 | 3 |
+| **C** | 2 | 60 | **15** | **9** |
+| **D** | **4** | 20 | **0** | **0** |
 
-## 2. O que foi observado
+## 2. Os critérios, aplicados um a um
 
-**Estes números vêm do log do sweep lido por ssh. Os manifestos que os
-sustentam estão em `~/wp05-results/` no host e NÃO foram recuperados.** Sob as
-regras do programa, uma medição sem artefato não é evidência — então a tabela
-abaixo é um **registro de observação**, não um resultado.
+| # | Critério (congelado antes) | Resultado |
+|---|---|---|
+| **W1** | monotônico A<B<C **nas duas** repetições | `0<3<15` e `1<3<9` → **SATISFEITO**, H1 sustentada |
+| **W2** | **refuta** H1 se A e C ficarem a ±1 | diferenças de 15 e 8 → **não disparou** |
+| **W3** | `D < B` **nas duas** | `0<3` e `0<3` → **SATISFEITO**, H2 sustentada |
+| **W4** | inválido se algum braço falhar por instrumento | 8 de 8 com exit 0 e manifesto → sem invalidade |
+| **W5** | `injected.txt` presente e vazio | 8 de 8, 0 bytes → toda recusa é de carga **por construção** |
+| **W6** | porta livre e snapshot antes da carga | nenhum `FATAL`; o harness sai != 0 se falharem |
+| §6.1 | disco usado ≤ 2 GiB | **159 MiB** — a justificativa da emenda se confirma |
 
-| braço | lanes | rajadas | recusas de carga | status |
-|---|---:|---:|---:|---|
-| rep1-A | 2 | 1 | **0** | observado |
-| rep1-B | 2 | 20 | **4** | observado |
-| rep1-C | 2 | 60 | **13** | observado |
-| rep1-D | **4** | 20 | **0** | observado |
-| rep2-D | **4** | 20 | **0** | observado |
-| rep2-C | 2 | 60 | — | interrompido |
-| rep2-B | 2 | 20 | — | não rodou |
-| rep2-A | 2 | 1 | — | não rodou |
+**O W2 existia porque eu queria que H1 fosse verdadeira** — a hipótese é minha,
+do §4.6 do pré-registro do soak. Ele não disparou, e é isso que separa "medi" de
+"torci".
 
-Todos os braços rodaram **a mesma taxa agregada (960/s) e a mesma duração
-(1200 s)**. Só a estrutura de reconexão e o número de lanes mudaram.
+## 3. O que está estabelecido
 
-## 3. Por que isto NÃO declara H1 nem H2
+**A recusa de saturação é função do número de eventos de reconexão, não da taxa
+de requisições.** Com carga total idêntica, um único evento de conexão produziu
+0 e 1 recusa; sessenta produziram 15 e 9.
 
-Os critérios foram congelados antes da medição, e nenhum dos dois está
-satisfeito:
+**Dobrar `max_handlers` de 2 para 4 elimina as recusas** na mesma densidade de
+rajada.
 
-- **W1** exige crescimento monotônico de A para B para C **nas duas
-  repetições**. A segunda não tem A, B nem C completos.
-- **W3** exige `D < B` **nas duas repetições**. A segunda não tem B.
+| | |
+|---|---|
+| com 2 lanes | **31 recusas em 162 rajadas = 0,191 por rajada** |
+| com 4 lanes | **0 em 40 rajadas** |
+| previsto pelo modelo de 2 lanes | 7,7 |
+| P(observar 0 se a taxa fosse a mesma) | **0,00047** |
 
-**A primeira repetição é coerente** — uma taxa constante de ~0,21 recusa por
-rajada reproduz A, B e C, e D zerou com o dobro de lanes. Mas coerência em uma
-repetição é exatamente o que o desenho de duas repetições existe para não
-aceitar, e o W1 foi escrito **antes** de eu ver qualquer número, para este
-momento.
+## 4. E isto explica por que o R2-WP04 parou
 
-**Declarar aqui seria usar o critério enquanto ele é conveniente.** O mesmo
-critério me custou 2h40 no R2-WP04 hoje quando disparou contra mim; ele não vale
-menos agora que atrapalha.
+O WP04 desceu a taxa duas vezes — f = 0,15 → 0,10 → 0,06 — e o piso de recusa
+**não se moveu**: 1 recusa de carga em 20 ciclos nas duas taxas medidas. Ele
+parou porque o C22 não permitia uma terceira descida.
 
-## 4. O achado que a interrupção produziu, e que não estava previsto
+**Agora se sabe por que não se movia.** A taxa nunca foi a variável. O
+`run-soak.sh` reabre ~624 conexões a cada ciclo, sempre — então descer a taxa
+reduzia o tempo *dentro* do handler e deixava a rajada intacta. **Nenhuma taxa
+teria convergido**, que é literalmente o cenário para o qual o C22 foi escrito:
 
-**Dois hosts perdidos em um dia, ambos sob carga desta campanha.**
+> *"sem piso, a regra do §4.1 é uma busca por uma taxa em que nada acontece, e
+> uma taxa suficientemente baixa sempre existe."*
 
-O que distingue este experimento do soak do WP04 é a **densidade de
-reconexão**: ~624 conexões novas a cada 20 segundos no braço C, contra uma a
-cada 120 segundos no soak. É a variável que o experimento existe para explorar, e
-é plausível que também seja a que derruba o host.
+O C22 parou a busca antes que ela consumisse dois finais de 12 h. Ele custou 2h40
+quando disparou contra o meu próprio run; poupou muito mais.
 
-**Não tenho mecanismo, só correlação.** A conta de sockets em `TIME_WAIT` não
-fecha como explicação: ~1.900 simultâneos contra ~28 mil portas efêmeras. Então
-isto fica como pergunta, não como conclusão.
+## 5. O que isto **não** estabelece
 
-**O que isso muda no plano:** retomar o experimento sem diagnóstico arrisca
-derrubar um terceiro host e gastar mais três horas para chegar ao mesmo lugar. O
-próximo passo **não** é relançar os três braços — é olhar `dmesg`, contadores do
-kernel e `netstat -s` num host vivo, antes de qualquer carga.
+- **Não é medida de capacidade.** Nenhum número aqui é knee, teto ou envelope.
+- **Não diz que 4 lanes é a configuração certa.** Quatro lanes em dois núcleos
+  físicos é **sobreassinatura**, e o relatório de 2026-07-25 mediu que mais lanes
+  reduz recusa **e custa vazão e cauda**. Este experimento mediu um lado da
+  troca; o outro lado é o resto do R2-WP05.
+- **Não reabre os finais.** Mudar `max_handlers` é candidato novo sob G1: a
+  escada inteira reinicia.
+- **Não vale para outra topologia.** Duas lanes em dois núcleos físicos é este
+  host. O que generaliza é a *forma* — rajada, não taxa —, não os números.
 
-## 5. Como retomar
+## 6. Replicação, e o que ela custou
 
-1. **host vivo, e diagnóstico ANTES de qualquer braço** (§4);
-2. **conferir se `~/wp05-results/` sobreviveu** — se sim, os cinco braços viram
-   evidência de verdade e faltam três; se não, o experimento reinicia;
-3. **conferir CPU e kernel** — um stop/start pode cair em hardware diferente, e
-   sob G1 isso é ambiente novo: os braços antigos não se juntam aos novos sem
-   emenda;
-4. `preflight.sh` + `smoke.sh` no host novo — a qualificação era da máquina
-   antiga;
-5. rodar `rep2-C`, `rep2-B`, `rep2-A` com `ops/wp05/burst-sweep.sh`, que já está
-   commitado e endurecido.
+Uma primeira tentativa rodou cinco de oito braços em `44.212.50.252` antes de o
+host ficar inacessível. Aqueles braços **não entram neste resultado** (G1: outro
+ambiente, e os artefatos ficaram na máquina perdida).
 
-**O instrumento e o pré-registro estão prontos e commitados.** O que falta é
-máquina e três braços.
+Mas foram observados, e a forma bate:
+
+| braço | rajadas | host perdido | host de registro |
+|---|---:|---:|---:|
+| A | 1 | 0 | 0 / 1 |
+| B | 20 | 4 | 3 / 3 |
+| C | 60 | 13 | 15 / 9 |
+| D (4 lanes) | 20 | 0 | 0 / 0 |
+
+**Duas máquinas físicas diferentes, a mesma forma.** Isso não soma sob G1 — e é
+exatamente o tipo de coisa que dá confiança num achado.
+
+## 7. Os hosts que caíram, que continua sem explicação
+
+Duas máquinas ficaram inacessíveis em 2026-08-04, ambas sob esta carga. O
+diagnóstico de linha de base no host de registro **eliminou três suspeitos**:
+
+| | medido | leitura |
+|---|---|---|
+| `nf_conntrack_max` | 1.048.576 (uso 34) | margem de um milhão — não é o gargalo |
+| `tcp_max_tw_buckets` | 65.536 | o pico desta carga é ~1.900 |
+| portas efêmeras | 28.231 | idem |
+
+**A terceira máquina completou os oito braços** com 60 s de folga entre eles. Não
+credito isso à folga — é n=1, e a folga foi a única variável que mudei de graça.
+Fica aberto.
+
+## 8. Entrada para o resto do R2-WP05
+
+1. **A troca completa de `max_handlers`**: vazão e cauda contra recusa, medidas
+   juntas. Este experimento tem metade da conta.
+2. **`/health` fora das lanes de aplicação** — a saída que não custa vazão. A
+   ADR-050 já fez esse argumento para a métrica; agora há medição para o mesmo
+   argumento na sonda de liveness.
+3. **O tamanho da rajada como variável separada da frequência.** Aqui só a
+   frequência variou; `-connections` por carga ficou fixo.
+
+## 9. Conteúdo
+
+```
+arms/rep{1,2}-{A,B,C,D}.manifest   identidade e contagem de cada braço: lanes,
+                                    rajadas, taxa agregada, commit, sha256 dos
+                                    dois binários, recusas antes e depois
+arms/sweep.log                     a execução, com os instantes de cada braço
+preflight-wp05.txt                 a qualificação do host de registro
+```

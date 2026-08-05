@@ -1,0 +1,20 @@
+### disco livre no inicio: 19785 MiB
+### rep1-A lanes=2 period=0 19:35:04Z
+### rep1-A recusas=0 bursts=1
+### rep1-B lanes=2 period=60 19:56:26Z
+### rep1-B recusas=3 bursts=20
+### rep1-C lanes=2 period=20 20:18:01Z
+### rep1-C recusas=15 bursts=60
+### rep1-D lanes=4 period=60 20:40:16Z
+### rep1-D recusas=0 bursts=20
+### rep2-D lanes=4 period=60 21:01:50Z
+### rep2-D recusas=0 bursts=20
+### rep2-C lanes=2 period=20 21:23:26Z
+### rep2-C recusas=9 bursts=60
+### rep2-B lanes=2 period=60 21:45:41Z
+### rep2-B recusas=3 bursts=20
+### rep2-A lanes=2 period=0 22:07:15Z
+### rep2-A recusas=1 bursts=1
+### disco livre no fim: 19626 MiB  (usado: 159 MiB)
+### criterio da §6.1: invalido se passar de 2048 MiB
+SWEEP_DONE
