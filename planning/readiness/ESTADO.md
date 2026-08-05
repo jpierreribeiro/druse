@@ -50,8 +50,8 @@ O custo alto é deliberado. As seis regras globais estão no
 | WP01 | o instrumento consegue explicar uma falha | **fechado** |
 | WP02 | o host e o candidato estão congelados | **fechado** |
 | WP03 | o servidor é observável enquanto falha | **fechado** |
-| **WP04** | **o candidato aguenta 12 h sem degradar** | **PAROU em 2026-08-04** por regra C22 — achado de capacidade, ver §6.2 |
-| WP05 | qual é o teto de capacidade e como degrada | **é o próximo** — herda o achado do WP04 |
+| **WP04** | **o candidato aguenta 12 h sem degradar** | **Final 1 em curso** desde 2026-08-05 10:28Z; escada pré-final PASS inteira (§6.2) |
+| WP05 | qual é o teto de capacidade e como degrada | **três experimentos completos** — foi ele que destravou o WP04 |
 | WP06 | segurança e cadeia de suprimentos | **fechado em 2026-08-04** — os 2 itens decididos, ver §5 |
 | WP07 | composição sob tráfego real | degrau 1 entregue; degraus 2–6 = risco aceito |
 | WP08 | o freeze e a decisão PROMOVER / SEGURAR | depende de tudo acima |
@@ -188,7 +188,31 @@ completo é justamente o degrau que produziu as 7 recusas de carga que
 responderam a pergunta. Um atalho teria levado a doze horas desperdiçadas em vez
 de duas.
 
-### 6.2 A escada rodou inteira e o WP04 PAROU — com um achado, não com uma falha
+### 6.2 O WP04 parou, o WP05 explicou por quê, e a escada voltou a passar
+
+**Esta seção tem duas metades. A primeira é história; a segunda é o estado.**
+
+#### 2026-08-05 — a escada passa no default do produto
+
+| degrau | ciclos | analisador | recusas de carga |
+|---|---:|---|---:|
+| smoke | 5 | **PASS** | **0** |
+| burn-in | 15 | **PASS** | **0** |
+| rehearsal | 60 | **PASS** | **0** |
+
+**Final 1 em curso** desde 10:28Z; Final 2 só em outro dia (§9). O que mudou não
+foi o produto — **nenhuma linha de código** — e sim a campanha parar de sobrepor
+o default de `max_handlers`. O produto escolhe **4 lanes**
+(`clamp(núcleos, 4, 32)`); a campanha rodava com **2**.
+
+Isso está na oitava emenda (§4.8 do pré-registro) e a evidência em
+[`../../evidence/2026-08-05-r2-wp04-default-ladder/`](../../evidence/2026-08-05-r2-wp04-default-ladder/).
+
+**A taxa é 1.118/s e quem a escolheu foi o disco do host**, não o produto: a
+escada inteira precisa caber em 19 GiB. O R2-WP05 mediu **10.000 req/s** a
+99,99% nesta mesma máquina.
+
+#### 2026-08-04 — o que parou, e por quê (história)
 
 **2026-08-04.** O host novo (§3.7) qualificou e a escada rodou até o fim:
 
