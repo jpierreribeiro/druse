@@ -1004,14 +1004,51 @@ para a frente uma compensação cujo motivo deixou de existir.
 
 Agregado: **2.369/s** — a tabela do §4.1, restaurada.
 
-**Por que f = 0,15 e não mais alto**, ainda que o WP05 tenha medido 10.000/s
-limpos: **o disco**. Um final de 12 h a 2.369/s escreve ~11,4 GiB de CSV por
-requisição; a 10.000/s escreveria 48 GiB, e o host tem 20 livres. A taxa é
-limitada pelo artefato, não pelo servidor — e dizer isso é mais honesto que
-apresentar 2.369/s como se fosse um limite do produto.
+> #### Correção da própria emenda, antes do run: **a taxa é 1.118/s, e quem a
+> escolheu foi o disco**
+>
+> **O preflight recusou o host** com a tabela acima, e estava certo. Ao consertar
+> o piso de disco para ser derivado — ele era uma constante de 25 GiB ao lado de
+> uma estimativa que eu já tinha derivado ontem, defeito meu deixado pela metade
+> — a conta real apareceu:
+>
+> **A escada inteira são 96.000 s de run:** smoke (10 min) + burn-in (30 min) +
+> rehearsal (2 h) + dois finais de 12 h, todos preservados lado a lado, porque
+> run vermelho é evidência e não se apaga.
+>
+> | taxa | escada inteira, com margem 1,5× | cabe em 19 GiB? |
+> |---|---:|---|
+> | 2.369/s (f = 0,15) | **38,1 GiB** | não |
+> | 1.586/s (f = 0,10) | 25,5 GiB | não |
+> | **1.118/s** | **18,0 GiB** | **sim** |
+>
+> **A constante de 25 GiB estava errada nas duas direções:** a 960/s a escada
+> pede 15 e ela recusava hosts que cabiam; a 2.369/s pede 38 e ela teria admitido
+> um host que fica sem disco no meio do segundo final. Uma constante não
+> consegue ser conservadora para uma quantidade que anda 4×.
+>
+> **A taxa de registro passa a ser 1.118/s**, e a razão está dita: **é o disco do
+> host que a escolhe, não o produto nem a campanha**. O R2-WP05 mediu 10.000
+> req/s entregues a 99,99%; a 10.000/s a escada precisaria de 161 GiB. Apresentar
+> 1.118/s como um limite do Druse seria mentir por omissão.
+>
+> **O que destravaria f = 0,15:** um volume de 60 GB no host de campanha. É ação
+> do dono, custa centavos, e está nomeada aqui em vez de sofrida em silêncio.
+>
+> | Profile | Path | Taxa | Conexões |
+> |---|---|---:|---:|
+> | health | `/health` | **20/s — inalterada** | 16 |
+> | tiny | `/tiny` | **702/s** | 128 |
+> | json encode | `/json/medium` | **105/s** | 128 |
+> | json decode | `/json/medium/decode` | **280/s** | 256 |
+> | 64 KiB | `/bytes/64k` | **10/s** | 64 |
+> | blocking | `/wait/40ms` | **1/s** | 32 |
+>
+> Agregado: **1.118/s**.
 
-**Os dois finais rodam em sequência**, com o artefato do primeiro puxado e
-verificado antes do segundo, porque dois × 11,4 GiB não cabem juntos.
+**Os dois finais rodam em sequência**, e o artefato do primeiro é puxado e
+verificado antes do segundo — mas o piso derivado já **não** conta com isso: ele
+exige espaço para a escada inteira lado a lado, que é a suposição segura.
 
 #### O que esta emenda cria, e o que ela não desfaz
 

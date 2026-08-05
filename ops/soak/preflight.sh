@@ -81,12 +81,27 @@ DRUSE_RATE_TOTAL=$(( ${DRUSE_SOAK_HEALTH_RATE:-20} + ${DRUSE_SOAK_TINY_RATE:-100
   + ${DRUSE_SOAK_BYTES_64K_RATE:-150} + ${DRUSE_SOAK_WAIT_40MS_RATE:-15} ))
 DRUSE_CSV_ROW_BYTES="${DRUSE_SOAK_CSV_ROW_BYTES:-120}"
 DRUSE_EST_GIB=$(( DRUSE_RATE_TOTAL * 3600 * HOURS * DRUSE_CSV_ROW_BYTES * 3 / 2 / 1073741824 ))
-# An absolute floor, because the disk holds THE WHOLE LADDER and not one run:
-# smoke, burn-in, rehearsal and both finals are preserved side by side (red runs
-# are never deleted — they are evidence about the instrument), plus the pinned
-# toolchain and the proxy smoke's container images. At the f = 0.10 rates that
-# is ~17 GiB of artefact before anything else.
-DRUSE_LADDER_FLOOR_GIB="${DRUSE_SOAK_LADDER_FLOOR_GIB:-25}"
+# THE LADDER FLOOR, DERIVED — and the first edition of it was a pinned 25 GiB,
+# which is the same defect this block exists to fix, left half-done.
+#
+# The disk holds THE WHOLE LADDER and not one run: smoke (10 min), burn-in
+# (30 min), rehearsal (2 h) and both finals (12 h each) are preserved side by
+# side — red runs are never deleted, they are evidence about the instrument.
+# That is 96,000 s of running, and its size is a function of the offered rate
+# exactly like the single-run estimate above.
+#
+# The pinned 25 GiB was not merely imprecise, it was WRONG IN BOTH DIRECTIONS:
+# at 960 req/s the ladder needs 15 GiB and 25 refused hosts that fit; at
+# 2,369 req/s it needs 38 GiB and 25 would have admitted a host that runs out
+# of disk somewhere in the second final. A constant cannot be conservative for
+# a quantity that moves by 4x.
+DRUSE_LADDER_SECONDS="${DRUSE_SOAK_LADDER_SECONDS:-96000}"
+DRUSE_LADDER_FLOOR_GIB="${DRUSE_SOAK_LADDER_FLOOR_GIB:-$(( DRUSE_RATE_TOTAL * DRUSE_LADDER_SECONDS * DRUSE_CSV_ROW_BYTES * 3 / 2 / 1073741824 ))}"
+# A small absolute floor underneath, for the toolchain, the repository and the
+# proxy smoke's container images, which no rate makes smaller.
+if (( DRUSE_LADDER_FLOOR_GIB < 5 )); then
+  DRUSE_LADDER_FLOOR_GIB=5
+fi
 if (( DRUSE_EST_GIB < DRUSE_LADDER_FLOOR_GIB )); then
   DRUSE_EST_GIB="$DRUSE_LADDER_FLOOR_GIB"
 fi
