@@ -41,10 +41,10 @@ comparação com pares. **Três experimentos entregaram parte disso:**
 | latência sob carga | **medido**: p99 de 1,25 ms a 960/s até 1,79 ms a 10.000/s |
 | efeito de `max_handlers` | **medido**: 1, 2, 4 e 8 lanes em três pontos de stress |
 | recusa: mecanismo | **medido**: função da rajada de reconexão **e** da taxa |
-| **recovery depois de sobrecarga** | ❌ não medido |
+| **recovery depois de sobrecarga** | ❌ não medido — **a lacuna mais importante**, e a própria região segura a nomeia |
 | **matriz fatorial com `max_connections` e pool upstream** | ❌ não medido |
 | **comparação com pares** | ❌ não medida, e o §8 do pré-registro do soak proíbe fazê-la sem harness que prove trabalho equivalente |
-| **safe operating region publicada** | ❌ não escrita — é critério de saída do WP08 |
+| **safe operating region publicada** | ✅ **escrita** em 2026-08-05 — `docs/safe-operating-region.md` |
 
 **A decisão precisa saber disto:** o envelope está **incompleto**, e a §4 tem de
 dizer se decide assim mesmo (com a região segura derivada do que existe) ou se
@@ -107,15 +107,20 @@ depois de ver os finais, a decisão vira racionalização.
 | zero P0/P1 aberto sem aceite formal | ✅ — os abertos (`wp123`, `ingest-leak`, hosts caindo) são de instrumento e estão registrados |
 | **soak ≥12 h PASS pelos critérios pré-registrados** | ⏳ **os finais** |
 | toda falha classificada | ✅ nos degraus rodados; a confirmar nos finais |
-| **SLO e safe operating region publicados** | ❌ **não escrita** — ver §2 |
+| **SLO e safe operating region publicados** | ⚠️ **região segura escrita**; o SLO por perfil segue com 15 de 18 células `open` (§6.2 do pré-registro) |
 | observabilidade mantém diagnóstico sob saturação | ✅ — R2-WP03; o snapshot da ADR-050 funcionou em todos os runs |
 | proxy real, segurança e rebuild aprovados | ✅ — R2-WP06 e `evidence/2026-08-03-r2-proxy-framing/` |
 | canário e rollback concluídos | ✅ com risco aceito assinado nos degraus 2–6 |
 | **hash do artefato implantado = hash aprovado** | ✅ — provado na v0.11.0, com mutante |
 
-**Dois em aberto: o soak e a região segura.** O primeiro é tempo; o segundo é
-trabalho que ninguém fez ainda, e é ele que pode segurar a promoção mesmo com
-dois finais verdes.
+**A região segura foi escrita** (`docs/safe-operating-region.md`) e o critério
+deixou de estar totalmente em aberto. **O que sobra dele é o SLO por perfil**: 15
+das 18 células de latência continuam `open` no §6.2 do pré-registro do soak, e
+uma região segura não é um SLO — ela diz onde operar, não o que prometemos.
+
+**Então continuam dois em aberto: o soak (tempo) e o SLO por perfil (trabalho).**
+A §4.1 continua valendo: promover com um critério de saída parcialmente aberto é
+o que o programa recusa em toda outra parte.
 
 ## 6. O que este pacote deliberadamente não faz
 
