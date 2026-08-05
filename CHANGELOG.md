@@ -7,7 +7,11 @@ Versioning is **pre-1.0 semantic**: while the MAJOR is `0`, a breaking change
 moves the MINOR. The series is `v0.9.0-pilot` and `v0.9.1-pilot`, both
 controlled pilots, then `v0.10.0` — the first release not marked a pilot.
 
-## [Unreleased]
+## [0.11.0] — 2026-08-05
+
+**Correção de segurança com quebra de compatibilidade.** Leia *Breaking* antes
+de atualizar. Verificado por hash, **não assinado** —
+`docs/release-integrity-policy.md`.
 
 ### Breaking
 
