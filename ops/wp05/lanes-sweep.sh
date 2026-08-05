@@ -47,10 +47,27 @@ ODIN_BIN="${DRUSE_ODIN_BIN:-$HOME/odin-pinned/odin}"
 SERVER_CPUS="${DRUSE_SOAK_SERVER_CPUS:-0,1,4,5}"
 GENERATOR_CPUS="${DRUSE_SOAK_GENERATOR_CPUS:-2,3,6,7}"
 
-# The §4.7 rates. Kept identical across arms — the whole design rests on rate
-# being held constant while the burst structure moves.
-HEALTH_RATE=20 TINY_RATE=600 JSON_ENCODE_RATE=90
-JSON_DECODE_RATE=240 BYTES_64K_RATE=9 WAIT_40MS_RATE=1
+# The offered rates. Defaults are §4.7 (aggregate 960/s), which is what
+# experiment 2 held constant while lanes moved.
+#
+# THEY ARE OVERRIDABLE, AND THE FIRST EDITION WAS NOT — that cost a run. This
+# harness was derived from `burst-sweep.sh`, where hard-coding was CORRECT:
+# there the rate had to stay fixed while the burst structure moved, and a
+# variable rate would have been a bug. Experiment 3 inverts the design — the
+# rate IS the variable — and the constant came along for the ride.
+#
+# The symptom was quiet in exactly the way that matters: the ladder's second
+# point offered 449,100 requests and delivered 288,000, which is 960 x 300 to
+# the request. The number looked like a 64% goodput collapse and was really the
+# generator never leaving the first rate. A harness that reports someone else's
+# configuration as a measurement is the same class of defect as one that reads
+# someone else's server.
+HEALTH_RATE="${DRUSE_SOAK_HEALTH_RATE:-20}"
+TINY_RATE="${DRUSE_SOAK_TINY_RATE:-600}"
+JSON_ENCODE_RATE="${DRUSE_SOAK_JSON_ENCODE_RATE:-90}"
+JSON_DECODE_RATE="${DRUSE_SOAK_JSON_DECODE_RATE:-240}"
+BYTES_64K_RATE="${DRUSE_SOAK_BYTES_64K_RATE:-9}"
+WAIT_40MS_RATE="${DRUSE_SOAK_WAIT_40MS_RATE:-1}"
 
 # THE PORT MUST BE FREE BEFORE WE START, and this is not defensive politeness.
 # The first edition skipped it and paid: arm 1 died on an unrelated bug leaving
