@@ -140,5 +140,20 @@ Preenchido **depois** do run.
 
 | Campo | Valor |
 |---|---|
-| H3 | — não medida |
-| decisão | — |
+| H3 | **REFUTADA** — X3 disparou nas duas repetições: L8 ficou a 0,0003% de L2 em vazão e a 0,32% em p99 |
+| X1 | não satisfeito — vazão idêntica em L2, L4 e L8 |
+| X2 | não satisfeito — p99 subiu 0,32%, não os >20% exigidos |
+| validade | X4, X5 e X6 satisfeitos; menor braço a 99,9996% do planejado |
+| decisão | pelo §6: **mais lanes é ganho quase puro NESTE ponto de operação**, com a ressalva de que 960/s não é o knee — e essa ressalva é a parte operativa |
+| evidência | `evidence/2026-08-05-r2-wp05-lanes/` |
+
+**A refutação é da minha própria expectativa**, e ela vale registrar como tal: eu
+esperava reproduzir o relatório de 2026-07-25, que mediu mais lanes custando
+vazão e cauda. Não reproduzi — porque medi a **40% do teto livre de recusa**,
+onde todos os oito braços serviram 100% da carga oferecida. Quando nenhuma
+configuração satura, a diferença entre elas não aparece na vazão.
+
+**Achado lateral, e é grande:** uma lane dá p99 de **34 ms** contra 1,25 ms com
+duas — vinte e sete vezes pior, mesma vazão, zero recusas. É a limitação **L2** do
+perfil suportado medida em número, e é a razão de o X6 ter excluído L1 da
+monotonicidade.

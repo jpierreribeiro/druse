@@ -1,0 +1,19 @@
+### disco livre no inicio: 19597 MiB
+### rep1-L1 lanes=1 03:19:09Z
+saturation_refusals=0 completed_2xx=576000 non_2xx=0 transport_failures=0 latency_p50_us=709 latency_p99_us=34174 
+### rep1-L2 lanes=2 03:30:19Z
+saturation_refusals=2 completed_2xx=575998 non_2xx=0 transport_failures=2 latency_p50_us=673 latency_p99_us=1250 
+### rep1-L4 lanes=4 03:41:30Z
+saturation_refusals=0 completed_2xx=576000 non_2xx=0 transport_failures=0 latency_p50_us=674 latency_p99_us=1257 
+### rep1-L8 lanes=8 03:52:41Z
+saturation_refusals=0 completed_2xx=576000 non_2xx=0 transport_failures=0 latency_p50_us=674 latency_p99_us=1254 
+### rep2-L8 lanes=8 04:03:52Z
+saturation_refusals=0 completed_2xx=576000 non_2xx=0 transport_failures=0 latency_p50_us=673 latency_p99_us=1258 
+### rep2-L4 lanes=4 04:15:03Z
+saturation_refusals=0 completed_2xx=576000 non_2xx=0 transport_failures=0 latency_p50_us=674 latency_p99_us=1260 
+### rep2-L2 lanes=2 04:26:14Z
+saturation_refusals=1 completed_2xx=575999 non_2xx=0 transport_failures=1 latency_p50_us=674 latency_p99_us=1254 
+### rep2-L1 lanes=1 04:37:24Z
+saturation_refusals=0 completed_2xx=576000 non_2xx=0 transport_failures=0 latency_p50_us=709 latency_p99_us=33313 
+### disco livre no fim: 19532 MiB
+LANES_DONE
