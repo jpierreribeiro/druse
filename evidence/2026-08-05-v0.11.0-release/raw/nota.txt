@@ -1,0 +1,59 @@
+v0.11.0 — TRUST-001 corrigido, e as políticas que faltavam para adoção
+
+Verificado por hash. NÃO ASSINADO. O sha256 do artefato consta no registro de
+aprovação e foi conferido contra os bytes no alvo (docs/release-integrity-policy.md).
+
+  artefact_sha256 = d9d4bda67d0cba476e0db6a9b6efe87993a97359c771700ea292e32709276bf8
+  artefact_bytes  = 918672
+  odin            = dev-2026-07a / 819fdc7
+
+ANTES DE ADOTAR, leia isto: este framework foi construído inteiramente por IA.
+Não há código escrito por humanos e não houve revisão humana linha a linha. O que
+existe no lugar disso é verificável -- um gate de 249 controles que roda inteiro
+antes de todo push, controle positivo E mutante para cada controle de segurança,
+corpus de comportamento de wire, e um programa de prontidão que recusa "existe um
+teste" como estado de encerramento. O que isso NAO substitui é o julgamento de um
+mantenedor experiente sobre o que ninguém pensou em testar. O portão de prontidão
+está em R1 -- piloto interno não crítico -- e produção geral não está autorizada.
+
+QUEBRA DE COMPATIBILIDADE (correção de segurança)
+
+  trust_proxies deixou de casar prefixos sem âncora. Uma entrada terminada em '.'
+  ou ':' continua sendo prefixo; qualquer outra passa a casar o endereço INTEIRO.
+
+  O que estava errado: escrever "127.0.0.1" para nomear um proxy também confiava
+  em 127.0.0.10 até 127.0.0.199 -- cerca de cento e dez endereços que ninguém
+  nomeou -- e não havia como dizer "este endereço e só ele". O mesmo matcher
+  decide a caminhada do X-Forwarded-For, e lá o defeito movia um valor: um hop
+  parecido era pulado como confiável e a caminhada seguia um passo mais à
+  esquerda, na direção que o cliente controla.
+
+  Ação necessária: nenhuma, se suas entradas já terminavam em '.' ou ':'
+  ("10.", "192.168.", "fd00:") ou já eram endereços completos ("127.0.0.1",
+  "::1"). CONFIRA se alguma era endereço truncado como "127.0.0" -- essas
+  confiavam por acidente e agora não confiam em nada.
+
+  Sem janela de depreciação: uma janela sobre uma API insegura prolonga a
+  insegurança (docs/compatibility-policy.md §3).
+
+  Pinado por tests/trust001-anchoring: sete casos sobre socket real, com mutante.
+
+ADICIONADO
+
+  docs/release-policy.md, docs/compatibility-policy.md e
+  docs/release-integrity-policy.md -- as três políticas que faltavam para a
+  limitação L6 (pre-1.0 sem backports nem LTS), classificada como bloqueante
+  para adoção externa.
+
+  Suporte: só a linha corrente, SEM BACKPORT. É escolha declarada, não omissão:
+  backport exige duas árvores verdes contra um gate de 30 min com um responsável
+  só, e uma janela curta e verdadeira vale mais que uma longa e condicional.
+
+CONSUMO SUPORTADO
+
+  git submodule add https://github.com/jpierreribeiro/druse vendor/druse
+  git -C vendor/druse checkout v0.11.0
+  odin build . -collection:druse=vendor/druse
+
+  Linux x86-64 apenas. TLS/HTTP2/WebSocket por proxy revisado, não nativos.
+  docs/supported-profile.md define o envelope.

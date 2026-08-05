@@ -1,0 +1,14 @@
+approval_utc=2026-08-05T05:39:46Z
+artefact_path=/home/jp/.claude/jobs/92ffe4bc/tmp/release-0.11.0/druse-server
+artefact_sha256=d9d4bda67d0cba476e0db6a9b6efe87993a97359c771700ea292e32709276bf8
+artefact_bytes=918672
+commit=3c370b20c8bdb05f61ac2840981140e826484f7c
+tree=384d6a4ddc7501a1f47fa908342b01ed3668c11e
+working_tree_dirty_files=0
+odin=/home/jp/.local/opt/Odin/odin version dev-2026-07-nightly:819fdc7
+odin_sha256=6fea037515fee6c4e681a67fe86818998241f15abbadd8df67899d9f0ff32b12
+pin_release=dev-2026-07a
+pin_commit=819fdc7
+claim=the bytes named by artefact_sha256 were approved; a deployment satisfies R2-WP08 when the deployed file hashes to this value
+not_claimed=that rebuilding commit= from source reproduces artefact_sha256; measured false, see evidence/2026-08-03-r2-wp06-assurance/raw/rebuild-two-clean-clones.txt
+approval=pass
