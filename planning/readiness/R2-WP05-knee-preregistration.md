@@ -68,6 +68,34 @@ envelope, não desta pergunta.
 em 20/s pela mesma razão dos experimentos anteriores — é sonda, não carga, e
 reduzi-la tiraria amostras do que mais interessa observar sob saturação.
 
+> ### Primeira emenda — 2026-08-05, depois da Fase 1 e antes da Fase 2
+>
+> **O K-B disparou: não há knee na faixa medida.** Os seis pontos entregaram
+> ≥ 99,99% da carga oferecida, inclusive 4.997 req/s. A Fase 2, como escrita,
+> pede "o ponto abaixo do knee, o knee, e o acima" — e esses pontos não existem.
+>
+> **Estender a escada primeiro**, dois pontos (7.000 e 10.000 req/s), porque um
+> knee logo acima da faixa muda quais pontos a Fase 2 deve usar, e 10 min de
+> host é barato contra escolher errado.
+>
+> **Se o knee ainda não aparecer**, a Fase 2 roda nos **três pontos mais altos
+> medidos**, e a razão é o que a Fase 1 encontrou: as recusas sobem com a taxa
+> mesmo com o goodput intacto — 0, 1, 0, 2, 6 e **69**. O sistema está
+> estressado a 5.000/s ainda que entregue tudo, e é lá que a troca de lanes
+> apareceria se existisse. Medir onde nada acontece foi exatamente o defeito do
+> experimento 2.
+>
+> **Nada dos critérios muda.** X7 e X8 continuam como escritos, aplicados aos
+> três pontos que a Fase 2 usar.
+>
+> **E um achado que a Fase 1 produziu sem ter sido desenhada para ele:** o
+> experimento 1 variou a rajada com a taxa parada e mediu recusas ∝ rajadas;
+> esta fase variou a taxa com a rajada parada e mede recusas subindo com a taxa.
+> **Não se contradizem — refinam.** A recusa acontece quando uma conexão nova
+> chega com todas as lanes ocupadas: mais rajada é mais chegadas, mais taxa é
+> lanes mais ocupadas. As duas variáveis entram, e cada experimento mediu uma
+> com a outra parada.
+
 ### Fase 2 — a troca, nos três pontos que importam
 
 Escolhidos **a partir do resultado da Fase 1**, não antes: o ponto imediatamente
