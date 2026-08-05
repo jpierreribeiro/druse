@@ -1,0 +1,13 @@
+### K1 lanes=2 agregado=960 05:19:46Z
+### K1 ofertado=288000 entregue=288000 (100.00%) p99=1272 recusas=0
+### K2 lanes=2 agregado=1497 05:25:36Z
+### K2 ofertado=449100 entregue=449100 (100.00%) p99=1252 recusas=1
+### K3 lanes=2 agregado=1996 05:31:26Z
+### K3 ofertado=598800 entregue=598800 (100.00%) p99=1263 recusas=0
+### K4 lanes=2 agregado=2498 05:37:17Z
+### K4 ofertado=749400 entregue=749399 (100.00%) p99=1271 recusas=2
+### K5 lanes=2 agregado=3498 05:43:08Z
+### K5 ofertado=1049400 entregue=1049395 (100.00%) p99=1268 recusas=6
+### K6 lanes=2 agregado=4997 05:49:01Z
+### K6 ofertado=1499100 entregue=1499039 (100.00%) p99=1398 recusas=69
+KNEE1_DONE
