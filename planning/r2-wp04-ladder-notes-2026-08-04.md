@@ -311,3 +311,79 @@ que a falha estaria no estado por servidor, não no runner.
 3. **E uma lição de processo que é minha:** rodei trabalho pesado em paralelo com
    o gate **duas vezes hoje**, depois de as notas de 2026-08-03 já dizerem para
    não fazer isso. As duas vezes produziram um vermelho que não reproduziu.
+
+## 9. `wp123` e `ingest-leak`, investigados por leitura — três achados, nenhum resolvido
+
+**2026-08-05.** Investigação feita **sem tocar `web/` nem `ingest/`**: mexer ali
+cria candidato novo sob G1 e jogaria fora os finais de 24 h que estão rodando.
+Ler o caminho de código não custa nada e rendeu mais que as medições.
+
+### 9.1 O 507 tem duas causas e o adapter não as distingue
+
+`web/internal/transport/odin_http_adapter.odin:644` responde **507** para
+**qualquer** retorno não-`Ready` de `ingest.begin`. E `begin` tem dois caminhos
+de falha com naturezas opostas:
+
+| retorno | quando | o que significa |
+|---|---|---|
+| `.Refused_Admission` | `!a.initialized` | **configuração** — upload nunca foi habilitado |
+| `.Disk_Full` | `os.open` do spool falhou | **ambiente** — o filesystem recusou |
+
+**Os dois viram 507.** Um operador vendo 507 não sabe se falta configuração ou se
+o disco recusou, e **eu passei duas rodadas de investigação perseguindo a causa
+errada por causa disso.** É defeito de observabilidade, e da mesma família do
+F-005 que esta campanha já corrigiu: dois estados diferentes com uma resposta só.
+
+### 9.2 A mensagem de falha do `wp123` descreve um defeito que o código não tem mais
+
+O teste falha dizendo:
+
+> *"B's drain closed A's upload admission, which A never asked for"*
+
+**Isso não pode acontecer no código atual**, e dá para mostrar por leitura:
+
+- `admission` é **por runtime** (`runtime.admission`), e o WP123 foi exatamente o
+  trabalho que separou isso — `odin_http_adapter.odin:253`;
+- `admission_drain` marca `draining = true` e **nunca** mexe em `initialized`;
+- `initialized` é escrito **uma vez**, no init. Nenhuma linha o zera;
+- e um `draining` marcado é recusado em **`admit`**, que responde **503**, não
+  507.
+
+**Então o 507 do `wp123` não é a admissão de A fechada — é `os.open` falhando.**
+A mensagem é uma interpretação escrita quando o defeito histórico era o slot
+compartilhado, e ela sobreviveu à correção.
+
+**Uma mensagem de falha que nomeia a causa errada é pior que uma genérica**,
+porque manda o investigador para o lugar errado com confiança. Foi o que fez
+comigo.
+
+### 9.3 O que sobrou, e é uma pergunta melhor
+
+A falha do `ingest-leak` (`server did not start`) e a do `wp123` (507) apontam
+agora para o **mesmo lugar**: uma operação de filesystem em
+`/tmp/druse-wp123-uploads` e `~/.cache/uru-ingest-f2` que falha transitoriamente
+sob contenção local.
+
+E as medições já eliminaram o que não é:
+
+| hipótese | estado |
+|---|---|
+| inicialização lenta | **refutada** — 48 medições, pior caso 174 ms contra janela de 600 ms |
+| lentidão por `enable_upload` | **refutada** — com upload é *mais* rápido |
+| colisão de nome de spool | **refutada por leitura** — o M8 pôs o pid no `spool_name`, e `O_TRUNC` não falharia de qualquer forma |
+| slot vazado por `os.open` | **já corrigido** — o F2 chama `release_slot` no caminho de falha |
+
+### 9.4 Os três reparos, nomeados e NÃO feitos
+
+**Nenhum é seguro antes do R2-WP08** — os três tocam produto ou o hash da árvore,
+e sob G1 isso é candidato novo.
+
+1. **Separar os dois 507.** `.Refused_Admission` de `begin` é configuração e
+   merece 503 ou uma mensagem própria; `.Disk_Full` é ambiente. Um status que
+   cobre os dois não diagnostica nenhum.
+2. **Corrigir a mensagem do `wp123`**, que nomeia um defeito corrigido.
+3. **Isolar o spool por run** em vez do caminho fixo — e este é o único que toca
+   só `tests/`.
+
+**O que eu NÃO faria:** alargar janela ou serializar suíte. Os dois consertos
+óbvios escondem a pergunta, e recusá-los é o que produziu a refutação útil da §8.
