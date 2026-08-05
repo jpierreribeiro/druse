@@ -1203,7 +1203,7 @@ PREREG="$SOAK/campaigns/2026-08-02-r2-soak-candidate-1.md"
 test -f "$PREREG" ||
   fail "the R2-WP02 pre-registration is missing. No soak result is admissible for promotion without it committed ahead of the run's started_utc."
 
-for DRUSE_CRIT in C18 C19 C20 C21 C22 C23; do
+for DRUSE_CRIT in C18 C19 C20 C21 C22 C23 C24; do
   grep -q "| $DRUSE_CRIT |" "$PREREG" ||
     fail "criterion $DRUSE_CRIT is gone from the R2-WP02 pre-registration. Criteria are frozen before the run (G3); removing one afterwards invalidates the run it was frozen for."
 done

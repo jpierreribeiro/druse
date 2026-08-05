@@ -127,7 +127,7 @@ third amendment's values. The rest of the table is unchanged and still binding.
 | **isolation** | **`preflight.sh` must report `physical_core_disjoint=yes`** |
 | server CPU set | `0,1,4,5` — physical cores `{0,1}` |
 | generator CPU set | `2,3,6,7` — physical cores `{2,3}` |
-| lanes (`DRUSE_SOAK_LANES`) | **2** (was 4; see §3.4) |
+| lanes (`DRUSE_SOAK_LANES`) | ⟶ **0 — o default do produto** (§4.8). Era 2, e o R2-WP05 mediu que 2 estava abaixo do piso do próprio default e produzia as recusas que pararam o WP04 |
 | **`memlock` (`RLIMIT_MEMLOCK`)** | **unlimited — see §3.5. The stock 8 MiB is a known startup crash (F-C03-2), not a tuning preference.** |
 | governor / turbo | recorded, not constrained |
 | NUMA nodes | recorded; a multi-node host needs this file amended before running |
@@ -942,6 +942,92 @@ G1: taxa nova é candidato novo, então smoke → burn-in → rehearsal outra ve
 > para**, e o resultado é um achado de capacidade sobre `max_handlers = lanes`
 > entregue ao R2-WP05 — não uma quarta descida.
 
+### 4.8 Oitava emenda — as lanes voltam ao default do produto, e a taxa sobe com elas
+
+**Antes de qualquer degrau do candidato novo**, que é onde emenda de campanha se
+escreve.
+
+#### O que o R2-WP05 mediu, e por que ele reprova esta campanha
+
+Três experimentos, dezessete braços, dois critérios de refutação disparando
+(`evidence/2026-08-05-r2-wp05-knee/`):
+
+| | |
+|---|---|
+| não há knee até **10.000 req/s** — oito pontos, todos ≥ 99,99% | H4 refutada |
+| sobreassinar lanes **não custa** nos três pontos de stress | H5 refutada |
+| e **melhora**: 8 lanes dão p99 menor (−5,7%, −6,0%, −16,7%) e **zero** recusa | não estava previsto |
+
+**E o achado que reprova a §3.4 desta campanha:** o default do produto é
+`max_handlers = 0` → `CPU count clamped to 4..32`, ou seja **nunca abaixo de 4
+lanes**. Esta campanha fixou **2**, com o raciocínio da §3.4:
+
+> *"Two physical cores cannot host four Handler lanes plus a load generator
+> without reintroducing the competition this amendment exists to remove."*
+
+**Esse raciocínio está medido como errado.** Nos mesmos dois núcleos físicos, 4 e
+8 lanes entregam cauda menor e zero recusa. **Uma lane bloqueada não consome
+CPU** — ela segura um slot de concorrência, e a competição temida custa menos que
+o bloqueio de cabeça de fila que a escolha criou.
+
+**Consequência direta: o R2-WP04 parou por recusas que o default do produto não
+teria produzido.** Ele mediu uma configuração que nenhuma implantação usaria.
+
+#### A mudança
+
+**`DRUSE_SOAK_LANES = 0`.** A campanha deixa de escolher e passa a medir o que o
+produto escolhe.
+
+Não é "subir para 8": é **parar de sobrepor o default**. O valor resolvido fica
+gravado no artefato — o snapshot da ADR-050 carrega `handler_capacity`, que é o
+número que o adapter escolheu — então o run registra a decisão do produto em vez
+de a minha.
+
+**A affinity não muda.** Servidor `0,1,4,5`, gerador `2,3,6,7`. O isolamento por
+núcleo físico da §3.2 continua certo e continua valendo; era a contagem de lanes
+que não estava.
+
+#### E a taxa volta para f = 0,15
+
+As duas descidas — §4.5 (f = 0,10) e §4.7 (f = 0,06) — responderam a recusas
+**causadas pela configuração que esta emenda corrige**. Mantê-las seria carregar
+para a frente uma compensação cujo motivo deixou de existir.
+
+| Profile | Path | Taxa | Conexões | Status esperado |
+|---|---|---:|---:|---|
+| health | `/health` | **20/s — inalterada** | 16 | 200 |
+| tiny | `/tiny` | **1.500/s** | 128 | 200 |
+| json encode | `/json/medium` | **225/s** | 128 | 200 |
+| json decode | `/json/medium/decode` | **600/s** | 256 | 204 |
+| 64 KiB | `/bytes/64k` | **22/s** | 64 | 200 |
+| blocking | `/wait/40ms` | **2/s** | 32 | 200 |
+
+Agregado: **2.369/s** — a tabela do §4.1, restaurada.
+
+**Por que f = 0,15 e não mais alto**, ainda que o WP05 tenha medido 10.000/s
+limpos: **o disco**. Um final de 12 h a 2.369/s escreve ~11,4 GiB de CSV por
+requisição; a 10.000/s escreveria 48 GiB, e o host tem 20 livres. A taxa é
+limitada pelo artefato, não pelo servidor — e dizer isso é mais honesto que
+apresentar 2.369/s como se fosse um limite do produto.
+
+**Os dois finais rodam em sequência**, com o artefato do primeiro puxado e
+verificado antes do segundo, porque dois × 11,4 GiB não cabem juntos.
+
+#### O que esta emenda cria, e o que ela não desfaz
+
+**Candidato novo sob G1** — lanes e taxa são configuração load-bearing. A escada
+reinicia no smoke: smoke, burn-in, rehearsal, e só então os finais.
+
+**O C22 e o C23 continuam valendo como escritos.** Se a recusa de carga
+reaparecer no default, a regra desce a taxa como sempre — e aí o **B3** (tirar a
+sonda de liveness das lanes de aplicação) volta a ser o caminho, com evidência
+melhor que a de hoje. Está escrito antes do run de propósito.
+
+**O que esta emenda NÃO desfaz:** nada do R2-WP04 vira inválido. Ele mediu o que
+mediu, na configuração que tinha, e o veredito dele continua correto para aquela
+configuração. O que mudou é que agora se sabe que aquela configuração não era a
+do produto.
+
 ## 6. Criteria and SLO
 
 The eighteen criteria in `ops/soak/CRITERIA.md` apply as written and are pinned
@@ -954,6 +1040,7 @@ before the run.
 | C19 | the host was qualified by core, not by number | the attached preflight report carries `physical_core_disjoint=yes` | the property §3.2 exists to guarantee, asserted in the artefact rather than assumed |
 | C20 | the smoke was green on this host, unqualified-override absent | `smoke=pass` and no `smoke_on_unqualified_host` line | a green smoke taken with the override is a fact about the script |
 | C21 | the run's rates equal the current amendment | the six `*_rate` fields in `manifest.txt` match the registered table in force when the run started (§4.5 today, §4.1 before it) | defined in full in §4.1; a run that adjusted its rate at the prompt disagrees with its own plan and nothing notices |
+| C24 | the campaign does not override the product default for `max_handlers` | `manifest.txt` records `lanes=0` and the snapshot's `handler_capacity` records what the adapter resolved | defined in full in §4.8; a campaign that picks a value the product would never pick measures a configuration nobody runs |
 | C22 | the descent has a floor | any pre-final step counting server refusals **attributable to offered load** at f = 0.10 drops the rate to f = 0.06 once; a load refusal in the f = 0.06 rehearsal stops R2-WP04 for attribution | defined in §4.5, amended in §4.6 — the rate-derivation ladder never measured an injected-fault cycle, so counting injected refusals against its thresholds compares different things |
 | C23 | a refusal total is attributed, not just counted | a step reporting `saturation_refusals > 0` states how many fall inside a declared injection window and how many do not | defined in full in §4.6; the split is what separates the two readings of C22, and a total without it leaves the next person with one number and two stories |
 
