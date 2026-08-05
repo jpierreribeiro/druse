@@ -1,0 +1,19 @@
+### P5k-L2 lanes=2 agregado=4997 06:10:32Z
+### P5k-L2 entregue=1498902 (99.99%) p99=1396 p50=643 recusas=214
+### P5k-L4 lanes=4 agregado=4997 06:16:26Z
+### P5k-L4 entregue=1499099 (100.00%) p99=1319 p50=640 recusas=1
+### P5k-L8 lanes=8 agregado=4997 06:22:20Z
+### P5k-L8 entregue=1499100 (100.00%) p99=1317 p50=640 recusas=0
+### P7k-L2 lanes=2 agregado=6997 06:28:14Z
+### P7k-L2 entregue=2099052 (100.00%) p99=1449 p50=619 recusas=87
+### P7k-L4 lanes=4 agregado=6997 06:34:11Z
+### P7k-L4 entregue=2099095 (100.00%) p99=1403 p50=628 recusas=5
+### P7k-L8 lanes=8 agregado=6997 06:40:07Z
+### P7k-L8 entregue=2099100 (100.00%) p99=1362 p50=630 recusas=0
+### P10k-L2 lanes=2 agregado=9997 06:46:03Z
+### P10k-L2 entregue=2999018 (100.00%) p99=1740 p50=578 recusas=153
+### P10k-L4 lanes=4 agregado=9997 06:52:03Z
+### P10k-L4 entregue=2999086 (100.00%) p99=1610 p50=564 recusas=21
+### P10k-L8 lanes=8 agregado=9997 06:58:02Z
+### P10k-L8 entregue=2999100 (100.00%) p99=1449 p50=582 recusas=0
+FASE2_DONE

@@ -168,7 +168,25 @@ Preenchido **depois** do run.
 
 | Campo | Valor |
 |---|---|
-| knee | — não medido |
-| H4 | — |
-| H5 | — |
-| decisão | — |
+| knee | **não existe até 10.000 req/s** — oito pontos, todos ≥ 99,99% |
+| H4 | **REFUTADA** (K-B) |
+| H5 | **REFUTADA** (X8 disparou nos três pontos) — e o efeito tem sinal contrário: sobreassinar **melhora** |
+| validade | X9 e X10 satisfeitos; 17 braços, todos com manifesto e `injected.txt` vazio |
+| decisão | ver abaixo — ela mudou de forma |
+| evidência | `evidence/2026-08-05-r2-wp05-knee/` |
+
+**O §6 previa que H5 refutada faria o B2 virar "paliativo legítimo". A medição
+entrega mais que isso.** Nos três pontos de stress, 8 lanes deram cauda **menor**
+(−5,7%, −6,0%, −16,7%) e **zero** recusa, com goodput idêntico. Sobreassinar não
+é um preço a pagar por menos recusa — é melhor nas duas dimensões.
+
+**E o achado que nenhuma hipótese previa:** o default do produto é
+`CPU count clamped to 4..32`, ou seja **nunca abaixo de 4 lanes**. A campanha do
+R2-WP04 fixou **2**, com o raciocínio escrito na §3.4 do pré-registro do soak —
+*"dois núcleos físicos não hospedam quatro lanes mais um gerador"*. **Esse
+raciocínio está medido como errado**, e o R2-WP04 parou por recusas que, no
+default do produto, não teriam acontecido.
+
+O mecanismo é o mesmo dos três experimentos: **uma lane bloqueada não consome
+CPU** — ela segura um slot de concorrência. Dimensionar lanes por núcleo trata
+lane como worker ligado a CPU, e ela não é.
