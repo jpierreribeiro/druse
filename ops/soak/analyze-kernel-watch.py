@@ -53,7 +53,16 @@ def ler(caminho):
     return linhas
 
 
-def serie(linhas, coluna):
+# Fração inicial descartada antes de medir inclinação. NÃO é conveniência: um
+# servidor aquecendo aloca arenas, preenche caches e estabiliza, e uma reta
+# ajustada sobre rampa+platô tem inclinação positiva sem haver vazamento nenhum.
+# O analisador do soak sempre usou `tail_slope_kib_per_hour` por esta razão; eu
+# não usei, e em 2026-08-06 acusei o RSS do Druse a 667,9 KiB/h quando o último
+# quarto da mesma série media -69,9. Ver o mutante 4 do self-test.
+FRACAO_DE_CAUDA = 0.5
+
+
+def serie(linhas, coluna, cauda=0.0):
     """Devolve (tempos, valores) descartando NA. NA é ausência, não zero."""
     t, v = [], []
     for linha in linhas:
@@ -65,6 +74,9 @@ def serie(linhas, coluna):
             t.append(float(linha["unix_s"]))
         except (ValueError, KeyError):
             continue
+    if cauda > 0:
+        corte = int(len(v) * cauda)
+        t, v = t[corte:], v[corte:]
     return t, v
 
 
@@ -95,8 +107,8 @@ def analisar(linhas_d, linhas_c, minutos_ate_morte):
     achados, tabela = [], []
 
     for coluna in colunas:
-        td, vd = serie(linhas_d, coluna)
-        tc, vc = serie(linhas_c, coluna)
+        td, vd = serie(linhas_d, coluna, FRACAO_DE_CAUDA)
+        tc, vc = serie(linhas_c, coluna, FRACAO_DE_CAUDA)
         if len(vd) < 3:
             tabela.append({"coluna": coluna, "estado": "amostras insuficientes no braço druse"})
             continue
@@ -107,6 +119,7 @@ def analisar(linhas_d, linhas_c, minutos_ate_morte):
 
         linha = {
             "coluna": coluna,
+            "fracao_de_cauda": FRACAO_DE_CAUDA,
             "druse_min": min(vd), "druse_max": max(vd),
             "druse_inclinacao_por_hora": sd,
             "druse_fracao_nao_decrescente": md,
@@ -197,6 +210,18 @@ def self_test():
             return 1
         print("  PASS: não acusou")
 
+        print("== mutante 4: rampa que ESTABILIZA não pode acusar ==")
+        # O caso real que me enganou: sobe rápido no aquecimento, depois estabiliza.
+        rampa = [base + (limite - base) * min(1.0, i / 120.0) * 0.02 for i in range(720)]
+        rampado = os.path.join(d, "rampa.csv")
+        escrever(rampado, rampa)
+        achados, _ = analisar(ler(rampado), ler(plano), 60)
+        if achados:
+            print(f"  FALHOU: acusou {[a['coluna'] for a in achados]} numa rampa que estabiliza",
+                  file=sys.stderr)
+            return 1
+        print("  PASS: não acusou — a cauda é plana, e é a cauda que conta")
+
         print("== mutante 3: se o CONTROLE também sobe, NÃO é achado do candidato ==")
         achados, _ = analisar(ler(subindo), ler(subindo), 60)
         if achados:
@@ -232,7 +257,14 @@ def main():
         "amostras_druse": len(ld),
         "amostras_control": len(lc),
         "minutos_ate_morte_usados": a.minutes_to_death,
-        "condicao_2_do_paragrafo_4": "satisfeita" if achados else "NAO satisfeita",
+        # Um achado INDETERMINADO não satisfaz nada. A versão anterior deste
+        # arquivo imprimia "satisfeita" sempre que a lista não estava vazia, o
+        # que transformava "não consegui ler o limite" em "o critério foi
+        # atendido" — o exagero exato que o §4 existe para impedir.
+        "condicao_2_do_paragrafo_4": (
+            "satisfeita" if any(a.get("dentro_da_ordem_de_grandeza") is True for a in achados)
+            else "INDETERMINADA" if achados
+            else "NAO satisfeita"),
         "achados": achados,
         "tabela": tabela,
         "aviso": ("A condição 1 do §4 — o host do Druse morre e o do controle sobrevive, "

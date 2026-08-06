@@ -194,6 +194,61 @@ deve olhar `SUnreclaim`, `Slab` e `file_nr` com o mesmo cuidado — e o critéri
 teria morrido na hora zero do host, depois de subir a máquina e antes de oferecer
 carga. Corrigido.
 
+## 5.2 O A/B de 2 h na máquina do autor — 2026-08-06, 14:31Z
+
+**Não é o experimento do §6.** É a **condição 2** do §4 — o contador de kernel —
+que não precisa de host morrendo, só de duração. Os dois braços rodaram **em
+paralelo**, 2 h, 56 ciclos cada, em conjuntos de núcleos separados. Paralelo de
+propósito: os dois atravessam as mesmas condições de sistema na mesma janela.
+
+**Veredito pela regra congelada: INDETERMINADA.** Nem satisfeita nem refutada.
+
+| coluna | Druse | controle | leitura |
+|---|---|---|---|
+| `proc_iouring_fds` | **5, constante** | **0** | o discriminador funciona; não cresce |
+| `proc_vmpin_kib` | **0** | 0 | o mecanismo que propus na §3 **não existe** |
+| `proc_threads` | **6, fixo** | 5–10 | sem crescimento |
+| `proc_fds` | 14–236, inclinação negativa | 6–284, negativa | limitado nos dois |
+| `proc_vmrss_kib` | **ver abaixo** | cai | **a única que sobrou** |
+
+### O RSS, e por que ele não decide nada aos 2 h
+
+| janela | Druse | controle |
+|---|---:|---:|
+| série inteira | +667,9 KiB/h | −449,7 |
+| última metade | **+81,7** | −54,7 |
+| último quarto | **−69,9** | −6,3 |
+| último oitavo | **−391,2** | +63,9 |
+
+**Ele sobe, estabiliza e cai.** É rampa de aquecimento, não vazamento — e o
+Final 1 mediu **0,99 KiB/h** de cauda em 12 h no host de campanha, que é o mesmo
+servidor sem vazar.
+
+**Aos 2 h a série ainda não assentou**, então a cauda de 50% ainda contém rampa.
+**Não vou baixar a fração de cauda até parar de acusar:** isso é ajustar o
+instrumento ao dado, que é o que este programa recusa em toda parte. O resultado
+correto é *inconclusivo por janela curta*, e isso é um fato sobre o experimento,
+não sobre o produto.
+
+**Exigência que isto impõe ao §6:** os braços precisam correr **tempo suficiente
+para a cauda ser pós-rampa** — pelas curvas acima, ≥ 4 h, e de preferência as
+12 h dos finais. Um par de 2 h responde "o host morreu?" mas **não** responde
+"algum contador vaza?".
+
+### Duas armadilhas que este ensaio revelou
+
+1. **Contadores de sistema numa máquina compartilhada não valem nada.**
+   `Slab`, `Unevictable` e `MemFree` tiveram inclinações enormes **nos dois
+   braços** — é o desktop do autor vivendo a vida dele, não os servidores. No
+   host de campanha, dedicado, elas voltam a significar algo. **Quem analisar o
+   §6 deve conferir que a máquina estava dedicada antes de ler qualquer coluna
+   de sistema.**
+2. **Meu analisador exagerava.** Ele imprimia `condição 2: satisfeita` sempre que
+   a lista de achados não estava vazia — inclusive quando o único achado estava
+   marcado `INDETERMINADO` por não ter limite legível. "Não consegui ler o
+   limite" virava "o critério foi atendido". Corrigido: agora só diz *satisfeita*
+   se algum achado tem projeção dentro da ordem de grandeza.
+
 ## 6. A ordem de execução
 
 0. **Conferir o tipo do volume** (§4.2) — dois minutos, sem host de pé. **Mas
