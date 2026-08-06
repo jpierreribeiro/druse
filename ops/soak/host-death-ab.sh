@@ -62,7 +62,11 @@ fi
 # --- construir o braço --------------------------------------------------------
 if [[ "$ARM" == druse ]]; then
   command -v "${DRUSE_ODIN_BIN:-odin}" >/dev/null 2>&1 || die "odin não encontrado"
-  ( cd "$REPO" && "${DRUSE_ODIN_BIN:-odin}" build ops/soak/soak-server -out:"$OUT/bin-server" -o:speed ) \
+  # -collection:druse é obrigatório: o soak-server faz `import web "druse:web"`.
+  # Sem ele o build morre com "Unknown library collection", e sem esta linha o
+  # roteiro morreria na hora zero do host. Achado ensaiando o braço localmente.
+  ( cd "$REPO" && "${DRUSE_ODIN_BIN:-odin}" build ops/soak/soak-server \
+      -collection:druse="$REPO" -o:speed -out:"$OUT/bin-server" ) \
     || die "build do soak-server falhou"
   SERVER_CMD=("$OUT/bin-server" 0 "$PORT" "$OUT/control/snapshot.txt")
 else

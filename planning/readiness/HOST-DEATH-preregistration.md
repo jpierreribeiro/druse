@@ -158,6 +158,42 @@ Final 1, que ainda vale. O sidecar não toca o instrumento pinado.
   em vez de gravar zeros. É o defeito que me custou nove horas ontem à noite, e
   ele não vai entrar no instrumento novo.
 
+## 5.1 O ensaio local dos dois braços — 2026-08-06, 12:25Z
+
+Rodei os dois braços na minha máquina, 2 min cada, **antes** de gastar hora de
+host. Duas coisas saíram, e a segunda mexe com H-B.
+
+**A coluna discrimina, que era o que precisava ser provado:**
+
+| | `proc_iouring_fds` | `proc_vmpin_kib` | threads | fds |
+|---|---:|---:|---:|---:|
+| control (epoll) | **0** constante | 0 | 5–10 | 6–368 |
+| druse (io_uring) | **5** constante | 0 | 6 fixo | 14–69 |
+
+**E o mecanismo que eu tinha proposto para H-B mede zero.** A §3 diz que memória
+fixada por anéis de io_uring aparece em `VmPin`. **`VmPin` é 0 no Druse**, e o
+número de anéis é **5, constante**, não crescente.
+
+**O que isso autoriza:** a versão específica de H-B que eu escrevi — *"o Druse
+esgota memória fixada por anéis"* — **não tem suporte neste ensaio**. Se o Druse
+fixasse memória por anel, `VmPin` seria diferente de zero desde o primeiro
+minuto, e não é.
+
+**O que não autoriza:** dizer que H-B caiu. Dois minutos não veem acúmulo de
+1h15, e H-B fala de *um recurso de kernel*, não necessariamente memória fixada.
+Slab, descritores, estruturas de conexão do kernel e buffers de socket continuam
+abertos, e o vigia colhe todos.
+
+**Consequência para o experimento:** o vigia continua necessário, mas a coluna
+que eu apostava (`VmPin`) provavelmente não é onde a resposta está. Quem analisar
+deve olhar `SUnreclaim`, `Slab` e `file_nr` com o mesmo cuidado — e o critério da
+§4 já exige **monotônico rumo a um limite**, não "alto".
+
+**Um defeito do roteiro achado pelo ensaio:** o build do braço Druse falhava com
+`Unknown library collection: 'druse'` — faltava `-collection:druse=$REPO`. Ele
+teria morrido na hora zero do host, depois de subir a máquina e antes de oferecer
+carga. Corrigido.
+
 ## 6. A ordem de execução
 
 0. **Conferir o tipo do volume** (§4.2) — dois minutos, sem host de pé. **Mas
