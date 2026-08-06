@@ -74,9 +74,13 @@ echo "== 5. Odin fixado =="
 if [[ -x "$HOME/odin-pinned/odin" ]]; then
   ok "odin já instalado: $("$HOME/odin-pinned/odin" version 2>&1 | head -1)"
 elif [[ -x "$REPO/ops/ci/install-odin.sh" ]]; then
-  bash "$REPO/ops/ci/install-odin.sh" "$HOME/odin-pinned" >/dev/null 2>&1 \
+  # O destino vem por AMBIENTE, não por argumento posicional. Passar posicional
+  # seria silenciosamente ignorado e instalaria em /opt/druse — o preparo diria
+  # "ok" e o odin estaria noutro lugar. Conferido em 2026-08-06.
+  DRUSE_ODIN_PREFIX="$HOME/odin-pinned" bash "$REPO/ops/ci/install-odin.sh" >/dev/null 2>&1 \
+    && [[ -x "$HOME/odin-pinned/odin" ]] \
     && ok "odin instalado: $("$HOME/odin-pinned/odin" version 2>&1 | head -1)" \
-    || falha "install-odin.sh falhou"
+    || falha "install-odin.sh falhou ou não deixou binário em ~/odin-pinned"
 else
   falha "sem odin e sem $REPO/ops/ci/install-odin.sh — clone o repositório primeiro"
 fi
