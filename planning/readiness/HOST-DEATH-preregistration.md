@@ -56,8 +56,38 @@ sem tempo de recarregar, e morreu em **1h15**. Também explica por que nenhum ho
 morreu ocioso — ociosidade não escreve.
 
 **O que a enfraquece:** se o volume for `gp3`, não há crédito de rajada
-(3.000 IOPS fixos) e a explicação cai. **Isto é a primeira coisa a verificar, e
-não dá para verificar de dentro da instância.**
+(3.000 IOPS fixos) e a explicação cai.
+
+### 2.2 H-D REBAIXADA às 12:40Z — pela aritmética, antes de custar tempo de ninguém
+
+Escrevi a §2.1 com "4,4 GB e ~50 mil arquivos" como se fosse muita escrita. **Fiz
+a conta e não é.** Do Final 1, que são números medidos e não estimados:
+
+| | |
+|---|---|
+| duração | 43.228 s |
+| arquivos criados | 49.621 → **1,15 por segundo** |
+| dados escritos | 4,4 GiB → **107 KiB/s** |
+| vazão usada | **0,08%** do teto de 128 MiB/s de um `gp2` |
+| IOPS estimado (dados a 16 KiB + ~5 de metadado por criação) | **~12** |
+| linha de base de um `gp2` de 24 GiB | **100 IOPS** |
+| **fração da linha de base** | **~12%** |
+
+**Doze por cento da linha de base não drena crédito de rajada — crédito só drena
+acima de 100%.** E rajadas momentâneas no fim de cada ciclo são exatamente o que
+o crédito existe para absorver, com uma média de 12 IOPS para recarregar.
+
+**H-D é implausível quantitativamente.** Continua valendo conferir o tipo do
+volume porque custa dois minutos e zero risco, mas **não é a explicação
+principal** e o dono não deve gastar tempo atrás dela achando que é.
+
+**O que isto não refuta:** um estol de EBS por causa *externa* (degradação do
+lado da AWS) continua consistente com o silêncio do console e com o
+`io_timeout` infinito. O que a aritmética derruba é a versão "a campanha
+esgotou o próprio volume", que era minha.
+
+**Consequência prática:** o experimento A/B da §6 volta a ser o caminho decisivo,
+e não há atalho barato antes dele.
 
 ## 3. Por que o RSS não teria visto H-B
 
@@ -130,9 +160,10 @@ Final 1, que ainda vale. O sidecar não toca o instrumento pinado.
 
 ## 6. A ordem de execução
 
-0. **VERIFICAR O TIPO DO VOLUME E O `BurstBalance`** (§2.1/§4.2). É a checagem
-   mais barata que existe, não precisa de host de pé, e pode encerrar a
-   investigação inteira. **Vem antes de tudo.**
+0. **Conferir o tipo do volume** (§4.2) — dois minutos, sem host de pé. **Mas
+   veja a §2.2 antes:** a aritmética rebaixou H-D, e esta checagem deixou de ser
+   a que pode encerrar a investigação. Faça porque é grátis, não porque é
+   promissora.
 1. ~~Console da AWS do terceiro host~~ — **feito em 2026-08-06**: o log não
    contém a morte. Ausência de dado, e a §4.1 já dizia que isso não é evidência
    a favor de nenhuma hipótese. O que ele deu foram as três linhas da §2.1.
