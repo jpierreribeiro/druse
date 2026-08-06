@@ -387,3 +387,73 @@ e sob G1 isso é candidato novo.
 
 **O que eu NÃO faria:** alargar janela ou serializar suíte. Os dois consertos
 óbvios escondem a pergunta, e recusá-los é o que produziu a refutação útil da §8.
+
+## 10. O Final 1 fechou, e o caminho até o Final 2 (2026-08-06)
+
+**Final 1: `result=PASS`, `reasons=[]`, `refusals_attributable_to_load=0`.** 334
+ciclos, 12h04, p99 mediano 1.165 µs, RSS 0,99 KiB/h **avaliada**, zero erro de
+transporte no `/health`, 4 falhas de workload todas classificadas.
+
+### 10.1 As 147 recusas que eu tinha chamado de "material"
+
+Às 20:08Z sinalizei `saturation_refusals=147` contra as 5 do rehearsal e escrevi
+que 0,55/ciclo contra 0,083/ciclo era uma diferença **material**. Estava errado.
+
+As injeções não são por ciclo — são por campanha: **66 `rst` + 66
+`slow_readers`, 8.448 faltas injetadas**. A atribuição do C23 pôs as 147 dentro
+das janelas, e **zero** sobrou para a carga.
+
+O que salvou a leitura não foi eu ter sido cuidadoso na aritmética: foi eu ter
+**recusado medir na hora**. Ler 34 mil arquivos de telemetria consome os mesmos
+núcleos que a campanha, e uma recusa induzida pela minha própria medição seria
+atribuída à carga. **Eu teria fabricado a falha que estava procurando.**
+
+### 10.2 Três instrumentos meus reportaram desastre para um run saudável
+
+No mesmo dia, três comandos meus mentiram — todos **devolvendo um número
+plausível** em vez de gritar:
+
+| comando | disse | era |
+|---|---|---|
+| `ls .../stats-*.json \| wc -l` | `0` amostras | 34.526 — estourou o `ARG_MAX` |
+| `pgrep -f "[s]oak-server"` | servidor morto | vivo há 9h37; o binário é `bin/server` |
+| verificação do `MANIFEST.sha256` | `conferem=0` | 15 conferem; o manifesto usa caminho **absoluto** |
+
+**Zero é a resposta mais perigosa que um instrumento pode dar aqui**, porque é
+exatamente o que a falha real produziria. Os três estão corrigidos, e o primeiro
+estava **dentro do handoff** como a forma recomendada de conferir o progresso.
+
+### 10.3 O smoke recusa o host se você não passar as taxas da campanha
+
+`smoke.sh` roda o `preflight.sh` por dentro. Sem os `DRUSE_SOAK_*_RATE`
+exportados, o preflight assume os **defaults** (15.685/s), estima disco para
+essa taxa e recusa. A mensagem fala de qualificação e **não** menciona ambiente
+— eu li "host não qualificado" para um host que tinha passado no preflight
+trinta segundos antes.
+
+**Exporte o ambiente da campanha inteiro antes de chamar o smoke.**
+
+### 10.4 A poda, e uma estimativa 3,9x conservadora
+
+O preflight recusou o Final 2 com 13 GiB livres contra 17 estimados — para um
+run que tinha acabado de consumir **4,4 GiB**. A estimativa usa
+`DRUSE_CSV_ROW_BYTES ≈ 252`; a linha real mede **~65 bytes**.
+
+Podei `cycles/*.csv` do Final 1 e do rehearsal (4,25 GiB de raw por requisição,
+atestado pelo `MANIFEST.sha256`), guardando antes os **resumos por ciclo** — 2
+MiB que iriam junto por descuido e que são o que permitiria comparar os dois
+finais ciclo a ciclo se eles discordarem.
+
+**Não corrigi o `row_bytes`.** Mexer no qualificador porque ele me barrou, logo
+depois de ver que ele me barrou, é a manobra que o G3 existe para impedir. Fica
+como achado para depois do WP04.
+
+### 10.5 Por que o Final 2 só às 10:28Z
+
+A §9 pede "on different days". O Final 1 terminou 22:29Z; começar às 01:30Z
+satisfaria "outro dia" pelo calendário UTC e seria **a mesma noite** — e a §9 usa
+essa palavra exata ao recusar "a que falhou teve uma noite ruim". Alvo escolhido:
+**10:28Z, 24 h depois do início do Final 1**, sem ambiguidade.
+
+O custo é 9 h de relógio. O benefício é um artefato que ninguém pode contestar
+no único critério que os dois finais existem para satisfazer.
