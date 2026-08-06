@@ -448,12 +448,57 @@ finais ciclo a ciclo se eles discordarem.
 depois de ver que ele me barrou, é a manobra que o G3 existe para impedir. Fica
 como achado para depois do WP04.
 
-### 10.5 Por que o Final 2 só às 10:28Z
+### 10.5 O horário do Final 2, e por que eu tinha escolhido o pior possível
 
-A §9 pede "on different days". O Final 1 terminou 22:29Z; começar às 01:30Z
-satisfaria "outro dia" pelo calendário UTC e seria **a mesma noite** — e a §9 usa
-essa palavra exata ao recusar "a que falhou teve uma noite ruim". Alvo escolhido:
-**10:28Z, 24 h depois do início do Final 1**, sem ambiguidade.
+**Primeira decisão (errada):** agendei o Final 2 para **10:28Z**, 24 h depois do
+início do Final 1, argumentando que 01:30Z satisfaria "outro dia" pelo calendário
+UTC mas seria "a mesma noite". Custava 9 h de relógio e comprava, escrevi eu, "um
+artefato incontestável".
 
-O custo é 9 h de relógio. O benefício é um artefato que ninguém pode contestar
-no único critério que os dois finais existem para satisfazer.
+**O dono perguntou se a regra faz algum sentido, e a pergunta derrubou a minha
+escolha — não a regra.**
+
+O Final 1 rodou **10:28→22:29Z**. Começar o Final 2 às 10:28Z cobre
+**exatamente as mesmas horas do dia**. Se o que a repetição tenta amostrar é
+efeito correlacionado com o relógio — cron, rotação de log, janela de backup,
+vizinho no EC2 — eu tinha escolhido a única hora que amostra **zero informação
+nova**. Otimizei a aparência do critério contra a finalidade dele, e paguei 9 h
+por isso.
+
+**Segunda decisão:** começar imediatamente. `2026-08-06T01:51:38Z` é outro dia
+UTC *e* uma janela diurna disjunta da do Final 1 (madrugada/manhã contra
+tarde/noite). Custa zero e amostra mais.
+
+**Nenhum critério mudou** — "on different days" continua como escrito, e a
+mudança é na direção conservadora: amostra mais variação, não menos. Uma
+mudança de agenda que torna o teste mais difícil de passar não pode ser acusada
+de fabricar aprovação.
+
+### 10.6 A crítica à própria regra, que vale para o R3
+
+A pergunta do dono merece a resposta completa, e ela não é "a regra é boa":
+
+- **n = 2 não dá poder estatístico.** Duas corridas quase não distinguem
+  "estável" de "teve sorte duas vezes". A escada já rodou 5 + 15 + 60 + 334
+  ciclos deste candidato; mais 334 é ~2x de exposição, não um salto qualitativo.
+- **O que a regra compra de verdade** é amostrar uma variável de estorvo: o
+  ambiente ao longo do tempo. E aqui isso **não é hipotético** — dois hosts
+  morreram em 2026-08-04 sob carga, com mecanismo desconhecido.
+- **Mas o desenho tem um furo grande:** o Final 2 roda **no mesmo host**. Ele
+  amostra variação de *tempo*; as duas mortes foram de *máquina*.
+
+**O desenho melhor, para o R3: dois hosts diferentes, simultâneos.** Amostra a
+variável que de fato nos mordeu e custa 12 h em vez de 24.
+
+**Não troco agora:** mudar o critério depois de ver o Final 1 passar é o que o G3
+proíbe, e qualificar um segundo host custa mais do que economiza. Fica como
+entrada para o plano do R3, onde o plano de repetição ainda pode ser escrito
+direito desde o começo.
+
+### 10.7 "The same candidate" não era um dado
+
+Ver `evidence/2026-08-05-r2-wp04-default-ladder/CANDIDATE-IDENTITY.md`. Resumo: o
+`server_sha256` difere nos quatro degraus da mesma `git_tree`; `.text` difere,
+então não era carimbo de build; os quatro têm 918.656 bytes exatos; e o
+inventário de 559 símbolos, removido o contador interno do compilador, tem o
+**mesmo sha256** nos quatro. Mesma árvore, mesmo programa, hash irreprodutível.
