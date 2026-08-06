@@ -86,6 +86,16 @@ Este é o ponto cego que o instrumento novo (§5) fecha.
 **H-C é declarada** se o braço de controle — mesmo gerador, mesmo taskset, outro
 servidor — matar o host com a mesma frequência.
 
+### 4.1 O que NÃO conta como evidência
+
+- **Um único par.** Um host morto em cada braço não distingue nada com n = 1.
+- **Ausência de log.** Um host que some sem deixar `dmesg` não é evidência a
+  favor de H-B; é ausência de dado. As duas primeiras mortes já foram assim.
+- **Correlação com uso alto de qualquer contador.** Alto não é o critério;
+  **monotônico rumo a um limite** é.
+- **"O Final 1 sobreviveu 12 h"** não refuta H-B: acúmulo entre runs e condições
+  que o Final 1 não teve continuam abertos.
+
 ### 4.2 O critério de H-D, congelado antes de olhar as métricas
 
 **H-D é declarada se as duas valerem:**
@@ -103,16 +113,6 @@ host. Se H-D se confirmar, o A/B ainda vale, mas deixa de ser urgente.
 
 **Se nenhuma das quatro se sustentar:** o resultado é *indeterminado*, e isso é um
 resultado. Fica registrado como limitação, não como "provavelmente ambiente".
-
-### 4.1 O que NÃO conta como evidência
-
-- **Um único par.** Um host morto em cada braço não distingue nada com n = 1.
-- **Ausência de log.** Um host que some sem deixar `dmesg` não é evidência a
-  favor de H-B; é ausência de dado. As duas primeiras mortes já foram assim.
-- **Correlação com uso alto de qualquer contador.** Alto não é o critério;
-  **monotônico rumo a um limite** é.
-- **"O Final 1 sobreviveu 12 h"** não refuta H-B: acúmulo entre runs e condições
-  que o Final 1 não teve continuam abertos.
 
 ## 5. O instrumento que falta, e o mutante dele
 
