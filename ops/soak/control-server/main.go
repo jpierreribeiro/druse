@@ -41,6 +41,7 @@ var (
 	doc      MediumDocument
 	docBytes []byte
 	blob64k  []byte
+	blob1m   []byte
 )
 
 func main() {
@@ -75,6 +76,14 @@ func main() {
 	blob64k = make([]byte, 64*1024)
 	for i := range blob64k {
 		blob64k[i] = byte('a' + i%23)
+	}
+	// /bytes/1m existe porque a injecao slow_readers do run-soak.sh bate nela:
+	// 24 conexoes que pedem 1 MiB e leem devagar. Sem esta rota o braco de
+	// controle receberia 404 onde o Druse entrega um corpo grande, e a carga
+	// deixaria de ser equivalente exatamente na injecao que mais estressa.
+	blob1m = make([]byte, 1024*1024)
+	for i := range blob1m {
+		blob1m[i] = byte('a' + i%23)
 	}
 
 	mux := http.NewServeMux()
@@ -111,6 +120,11 @@ func main() {
 	mux.HandleFunc("/bytes/64k", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Write(blob64k)
+	})
+
+	mux.HandleFunc("/bytes/1m", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Write(blob1m)
 	})
 
 	mux.HandleFunc("/wait/40ms", func(w http.ResponseWriter, r *http.Request) {

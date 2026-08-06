@@ -1,6 +1,6 @@
 # Onde estamos — mapa do programa de prontidão
 
-**Última atualização: 2026-08-05** — a ambição foi ratificada (**ADR-052**):
+**Última atualização: 2026-08-06** — a ambição foi ratificada (**ADR-052**):
 o Druse é **para outras pessoas usarem** (A2). O caminho decorrente está em
 [`DECISOES-2026-08-05.md`](DECISOES-2026-08-05.md).
 
@@ -50,7 +50,7 @@ O custo alto é deliberado. As seis regras globais estão no
 | WP01 | o instrumento consegue explicar uma falha | **fechado** |
 | WP02 | o host e o candidato estão congelados | **fechado** |
 | WP03 | o servidor é observável enquanto falha | **fechado** |
-| **WP04** | **o candidato aguenta 12 h sem degradar** | **Final 1 em curso** desde 2026-08-05 10:28Z; escada pré-final PASS inteira (§6.2) |
+| **WP04** | **o candidato aguenta 12 h sem degradar** | **Final 1 PASS** (334 ciclos, 0 recusa de carga); **Final 2 PERDIDO — o host morreu 1h15 dentro**. Ver §6.3 |
 | WP05 | qual é o teto de capacidade e como degrada | **três experimentos completos** — foi ele que destravou o WP04 |
 | WP06 | segurança e cadeia de suprimentos | **fechado em 2026-08-04** — os 2 itens decididos, ver §5 |
 | WP07 | composição sob tráfego real | degrau 1 entregue; degraus 2–6 = risco aceito |
@@ -61,6 +61,38 @@ foi respondido.** Ele parou em 2026-08-04 com um achado (§6.2): descer a taxa
 não faz a recusa chegar a zero, então não existe corrida de 12 h a rodar neste
 candidato. **O gargalo passou a ser uma decisão de produto sobre
 `max_handlers = lanes`**, e essa é sua (§6).
+
+## 3.1 O bloqueio de hoje: três hosts mortos sob carga
+
+**2026-08-06.** O terceiro host de campanha morreu **1h15 dentro do Final 2**,
+às ~03:06Z, com 4.490 das 43.235 amostras. SSH, ICMP e 8080 sem resposta.
+
+**Três hosts, todos sob carga, nenhum ocioso.** O primeiro tinha auto-upgrade
+ligado — causa eliminada por construção nos outros dois.
+
+**Isto deixou de ser achado de instrumento.** Enquanto era "perdemos corridas", o
+custo era tempo. A hipótese que agora precisa de teste é que **o candidato
+derruba o host** — e se for isso, é **P0 de produção**, porque um framework que
+mata a máquina depois de horas de carga não é promovível sob leitura nenhuma.
+
+O contrato está em
+[`HOST-DEATH-preregistration.md`](HOST-DEATH-preregistration.md), com quatro
+hipóteses e os critérios congelados antes do dado. **A H-D (estol de
+armazenamento) já foi rebaixada pela aritmética**: a campanha usa ~12% da linha
+de base de IOPS do volume, e 12% não drena crédito de rajada.
+
+**O caminho decisivo é o A/B** — Druse × não-Druse sob carga idêntica — e os três
+instrumentos dele estão prontos e qualificados:
+
+| instrumento | o que faz | estado |
+|---|---|---|
+| `ops/soak/kernel-watch.sh` | vigia memória de **kernel**, que o RSS não vê | qualificado: `mlock` de 4 MiB moveu `Mlocked` em exatos 4.096 KiB; PID falso → recusa |
+| `ops/soak/watch-remote.sh` | observa **de fora**, com três estados | qualificado contra o host morto de verdade |
+| `ops/soak/host-death-ab.sh` + `control-server` | o par, com a **única** variável sendo o servidor | ensaiado ponta a ponta: 84.240 planejadas = completadas, 0 erro |
+
+**O R2 não anda até isso fechar.** Não é burocracia: se a causa é o framework,
+promover seria promover um defeito de produção; se é ambiente, precisamos saber
+para não perder o quarto host.
 
 ## 4. O que 2026-08-03 produziu — e o que não produziu
 
