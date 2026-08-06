@@ -474,6 +474,27 @@ mudança é na direção conservadora: amostra mais variação, não menos. Uma
 mudança de agenda que torna o teste mais difícil de passar não pode ser acusada
 de fabricar aprovação.
 
+**Mas há uma ressalva que corta contra mim, e ela vale mais no relógio do HOST
+que no nosso.** Em `us-east-1`:
+
+| | janela local do host |
+|---|---|
+| Final 1 | **06:28 → 18:29 EDT** — dia útil inteiro |
+| Final 2 | **21:51 → 09:52 EDT** — noite virando manhã |
+
+As janelas são de fato disjuntas, o que era o objetivo. **Só que elas não são
+igualmente exigentes.** Uma janela noturna numa região da AWS é plausivelmente a
+mais *branda* das duas: menos contenção de vizinho, menos atividade agregada.
+
+**Consequência para a leitura do par:** se o Final 2 passar, parte disso pode ser
+a janela mais mansa, e o par **não** deve ser lido como "duas condições de igual
+severidade". Se o Final 2 **falhar** numa janela mais branda que a do Final 1,
+o achado é mais forte, não mais fraco.
+
+Isto não muda o que foi rodado — está aqui porque uma dissimetria conhecida entre
+as duas amostras é exatamente o tipo de coisa que fica invisível se ninguém a
+escrever antes do resultado.
+
 ### 10.6 A crítica à própria regra, que vale para o R3
 
 A pergunta do dono merece a resposta completa, e ela não é "a regra é boa":
