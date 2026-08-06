@@ -118,7 +118,7 @@ depois de ver os finais, a decisão vira racionalização.
 | zero P0/P1 aberto sem aceite formal | ✅ — os abertos (`wp123`, `ingest-leak`, hosts caindo) são de instrumento e estão registrados |
 | **soak ≥12 h PASS pelos critérios pré-registrados** | ⏳ **os finais** |
 | toda falha classificada | ✅ nos degraus rodados; a confirmar nos finais |
-| **SLO e safe operating region publicados** | ⚠️ **região segura escrita**; o SLO por perfil segue com 15 de 18 células `open` (§6.2 do pré-registro) |
+| **SLO e safe operating region publicados** | ⚠️ **região segura escrita**; o SLO por workload **não pode ser fechado pelo caminho prescrito** — ver `R2-SLO-derivation-preregistration.md` |
 | observabilidade mantém diagnóstico sob saturação | ✅ — R2-WP03; o snapshot da ADR-050 funcionou em todos os runs |
 | proxy real, segurança e rebuild aprovados | ✅ — R2-WP06 e `evidence/2026-08-03-r2-proxy-framing/` |
 | canário e rollback concluídos | ✅ com risco aceito assinado nos degraus 2–6 |
@@ -129,7 +129,33 @@ deixou de estar totalmente em aberto. **O que sobra dele é o SLO por perfil**: 
 das 18 células de latência continuam `open` no §6.2 do pré-registro do soak, e
 uma região segura não é um SLO — ela diz onde operar, não o que prometemos.
 
-**Então continuam dois em aberto: o soak (tempo) e o SLO por perfil (trabalho).**
+### 5.1 O SLO por workload: o prazo venceu e a fonte não serve
+
+Duas coisas apareceram em 2026-08-06 e mudam o que a §4 pode afirmar:
+
+1. **O prazo do §6.2 já foi perdido.** Ele exige o SLO commitado "before the
+   final run", e **os dois finais rodaram sem ele**. Um SLO escrito agora não
+   pode graduar nenhum dos dois sem ser "G3 read backwards" — o que o próprio
+   §6.2 proíbe.
+2. **A fonte prescrita não produz o dado.** O §6.2 manda derivar do knee do
+   WP05, mas o harness do knee agrega os seis workloads numa distribuição só
+   (`glob(raw/*.csv)`), descartando a dimensão que o SLO precisa. E o agregado
+   mistura um workload com piso de 40 ms por projeto: o `p999=40.249 µs` do K1 é
+   o `/wait/40ms`, não degradação.
+
+**O que existe agora:** a regra de derivação está **congelada em commit próprio,
+antes de qualquer número por workload existir** —
+`R2-SLO-derivation-preregistration.md`. É a única proteção do G3 que sobrou, e
+ela é auditável: um revisor aplica a regra aos números e tem de chegar às mesmas
+células.
+
+**A saída recomendada:** rodar a medição por workload (§2 daquele documento)
+antes de decidir. ~30 min por ponto, não toca o produto, não cria candidato novo
+sob o G1. **Não é saída** preencher as células com os agregados: seria publicar
+como SLO um número que soma um `sleep` de 40 ms a um `/tiny`.
+
+**Então continuam dois em aberto: o soak (tempo) e o SLO por workload (trabalho,
+agora com causa nomeada).**
 A §4.1 continua valendo: promover com um critério de saída parcialmente aberto é
 o que o programa recusa em toda outra parte.
 
