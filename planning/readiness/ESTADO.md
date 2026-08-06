@@ -322,7 +322,17 @@ descreve não estão liberados** (§6.2).
 
 ## 7. Como retomar
 
-- **Host de campanha:** `44.212.50.252`, usuário `ubuntu`, chave
+> ⚠️ **2026-08-06: NÃO HÁ HOST DE CAMPANHA.** O parágrafo abaixo descreve
+> hosts mortos. O último (`98.92.141.100`, `i-0dc43a340e9ab0388`) morreu 1h15
+> dentro do Final 2 e não voltou do reboot. **Antes de preparar um host novo,
+> leia a §3.1 e o `HOST-DEATH-preregistration.md`** — relançar sem diagnóstico
+> já custou três máquinas.
+>
+> **O preparo agora é um script:** `ops/soak/prepare-host.sh`, que executa **e
+> confere** cada passo desta receita, inclusive o auto-upgrade que matou o
+> primeiro host.
+
+- **Host de campanha (histórico):** `44.212.50.252`, usuário `ubuntu`, chave
   `~/Downloads/colossus.pem`. c5.2xlarge `i-08c31e483e890fd16`, us-east-1a,
   Ubuntu 24.04.4, kernel `6.17.0-1017-aws`, Xeon 8275CL, 4 núcleos físicos com
   irmãos SMT. **Qualificado em 2026-08-04** — `preflight=pass`, `smoke=pass`,
