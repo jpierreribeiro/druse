@@ -89,6 +89,62 @@ esgotou o próprio volume", que era minha.
 **Consequência prática:** o experimento A/B da §6 volta a ser o caminho decisivo,
 e não há atalho barato antes dele.
 
+### 2.3 H-E — **acrescentada às 15:45Z de 2026-08-08**, depois da quarta morte
+
+**Marcando a hora**, como fiz com H-D: esta nasceu de evidência e não estava no
+congelamento original. O critério (§4.3) está congelado **antes** de qualquer
+teste dela.
+
+**As quatro mortes compartilham um kernel que não é o do sistema.**
+
+| host | kernel | morreu com |
+|---|---|---|
+| 1 — `184.72.201.140` | **`7.0.0-1009-aws`** (derivou sozinho de `-1006`) | sob carga |
+| 2 — `3.208.73.168` | não registrado | sob carga |
+| 3 — `98.92.141.100` | **`6.17.0-1017-aws`** | **1h15** |
+| 4 — `100.58.224.180` | **`6.17.0-1017-aws`** | **~9h30** |
+
+Todos rodam **Ubuntu 24.04 LTS**, cuja série de kernel de suporte longo é a
+**6.8**. Um `6.17` — e mais ainda um `7.0` — é kernel de ponta sobre distro LTS.
+
+> **H-E — o kernel.** A carga da campanha é **pesada em io_uring**, que é o
+> subsistema do kernel que mais muda entre versões. Uma instabilidade em
+> io_uring num kernel de ponta produziria exatamente o que se vê: a máquina para
+> sem imprimir nada (o `NMI watchdog` está desligado), sem panic (não houve
+> reboot, e `panic=-1` reiniciaria), e **sem contador nenhum se mover** — porque
+> não é esgotamento, é travamento.
+
+**O que a torna forte, e é o argumento novo:** ela explica o que as outras quatro
+não explicam — **as durações até a morte são radicalmente diferentes**
+(1h15 contra ~9h30). Um recurso que enche a taxa constante mataria em tempos
+parecidos. **Um defeito de código dispara quando o caminho é executado**, e isso
+é compatível com qualquer duração.
+
+E é consistente com o que os contadores dizem: em 5h15 de Final 2, **nada
+caminhava para um limite** (`mem_available` plana, `SUnreclaim` a 2,07 MiB/h =
+307 dias até esgotar).
+
+**O que a enfraquece:** não confirmei que `6.17.0-1017-aws` é kernel fora do
+suporte padrão do 24.04 — isso é uma checagem de um minuto com máquina em mãos,
+e **deve ser feita antes de tratar H-E como principal**. Se a AMI usada entrega
+6.17 como default, a hipótese perde a premissa.
+
+### 4.3 O critério de H-E, congelado antes de qualquer teste
+
+**H-E é declarada se as duas valerem:**
+
+1. a campanha roda no **kernel padrão da série LTS** (`6.8.x-aws`), com carga,
+   taxa e duração idênticas, e o host **sobrevive a ≥ 2 corridas de 12 h**;
+2. os hosts de kernel de ponta morreram em **≥ 3 de 3** tentativas comparáveis
+   (hoje: 3 de 3 com kernel registrado).
+
+**H-E é refutada** se um host no kernel `6.8` também morrer sob a mesma carga.
+
+**É a hipótese mais barata de testar de todas as cinco**, e a única que se testa
+**sem** um segundo host: basta uma máquina com o kernel da série LTS. Por isso
+ela passa à frente do A/B na ordem de execução — **não** por ser mais provável,
+mas por custar menos para eliminar.
+
 ## 3. Por que o RSS não teria visto H-B
 
 O soak vigia RSS. O RSS do Final 1 ficou em **0,99 KiB/h** e nos deu confiança.
