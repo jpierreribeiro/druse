@@ -56,6 +56,34 @@ for unidade in unattended-upgrades.service apt-daily-upgrade.timer apt-daily.tim
   fi
 done
 
+echo "== 2b. série do kernel (hipótese H-E) =="
+# H-E, acrescentada depois da QUARTA morte de host: os quatro hosts que morreram
+# rodavam kernel de PONTA sobre distro LTS -- 6.17.0-1017-aws em dois deles e
+# 7.0.0-1009-aws no primeiro -- e a carga desta campanha é pesada em io_uring, o
+# subsistema que mais muda entre versões. O Ubuntu 24.04 LTS tem a série 6.8.
+# Isto NÃO recusa: H-E ainda não foi testada, e recusar por hipótese não medida
+# seria o oposto do que este programa faz. Mas o kernel entra no relatório em
+# voz alta, porque foi a única coisa comum às quatro mortes.
+kernel_atual="$(uname -r)"
+kernel_serie="${kernel_atual%%.*}.${kernel_atual#*.}"; kernel_serie="${kernel_serie%%.*}"
+kernel_major_minor="$(echo "$kernel_atual" | cut -d. -f1,2)"
+echo "  kernel: $kernel_atual  (série $kernel_major_minor)"
+case "$kernel_major_minor" in
+  6.8)
+    ok "série 6.8 — a do Ubuntu 24.04 LTS. É o kernel que H-E prevê como sobrevivente." ;;
+  *)
+    echo "  [ATENÇÃO] série $kernel_major_minor NÃO é a 6.8 do 24.04 LTS."
+    echo "            Os QUATRO hosts que morreram rodavam kernel de ponta."
+    echo "            Ver planning/readiness/HOST-DEATH-preregistration.md §2.3."
+    echo "            Para testar H-E, use um host na série 6.8."
+    echo "            Para aceitar assim mesmo: DRUSE_SOAK_ALLOW_EDGE_KERNEL=1"
+    if [[ "${DRUSE_SOAK_ALLOW_EDGE_KERNEL:-0}" != "1" ]]; then
+      falha "kernel de ponta ($kernel_atual) sem DRUSE_SOAK_ALLOW_EDGE_KERNEL=1"
+    else
+      echo "  [ok]   risco de kernel de ponta ACEITO explicitamente — fica no relatório"
+    fi ;;
+esac
+
 echo "== 3. memlock unlimited (io_uring registra memória fixada) =="
 sudo mkdir -p /etc/security/limits.d /etc/systemd/system/user@.service.d
 printf '* soft memlock unlimited\n* hard memlock unlimited\n' \
@@ -109,7 +137,7 @@ echo "  threads online:  $(nproc)"
 echo "  memória: $(free -g 2>/dev/null | awk '/^Mem:/{print $2" GiB"}')"
 echo "  disco livre em \$HOME: $(df -BG --output=avail "$HOME" 2>/dev/null | tail -1 | tr -d ' ')"
 echo "  volume raiz: $(findmnt -no SOURCE / 2>/dev/null)"
-echo "  kernel: $(uname -r)"
+echo "  kernel: $(uname -r)  (série do 24.04 LTS = 6.8)"
 
 echo
 if (( ${#falhas[@]} )); then

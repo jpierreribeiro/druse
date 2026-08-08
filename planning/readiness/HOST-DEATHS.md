@@ -12,12 +12,19 @@ existe porque **três não é coincidência**, e porque a explicação confortá
 |---|---|---|---|---|
 | 1 | 2026-08-04 | `184.72.201.140` | sob carga | `sshd` travado; kernel trocado sozinho por auto-upgrade |
 | 2 | 2026-08-04 | `3.208.73.168` | sob carga | sumiu da rede |
-| 3 | **2026-08-06** | **`98.92.141.100`** (`i-0dc43a340e9ab0388`) | **~03:06–03:14Z**, **1h15 dentro do Final 2** | SSH, ICMP e 8080 sem resposta |
+| 3 | 2026-08-06 | `98.92.141.100` (`i-0dc43a340e9ab0388`) | ~03:06Z, **1h15 dentro do Final 2** | SSH, ICMP e 8080 sem resposta |
+| 4 | **2026-08-08** | **`100.58.224.180`** (`i-0b173808de6a95d1f`) | **~15:13Z, ~9h30 dentro do Final 2 (2ª tentativa)** | idem; observador pegou em **10 min** |
 
 O terceiro tinha o auto-upgrade **desligado** — a causa do primeiro estava
 eliminada por construção.
 
-**Nenhum morreu ocioso. Os três morreram sob carga de campanha.**
+**Nenhum morreu ocioso. Os QUATRO morreram sob carga de campanha.**
+
+**E as durações são radicalmente diferentes — 1h15 contra ~9h30.** Isso é o
+achado mais informativo das quatro mortes juntas: um recurso que enche a taxa
+constante mataria em tempos parecidos. Um **defeito de código** dispara quando o
+caminho é executado, e é compatível com qualquer duração. Ver **H-E** (§2.3 do
+pré-registro): os quatro rodavam **kernel de ponta sobre distro LTS**.
 
 ## 2. O que já foi eliminado por medição
 
