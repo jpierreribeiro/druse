@@ -35,7 +35,8 @@ de virar lista de medos:
 | **L1** | **nunca viu tráfego real** | medido (risco aceito assinado, R2-WP07 §8.1) | **R2 canário, degrau 2** | pôr em produção como canário |
 | **L2** | **falha de handler custa o processo inteiro** | medido (`R3-WP10`: "hoje um fault custa 100% da capacidade e toda conexão em voo") | **R3-WP10** ✅ *já é trilha* | médio-alto |
 | **L3** | **recuperação depois de sobrecarga não medida** | medido (ausência; `safe-operating-region.md` §5) | **R2** (barato) | ~2 h de host |
-| **L4** | **uma classe de máquina, um mix** | medido | **R3, sem WP** ⚠️ | alto |
+| **L4a** | **um mix** (um handler bloqueante a 1–2 req/s) | medido | **R3-WP04** ✅ — o §5 do `sync-async-evaluation.md` já fixa 8 workloads, incluindo espera sintética de 1/10/100/500 ms e Postgres com `pg_sleep` e exaustão de pool | médio |
+| **L4b** | **uma classe de máquina** (só `c5.2xlarge`) | medido | **R3, sem WP** ⚠️ | alto |
 | **L5** | **três hosts mortos sob carga** | medido | **R2, bloqueante** | em investigação |
 | **L6** | **SLO por workload: 15 de 18 células** | medido | **R2** | ~1 h de host |
 | **L7** | **parada de 30 ms no ciclo 225** | medido (`FINDING-cycle-225.md`) | **R2, não bloqueante** | horas |
@@ -125,9 +126,13 @@ O R3 é **cardápio, não programa de fechar lacunas** — seus resultados permi
 incluem *"R2 REMAINS THE PRODUCT"* e *"TRAIL REJECTED"*. Então um item só é
 tratado se virar trilha, e **duas lacunas do R3 não têm trilha**:
 
-1. **Matriz de plataformas (L4)** — outras topologias de CPU, outros mixes, mais
-   I/O bloqueante por requisição. Hoje toda a evidência é `c5.2xlarge` com **um**
-   handler bloqueante a 1–2 req/s.
+1. **Matriz de plataformas (L4b)** — outras topologias de CPU. Hoje toda a
+   evidência é `c5.2xlarge`, 4 núcleos físicos.
+
+   **Corrigido em 2026-08-08:** eu tinha juntado "uma máquina" e "um mix" num
+   item só e declarado os dois sem dono. **O mix tem dono** — o §5 do
+   `sync-async-evaluation.md` especifica oito workloads para o R3-WP04, com
+   espera sintética e exaustão de pool. Só a **matriz de máquinas** está órfã.
 2. **Custo de TLS e comparação com pares (L10)** — a comparação exige, pelo §8 do
    pré-registro do soak, um harness que **prove trabalho equivalente**. Esse
    harness não existe.
