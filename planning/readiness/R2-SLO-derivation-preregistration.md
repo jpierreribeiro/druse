@@ -104,9 +104,33 @@ julgada sem eles.
 - os percentis **agregados** do WP05 (p50 684 µs, p99 1.272 µs a 960/s);
 - os percentis **agregados** do Final 1 (p99 mediano 1.165 µs, máximo 1.563 µs).
 
-**Não vi nenhum percentil por workload** — eles não existem em lugar nenhum hoje,
-porque o §1.2 explica que foram agregados na origem. As 15 células que este
-documento governa são exatamente as que eu não tenho como ter visto.
+~~**Não vi nenhum percentil por workload** — eles não existem em lugar nenhum
+hoje.~~
+
+**CORRIGIDO em 2026-08-08, por auditoria externa. A frase acima era falsa.**
+
+O `verdict.json` do Final 1 carrega `median_p99_us` e `max_p99_us` **para os seis
+workloads** — o `analyze-soak.py` já faz por workload o que o harness do knee não
+faz. Eu afirmei "não existem em lugar nenhum" sobre material que estava no
+artefato que eu mesmo commitei três dias antes.
+
+**O que é verdade, e continua protetivo:**
+
+> Existem **p99 por workload** no `verdict.json` do Final 1, a ~1.118 req/s
+> agregados. Eles **não servem à regra da §3**, que exige o **topo da zona verde
+> (2.500 req/s)** e **três percentis** (p50/p95/p99); o Final 1 dá **um**
+> percentil, num **ponto de operação diferente**. As 15 células seguem
+> inexistentes — mas por não terem sido medidas onde a regra pede, não por não
+> existir percentil nenhum.
+
+**Por que deixo o erro visível em vez de reescrever:** um pré-registro existe
+para ser auditado, e a força dele vem de o leitor poder conferir. Apagar a frase
+faria o documento parecer sempre correto e destruiria justamente a propriedade
+que o torna útil. Um revisor que encontrasse aqueles números depois concluiria
+que o pré-registro estava errado sobre o próprio material — e estaria certo.
+
+**A proteção do G3 sobrevive, mais fraca do que o texto original declarava**, e a
+regra da §3 não muda em nada.
 
 **O que isso significa na prática:** a regra da §3 é auditável. Um revisor pode
 aplicá-la aos números quando eles existirem e chegar às mesmas 15 células. Se
