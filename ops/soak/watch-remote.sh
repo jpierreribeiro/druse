@@ -47,7 +47,7 @@ probe() {
   local out rc
   out=$(timeout 45 ssh -i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -o BatchMode=yes -o ConnectTimeout=20 "ubuntu@$HOST" \
-        'if grep -q FINAL_DONE ~/*.log 2>/dev/null; then echo DONE; else find ~/soak-runs/soak/telemetry -name "stats-*.json" 2>/dev/null | wc -l; fi' 2>/dev/null)
+        'if grep -qE "FINAL[0-9]*_DONE|AB_ARM_[a-z]*_DONE" ~/*.log 2>/dev/null; then echo DONE; else find ~/soak-runs/soak/telemetry -name "stats-*.json" 2>/dev/null | wc -l; fi' 2>/dev/null)
   rc=$?
   # A checagem que faltava: sucesso do ssh E saída não-vazia E numérica-ou-DONE.
   if (( rc != 0 )) || [[ -z "${out//[[:space:]]/}" ]]; then return 1; fi
