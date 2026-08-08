@@ -41,8 +41,14 @@ echo "== 2. auto-upgrade DESLIGADO (foi isto que matou o primeiro host) =="
 sudo systemctl disable --now unattended-upgrades.service apt-daily-upgrade.timer apt-daily.timer \
   >/dev/null 2>&1 || true
 for unidade in unattended-upgrades.service apt-daily-upgrade.timer apt-daily.timer; do
-  estado=$(systemctl is-enabled "$unidade" 2>/dev/null || echo "unknown")
-  ativo=$(systemctl is-active "$unidade" 2>/dev/null || echo "unknown")
+  # head -1 NÃO é cosmético. `systemctl is-enabled` pode imprimir mais de uma
+  # linha, e o `|| echo unknown` acrescenta outra quando o comando falha. Sem
+  # isto, $estado vira "disabled\nunknown" — e a comparação `== "enabled"`
+  # falha para QUALQUER string multilinha, inclusive "enabled\nunknown".
+  # O controle passaria sobre uma unidade LIGADA. Achado na estreia em host
+  # real, 2026-08-06.
+  estado=$( { systemctl is-enabled "$unidade" 2>/dev/null || echo "unknown"; } | head -1 )
+  ativo=$(  { systemctl is-active  "$unidade" 2>/dev/null || echo "unknown"; } | head -1 )
   if [[ "$estado" == "enabled" || "$ativo" == "active" ]]; then
     falha "$unidade continua $estado/$ativo — a campanha NÃO pode rodar assim"
   else
@@ -94,7 +100,12 @@ fi
 
 echo "== 7. topologia e disco, só para registro =="
 echo "  núcleos online: $(nproc)"
-echo "  núcleos físicos: $(lscpu -p=CORE 2>/dev/null | grep -vc '^#' | xargs -I{} echo {} 2>/dev/null || echo '?')"
+# `grep -vc '^#'` conta LINHAS — uma por thread — e devolve 8 num host de 4
+# núcleos com SMT. O default de lanes resolve por núcleo FÍSICO, então esse
+# número errado desmente a configuração que ele deveria explicar. `sort -u`
+# é o conserto.
+echo "  núcleos físicos: $(lscpu -p=CORE 2>/dev/null | grep -v '^#' | sort -u | wc -l)"
+echo "  threads online:  $(nproc)"
 echo "  memória: $(free -g 2>/dev/null | awk '/^Mem:/{print $2" GiB"}')"
 echo "  disco livre em \$HOME: $(df -BG --output=avail "$HOME" 2>/dev/null | tail -1 | tr -d ' ')"
 echo "  volume raiz: $(findmnt -no SOURCE / 2>/dev/null)"
