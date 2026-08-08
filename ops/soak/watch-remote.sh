@@ -26,6 +26,7 @@
 set -u
 
 HOST=""; KEY=""; TIMELINE=""; INTERVAL=60; SELF_TEST=0
+PULL_DIR=""             # se definido, puxa os CSVs de vigia a cada sondagem
 STALL_LIMIT=5          # ciclos parados até gritar
 UNREACH_LIMIT=2        # ciclos sem resposta até declarar morte provável
 
@@ -35,6 +36,7 @@ while (( $# )); do
     --key)      KEY="$2"; shift 2 ;;
     --timeline) TIMELINE="$2"; shift 2 ;;
     --interval) INTERVAL="$2"; shift 2 ;;
+    --pull)     PULL_DIR="$2"; shift 2 ;;
     --self-test) SELF_TEST=1; shift ;;
     *) echo "argumento desconhecido: $1" >&2; exit 2 ;;
   esac
@@ -86,6 +88,21 @@ while :; do
       echo "$(stamp),DONE,,corrida terminou" >>"$TIMELINE"
       echo "$(stamp)  DONE"
       exit 0
+    fi
+    # PUXAR ENQUANTO DÁ. Aprendido matando o quarto host em 2026-08-08: o
+    # kernel-watch grava NO HOST, e o host é justamente o que morre. Eu tinha
+    # 5h15 de contadores porque baixei uma vez à mão; as últimas 4h15 -- as que
+    # levam à morte, as únicas que respondem a condição 2 do §4 -- ficaram na
+    # máquina morta. Um vigia cujo dado morre junto com o sujeito não é vigia.
+    if [[ -n "$PULL_DIR" ]]; then
+      mkdir -p "$PULL_DIR"
+      timeout 120 scp -q -i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o BatchMode=yes -o ConnectTimeout=20 \
+        "ubuntu@$HOST:~/soak-runs/soak/kernel-watch.csv" "$PULL_DIR/kernel-watch.csv" 2>/dev/null \
+        && echo "$(stamp),PULL,$(( $(wc -l < "$PULL_DIR/kernel-watch.csv" 2>/dev/null || echo 1) - 1 )),kernel-watch" >>"$TIMELINE"
+      timeout 60 scp -q -i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o BatchMode=yes -o ConnectTimeout=20 \
+        "ubuntu@$HOST:~/soak-runs/soak/cycles.csv" "$PULL_DIR/cycles.csv" 2>/dev/null || true
     fi
     if (( value > last )); then
       stalled=0
