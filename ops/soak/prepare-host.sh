@@ -90,20 +90,25 @@ echo "== 2c. detector de travamento armado? (§2.4) =="
 # watchdog não dá para ligar aqui (sem PMU). O detector de tarefa travada é por
 # software, funciona sem PMU, e hoje só AVISA -- em pânico, ele imprime stack
 # trace no console serial antes de reiniciar.
-cmdline="$(cat /proc/cmdline 2>/dev/null || echo '')"
+# Conferir o VALOR EFETIVO em /proc/sys, não o /proc/cmdline. A AMI fixa
+# panic=-1 no cmdline e um sysctl posterior sobrescreve; ler o cmdline reporta
+# "não armado" para um host armado. Achado em 2026-08-08, no host 5: mesma
+# classe dos outros — conferir a fonte errada com confiança.
 armado=1
-for flag in hung_task_panic=1 softlockup_panic=1; do
-  if [[ "$cmdline" == *"$flag"* ]]; then ok "$flag presente"; else
-    echo "  [ATENÇÃO] $flag AUSENTE — uma morte por travamento será MUDA"; armado=0; fi
-done
-if [[ "$cmdline" == *"panic=-1"* ]]; then
-  echo "  [ATENÇÃO] panic=-1 reinicia IMEDIATAMENTE — o texto do pânico mal sai pelo serial."
-  echo "            Prefira panic=30 para dar tempo de capturar."
+leia() { cat "/proc/sys/kernel/$1" 2>/dev/null || echo "?"; }
+p_panic=$(leia panic); p_hung=$(leia hung_task_panic); p_soft=$(leia softlockup_panic)
+[[ "$p_hung" == "1" ]] && ok "hung_task_panic = 1" || { echo "  [ATENÇÃO] hung_task_panic = $p_hung — travamento será MUDO"; armado=0; }
+[[ "$p_soft" == "1" ]] && ok "softlockup_panic = 1" || { echo "  [ATENÇÃO] softlockup_panic = $p_soft"; armado=0; }
+if [[ "$p_panic" =~ ^[0-9]+$ ]] && (( p_panic > 0 )); then
+  ok "kernel.panic = ${p_panic}s — há janela para o serial capturar"
+else
+  echo "  [ATENÇÃO] kernel.panic = $p_panic — com -1 ou 0 o texto do pânico mal sai pelo serial."
   armado=0
 fi
 if (( armado )); then ok "detector de travamento armado"; else
-  echo "  Para armar (GRUB_CMDLINE_LINUX em /etc/default/grub, depois update-grub e reboot):"
-  echo "    hung_task_panic=1 softlockup_panic=1 panic=30"
+  echo "  Para armar SEM reboot (sysctl ganha do cmdline da AMI):"
+  echo "    printf 'kernel.panic=30\\nkernel.hung_task_panic=1\\nkernel.softlockup_panic=1\\n' \\"
+  echo "      | sudo tee /etc/sysctl.d/99-druse-hang-detector.conf && sudo sysctl --system"
   echo "  NÃO recuso por isto: é instrumentação, não requisito de validade."
 fi
 
