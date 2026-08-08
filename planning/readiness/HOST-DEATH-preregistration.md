@@ -145,6 +145,59 @@ e **deve ser feita antes de tratar H-E como principal**. Se a AMI usada entrega
 ela passa à frente do A/B na ordem de execução — **não** por ser mais provável,
 mas por custar menos para eliminar.
 
+### 2.4 O console do 4º host — e o que fazer para o 5º não ser mudo
+
+**2026-08-08.** O console do host 4 chegou e **também não contém a morte**: é o
+boot de `05:33:54Z` e termina no prompt de login. **Dois de dois com console
+capturado, ambos vazios.**
+
+Isso deixou de ser ausência de dado e virou **observação repetida**, e ela
+descarta bastante coisa:
+
+| causa | imprimiria? | vimos? |
+|---|---|---|
+| kernel panic | **sim**, e com `panic=-1` reiniciaria | não — e não houve reboot |
+| OOM killer | **sim** | não |
+| reset do driver ENA | **sim** | não |
+| soft lockup / hung task | **sim** | não |
+| **hard lockup** | **não** — `NMI watchdog permanently disabled` | compatível |
+| parada externa (hipervisor) | não | compatível |
+| estol de I/O com `io_timeout` infinito | não | compatível |
+
+**E o NMI watchdog não dá para ligar nestes hosts:** o log diz
+`Performance Events: unsupported CPU family 6 model 85 no PMU driver, software
+events only`. Sem PMU, não há watchdog por NMI.
+
+#### A mudança que torna a 5ª morte diagnosticável
+
+**O detector de tarefa travada é por software e funciona sem PMU.** Hoje ele
+apenas *avisa*; se ele **entrar em pânico**, o pânico **imprime no console serial
+antes de reiniciar** — e o silêncio vira diagnóstico.
+
+Proposto para o próximo host, na linha de comando do kernel:
+
+```
+hung_task_panic=1  softlockup_panic=1  panic=30
+```
+
+- `hung_task_panic=1` — tarefa em D-state além de `hung_task_timeout_secs`
+  (120 s por padrão) vira pânico **com o stack trace da tarefa travada**;
+- `softlockup_panic=1` — CPU presa em kernel sem ceder vira pânico;
+- `panic=30` em vez de `-1` — dá **trinta segundos** para o texto sair pelo
+  console serial antes do reboot. Com `-1` o reboot é imediato e a janela de
+  captura é mínima.
+
+**Isto não é hipótese, é instrumentação.** Não decide entre H-A, H-B, H-C ou
+H-E — mas transforma a próxima morte de "silêncio" em "stack trace", e é o que
+faltou nas quatro.
+
+**Custo:** uma linha no GRUB e um reboot, antes de qualquer carga.
+
+**Risco declarado:** se a morte for causa externa, nada mudará — o pânico só
+dispara para travamento dentro do kernel. Um quinto silêncio, **com o detector
+armado**, passa a ser evidência a favor de causa externa em vez de ausência de
+dado.
+
 ## 3. Por que o RSS não teria visto H-B
 
 O soak vigia RSS. O RSS do Final 1 ficou em **0,99 KiB/h** e nos deu confiança.

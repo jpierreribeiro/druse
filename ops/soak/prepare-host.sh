@@ -84,6 +84,29 @@ case "$kernel_major_minor" in
     fi ;;
 esac
 
+echo "== 2c. detector de travamento armado? (§2.4) =="
+# Quatro hosts morreram e DOIS consoles capturados vieram VAZIOS. Panic, OOM,
+# reset de driver e soft lockup TODOS imprimiriam; nenhum imprimiu. O NMI
+# watchdog não dá para ligar aqui (sem PMU). O detector de tarefa travada é por
+# software, funciona sem PMU, e hoje só AVISA -- em pânico, ele imprime stack
+# trace no console serial antes de reiniciar.
+cmdline="$(cat /proc/cmdline 2>/dev/null || echo '')"
+armado=1
+for flag in hung_task_panic=1 softlockup_panic=1; do
+  if [[ "$cmdline" == *"$flag"* ]]; then ok "$flag presente"; else
+    echo "  [ATENÇÃO] $flag AUSENTE — uma morte por travamento será MUDA"; armado=0; fi
+done
+if [[ "$cmdline" == *"panic=-1"* ]]; then
+  echo "  [ATENÇÃO] panic=-1 reinicia IMEDIATAMENTE — o texto do pânico mal sai pelo serial."
+  echo "            Prefira panic=30 para dar tempo de capturar."
+  armado=0
+fi
+if (( armado )); then ok "detector de travamento armado"; else
+  echo "  Para armar (GRUB_CMDLINE_LINUX em /etc/default/grub, depois update-grub e reboot):"
+  echo "    hung_task_panic=1 softlockup_panic=1 panic=30"
+  echo "  NÃO recuso por isto: é instrumentação, não requisito de validade."
+fi
+
 echo "== 3. memlock unlimited (io_uring registra memória fixada) =="
 sudo mkdir -p /etc/security/limits.d /etc/systemd/system/user@.service.d
 printf '* soft memlock unlimited\n* hard memlock unlimited\n' \
