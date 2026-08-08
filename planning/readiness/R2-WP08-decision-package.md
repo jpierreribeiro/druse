@@ -159,6 +159,24 @@ agora com causa nomeada).**
 A §4.1 continua valendo: promover com um critério de saída parcialmente aberto é
 o que o programa recusa em toda outra parte.
 
+## 5.2 O registro de lacunas — anexo obrigatório desta decisão
+
+`REGISTRO-DE-LACUNAS.md` lista **tudo** que fica em aberto: as 10 limitações do
+envelope, 11 defeitos de produto da auditoria de 2026-08-08, e 5 achados sem
+causa. Cada um com **verificação, portão e custo**.
+
+**Ele existe porque sete das dez limitações não estavam em plano nenhum** — nem
+critério de saída do R2, nem trilha do R3. E o R3 é **cardápio, não programa de
+fechar lacunas**: seus resultados permitidos incluem *"R2 REMAINS THE PRODUCT"* e
+*"TRAIL REJECTED"*.
+
+**A §4 desta decisão passa a ter uma pergunta a mais:** promover com **quantos**
+destes em aberto, e quais viram risco aceito **por escrito, com validade**?
+
+Quatro deles são baratos e deveriam fechar antes: **L3** (recuperação, ~2 h de
+host), **L6** (SLO por workload, ~1 h), **P1** (`upload_max_conc` entrega 1/3 do
+contrato publicado) e **P3** (app envenenado sai 0 **sem imprimir nada**).
+
 ## 6. O que este pacote deliberadamente não faz
 
 - **Não antecipa o veredito.** A §4 está em branco de propósito.
