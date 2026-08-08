@@ -64,11 +64,22 @@ candidato. **O gargalo passou a ser uma decisão de produto sobre
 
 ## 3.1 O bloqueio de hoje: três hosts mortos sob carga
 
-**2026-08-06.** O terceiro host de campanha morreu **1h15 dentro do Final 2**,
-às ~03:06Z, com 4.490 das 43.235 amostras. SSH, ICMP e 8080 sem resposta.
+**2026-08-08: QUATRO hosts.** O quarto morreu **~9h30 dentro do Final 2**
+(segunda tentativa), às ~15:13Z, com 34.037 das 43.235 amostras. O observador
+remoto o pegou em **10 minutos** — contra as nove horas da vez anterior.
 
-**Três hosts, todos sob carga, nenhum ocioso.** O primeiro tinha auto-upgrade
-ligado — causa eliminada por construção nos outros dois.
+**Quatro hosts, todos sob carga, nenhum ocioso.**
+
+**O achado das quatro juntas: as durações são radicalmente diferentes — 1h15
+contra ~9h30.** Um recurso que enche a taxa constante mataria em tempos
+parecidos. Um defeito de código dispara quando o caminho roda. Daí a **H-E**: os
+quatro rodavam **kernel de ponta sobre distro LTS** (`6.17`/`7.0` contra a série
+`6.8` do 24.04), e a carga é pesada em io_uring — o subsistema do kernel que mais
+muda entre versões.
+
+**H-E é a mais barata das cinco de testar**, e a única que não precisa de um
+segundo host: basta uma máquina na série 6.8. `prepare-host.sh` agora recusa
+kernel de ponta sem aceite explícito.
 
 **Isto deixou de ser achado de instrumento.** Enquanto era "perdemos corridas", o
 custo era tempo. A hipótese que agora precisa de teste é que **o candidato
